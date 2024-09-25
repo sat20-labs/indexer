@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package pb.common;
+
+option go_package = "/common/pb";
+message MyRange {
+    int64 start = 1;
+    int64 size = 2;
+}
+
+message MyUtxoValueInDB {
+    uint64 utxo_id = 1;
+    uint32 address_type = 2;
+    repeated uint64 address_ids = 3;
+    repeated MyRange ordinals = 4;
+}

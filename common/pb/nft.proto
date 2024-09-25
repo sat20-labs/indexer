@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package pb.common;
+
+option go_package = "/common/pb";
+
+message InscribeBaseContent {
+    string inscription_id = 1;
+    uint64 inscription_address = 2;
+    int32 block_height = 3;
+    int64 block_time = 4;
+    bytes content_type = 5;
+    bytes content = 6;
+    bytes meta_protocol = 7;
+    bytes meta_data = 8;
+    bytes content_encoding = 9;
+    string parent = 10;
+    string delegate = 11;
+    int64 id = 12;
+    int64 sat = 13;
+    string typeName = 14;
+    bytes user_data = 15;
+}
+
+message NftsInSat {
+    int64 sat = 1;
+    uint64 owner_address_id = 2;
+    uint64 utxo_id = 3;
+    repeated InscribeBaseContent nfts = 4;
+}

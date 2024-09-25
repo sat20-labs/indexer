@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package pb.indexer.ns;
+
+option go_package = "/indexer/ns/pb";
+
+message NameValueInDB {
+    int64  nftId = 1;
+    int64  Id = 2;
+    int64  sat = 3;
+    string name = 4;
+}

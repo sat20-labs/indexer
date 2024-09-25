@@ -1,0 +1,13 @@
+# common
+.DS_Store
+# .vscode
+*debug_bin*
+db/*
+log/*
+# for conf
+*.env
+.env
+!example.env
+!example.yaml
+# build execute file
+indexer-*

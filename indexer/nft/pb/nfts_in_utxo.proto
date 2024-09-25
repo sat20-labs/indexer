@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package pb.indexer.nft;
+
+option go_package = "/indexer/nft/pb";
+
+message NftsInUtxo {
+    repeated int64 sats = 1;
+}
+
