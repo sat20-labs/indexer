@@ -1,7 +1,7 @@
 package nft
 
 import (
-	"github.com/sat20-labs/ordx/indexer/nft/pb"
+	"github.com/sat20-labs/indexer/indexer/nft/pb"
 )
 
 const NFT_DB_VERSION = "1.0.0"

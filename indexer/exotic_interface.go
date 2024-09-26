@@ -3,7 +3,7 @@ package indexer
 import (
 	"fmt"
 
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 func (b *IndexerMgr) GetExoticsWithRanges(ranges []*common.Range) []*common.ExoticRange {

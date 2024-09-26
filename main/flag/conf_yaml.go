@@ -7,8 +7,8 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/sat20-labs/ordx/main/conf"
-	serverCommon "github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/main/conf"
+	serverCommon "github.com/sat20-labs/indexer/server/define"
 	"github.com/sirupsen/logrus"
 )
 

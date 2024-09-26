@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/exotic"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/exotic"
 )
 
 // memory util

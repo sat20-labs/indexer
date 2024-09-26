@@ -1,7 +1,7 @@
 package define
 
 import (
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 type TickerStatus struct {

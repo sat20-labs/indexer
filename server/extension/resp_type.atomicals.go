@@ -1,6 +1,6 @@
 package extension
 
-// import "github.com/sat20-labs/ordx/server/define"
+// import "github.com/sat20-labs/indexer/server/define"
 
 // /atomicals/nft
 // type AtomicalsNftInscriptionList struct {

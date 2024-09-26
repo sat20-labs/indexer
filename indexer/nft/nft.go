@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/base"
-	indexer "github.com/sat20-labs/ordx/indexer/common"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/base"
+	indexer "github.com/sat20-labs/indexer/indexer/common"
 )
 
 type SatInfo struct {

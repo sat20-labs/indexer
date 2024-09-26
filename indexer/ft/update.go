@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 // 每个deploy都调用

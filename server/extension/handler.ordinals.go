@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	serverCommon "github.com/sat20-labs/ordx/server/define"
-	"github.com/sat20-labs/ordx/share/base_indexer"
+	serverCommon "github.com/sat20-labs/indexer/server/define"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 func (s *Service) ordinals_inscriptionList(c *gin.Context) {

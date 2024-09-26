@@ -1,9 +1,9 @@
 package define
 
 import (
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/share/base_indexer"
-	"github.com/sat20-labs/ordx/share/bitcoin_rpc"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/share/base_indexer"
+	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"gopkg.in/yaml.v2"
 )
 

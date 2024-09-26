@@ -5,7 +5,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 // 不要panic，可能会影响写数据库

@@ -1,6 +1,6 @@
 package extension
 
-// import "github.com/sat20-labs/ordx/server/define"
+// import "github.com/sat20-labs/indexer/server/define"
 
 // // /arc20/balance-list
 // type Arc20Balance struct {

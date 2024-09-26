@@ -1,7 +1,7 @@
 package extension
 
 import (
-	baseDefine "github.com/sat20-labs/ordx/server/define"
+	baseDefine "github.com/sat20-labs/indexer/server/define"
 )
 
 type RareSatListData struct {

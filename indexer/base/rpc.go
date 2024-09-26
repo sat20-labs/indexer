@@ -3,8 +3,8 @@ package base
 import (
 	"time"
 
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/share/bitcoin_rpc"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
 // 带了延时，仅用于跑数据

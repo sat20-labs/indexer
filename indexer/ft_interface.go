@@ -3,7 +3,7 @@ package indexer
 import (
 	"strings"
 
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 // 检查一个tick中的哪些nft已经被分拆

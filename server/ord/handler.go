@@ -7,7 +7,7 @@ import (
 	"text/template"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 //go:embed templates/*

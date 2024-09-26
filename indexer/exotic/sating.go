@@ -1,6 +1,6 @@
 package exotic
 
-import "github.com/sat20-labs/ordx/common"
+import "github.com/sat20-labs/indexer/common"
 
 // satingRange is a range of sats as defined by sating.io
 type satingRange struct {

@@ -3,8 +3,8 @@ package indexer
 import (
 	"strings"
 
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/ns"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/ns"
 )
 
 func (b *IndexerMgr) GetNSStatus() *common.NameServiceStatus {

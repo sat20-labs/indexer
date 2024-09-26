@@ -1,8 +1,8 @@
 package ns
 
 import (
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/ns/pb"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/ns/pb"
 )
 
 const NS_DB_VERSION = "1.0.1"

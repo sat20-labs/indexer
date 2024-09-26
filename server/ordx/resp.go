@@ -1,9 +1,9 @@
 package ordx
 
 import (
-	"github.com/sat20-labs/ordx/common"
-	ordx "github.com/sat20-labs/ordx/common"
-	serverOrdx "github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/common"
+	ordx "github.com/sat20-labs/indexer/common"
+	serverOrdx "github.com/sat20-labs/indexer/server/define"
 )
 
 type BestHeightResp struct {
@@ -184,9 +184,9 @@ type NameCheckResp struct {
 }
 
 type AddCollectionReq struct {
-	Type    string    `json:"type"`
-	Ticker  string    `json:"ticker"`
-	Data []*serverOrdx.InscriptionId `json:"data"`
+	Type   string                      `json:"type"`
+	Ticker string                      `json:"ticker"`
+	Data   []*serverOrdx.InscriptionId `json:"data"`
 }
 
 type AddCollectionResp struct {
@@ -203,8 +203,6 @@ type NftStatusData struct {
 	Start   uint64                `json:"start"`
 	Nfts    []*serverOrdx.NftItem `json:"nfts"`
 }
-
-
 
 type NftStatusResp struct {
 	serverOrdx.BaseResp

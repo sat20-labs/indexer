@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	ordxCommon "github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/exotic"
-	"github.com/sat20-labs/ordx/server/define"
+	ordxCommon "github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/exotic"
+	"github.com/sat20-labs/indexer/server/define"
 
 	"github.com/gin-gonic/gin"
 )

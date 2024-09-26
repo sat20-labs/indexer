@@ -7,7 +7,7 @@ import (
 	"unicode"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 func genContentHeader(c *gin.Context, nft *common.Nft) (string, error) {

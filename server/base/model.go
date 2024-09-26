@@ -3,10 +3,10 @@ package base
 import (
 	"sort"
 
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/exotic"
-	"github.com/sat20-labs/ordx/server/define"
-	"github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/exotic"
+	"github.com/sat20-labs/indexer/server/define"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 type Model struct {

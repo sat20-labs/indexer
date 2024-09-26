@@ -5,9 +5,9 @@ import (
 	"sort"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/common"
-	baseDefine "github.com/sat20-labs/ordx/server/define"
-	indexer "github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/common"
+	baseDefine "github.com/sat20-labs/indexer/server/define"
+	indexer "github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 // func (s *Service) token_list(c *gin.Context) {

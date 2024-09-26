@@ -1,7 +1,7 @@
 package extension
 
 // import (
-// 	serverCommon "github.com/sat20-labs/ordx/server/define"
+// 	serverCommon "github.com/sat20-labs/indexer/server/define"
 // )
 
 // // /brc20/list

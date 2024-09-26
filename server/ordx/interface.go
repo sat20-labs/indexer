@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/ordx/common"
-	serverOrdx "github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/common"
+	serverOrdx "github.com/sat20-labs/indexer/server/define"
 )
 
 func (s *Model) GetSyncHeight() int {
@@ -206,7 +206,6 @@ func (s *Model) GetBalanceSummaryList(address string, start int, limit int) ([]*
 	return result, nil
 }
 
-
 func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*serverOrdx.UtxoAbbrAssets, error) {
 	result := make([]*serverOrdx.UtxoAbbrAssets, 0)
 	for _, utxo := range req.Utxos {
@@ -215,12 +214,12 @@ func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*serverOrdx.UtxoAbbrAssets,
 
 		utxoAssets := serverOrdx.UtxoAbbrAssets{Utxo: utxo}
 		for ticker, mintinfo := range assets {
-	
+
 			amount := int64(0)
 			for _, rng := range mintinfo {
 				amount += common.GetOrdinalsSize(rng)
 			}
-	
+
 			utxoAssets.Assets = append(utxoAssets.Assets, &serverOrdx.AssetAbbrInfo{
 				TypeName: ticker.Name,
 				Ticker:   ticker.Name,
@@ -541,7 +540,6 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*serverOrdx.AssetDetailInfo
 	return &result, nil
 }
 
-
 func (s *Model) GetAssetOffsetWithUtxo(utxo string) ([]*common.AssetOffsetRange, error) {
 	return s.indexer.GetAssetOffsetWithUtxo(utxo), nil
 }
@@ -690,7 +688,7 @@ func (s *Model) GetNameValues(name, prefix string, start, limit int) (*serverOrd
 	filter := make([]*FilterResult, 0)
 	for k, v := range info.KVs {
 		if strings.HasPrefix(k, prefix) {
-			filter = append(filter, &FilterResult{Key:k, Value: v})
+			filter = append(filter, &FilterResult{Key: k, Value: v})
 		}
 	}
 
@@ -719,21 +717,22 @@ func (s *Model) GetNameValues(name, prefix string, start, limit int) (*serverOrd
 	return &ret, nil
 }
 
-
 func (s *Model) GetNameRouting(name string) (*serverOrdx.NameRouting, error) {
 	info := s.indexer.GetNameInfo(name)
 	if info == nil {
 		return nil, fmt.Errorf("can't find name %s", name)
 	}
 
-	ret := serverOrdx.NameRouting{Holder: info.OwnerAddress, InscriptionId: info.Base.InscriptionId, P:"btcname", Op: "routing", Name: info.Name}
+	ret := serverOrdx.NameRouting{Holder: info.OwnerAddress, InscriptionId: info.Base.InscriptionId, P: "btcname", Op: "routing", Name: info.Name}
 	for k, v := range info.KVs {
 		switch k {
-		case "ord_handle": ret.Handle = v.Value
-		case "ord_index": ret.Index = v.Value
+		case "ord_handle":
+			ret.Handle = v.Value
+		case "ord_index":
+			ret.Index = v.Value
 		}
 	}
-	
+
 	return &ret, nil
 }
 
@@ -749,7 +748,7 @@ func (s *Model) GetNamesWithAddress(address, sub string, start, limit int) (*Nam
 		}
 		names, total = s.indexer.GetSubNamesWithAddress(address, sub, start, limit)
 	}
-	
+
 	for _, info := range names {
 		data := serverOrdx.OrdinalsName{NftItem: *s.nameToItem(info)}
 		// 暂时不要传回kv
@@ -764,17 +763,16 @@ func (s *Model) GetNamesWithAddress(address, sub string, start, limit int) (*Nam
 	return &ret, nil
 }
 
-
 func (s *Model) GetNamesWithFilters(address, sub, filters string, start, limit int) (*NamesWithAddressData, error) {
 	ret := NamesWithAddressData{Address: address}
 	var names []*common.NameInfo
 	var total int
-	
+
 	if sub == "PureName" {
 		sub = ""
 	}
 	names, total = s.indexer.GetSubNamesWithFilters(address, sub, filters, start, limit)
-	
+
 	for _, info := range names {
 		data := serverOrdx.OrdinalsName{NftItem: *s.nameToItem(info)}
 		// 暂时不要传回kv
@@ -843,9 +841,7 @@ func (s *Model) GetNameCheckResult(req *NameCheckReq) ([]*serverOrdx.NameCheckRe
 	return result, nil
 }
 
-
-
-func (s *Model) AddCollection(req *AddCollectionReq) (error) {
+func (s *Model) AddCollection(req *AddCollectionReq) error {
 	if strings.Contains(req.Ticker, "-") {
 		return fmt.Errorf("ticker name contains symbol -")
 	}

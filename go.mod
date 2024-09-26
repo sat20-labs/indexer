@@ -1,4 +1,4 @@
-module github.com/sat20-labs/ordx
+module github.com/sat20-labs/indexer
 
 go 1.22.1
 

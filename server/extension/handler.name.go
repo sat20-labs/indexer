@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 
 	"github.com/gin-gonic/gin"
-	serverDefine "github.com/sat20-labs/ordx/server/define"
-	indexer "github.com/sat20-labs/ordx/share/base_indexer"
+	serverDefine "github.com/sat20-labs/indexer/server/define"
+	indexer "github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 func (s *Service) name_list(c *gin.Context) {

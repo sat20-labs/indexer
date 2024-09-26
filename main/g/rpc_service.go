@@ -1,11 +1,11 @@
 package g
 
 import (
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer"
-	mainCommon "github.com/sat20-labs/ordx/main/common"
-	"github.com/sat20-labs/ordx/server"
-	serverCommon "github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer"
+	mainCommon "github.com/sat20-labs/indexer/main/common"
+	"github.com/sat20-labs/indexer/server"
+	serverCommon "github.com/sat20-labs/indexer/server/define"
 )
 
 func InitRpcService(indexerMgr *indexer.IndexerMgr) (*server.Rpc, error) {

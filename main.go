@@ -4,12 +4,12 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer"
-	mainCommon "github.com/sat20-labs/ordx/main/common"
-	"github.com/sat20-labs/ordx/main/flag"
-	"github.com/sat20-labs/ordx/main/g"
-	"github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer"
+	mainCommon "github.com/sat20-labs/indexer/main/common"
+	"github.com/sat20-labs/indexer/main/flag"
+	"github.com/sat20-labs/indexer/main/g"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 type Config struct {

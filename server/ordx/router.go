@@ -1,8 +1,8 @@
 package ordx
 
 import (
-	"github.com/sat20-labs/ordx/share/base_indexer"
 	"github.com/gin-gonic/gin"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 type Service struct {

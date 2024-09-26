@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/OLProtocol/go-bitcoind"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 var ShareBitconRpc *bitcoind.Bitcoind

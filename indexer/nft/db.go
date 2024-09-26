@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/dgraph-io/badger/v4"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 func initStatusFromDB(db *badger.DB) *common.NftStatus {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/server/define"
 )
 
 func (s *Service) version_detail(c *gin.Context) {

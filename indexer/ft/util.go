@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/ordx/common"
-	indexer "github.com/sat20-labs/ordx/indexer/common"
+	"github.com/sat20-labs/indexer/common"
+	indexer "github.com/sat20-labs/indexer/indexer/common"
 )
 
 func parseTickListKey(input string) (string, error) {

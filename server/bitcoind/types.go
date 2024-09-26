@@ -2,7 +2,7 @@ package bitcoind
 
 import (
 	// gobitcoind "github.com/OLProtocol/go-bitcoind"
-	"github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/server/define"
 )
 
 type SendRawTxReq struct {

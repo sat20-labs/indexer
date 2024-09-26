@@ -9,9 +9,9 @@ import (
 	"github.com/didip/tollbooth/v7"
 	"github.com/didip/tollbooth/v7/limiter"
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/docs"
-	serverCommon "github.com/sat20-labs/ordx/server/define"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/docs"
+	serverCommon "github.com/sat20-labs/indexer/server/define"
 	"gopkg.in/yaml.v2"
 )
 

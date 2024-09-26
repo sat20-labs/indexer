@@ -5,7 +5,7 @@ import (
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/sat20-labs/ordx/common/pb"
+	"github.com/sat20-labs/indexer/common/pb"
 )
 
 type Range = pb.MyRange

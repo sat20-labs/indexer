@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/nft"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/nft"
 )
 
 // 名字注册到几百万几千万后，这个模块的加载速度查找速度

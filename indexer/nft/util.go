@@ -3,7 +3,7 @@ package nft
 import (
 	"sort"
 
-	indexer "github.com/sat20-labs/ordx/indexer/common"
+	indexer "github.com/sat20-labs/indexer/indexer/common"
 )
 
 func BindIdstoSat(p *indexer.SatRBTree, sat int64, ids []int64) error {

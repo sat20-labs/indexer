@@ -3,7 +3,7 @@ package common
 import (
 	"math"
 
-	"github.com/sat20-labs/ordx/common/pb"
+	"github.com/sat20-labs/indexer/common/pb"
 )
 
 const (

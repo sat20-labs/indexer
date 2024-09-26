@@ -13,10 +13,10 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/emirpasic/gods/utils"
-	"github.com/sat20-labs/ordx/common"
-	"github.com/sat20-labs/ordx/indexer/exotic"
-	"github.com/sat20-labs/ordx/indexer/nft"
-	"github.com/sat20-labs/ordx/indexer/ns"
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/exotic"
+	"github.com/sat20-labs/indexer/indexer/nft"
+	"github.com/sat20-labs/indexer/indexer/ns"
 )
 
 type Inscription struct {

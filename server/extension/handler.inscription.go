@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/common"
-	serverCommon "github.com/sat20-labs/ordx/server/define"
-	"github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/common"
+	serverCommon "github.com/sat20-labs/indexer/server/define"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 func (s *Service) inscription_utxo(c *gin.Context) {

@@ -5,9 +5,9 @@ import (
 	"sort"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/indexer/exotic"
-	baseDefine "github.com/sat20-labs/ordx/server/define"
-	indexer "github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/indexer/exotic"
+	baseDefine "github.com/sat20-labs/indexer/server/define"
+	indexer "github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 func (s *Service) raresat_list(c *gin.Context) {

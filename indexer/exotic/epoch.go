@@ -1,6 +1,6 @@
 package exotic
 
-import "github.com/sat20-labs/ordx/common"
+import "github.com/sat20-labs/indexer/common"
 
 const MAX_EPOCH = 34
 

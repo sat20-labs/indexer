@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/sat20-labs/ordx/common"
-	mainCommon "github.com/sat20-labs/ordx/main/common"
-	"github.com/sat20-labs/ordx/share/base_indexer"
-	"github.com/sat20-labs/ordx/share/bitcoin_rpc"
+	"github.com/sat20-labs/indexer/common"
+	mainCommon "github.com/sat20-labs/indexer/main/common"
+	"github.com/sat20-labs/indexer/share/base_indexer"
+	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
 func getOrdContentUrl(inscriptionId string) (string, string) {

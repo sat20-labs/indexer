@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	badger "github.com/dgraph-io/badger/v4"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 func dbLogGC(dbDir string, discardRatio float64) error {

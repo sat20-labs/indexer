@@ -9,7 +9,7 @@ import (
 
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/sat20-labs/ordx/common/pb"
+	"github.com/sat20-labs/indexer/common/pb"
 	"google.golang.org/protobuf/proto"
 )
 

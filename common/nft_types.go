@@ -1,7 +1,7 @@
 package common
 
 import (
-	"github.com/sat20-labs/ordx/common/pb"
+	"github.com/sat20-labs/indexer/common/pb"
 )
 
 type InscribeBaseContent = pb.InscribeBaseContent

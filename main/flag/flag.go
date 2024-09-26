@@ -4,9 +4,9 @@ import (
 	"flag"
 	"os"
 
-	"github.com/sat20-labs/ordx/common"
-	mainCommon "github.com/sat20-labs/ordx/main/common"
-	"github.com/sat20-labs/ordx/main/g"
+	"github.com/sat20-labs/indexer/common"
+	mainCommon "github.com/sat20-labs/indexer/main/common"
+	"github.com/sat20-labs/indexer/main/g"
 )
 
 func ParseCmdParams() {

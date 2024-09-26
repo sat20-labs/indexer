@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/common"
-	serverCommon "github.com/sat20-labs/ordx/server/define"
-	"github.com/sat20-labs/ordx/share/base_indexer"
+	"github.com/sat20-labs/indexer/common"
+	serverCommon "github.com/sat20-labs/indexer/server/define"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 func getAssetSummary(address string) (*AssetSummary, error) {

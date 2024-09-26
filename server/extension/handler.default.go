@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sat20-labs/ordx/server/define"
-	"github.com/sat20-labs/ordx/share/bitcoin_rpc"
+	"github.com/sat20-labs/indexer/server/define"
+	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
 func (s *Service) walletConfig(c *gin.Context) {

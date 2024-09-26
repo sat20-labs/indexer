@@ -3,7 +3,7 @@ package extension
 // import (
 // 	"net/http"
 
-// 	"github.com/sat20-labs/ordx/server/define"
+// 	"github.com/sat20-labs/indexer/server/define"
 // 	"github.com/gin-gonic/gin"
 // )
 

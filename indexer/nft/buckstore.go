@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/dgraph-io/badger/v4"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 const key_last = DB_PREFIX_BUCK + "lk"

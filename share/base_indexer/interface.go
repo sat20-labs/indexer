@@ -2,7 +2,7 @@ package base_indexer
 
 import (
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/sat20-labs/ordx/common"
+	"github.com/sat20-labs/indexer/common"
 )
 
 type Indexer interface {

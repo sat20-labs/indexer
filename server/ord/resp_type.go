@@ -1,8 +1,8 @@
 package ord
 
 // import (
-// 	"github.com/sat20-labs/ordx/server/define"
-// 	"github.com/sat20-labs/ordx/share/ord_rpc"
+// 	"github.com/sat20-labs/indexer/server/define"
+// 	"github.com/sat20-labs/indexer/share/ord_rpc"
 // )
 
 // type InscriptionContentResp struct {
