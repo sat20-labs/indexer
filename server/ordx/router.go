@@ -37,6 +37,7 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// utxo
 	// 获取某个UTXO上所有的资产信息
 	r.GET(proxy+"/utxo/assets/:utxo", s.handle.getAssetDetailInfo)
+	r.GET(proxy+"/utxo/assetoffset/:utxo", s.handle.getAssetOffset)
 	//查询utxo上的资产和数量
 	r.GET(proxy+"/utxo/abbrassets/:utxo", s.handle.getAbbrAssetsWithUtxo)
 	//获取utxo上的资产类型和对应的seed，seed由聪的属性（资产类型，数量，序号）决定

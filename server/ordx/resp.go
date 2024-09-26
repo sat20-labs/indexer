@@ -1,6 +1,7 @@
 package ordx
 
 import (
+	"github.com/sat20-labs/ordx/common"
 	ordx "github.com/sat20-labs/ordx/common"
 	serverOrdx "github.com/sat20-labs/ordx/server/define"
 )
@@ -129,6 +130,16 @@ type AssetsResp struct {
 type AssetListResp struct {
 	serverOrdx.BaseResp
 	Data []*serverOrdx.AssetAbbrInfo `json:"data"`
+}
+
+type AssetOffsetData struct {
+	serverOrdx.ListResp
+	AssetOffset []*common.AssetOffsetRange `json:"detail"`
+}
+
+type AssetOffsetResp struct {
+	serverOrdx.BaseResp
+	Data *AssetOffsetData `json:"data"`
 }
 
 type SeedsResp struct {

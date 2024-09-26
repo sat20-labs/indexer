@@ -661,6 +661,36 @@ func (s *Handle) getAssetDetailInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func (s *Handle) getAssetOffset(c *gin.Context) {
+	resp := &AssetOffsetResp{
+		BaseResp: serverOrdx.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+
+	utxo := c.Param("utxo")
+	utxoAssets, err := s.model.GetAssetOffsetWithUtxo(utxo)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	resp.Data = &AssetOffsetData{
+		ListResp: serverOrdx.ListResp{
+			Total: uint64(len(utxoAssets)),
+			Start: 0,
+		},
+		AssetOffset: utxoAssets,
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+
 // @Summary Get assets with abbreviated info in the UTXO
 // @Description Get assets with abbreviated info in the UTXO
 // @Tags ordx.utxo

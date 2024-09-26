@@ -541,6 +541,11 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*serverOrdx.AssetDetailInfo
 	return &result, nil
 }
 
+
+func (s *Model) GetAssetOffsetWithUtxo(utxo string) ([]*common.AssetOffsetRange, error) {
+	return s.indexer.GetAssetOffsetWithUtxo(utxo), nil
+}
+
 func (s *Model) GetDetailAssetWithRanges(req *RangesReq) (*serverOrdx.AssetDetailInfo, error) {
 
 	var result serverOrdx.AssetDetailInfo
