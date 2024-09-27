@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
 	mainCommon "github.com/sat20-labs/indexer/main/common"
@@ -139,6 +140,9 @@ func (s *Service) tx_decodePsbt(c *gin.Context) {
 	// handle inputs
 	inputRanges := make([]*common.Range, 0)
 	for index, unsingedTxIn := range pb.UnsignedTx.TxIn {
+		if pb.Inputs[index].WitnessUtxo.PkScript[0] == txscript.OP_RETURN {
+			continue
+		}
 		address, err := common.PkScriptToAddr(pb.Inputs[index].WitnessUtxo.PkScript, chain)
 		if err != nil {
 			resp.Code = -1
@@ -189,6 +193,9 @@ func (s *Service) tx_decodePsbt(c *gin.Context) {
 
 	// handle outputs
 	for _, unSignedTxOut := range pb.UnsignedTx.TxOut {
+		if unSignedTxOut.PkScript[0] == txscript.OP_RETURN {
+			continue
+		}
 		address, err := common.PkScriptToAddr(unSignedTxOut.PkScript, chain)
 		if err != nil {
 			resp.Code = -1
