@@ -309,11 +309,11 @@ func (b *IndexerMgr) GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRa
 		for _, assetRngs := range assets {
 			for _, assetRng := range assetRngs {
 
-				var newResult []*common.AssetOffsetRange
-				for i := 0; i < len(result); i++ {
+				for i := 0; i < len(result);  {
 					rng := result[i]
 					intersection := common.InterRange(rng.Range, assetRng)
 					if intersection.Start < 0 {
+						i++
 						continue
 					}
 
@@ -343,7 +343,8 @@ func (b *IndexerMgr) GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRa
 					rng3.Range.Size = offset4 - offset3
 					rng3.Offset = offset3 + rng.Offset
 
-					newResult = result[:i]
+					newResult := make([]*common.AssetOffsetRange, i)
+					copy(newResult, result[0:i])
 					j := i
 					if rng1.Range.Size > 0 {
 						newResult = append(newResult, rng1)
@@ -357,8 +358,10 @@ func (b *IndexerMgr) GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRa
 						newResult = append(newResult, rng3)
 						j++
 					}
-					newResult = append(newResult, result[i:]...)
-					i = j
+					if i+1 < len(result) {
+						newResult = append(newResult, result[i+1:]...)
+					}
+					i = j + 1
 					result = newResult
 				}
 			}
