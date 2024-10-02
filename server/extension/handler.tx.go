@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
@@ -259,6 +260,6 @@ func (s *Service) tx_broadcast(c *gin.Context) {
 		return
 	}
 
-	resp.Data = txid
+	resp.Data = strings.Trim(txid, "\"")
 	c.JSON(http.StatusOK, resp)
 }

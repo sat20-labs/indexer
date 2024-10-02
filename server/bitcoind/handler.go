@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/server/define"
@@ -44,7 +45,7 @@ func (s *Service) sendRawTx(c *gin.Context) {
 		return
 	}
 
-	resp.Data = txid
+	resp.Data = strings.Trim(txid, "\"")
 	c.JSON(http.StatusOK, resp)
 }
 
