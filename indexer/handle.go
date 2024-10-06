@@ -181,13 +181,13 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 	}
 	if selfmint < 100 && s.isSat20Actived(int(height)) {
 		if s.IsMainnet() {
-			if int(height)+common.MIN_BLOCK_INTERVAL > blockStart {
+			if blockStart > 0 && int(height)+common.MIN_BLOCK_INTERVAL > blockStart {
 				common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, start of block should be larger than: %d",
 					nft.Base.InscriptionId, content.Ticker, height+common.MIN_BLOCK_INTERVAL)
 				return nil
 			}
 		} else {
-			if int(height)+5 > blockStart {
+			if blockStart > 0 &&  int(height)+5 > blockStart {
 				common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, start of block should be larger than: %d",
 					nft.Base.InscriptionId, content.Ticker, height+5)
 				return nil
