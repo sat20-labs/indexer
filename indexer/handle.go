@@ -74,16 +74,20 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		return nil
 	}
 
-	addressId := nft.OwnerAddressId
-	var reg = s.ns.GetNameRegisterInfo(content.Ticker)
-	if reg != nil && s.isSat20Actived(int(height)) {
-		if reg.Nft.OwnerAddressId != addressId {
-			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s has owner %d",
-				nft.Base.InscriptionId, content.Ticker, reg.Nft.OwnerAddressId)
-			return nil
+	// 名字不跟ticker挂钩
+	var reg *ns.NameRegister
+	if !common.TickerSeparatedFromName {
+		addressId := nft.OwnerAddressId
+		reg = s.ns.GetNameRegisterInfo(content.Ticker)
+		if reg != nil && s.isSat20Actived(int(height)) {
+			if reg.Nft.OwnerAddressId != addressId {
+				common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s has owner %d",
+					nft.Base.InscriptionId, content.Ticker, reg.Nft.OwnerAddressId)
+				return nil
+			}
 		}
 	}
-
+	
 	var err error
 	lim := int64(1)
 	if content.Lim != "" {
@@ -232,15 +236,17 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		Attr:       attr,
 	}
 
-	if reg == nil {
-		reg = &ns.NameRegister{
-			Nft:  nft,
-			Name: strings.ToLower(ticker.Name),
+	if !common.TickerSeparatedFromName {
+		if reg == nil {
+			reg = &ns.NameRegister{
+				Nft:  nft,
+				Name: strings.ToLower(ticker.Name),
+			}
+	
+			s.ns.NameRegister(reg)
 		}
-
-		s.ns.NameRegister(reg)
 	}
-
+	
 	return ticker
 }
 

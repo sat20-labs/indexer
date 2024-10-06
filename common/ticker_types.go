@@ -1,6 +1,6 @@
 package common
 
-
+const TickerSeparatedFromName = true
 
 type Mint struct {
 	Base     *InscribeBaseContent

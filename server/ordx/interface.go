@@ -20,22 +20,25 @@ func (s *Model) GetBlockInfo(height int) (*common.BlockInfo, error) {
 
 func (s *Model) IsDeployAllowed(address, ticker string) (bool, error) {
 	
-	// info := s.indexer.GetNameInfo(ticker)
-	// if info != nil {
-	// 	tickerInfo := s.indexer.GetTicker(ticker)
-	// 	if tickerInfo != nil {
-	// 		return false, fmt.Errorf("ticker %s exists", ticker)
-	// 	}
-	// 	if info.OwnerAddress != address {
-	// 		return false, fmt.Errorf("ticker name %s has been registered", ticker)
-	// 	}
-	// }
-
-	// 不将名字和ticker挂钩！
-	tickerInfo := s.indexer.GetTicker(ticker)
-	if tickerInfo != nil {
-		return false, fmt.Errorf("ticker %s exists", ticker)
+	if !common.TickerSeparatedFromName {
+		info := s.indexer.GetNameInfo(ticker)
+		if info != nil {
+			tickerInfo := s.indexer.GetTicker(ticker)
+			if tickerInfo != nil {
+				return false, fmt.Errorf("ticker %s exists", ticker)
+			}
+			if info.OwnerAddress != address {
+				return false, fmt.Errorf("ticker name %s has been registered", ticker)
+			}
+		}
+	} else {
+		// 不将名字和ticker挂钩！
+		tickerInfo := s.indexer.GetTicker(ticker)
+		if tickerInfo != nil {
+			return false, fmt.Errorf("ticker %s exists", ticker)
+		}
 	}
+	
 	return true, nil
 }
 
