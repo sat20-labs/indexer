@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/server/define"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -165,27 +166,35 @@ func (s *Service) getTx(c *gin.Context) {
 	}
 
 	for _, vin := range tx.Vin {
-		rawTx, err := bitcoin_rpc.GetTx(vin.Txid)
-		if err != nil {
-			resp.Code = -1
-			resp.Msg = err.Error()
-			c.JSON(http.StatusOK, resp)
-			return
-		}
-
 		address := ""
 		value := float64(0)
-		if len(rawTx.Vout) > vin.Vout {
-			vout := rawTx.Vout[vin.Vout]
-			address = vout.ScriptPubKey.Address
-			value = vout.Value * 1e8
+		utxo := ""
+		if vin.Vout >= 0 {
+			rawTx, err := bitcoin_rpc.GetTx(vin.Txid)
+			if err != nil {
+				resp.Code = -1
+				resp.Msg = err.Error()
+				c.JSON(http.StatusOK, resp)
+				return
+			}
+	
+			
+			if len(rawTx.Vout) > vin.Vout {
+				vout := rawTx.Vout[vin.Vout]
+				address = vout.ScriptPubKey.Address
+				value = vout.Value * 1e8
+			} else {
+				resp.Code = -1
+				resp.Msg = "vout not found"
+				c.JSON(http.StatusOK, resp)
+				return
+			}
+			utxo = fmt.Sprintf("%s:%d", vin.Txid, vin.Vout)
 		} else {
-			resp.Code = -1
-			resp.Msg = "vout not found"
-			c.JSON(http.StatusOK, resp)
-			return
+			out := wire.OutPoint{}
+			utxo = out.String()
 		}
-		utxo := fmt.Sprintf("%s:%d", vin.Txid, vin.Vout)
+		
 		txInfo.Vins = append(txInfo.Vins, Vin{
 			Utxo:     utxo,
 			Sequence: vin.Sequence,
