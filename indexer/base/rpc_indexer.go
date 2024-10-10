@@ -294,10 +294,9 @@ func (b *RpcIndexer) FindSat(sat int64) (string, string, error) {
 		}
 	}
 
-	// 聪网中该值只是一个计数
-	// if sat >= b.stats.TotalSats {
-	// 	return "", "", fmt.Errorf("sat too big")
-	// }
+	if sat >= b.stats.TotalSats {
+		return "", "", fmt.Errorf("sat too big")
+	}
 
 	if sat < 0 {
 		return "", "", fmt.Errorf("sat number must be greater than 0")
