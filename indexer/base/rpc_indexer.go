@@ -218,45 +218,66 @@ func (b *RpcIndexer) GetUTXOs2(address string) []string {
 }
 
 func (b *RpcIndexer) searhing(sat int64) {
-	var value common.UtxoValueInDB
+	
+	var address, utxo string
 	bFound := false
-	b.db.View(func(txn *badger.Txn) error {
-		var err error
-		prefix := []byte(common.DB_KEY_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
 
-		startTime := time.Now()
-		common.Log.Infof("Search sat in %s table ...", common.DB_KEY_UTXO)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-
-			err = item.Value(func(data []byte) error {
-				return common.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Errorf("item.Value error: %v", err)
-				continue
-			}
-
-			if common.IsSatInRanges(sat, value.Ordinals) {
-				common.Log.Infof("find sat %d in utxo %d in address %d", sat, value.UtxoId, value.AddressIds[0])
-				bFound = true
-				break
-			}
+	// search in buffer
+	for k,v := range b.utxoIndex.Index {
+		if common.IsSatInRanges(sat, v.Ordinals) {
+			common.Log.Infof("find sat %d in utxo %s in address %s", sat, k, v.Address.Addresses[0])
+			bFound = true
+			address = v.Address.Addresses[0]
+			utxo = k
+			break
 		}
-		common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime))
+	}
 
-		return nil
-	})
+	if !bFound {
+		var value common.UtxoValueInDB
+		b.db.View(func(txn *badger.Txn) error {
+			var err error
+			prefix := []byte(common.DB_KEY_UTXO)
+			itr := txn.NewIterator(badger.DefaultIteratorOptions)
+			defer itr.Close()
+	
+			startTime := time.Now()
+			common.Log.Infof("Search sat in %s table ...", common.DB_KEY_UTXO)
+	
+			for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
+				item := itr.Item()
+	
+				err = item.Value(func(data []byte) error {
+					return common.DecodeBytesWithProto3(data, &value)
+				})
+				if err != nil {
+					common.Log.Errorf("item.Value error: %v", err)
+					continue
+				}
+	
+				if common.IsSatInRanges(sat, value.Ordinals) {
+					common.Log.Infof("find sat %d in utxo %d in address %d", sat, value.UtxoId, value.AddressIds[0])
+					bFound = true
+					break
+				}
+			}
+			common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime))
+	
+			return nil
+		})
+		if bFound {
+			address, _ = common.GetAddressByID(b.db, value.AddressIds[0])
+			utxo, _ = common.GetUtxoByID(b.db, value.UtxoId)
+		}
+	}
+	
 
 	b.mutex.Lock()
 	status, ok := b.satSearchingStatus[sat]
 	if ok {
 		if bFound {
-			status.Address, _ = common.GetAddressByID(b.db, value.AddressIds[0])
-			status.Utxo, _ = common.GetUtxoByID(b.db, value.UtxoId)
+			status.Address = address
+			status.Utxo = utxo
 			status.Status = 0
 		} else {
 			status.Status = -1
@@ -278,6 +299,7 @@ func (b *RpcIndexer) searhing(sat int64) {
 
 	b.bSearching = false
 }
+
 
 // address, utxo, message
 func (b *RpcIndexer) FindSat(sat int64) (string, string, error) {
