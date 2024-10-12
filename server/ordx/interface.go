@@ -551,7 +551,11 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*serverOrdx.AssetDetailInfo
 }
 
 func (s *Model) GetAssetOffsetWithUtxo(utxo string) ([]*common.AssetOffsetRange, error) {
-	return s.indexer.GetAssetOffsetWithUtxo(utxo), nil
+	ret := s.indexer.GetAssetOffsetWithUtxo(utxo)
+	if len(ret) == 0 {
+		return nil, fmt.Errorf("can't find this utxo %s", utxo)
+	}
+	return ret, nil
 }
 
 func (s *Model) GetDetailAssetWithRanges(req *RangesReq) (*serverOrdx.AssetDetailInfo, error) {
