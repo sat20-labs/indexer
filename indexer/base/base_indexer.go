@@ -80,8 +80,8 @@ func NewBaseIndexer(
 func (b *BaseIndexer) Init(cb1 BlockProcCallback, cb2 UpdateDBCallback) {
 	dbver := b.GetBaseDBVer()
 	common.Log.Infof("base db version: %s", b.GetBaseDBVer())
-	if dbver != "" && dbver != BASE_DB_VERSION {
-		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, BASE_DB_VERSION)
+	if dbver != "" && dbver != common.BASE_DB_VERSION {
+		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
 	}
 
 	b.blockprocCB = cb1
@@ -770,7 +770,7 @@ func (b *BaseIndexer) loadUtxoFromDB(txn *badger.Txn, utxostr string) error {
 	addresses.Type = txscript.ScriptClass(utxo.AddressType)
 
 	// TODO 对于多签的utxo，目前相当于把这个utxo给第一个地址
-	height, txid, vout := common.ConvertFromUtxoId(utxo.UtxoId)
+	height, txid, vout := common.FromUtxoId(utxo.UtxoId)
 	b.utxoIndex.Index[utxostr] = &common.Output{Height: height, TxId: txid,
 		Value:   common.GetOrdinalsSize(utxo.Ordinals),
 		Address: &addresses,
@@ -1207,7 +1207,7 @@ func (b *BaseIndexer) deleteUtxos(utxos map[uint64]string) {
 }
 
 func (b *BaseIndexer) setDBVersion() {
-	err := common.SetRawValueToDB([]byte(BaseDBVerKey), []byte(BASE_DB_VERSION), b.db)
+	err := common.SetRawValueToDB([]byte(BaseDBVerKey), []byte(common.BASE_DB_VERSION), b.db)
 	if err != nil {
 		common.Log.Panicf("Error setting in db %v", err)
 	}

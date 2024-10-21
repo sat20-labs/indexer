@@ -281,9 +281,9 @@ func TestDecode3(t *testing.T) {
 	value2 := int64(BytesToUint64(bytes))
 	fmt.Printf("%d", value2)
 
-	utxoid := ConvertToUtxoId(0x7ffffffe, 0xeffe, 0x1effe)
+	utxoid := ToUtxoId(0x7ffffffe, 0xeffe, 0x1effe)
 	fmt.Printf("%x\n", utxoid)
-	v1, v2, v3 := ConvertFromUtxoId(utxoid)
+	v1, v2, v3 := FromUtxoId(utxoid)
 	fmt.Printf("%x %x %x\n", v1, v2, v3)
 }
 

@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 )
 
 func ConvertTimestampToISO8601(timestamp int64) string {
@@ -49,7 +48,7 @@ func ParseUtxo(utxo string) (txid string, vout int, err error) {
 	return txid, vout, err
 }
 
-func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, typ, index int64,  err error) {
+func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, typ, index int64, err error) {
 	parts := strings.Split(addresskey, "-")
 	if len(parts) < 4 {
 		return INVALID_ID, INVALID_ID, 0, 0, fmt.Errorf("invalid address key %s", addresskey)
@@ -76,21 +75,38 @@ func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, typ,
 	return addressId, utxoId, typ, index, err
 }
 
-func ConvertToUtxoId(height int, tx int, vout int) uint64 {
-	// 极少情况下，vout会大于0xffff，目前在主网上没看到，只在测试网络看到，比如高度2578308
-	if height > 0x7fffffff || tx > 0xffff || vout > 0x1ffff {
+/*
+新的数据库版本，修改为跟闪电通道ShortID一致：
+
+	func NewShortChanIDFromInt(chanID uint64) ShortChannelID {
+		return ShortChannelID{
+			BlockHeight: uint32(chanID >> 40),
+			TxIndex:     uint32(chanID>>16) & 0xFFFFFF,
+			TxPosition:  uint16(chanID),
+		}
+	}
+
+	func (c ShortChannelID) ToUint64() uint64 {
+		// TODO(roasbeef): explicit error on overflow?
+		return ((uint64(c.BlockHeight) << 40) | (uint64(c.TxIndex) << 16) |
+			(uint64(c.TxPosition)))
+	}
+*/
+func ToUtxoId(height int, tx int, vout int) uint64 {
+	// 极少情况下，vout会大于0xffff，目前在主网上没看到，只在testnet3看到，比如高度2578308。我们不再支持testnet3
+	if height > 0xffffff || tx > 0xffffff || vout > 0xffff {
 		Log.Panicf("parameters too big %x %x %x", height, tx, vout)
 	}
 
-	return (uint64(height)<<33 | uint64(tx)<<17 | uint64(vout))
+	return (uint64(height)<<40 | uint64(tx)<<16 | uint64(vout))
 }
 
-func ConvertFromUtxoId(id uint64) (int, int, int) {
-	return (int)(id >> 33), (int)(uint32((id >> 17) & 0xffff)), int((uint32(id)) & 0x1ffff)
+func FromUtxoId(id uint64) (int, int, int) {
+	return (int)(id >> 40), (int)(uint32((id >> 16) & 0xffffff)), int((uint16(id)))
 }
 
 func GetUtxoId(addrAndId *Output) uint64 {
-	return ConvertToUtxoId(addrAndId.Height, addrAndId.TxId, int(addrAndId.N))
+	return ToUtxoId(addrAndId.Height, addrAndId.TxId, int(addrAndId.N))
 }
 
 func ParseOrdInscriptionID(inscriptionID string) (txid string, index int, err error) {

@@ -108,8 +108,8 @@ func (b *IndexerMgr) Init() {
 
 	dbver := b.GetBaseDBVer()
 	common.Log.Infof("base db version: %s", dbver)
-	if dbver != "" && dbver != base_indexer.BASE_DB_VERSION {
-		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, base_indexer.BASE_DB_VERSION)
+	if dbver != "" && dbver != common.BASE_DB_VERSION {
+		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
 	}
 
 	if !instance.IsMainnet() {
