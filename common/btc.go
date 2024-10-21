@@ -30,6 +30,10 @@ func PkScriptToAddr(pkScript []byte, chain string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	if len(addrs) == 0 {
+		return "", fmt.Errorf("no address")
+	}
 	return addrs[0].EncodeAddress(), nil
 }
 
