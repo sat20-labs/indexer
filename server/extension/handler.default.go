@@ -178,7 +178,7 @@ func (s *Service) feeSummary(c *gin.Context) {
 		},
 	}
 
-	ret, err := bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(6, "ECONOMICAL")
+	ret, err := bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(1, "ECONOMICAL")
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
