@@ -796,6 +796,35 @@ func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func (s *Handle) getExistingUtxos(c *gin.Context) {
+	resp := &ExistingUtxoResp{
+		BaseResp: serverOrdx.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+
+	var req UtxosReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	result, err := s.model.GetExistingUtxos(&req)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	} else {
+		resp.ExistingUtxos = result
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+
 // @Summary Get asset details in a range
 // @Description Get asset details in a range
 // @Tags ordx.range

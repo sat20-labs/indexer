@@ -45,6 +45,7 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// for test
 	r.GET(proxy+"/utxo/range/:utxo", s.handle.getSatRangeWithUtxo)
 	r.POST(proxy+"/utxos/assets", s.handle.getAssetsWithUtxos)
+	r.POST(proxy+"/utxos/exist", s.handle.getExistingUtxos)
 
 	// range
 	// 获取Range上所有的资产信息

@@ -246,6 +246,22 @@ func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*serverOrdx.UtxoAbbrAssets,
 	return result, nil
 }
 
+
+func (s *Model) GetExistingUtxos(req *UtxosReq) ([]string, error) {
+	result := make([]string, 0)
+	for _, utxo := range req.Utxos {
+		utxoId := s.indexer.GetUtxoId(utxo)
+		if utxoId == common.INVALID_ID {
+			continue
+		}
+
+		result = append(result, utxo)
+	}
+
+	return result, nil
+}
+
+
 func (s *Model) GetUtxoList(address string, tickerName string, start, limit int) ([]*serverOrdx.TickerAsset, int, error) {
 
 	var ticker common.TickerName

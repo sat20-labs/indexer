@@ -76,33 +76,28 @@ func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, typ,
 }
 
 /*
-新的数据库版本，修改为跟闪电通道ShortID一致：
+最小交易总大小 = 82 bytes
+区块大小限制：4MB (4,000,000 bytes)
+理论最大交易数 = 4,000,000 / 82 ≈ 48,780 笔交易
+每个输入最小大小：41 bytes (前一个输出点36 + 序列号4 + varint 1)
+理论最大输入数 = (4,000,000 - 10) / 41 ≈ 97,560个
+每个输出最小大小：31 bytes (value 8 + varint 1 + 最小脚本22)
+理论最大输出数 = (4,000,000 - 10) / 31 ≈ 129,032个
 
-	func NewShortChanIDFromInt(chanID uint64) ShortChannelID {
-		return ShortChannelID{
-			BlockHeight: uint32(chanID >> 40),
-			TxIndex:     uint32(chanID>>16) & 0xFFFFFF,
-			TxPosition:  uint16(chanID),
-		}
-	}
-
-	func (c ShortChannelID) ToUint64() uint64 {
-		// TODO(roasbeef): explicit error on overflow?
-		return ((uint64(c.BlockHeight) << 40) | (uint64(c.TxIndex) << 16) |
-			(uint64(c.TxPosition)))
-	}
+Height: 29bit 0x1fffffff  	< 536870911
+tx: 	17bit 0x1ffff 		< 131071
+vout:	18bit 0x3ffff 		< 262143
 */
 func ToUtxoId(height int, tx int, vout int) uint64 {
-	// 极少情况下，vout会大于0xffff，目前在主网上没看到，只在testnet3看到，比如高度2578308。我们不再支持testnet3
-	if height > 0xffffff || tx > 0xffffff || vout > 0xffff {
+	if height > 0x1fffffff || tx > 0x1ffff || vout > 0x3ffff {
 		Log.Panicf("parameters too big %x %x %x", height, tx, vout)
 	}
 
-	return (uint64(height)<<40 | uint64(tx)<<16 | uint64(vout))
+	return (uint64(height)<<35 | uint64(tx)<<18 | uint64(vout))
 }
 
 func FromUtxoId(id uint64) (int, int, int) {
-	return (int)(id >> 40), (int)(uint32((id >> 16) & 0xffffff)), int((uint16(id)))
+	return (int)(id >> 35), (int)((id >> 18) & 0x1ffff), (int)((id) & 0x3ffff)
 }
 
 func GetUtxoId(addrAndId *Output) uint64 {

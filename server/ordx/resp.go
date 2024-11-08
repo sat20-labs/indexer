@@ -95,6 +95,11 @@ type UtxoListResp struct {
 	Data *UtxoListData `json:"data"`
 }
 
+type ExistingUtxoResp struct {
+	serverOrdx.BaseResp
+	ExistingUtxos []string `json:"data"`
+}
+
 type OrdInscriptionListData struct {
 	serverOrdx.ListResp
 	Detail any `json:"detail"`
