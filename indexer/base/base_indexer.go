@@ -509,7 +509,7 @@ func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 			if err == nil {
 				if hash != blockHash {
 					common.Log.Warnf("Detected reorg at height %d", i)
-					reorgHeight = -1
+					reorgHeight = i
 				}
 			}
 		}
