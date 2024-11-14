@@ -40,6 +40,7 @@ type BaseIndexer struct {
 
 	lastHeight int // 内存数据同步区块
 	lastHash   string
+	prevBlockHashMap map[int]string // 记录过去6个区块hash，判断哪个区块分叉
 	lastSats   int64
 	////////////
 
@@ -73,6 +74,7 @@ func NewBaseIndexer(
 	}
 
 	indexer.addressIdMap = make(map[string]*AddressStatus, 0)
+	indexer.prevBlockHashMap = make(map[int]string)
 
 	return indexer
 }
@@ -491,13 +493,29 @@ func (b *BaseIndexer) forceMajeure() {
 	b.closeDB()
 }
 
-func (b *BaseIndexer) handleReorg(currentBlock *common.Block) {
+func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 	common.Log.Warnf("BaseIndexer.handleReorg-> reorg detected at heigh %d", currentBlock.Height)
 
 	// clean memory and reload stats from DB
 	// b.reset()
 	//b.stats.ReorgsDetected = append(b.stats.ReorgsDetected, currentBlock.Height)
 	b.drainBlocksChan()
+
+	reorgHeight := currentBlock.Height
+	for i := b.lastHeight - 6; i <= b.lastHeight; i++ {
+		blockHash, ok := b.prevBlockHashMap[i] 
+		if ok {
+			hash, err := getBlockHash(uint64(i))
+			if err == nil {
+				if hash != blockHash {
+					common.Log.Warnf("Detected reorg at height %d", i)
+					reorgHeight = -1
+				}
+			}
+		}
+	}
+	b.prevBlockHashMap = make(map[int]string)
+	return reorgHeight
 }
 
 // syncToBlock continues from the sync height to the current height
@@ -548,8 +566,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			if i > 0 && block.PrevBlockHash != b.lastHash {
 				common.Log.WithField("BaseIndexer.SyncToBlock-> height", i).Warn("reorg detected")
 				stopBlockFetcherChan <- struct{}{}
-				b.handleReorg(block)
-				return block.Height
+				return b.handleReorg(block)
 			}
 
 			//localStartTime := time.Now()
@@ -563,6 +580,10 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			b.stats.ChainTip = height
 			b.lastHeight = block.Height
 			b.lastHash = block.Hash
+			b.prevBlockHashMap[b.lastHeight] = b.lastHash
+			if len(b.prevBlockHashMap) > 6 {
+				delete(b.prevBlockHashMap, b.lastHeight-6)
+			}
 
 			//localStartTime = time.Now()
 			b.blockprocCB(block)
@@ -1241,6 +1262,10 @@ func (b *BaseIndexer) GetChainTip() int {
 
 func (b *BaseIndexer) SetReorgHeight(height int) {
 	b.stats.ReorgsDetected = append(b.stats.ReorgsDetected, height)
+	err := common.GobSetDB1([]byte(SyncStatsKey), b.stats, b.db)
+	if err != nil {
+		common.Log.Panicf("Error setting in db %v", err)
+	}
 }
 
 func (b *BaseIndexer) GetBlockHistory() int {
