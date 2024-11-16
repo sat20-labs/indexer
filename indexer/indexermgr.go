@@ -275,9 +275,9 @@ func (b *IndexerMgr) forceUpdateDB() {
 }
 
 func (b *IndexerMgr) handleReorg(height int) {
-	b.compiling.SetReorgHeight(height)
 	b.closeDB()
 	b.Init()
+	b.compiling.SetReorgHeight(height)
 	common.Log.Infof("IndexerMgr handleReorg completed.")
 }
 
