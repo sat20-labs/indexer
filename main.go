@@ -39,13 +39,9 @@ func main() {
 
 	cfg := GetConfig()
 
-	indexerMgr := indexer.NewIndexerMgr(cfg.DBDir, cfg.ChainParam, cfg.MaxIndexHeight)
+	indexerMgr := indexer.NewIndexerMgr(cfg.DBDir, cfg.ChainParam, cfg.MaxIndexHeight, cfg.PeriodFlushToDB)
 	base_indexer.InitBaseIndexer(indexerMgr)
 	indexerMgr.Init()
-
-	if cfg.PeriodFlushToDB != 0 {
-		indexerMgr.WithPeriodFlushToDB(cfg.PeriodFlushToDB)
-	}
 
 	_, err = g.InitRpcService(indexerMgr)
 	if err != nil {

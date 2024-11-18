@@ -31,6 +31,7 @@ type IndexerMgr struct {
 	ordxFirstHeight int
 	ordFirstHeight  int
 	maxIndexHeight  int
+	periodFlushToDB int
 
 	exotic    *exotic.ExoticIndexer
 	ftIndexer *ft.FTIndexer
@@ -62,16 +63,22 @@ func NewIndexerMgr(
 	dbDir string,
 	chaincfgParam *chaincfg.Params,
 	maxIndexHeight int,
+	periodFlushToDB int,
 ) *IndexerMgr {
 
 	if instance != nil {
 		return instance
 	}
 
+	if periodFlushToDB == 0 {
+		periodFlushToDB = 500
+	}
+
 	mgr := &IndexerMgr{
 		dbDir:             dbDir,
 		chaincfgParam:     chaincfgParam,
 		maxIndexHeight:    maxIndexHeight,
+		periodFlushToDB:   periodFlushToDB,
 		compilingBackupDB: nil,
 		exoticBackupDB:    nil,
 		ordxBackupDB:      nil,
@@ -101,7 +108,7 @@ func (b *IndexerMgr) Init() {
 	if err != nil {
 		common.Log.Panicf("initDB failed. %v", err)
 	}
-	b.compiling = base_indexer.NewBaseIndexer(b.baseDB, b.chaincfgParam, b.maxIndexHeight)
+	b.compiling = base_indexer.NewBaseIndexer(b.baseDB, b.chaincfgParam, b.maxIndexHeight, b.periodFlushToDB)
 	b.compiling.Init(b.processOrdProtocol, b.forceUpdateDB)
 	b.lastCheckHeight = b.compiling.GetSyncHeight()
 	b.initCollections()
@@ -140,11 +147,6 @@ func (b *IndexerMgr) Init() {
 
 func (b *IndexerMgr) GetBaseDB() *badger.DB {
 	return b.baseDB
-}
-
-func (b *IndexerMgr) WithPeriodFlushToDB(value int) *IndexerMgr {
-	b.compiling.WithPeriodFlushToDB(value)
-	return b
 }
 
 func (b *IndexerMgr) StartDaemon(stopChan chan bool) {

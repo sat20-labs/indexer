@@ -62,11 +62,12 @@ func NewBaseIndexer(
 	basicDB *badger.DB,
 	chaincfgParam *chaincfg.Params,
 	maxIndexHeight int,
+	periodFlushToDB int,
 ) *BaseIndexer {
 	indexer := &BaseIndexer{
 		db:               basicDB,
 		stats:            &SyncStats{},
-		periodFlushToDB:  500,
+		periodFlushToDB:  periodFlushToDB,
 		keepBlockHistory: 6,
 		blocksChan:       make(chan *common.Block, BLOCK_PREFETCH),
 		chaincfgParam:    chaincfgParam,
@@ -105,7 +106,7 @@ func (b *BaseIndexer) reset() {
 // 只保存UpdateDB需要用的数据
 func (b *BaseIndexer) Clone() *BaseIndexer {
 	startTime := time.Now()
-	newInst := NewBaseIndexer(b.db, b.chaincfgParam, b.maxIndexHeight)
+	newInst := NewBaseIndexer(b.db, b.chaincfgParam, b.maxIndexHeight, b.periodFlushToDB)
 
 	newInst.utxoIndex = common.NewUTXOIndex()
 	for key, value := range b.utxoIndex.Index {
@@ -209,11 +210,6 @@ func (b *BaseIndexer) Repair() {
 	if err != nil {
 		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
 	}
-}
-
-func (b *BaseIndexer) WithPeriodFlushToDB(value int) *BaseIndexer {
-	b.periodFlushToDB = value
-	return b
 }
 
 // only call in compiling data
