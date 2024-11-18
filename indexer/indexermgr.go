@@ -71,7 +71,7 @@ func NewIndexerMgr(
 	}
 
 	if periodFlushToDB == 0 {
-		periodFlushToDB = 500
+		periodFlushToDB = 12
 	}
 
 	mgr := &IndexerMgr{
