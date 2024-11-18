@@ -40,7 +40,7 @@ func LoadYamlConf(cfgPath string) (*conf.YamlConf, error) {
 	}
 
 	if ret.BasicIndex.PeriodFlushToDB <= 0 {
-		ret.BasicIndex.PeriodFlushToDB = 500
+		ret.BasicIndex.PeriodFlushToDB = 12
 	}
 
 	if ret.BasicIndex.MaxIndexHeight <= 0 {
@@ -118,7 +118,7 @@ func NewDefaultYamlConf(chain string) (*conf.YamlConf, error) {
 		},
 		BasicIndex: conf.BasicIndex{
 			MaxIndexHeight:  0,
-			PeriodFlushToDB: 100,
+			PeriodFlushToDB: 12,
 		},
 		RPCService: serverCommon.RPCService{
 			Addr:  "0.0.0.0:80",
