@@ -504,7 +504,7 @@ func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 			hash, err := getBlockHash(uint64(i))
 			if err == nil {
 				if hash != blockHash {
-					common.Log.Warnf("Detected reorg at height %d", i)
+					common.Log.Warnf("detected reorg at height %d, old hash %s, new hash %s", i, blockHash, hash)
 					reorgHeight = i
 				}
 			}
