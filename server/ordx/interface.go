@@ -652,12 +652,15 @@ func (s *Model) GetSeedsWithUtxo(utxo string) ([]*serverOrdx.Seed, error) {
 
 func (s *Model) GetSatRangeWithUtxo(utxo string) (*serverOrdx.UtxoInfo, error) {
 	utxoId := uint64(common.INVALID_ID)
+	var err error
 	if len(utxo) < 64 {
-		utxoId, _ = strconv.ParseUint(utxo, 10, 64)
+		utxoId, err = strconv.ParseUint(utxo, 10, 64)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result := serverOrdx.UtxoInfo{}
-	var err error
 	if utxoId == common.INVALID_ID {
 		result.Id, result.Ranges, err = s.indexer.GetOrdinalsWithUtxo(utxo)
 		result.Utxo = utxo
