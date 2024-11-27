@@ -126,7 +126,7 @@ func (s *Service) getBlockHash(c *gin.Context) {
 // @Success 200 {object} TxResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/tx/{txid} [get]
-func (s *Service) getTx(c *gin.Context) {
+func (s *Service) getTxInfo(c *gin.Context) {
 	resp := &TxResp{
 		BaseResp: define.BaseResp{
 			Code: 0,
@@ -177,8 +177,7 @@ func (s *Service) getTx(c *gin.Context) {
 				c.JSON(http.StatusOK, resp)
 				return
 			}
-	
-			
+
 			if len(rawTx.Vout) > vin.Vout {
 				vout := rawTx.Vout[vin.Vout]
 				address = vout.ScriptPubKey.Address
@@ -194,7 +193,7 @@ func (s *Service) getTx(c *gin.Context) {
 			out := wire.OutPoint{}
 			utxo = out.String()
 		}
-		
+
 		txInfo.Vins = append(txInfo.Vins, Vin{
 			Utxo:     utxo,
 			Sequence: vin.Sequence,
@@ -208,6 +207,47 @@ func (s *Service) getTx(c *gin.Context) {
 			Address: vout.ScriptPubKey.Address,
 			Value:   int64(vout.Value * 1e8),
 		})
+	}
+
+	resp.Data = txInfo
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Service) getTxSimpleInfo(c *gin.Context) {
+	resp := &TxResp{
+		BaseResp: define.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+	txid := c.Param("txid")
+	tx, err := bitcoin_rpc.GetTx(txid)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
+	if err != nil {
+		mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
+		if err != nil {
+			resp.Code = -1
+			resp.Msg = err.Error()
+			c.JSON(http.StatusOK, resp)
+			return
+		}
+		blockHeight = int64(mt.Height)
+	}
+
+	txInfo := &TxSimpleInfo{
+		TxID:          tx.Txid,
+		Version:       tx.Version,
+		Confirmations: tx.Confirmations,
+		BlockHeight:   blockHeight,
+		BlockTime:     tx.Blocktime,
 	}
 
 	resp.Data = txInfo

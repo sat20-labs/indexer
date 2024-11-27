@@ -47,6 +47,14 @@ type TxInfo struct {
 	Vouts         []Vout `json:"vout"`
 }
 
+type TxSimpleInfo struct {
+	TxID          string `json:"txid"`
+	Version       uint32 `json:"version"`
+	Confirmations uint64 `json:"confirmations"`
+	BlockHeight   int64  `json:"block_height"`
+	BlockTime     int64  `json:"block_time"`
+}
+
 type BlockHashResp struct {
 	define.BaseResp
 	Data string `json:"data" example:""`
