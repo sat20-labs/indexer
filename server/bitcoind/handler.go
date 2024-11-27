@@ -214,7 +214,7 @@ func (s *Service) getTxInfo(c *gin.Context) {
 }
 
 func (s *Service) getTxSimpleInfo(c *gin.Context) {
-	resp := &TxResp{
+	resp := &TxSimpleInfoResp{
 		BaseResp: define.BaseResp{
 			Code: 0,
 			Msg:  "ok",
