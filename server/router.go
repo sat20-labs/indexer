@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -177,10 +178,30 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	s.extensionService.InitRouter(r, rpcProxy)
 
 	parts := strings.Split(rpcUrl, ":")
+	var port string
 	if len(parts) < 2 {
 		rpcUrl += ":80"
+		port = "80"
+	} else {
+		port = parts[1]
+	}
+
+	// 先检查端口
+	if err := checkPort(port); err != nil {
+		return err
 	}
 
 	go r.Run(rpcUrl)
 	return nil
+}
+
+func checkPort(port string) error {
+    // 方法1: 尝试监听该端口
+    addr := fmt.Sprintf(":%s", port)
+    l, err := net.Listen("tcp", addr)
+    if err != nil {
+        return fmt.Errorf("port %s is in use: %v", port, err)
+    }
+    l.Close()
+    return nil
 }
