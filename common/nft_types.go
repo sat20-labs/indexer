@@ -19,12 +19,6 @@ type NftStatus struct {
 
 type NftsInSat = pb.NftsInSat
 
-const ALL_TICKERS = "*"
-
-type TickerName struct {
-	TypeName string `json:"type"`
-	Name     string `json:"ticker"` // * 所有ticker
-}
 
 func (p *NftStatus) Clone() *NftStatus {
 	c := &NftStatus{

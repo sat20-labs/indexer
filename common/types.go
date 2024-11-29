@@ -62,6 +62,13 @@ type BlockInfo struct {
 
 const INVALID_ID = math.MaxUint64
 
+const ALL_TICKERS = "*"
+type TickerName struct {
+	Protocol string `json:"protocol"` // 默认是ordx, 可以是任意协议，brc-20, runes, 甚至是eth
+	TypeName string `json:"type"`     // 默认是FT， ASSET_TYPE_FT
+	Name     string `json:"ticker"`   // * 所有ticker
+}
+
 type AssetOffsetRange struct {
 	Range  *Range        `json:"range"`
 	Offset int64         `json:"offset"`
