@@ -191,6 +191,9 @@ func (p *NameService) CheckSelf(baseDB *badger.DB) bool {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value NameValueInDB
 			err = item.Value(func(data []byte) error {
 				// return common.DecodeBytes(data, &value)

@@ -252,6 +252,9 @@ func (bs *BuckStore) GetAll() map[int]*common.Range {
 		// 遍历匹配前缀的key
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 
 			var bulk map[int]*common.Range
 			err = item.Value(func(val []byte) error {

@@ -297,7 +297,9 @@ func (bs *NSBuckStore) GetAll() map[int]*BuckValue {
 		// 遍历匹配前缀的key
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
-
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			if string(item.Key()) == key_last {
 				continue
 			}

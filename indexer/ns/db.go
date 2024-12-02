@@ -46,6 +46,9 @@ func initNameTreeFromDB(tree *indexer.SatRBTree, db *badger.DB) {
 		defer it.Close()
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 
 			_, err := ParseNameKey(key)
@@ -112,6 +115,9 @@ func loadNameProperties(name string, db *badger.DB) map[string]*common.KeyValueI
 		defer it.Close()
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			_, key, err := ParseKVKey(string(item.Key()))
 			if err == nil {
 				var valueInDB common.KeyValueInDB

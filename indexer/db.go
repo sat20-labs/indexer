@@ -83,6 +83,9 @@ func (p *IndexerMgr) initCollections() {
 		defer it.Close()
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 
 			nty, name, err := parseCollectionKey(key)

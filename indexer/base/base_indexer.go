@@ -176,6 +176,10 @@ func (b *BaseIndexer) Repair() {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
+
 			var value common.UtxoValueInDB
 			err = item.Value(func(data []byte) error {
 				//return common.DecodeBytes(data, &value)
@@ -961,6 +965,9 @@ func (b *BaseIndexer) CheckSelf() bool {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value common.UtxoValueInDB
 			err = item.Value(func(data []byte) error {
 				//return common.DecodeBytes(data, &value)
@@ -1016,6 +1023,9 @@ func (b *BaseIndexer) CheckSelf() bool {
 		defer itr.Close()
 		for itr.Seek(prefix); itr.ValidForPrefix(prefix); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			value := int64(0)
 			item.Value(func(data []byte) error {
 				value = int64(common.BytesToUint64(data))
@@ -1124,6 +1134,9 @@ func (b *BaseIndexer) verifyAllUtxosWithBtcd() {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value common.UtxoValueInDB
 			err = item.Value(func(data []byte) error {
 				return common.DecodeBytesWithProto3(data, &value)
@@ -1164,6 +1177,9 @@ func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value common.UtxoValueInDB
 			err = item.Value(func(data []byte) error {
 				return common.DecodeBytesWithProto3(data, &value)

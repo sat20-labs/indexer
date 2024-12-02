@@ -464,6 +464,9 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value common.NftsInSat
 			err = item.Value(func(data []byte) error {
 				// return common.DecodeBytes(data, &value)
@@ -502,6 +505,9 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value NftsInUtxo
 			err = item.Value(func(data []byte) error {
 				// return common.DecodeBytes(data, &value)
@@ -712,6 +718,9 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, db *badger.DB) map[uint6
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value common.UtxoValueInDB
 			err = item.Value(func(data []byte) error {
 				return common.DecodeBytesWithProto3(data, &value)

@@ -619,6 +619,9 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 			total := int64(0)
 			for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 				item := itr.Item()
+				if item.IsDeletedOrExpired() {
+					continue
+				}
 				var value common.UtxoValueInDB
 				err = item.Value(func(data []byte) error {
 					return common.DecodeBytesWithProto3(data, &value)
@@ -1135,6 +1138,9 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value ns.NameValueInDB
 			err = item.Value(func(data []byte) error {
 				return common.DecodeBytesWithProto3(data, &value)
@@ -1260,6 +1266,9 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 
 		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			var value ns.NameValueInDB
 			err = item.Value(func(data []byte) error {
 				// return common.DecodeBytes(data, &value)

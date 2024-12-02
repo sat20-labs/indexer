@@ -1,36 +1,10 @@
 package common
 
 import (
-	"fmt"
 
 	badger "github.com/dgraph-io/badger/v4"
 )
 
-
-func SeekItemInDB(searchKey []byte, db *badger.DB) []byte {
-	// 查找第一个大于或等于给定键的项
-	var result []byte
-	err := db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-
-		it.Seek(searchKey)
-
-		if it.Valid() {
-			item := it.Item()
-			result = item.KeyCopy(nil)
-			return nil
-			//fmt.Printf("Key: %s, Value: %s\n", key, value)
-		} else {
-			return fmt.Errorf("no item found")
-		}
-	})
-	if err != nil {
-		Log.Errorf("can't find key %v", searchKey)
-	}
-
-	return result
-}
 
 func IterateRangeInDB(db *badger.DB, startKey, endKey []byte, processFunc func(key, value []byte) error) error {
 	err := db.View(func(txn *badger.Txn) error {
@@ -40,6 +14,12 @@ func IterateRangeInDB(db *badger.DB, startKey, endKey []byte, processFunc func(k
 		it.Seek(startKey)
 		for it.Valid() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				Log.Errorf("IsDeletedOrExpired return true")
+				it.Next()
+				continue
+			}
+
 			key := item.KeyCopy(nil)
 			if compareKeys(key, endKey) > 0 {
 				break

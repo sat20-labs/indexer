@@ -298,6 +298,9 @@ func (bs *NftBuckStore) GetAll() map[int64]*BuckValue {
 		// 遍历匹配前缀的key
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 
 			if string(item.Key()) == key_last {
 				continue

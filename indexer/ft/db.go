@@ -43,6 +43,9 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 		// 遍历匹配前缀的key
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 
 			utxo, err := parseHolderInfoKey(key)
@@ -95,6 +98,9 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
 		// 遍历匹配前缀的key
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 
 			ticker, utxo, err := parseTickUtxoKey(key)
@@ -149,6 +155,9 @@ func (s *FTIndexer) loadTickListFromDB() []string {
 		defer it.Close()
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 			tickname, err := parseTickListKey(key)
 			if err == nil {
@@ -213,6 +222,9 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 		defer it.Close()
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 
 			tick, utxo, _ := ParseMintHistoryKey(key)

@@ -114,63 +114,6 @@ func GetValueFromDBWithType[T any](key []byte, txn *badger.Txn) (*T, error) {
 	return &target, err
 }
 
-func IsExistWithPrefixFromDB[T any](prefix []byte, db *badger.DB) (find bool, value T, err error) {
-	err = db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		it.Seek([]byte(prefix))
-		if it.ValidForPrefix([]byte(prefix)) {
-			err = it.Item().Value(func(data []byte) error {
-				return DecodeBytes(data, &value)
-			})
-			find = err == nil
-		}
-		return err
-	})
-	return
-}
-
-func GetValuesWithPrefixFromDB[T any](prefix []byte, txn *badger.Txn) (map[string]T, error) {
-	result := make(map[string]T)
-	itr := txn.NewIterator(badger.DefaultIteratorOptions)
-	defer itr.Close()
-
-	for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-		item := itr.Item()
-		var value T
-		err := item.Value(func(data []byte) error {
-			return DecodeBytes(data, &value)
-		})
-		if err != nil {
-			Log.Warnf("GetValuesWithPrefixFromDB error: %v", err)
-			continue
-		}
-		key := item.KeyCopy(nil)
-		result[string(key)] = value
-	}
-	return result, nil
-}
-
-func GetValuesWithPrefixFromDB2[T any](prefix []byte, txn *badger.Txn) (map[string]*T, error) {
-	result := make(map[string]*T)
-	itr := txn.NewIterator(badger.DefaultIteratorOptions)
-	defer itr.Close()
-
-	for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-		item := itr.Item()
-		var value T
-		err := item.Value(func(data []byte) error {
-			return DecodeBytes(data, &value)
-		})
-		if err != nil {
-			Log.Warnf("GetValuesWithPrefixFromDB error: %v", err)
-			continue
-		}
-		key := bytes.Split(item.KeyCopy(nil), prefix)
-		result[string(key[0])] = &value
-	}
-	return result, nil
-}
 
 func DecodeBytes(data []byte, target interface{}) error {
 	buf := bytes.NewBuffer(data)

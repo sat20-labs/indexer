@@ -42,6 +42,9 @@ func getNftsWithAddressFromDB(addressId uint64, db *badger.DB) []int64 {
 		defer it.Close()
 		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
 			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			key := string(item.Key())
 
 			_, nftId, err := ParseAddressKey(key)

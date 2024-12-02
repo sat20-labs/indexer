@@ -83,6 +83,9 @@ func (b *RpcIndexer) getAddressValue2(address string, txn *badger.Txn) *common.A
 
 		for itr.Seek(prefix); itr.ValidForPrefix(prefix); itr.Next() {
 			item := itr.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
 			value := int64(0)
 			item.Value(func(data []byte) error {
 				value = int64(common.BytesToUint64(data))
@@ -246,6 +249,9 @@ func (b *RpcIndexer) searhing(sat int64) {
 	
 			for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 				item := itr.Item()
+				if item.IsDeletedOrExpired() {
+					continue
+				}
 	
 				err = item.Value(func(data []byte) error {
 					return common.DecodeBytesWithProto3(data, &value)
