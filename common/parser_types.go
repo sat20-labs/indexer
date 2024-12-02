@@ -1,7 +1,10 @@
 package common
 
 const (
-	PROTOCOL_NAME = "ordx"
+	PROTOCOL_NAME_ORD = "ord"
+	PROTOCOL_NAME_ORDX = "ordx"
+	PROTOCOL_NAME_BRC20 = "brc20"
+	PROTOCOL_NAME_RUNES = "runes"
 )
 const (
 	FIELD_CONTENT          = 0

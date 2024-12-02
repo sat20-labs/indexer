@@ -447,7 +447,7 @@ func IsOrdXProtocol(fields map[int][]byte) (string, bool) {
 	content = string((fields)[FIELD_CONTENT])
 	protocol, ok := (fields)[FIELD_META_PROTOCOL]
 	if ok {
-		if string(protocol) == PROTOCOL_NAME {
+		if string(protocol) == PROTOCOL_NAME_ORDX {
 			jsonStr, err := Cbor2json((fields)[FIELD_META_DATA])
 			if err != nil {
 				return content, false
@@ -463,7 +463,7 @@ func IsOrdXProtocol(fields map[int][]byte) (string, bool) {
 		return content, false
 	}
 
-	return content, ordxContent.P == PROTOCOL_NAME
+	return content, ordxContent.P == PROTOCOL_NAME_ORDX
 }
 
 func GetProtocol(fields map[int][]byte) (string, []byte) {
