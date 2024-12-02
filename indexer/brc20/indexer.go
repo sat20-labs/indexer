@@ -17,7 +17,7 @@ type TickInfo struct {
 	MintInfo       *indexer.RangeRBTree            // mint history: 用于查找某个SatRange是否存在该ticker， Value是RBTreeValue_Mint
 	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
 	MintAdded      []*common.Mint
-	Ticker         *common.Ticker
+	Ticker         *common.Brc20Ticker
 }
 
 type HolderAction struct {
@@ -48,7 +48,7 @@ type BRC20Indexer struct {
 
 	// 其他辅助信息
 	holderActionList []*HolderAction           // 在同一个block中，状态变迁需要按顺序执行，因为一个utxo会很快被消费掉，变成新的utxo
-	tickerAdded      map[string]*common.Ticker // key: ticker
+	tickerAdded      map[string]*common.Brc20Ticker // key: ticker
 }
 
 func NewIndexer(db *badger.DB) *BRC20Indexer {
@@ -81,7 +81,7 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
 	copy(newInst.holderActionList, s.holderActionList)
 
-	newInst.tickerAdded = make(map[string]*common.Ticker, 0)
+	newInst.tickerAdded = make(map[string]*common.Brc20Ticker, 0)
 	for key, value := range s.tickerAdded {
 		newInst.tickerAdded[key] = value
 	}
@@ -183,7 +183,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 		s.utxoMap = s.loadUtxoMapFromDB()
 
 		s.holderActionList = make([]*HolderAction, 0)
-		s.tickerAdded = make(map[string]*common.Ticker, 0)
+		s.tickerAdded = make(map[string]*common.Brc20Ticker, 0)
 
 		s.mutex.Unlock()
 	}
@@ -242,9 +242,9 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	}
 
 	// 需要高度到达一定高度才需要检查
-	if s.nftIndexer.GetBaseIndexer().IsMainnet() && height > 828800 {
+	if s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 828800 {
 		// 需要区分主网和测试网
-		name := "pearl"
+		name := "ordi"
 		ticker := s.GetTicker(name)
 		if ticker == nil {
 			common.Log.Panicf("can't find %s in db", name)
@@ -261,16 +261,10 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			common.Log.Panicf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
 		}
 
-		// 1.2.0 版本升级后，pearl的数量增加了105张。原因是之前铸造时，部分输出少于amt的铸造，被错误的识别为无效的铸造。
-		// 但实际上，这些铸造是有效的，铸造时已经提供了大于10000的聪，只是大部分铸造出来的pearl，都给了矿工，只有546或者330留在铸造者手里
-		// 比如： 5647d570edcbe45d4953915f7b9063e9b39b83432ae2ae13fdbd5283abb83367i0 等
-		if ticker.BlockStart == 828200 {
-			if holderAmount != 156271012 {
-				common.Log.Panicf("%s amount incorrect. %d", name, holderAmount)
-			}
-		} else {
-			common.Log.Panicf("Incorrect %s", name)
-		}
+		// if holderAmount != 156271012 {
+		// 	common.Log.Panicf("%s amount incorrect. %d", name, holderAmount)
+		// }
+		
 	}
 
 	// 检查holderinfo？

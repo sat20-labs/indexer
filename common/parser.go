@@ -352,7 +352,41 @@ func ParseBrc20Content(content string) *Brc20BaseContent {
 		Log.Warnf("invalid json: %s, %v", content, err)
 		return nil
 	}
-	ret.Ticker = strings.TrimSpace(ret.Ticker)
+	//ret.Ticker = strings.TrimSpace(ret.Ticker) brc20的ticker支持空格
+	ret.Ticker = strings.ToLower(ret.Ticker)
+	ret.Op = strings.ToLower(ret.Op)
+	ret.P = strings.ToLower(ret.P)
+	return &ret
+}
+
+
+func ParseBrc20DeployContent(content string) *Brc20DeployContent {
+	var ret Brc20DeployContent
+	err := json.Unmarshal([]byte(content), &ret)
+	if err != nil {
+		Log.Warnf("invalid json: %s, %v", content, err)
+		return nil
+	}
+	ret.Ticker = strings.ToLower(ret.Ticker)
+	
+	return &ret
+}
+
+func ParseBrc20MintContent(content string) *Brc20MintContent {
+	var ret Brc20MintContent
+	err := json.Unmarshal([]byte(content), &ret)
+	if err != nil {
+		return nil
+	}
+	return &ret
+}
+
+func ParseBrc20TransferContent(content string) *Brc20TransferContent {
+	var ret Brc20TransferContent
+	err := json.Unmarshal([]byte(content), &ret)
+	if err != nil {
+		return nil
+	}
 	return &ret
 }
 

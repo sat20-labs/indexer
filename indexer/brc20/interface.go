@@ -14,10 +14,10 @@ func (p *BRC20Indexer) TickExisted(ticker string) bool {
 	return p.tickerMap[strings.ToLower(ticker)] != nil
 }
 
-func (p *BRC20Indexer) GetTickerMap() (map[string]*common.Ticker, error) {
+func (p *BRC20Indexer) GetTickerMap() (map[string]*common.Brc20Ticker, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	ret := make(map[string]*common.Ticker)
+	ret := make(map[string]*common.Brc20Ticker)
 
 	for name, tickinfo := range p.tickerMap {
 		if tickinfo.Ticker != nil {
@@ -32,7 +32,7 @@ func (p *BRC20Indexer) GetTickerMap() (map[string]*common.Ticker, error) {
 	return ret, nil
 }
 
-func (p *BRC20Indexer) GetTicker(tickerName string) *common.Ticker {
+func (p *BRC20Indexer) GetTicker(tickerName string) *common.Brc20Ticker {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 

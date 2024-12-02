@@ -36,11 +36,6 @@ type OrdxDeployContent struct {
 	Des      string `json:"des,omitempty"`
 }
 
-type Brc20BaseContent struct {
-	OrdxBaseContent
-	Ticker string `json:"tick,omitempty"`
-}
-
 type PrimaryNameBaseContent struct {
 	OrdxBaseContent
 	Name   string `json:"name"`

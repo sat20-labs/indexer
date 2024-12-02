@@ -258,8 +258,8 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 	return result
 }
 
-func (s *BRC20Indexer) getTickerFromDB(tickerName string) *common.Ticker {
-	var result common.Ticker
+func (s *BRC20Indexer) getTickerFromDB(tickerName string) *common.Brc20Ticker {
+	var result common.Brc20Ticker
 	err := s.db.View(func(txn *badger.Txn) error {
 		key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
 		err := common.GetValueFromDB([]byte(key), txn, &result)
