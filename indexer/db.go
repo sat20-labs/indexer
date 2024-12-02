@@ -43,6 +43,16 @@ func (p *IndexerMgr) initDB() (err error) {
 		return err
 	}
 
+	p.brc20DB, err = openDB(p.dbDir+"brc20", opts)
+	if err != nil {
+		return err
+	}
+
+	p.runesDB, err = openDB(p.dbDir+"runes", opts)
+	if err != nil {
+		return err
+	}
+
 	p.localDB, err = openDB(p.dbDir+"local", opts)
 	if err != nil {
 		return err

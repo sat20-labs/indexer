@@ -6,6 +6,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	base_indexer "github.com/sat20-labs/indexer/indexer/base"
+	"github.com/sat20-labs/indexer/indexer/brc20"
 	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/ft"
 	"github.com/sat20-labs/indexer/indexer/nft"
@@ -19,10 +20,12 @@ import (
 type IndexerMgr struct {
 	dbDir string
 	// data from blockchain
-	baseDB *badger.DB
-	ftDB   *badger.DB
-	nsDB   *badger.DB
-	nftDB  *badger.DB
+	baseDB  *badger.DB
+	ftDB    *badger.DB
+	nsDB    *badger.DB
+	nftDB   *badger.DB
+	brc20DB *badger.DB
+	runesDB *badger.DB
 	// data from market
 	localDB *badger.DB
 
@@ -33,6 +36,8 @@ type IndexerMgr struct {
 	maxIndexHeight  int
 	periodFlushToDB int
 
+	brc20Indexer *brc20.BRC20Indexer
+	//runesIndexer *ft.FTIndexer
 	exotic    *exotic.ExoticIndexer
 	ftIndexer *ft.FTIndexer
 	ns        *ns.NameService
@@ -46,9 +51,11 @@ type IndexerMgr struct {
 	// 备份所有需要写入数据库的数据
 	compilingBackupDB *base_indexer.BaseIndexer
 	exoticBackupDB    *exotic.ExoticIndexer
-	ordxBackupDB      *ft.FTIndexer
-	nsBackupDB        *ns.NameService
-	nftBackupDB       *nft.NftIndexer
+	brc20BackupDB     *brc20.BRC20Indexer
+	//runesBackupDB	  *ft.FTIndexer
+	ftBackupDB  *ft.FTIndexer
+	nsBackupDB  *ns.NameService
+	nftBackupDB *nft.NftIndexer
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
 
@@ -81,7 +88,7 @@ func NewIndexerMgr(
 		periodFlushToDB:   periodFlushToDB,
 		compilingBackupDB: nil,
 		exoticBackupDB:    nil,
-		ordxBackupDB:      nil,
+		ftBackupDB:        nil,
 		nsBackupDB:        nil,
 		nftBackupDB:       nil,
 		rpcService:        nil,
@@ -132,12 +139,16 @@ func (b *IndexerMgr) Init() {
 	b.ftIndexer.InitOrdxIndexer(b.nft)
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
+	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
+	b.brc20Indexer.InitIndexer(b.nft)
+	// b.runesIndexer = brc20.NewIndexer(b.runesDB)
+	// b.runesIndexer.InitIndexer()
 
 	b.rpcService = base_indexer.NewRpcIndexer(b.compiling)
 
 	b.compilingBackupDB = nil
 	b.exoticBackupDB = nil
-	b.ordxBackupDB = nil
+	b.ftBackupDB = nil
 	b.nsBackupDB = nil
 	b.nftBackupDB = nil
 
@@ -248,7 +259,11 @@ func (b *IndexerMgr) closeDB() {
 	common.RunBadgerGC(b.nftDB)
 	common.RunBadgerGC(b.nsDB)
 	common.RunBadgerGC(b.ftDB)
+	common.RunBadgerGC(b.brc20DB)
+	common.RunBadgerGC(b.runesDB)
 
+	b.runesDB.Close()
+	b.brc20DB.Close()
 	b.ftDB.Close()
 	b.nsDB.Close()
 	b.nftDB.Close()
@@ -262,6 +277,8 @@ func (b *IndexerMgr) checkSelf() {
 	b.exotic.CheckSelf()
 	b.nft.CheckSelf(b.baseDB)
 	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight())
+	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight())
+	//b.runesIndexer.CheckSelf()
 	b.ns.CheckSelf(b.baseDB)
 	common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
 }
@@ -272,6 +289,8 @@ func (b *IndexerMgr) forceUpdateDB() {
 	b.nft.UpdateDB()
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
+	b.brc20Indexer.UpdateDB()
+	//b.runesIndexer.UpdateDB()
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
 }
@@ -330,7 +349,7 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.exoticBackupDB.UpdateDB()
 	b.nftBackupDB.UpdateDB()
 	b.nsBackupDB.UpdateDB()
-	b.ordxBackupDB.UpdateDB()
+	b.ftBackupDB.UpdateDB()
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
@@ -338,16 +357,20 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.compiling.ResetBlockVector()
 
 	b.exoticBackupDB = b.exotic.Clone()
-	b.ordxBackupDB = b.ftIndexer.Clone()
+	b.ftBackupDB = b.ftIndexer.Clone()
 	b.nsBackupDB = b.ns.Clone()
 	b.nftBackupDB = b.nft.Clone()
+	b.brc20BackupDB = b.brc20Indexer.Clone()
+	//b.runesBackupDB = b.runesIndexer.Clone()
 	common.Log.Infof("backup instance %d cloned", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
 	b.compiling.Subtract(b.compilingBackupDB)
 	b.exotic.Subtract(b.exoticBackupDB)
-	b.ftIndexer.Subtract(b.ordxBackupDB)
+	b.ftIndexer.Subtract(b.ftBackupDB)
+	b.brc20Indexer.Subtract(b.brc20BackupDB)
+	//b.runesIndexer.Subtract(b.runesBackupDB)
 	b.ns.Subtract(b.nsBackupDB)
 	b.nft.Subtract(b.nftBackupDB)
 }

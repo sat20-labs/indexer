@@ -45,6 +45,8 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 	s.nft.UpdateTransfer(block)
 	s.ns.UpdateTransfer(block)
 	s.ftIndexer.UpdateTransfer(block)
+	s.brc20Indexer.UpdateTransfer(block)
+	//s.runesIndexer.UpdateTransfer(block)
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 
