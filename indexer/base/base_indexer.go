@@ -164,56 +164,56 @@ func needMerge(rngs []*common.Range) bool {
 
 func (b *BaseIndexer) Repair() {
 
-	changedUtxoMap := make(map[string]*common.UtxoValueInDB)
-	b.db.View(func(txn *badger.Txn) error {
-		var err error
-		prefix := []byte(common.DB_KEY_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
+	// changedUtxoMap := make(map[string]*common.UtxoValueInDB)
+	// b.db.View(func(txn *badger.Txn) error {
+	// 	var err error
+	// 	prefix := []byte(common.DB_KEY_UTXO)
+	// 	itr := txn.NewIterator(badger.DefaultIteratorOptions)
+	// 	defer itr.Close()
 
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
+	// 	startTime2 := time.Now()
+	// 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
 
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
+	// 	for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
+	// 		item := itr.Item()
+	// 		if item.IsDeletedOrExpired() {
+	// 			continue
+	// 		}
 
-			var value common.UtxoValueInDB
-			err = item.Value(func(data []byte) error {
-				//return common.DecodeBytes(data, &value)
-				return common.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Panicf("item.Value error: %v", err)
-			}
+	// 		var value common.UtxoValueInDB
+	// 		err = item.Value(func(data []byte) error {
+	// 			//return common.DecodeBytes(data, &value)
+	// 			return common.DecodeBytesWithProto3(data, &value)
+	// 		})
+	// 		if err != nil {
+	// 			common.Log.Panicf("item.Value error: %v", err)
+	// 		}
 
-			if needMerge(value.Ordinals) {
-				key := item.KeyCopy(nil)
-				changedUtxoMap[string(key)] = &value
-			}
-		}
+	// 		if needMerge(value.Ordinals) {
+	// 			key := item.KeyCopy(nil)
+	// 			changedUtxoMap[string(key)] = &value
+	// 		}
+	// 	}
 
-		common.Log.Infof("%s table %d takes %v", common.DB_KEY_UTXO, len(changedUtxoMap), time.Since(startTime2))
-		return nil
-	})
+	// 	common.Log.Infof("%s table %d takes %v", common.DB_KEY_UTXO, len(changedUtxoMap), time.Since(startTime2))
+	// 	return nil
+	// })
 
-	wb := b.db.NewWriteBatch()
-	defer wb.Cancel()
+	// wb := b.db.NewWriteBatch()
+	// defer wb.Cancel()
 
-	for k, v := range changedUtxoMap {
-		v.Ordinals = appendRanges(nil, v.Ordinals)
-		err := common.SetDBWithProto3([]byte(k), v, wb)
-		if err != nil {
-			common.Log.Panicf("Error setting in db %v", err)
-		}
-	}
+	// for k, v := range changedUtxoMap {
+	// 	v.Ordinals = appendRanges(nil, v.Ordinals)
+	// 	err := common.SetDBWithProto3([]byte(k), v, wb)
+	// 	if err != nil {
+	// 		common.Log.Panicf("Error setting in db %v", err)
+	// 	}
+	// }
 
-	err := wb.Flush()
-	if err != nil {
-		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
-	}
+	// err := wb.Flush()
+	// if err != nil {
+	// 	common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
+	// }
 }
 
 // only call in compiling data
