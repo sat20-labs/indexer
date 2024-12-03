@@ -245,7 +245,7 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 		//startTime := time.Now()
 
 		for _, v := range b.utxoIndex.Index {
-			if v.Address.Type == txscript.NullDataTy {
+			if v.Address.Type == int(txscript.NullDataTy) {
 				// 只有OP_RETURN 才不记录
 				if v.Value == 0 {
 					continue
@@ -311,7 +311,7 @@ func (b *BaseIndexer) UpdateDB() {
 		//}
 		// v.Address.Type == (txscript.NonStandardTy) 这样的utxo需要被记录下来，虽然地址是nil，ordinals也是nil
 		// 比如：21e48796d17bcab49b1fea7211199c0fa1e296d2ecf4cf2f900cee62153ee331的所有输出 （testnet）
-		if v.Address.Type == (txscript.NullDataTy) {
+		if v.Address.Type == int(txscript.NullDataTy) {
 			// 只有OP_RETURN 才不记录
 			if v.Value == 0 {
 				utxoSkipped++
@@ -343,7 +343,7 @@ func (b *BaseIndexer) UpdateDB() {
 
 		saveUTXO := &common.UtxoValueInDB{
 			UtxoId:      utxoId,
-			AddressType: uint32(v.Address.Type),
+			AddressType: common.ToAddrType(int(v.Address.Type), v.Address.ReqSig),
 			AddressIds:  addressIds,
 			Ordinals:    v.Ordinals,
 		}
@@ -788,7 +788,7 @@ func (b *BaseIndexer) loadUtxoFromDB(txn *badger.Txn, utxostr string) error {
 		b.addressIdMap[address] = &AddressStatus{AddressId: addressId, Op: 0}
 		addresses.Addresses = append(addresses.Addresses, address)
 	}
-	addresses.Type = txscript.ScriptClass(utxo.AddressType)
+	addresses.Type, addresses.ReqSig = common.FromAddrType(utxo.AddressType)
 
 	// TODO 对于多签的utxo，目前相当于把这个utxo给第一个地址
 	height, txid, vout := common.FromUtxoId(utxo.UtxoId)

@@ -4,8 +4,11 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 // interface for RPC
@@ -73,11 +76,11 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 
 	bSpecialTicker := false
 	result := make(map[uint64]int64)
-	switch ticker.TypeName {
+	switch ticker.Type {
 	case common.ASSET_TYPE_NFT:
 		var inscmap map[string]int64
 
-		if ticker.Name != common.ALL_TICKERS {
+		if ticker.Ticker != common.ALL_TICKERS {
 			b.mutex.RLock()
 			inscmap, bSpecialTicker = b.clmap[*ticker]
 			b.mutex.RUnlock()
@@ -106,7 +109,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 		}
 
 	case common.ASSET_TYPE_NS:
-		if ticker.Name != common.ALL_TICKERS {
+		if ticker.Ticker != common.ALL_TICKERS {
 			bSpecialTicker = true
 		}
 		for utxoId := range utxos {
@@ -115,7 +118,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 			if bSpecialTicker {
 				for _, name := range names {
 					_, subName := getSubName(name)
-					if subName == ticker.Name {
+					if subName == ticker.Ticker {
 						amount++
 					}
 				}
@@ -128,7 +131,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 		}
 
 	case common.ASSET_TYPE_EXOTIC:
-		if ticker.Name != common.ALL_TICKERS {
+		if ticker.Ticker != common.ALL_TICKERS {
 			bSpecialTicker = true
 		}
 		for utxoId := range utxos {
@@ -142,7 +145,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 			amount := int64(0)
 			for name, rngs := range sr {
 				if bSpecialTicker {
-					if name == ticker.Name {
+					if name == ticker.Ticker {
 						amount += (common.GetOrdinalsSize(rngs))
 					}
 				} else {
@@ -155,7 +158,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 		}
 
 	case common.ASSET_TYPE_FT:
-		result = b.ftIndexer.GetAssetUtxosWithTicker(b.rpcService.GetAddressId(address), ticker.Name)
+		result = b.ftIndexer.GetAssetUtxosWithTicker(b.rpcService.GetAddressId(address), ticker.Ticker)
 	}
 
 	return result, nil
@@ -171,19 +174,19 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	result := make(map[common.TickerName]int64)
 	nsAsset := b.GetSubNameSummaryWithAddress(address)
 	for k, v := range nsAsset {
-		tickName := common.TickerName{TypeName: common.ASSET_TYPE_NS, Name: k}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
 		result[tickName] = v
 	}
 
 	nftAsset := b.GetNftAmountWithAddress(address)
 	for k, v := range nftAsset {
-		tickName := common.TickerName{TypeName: common.ASSET_TYPE_NFT, Name: k}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
 		result[tickName] = v
 	}
 
 	ftAsset := b.ftIndexer.GetAssetSummaryByAddress(utxos)
 	for k, v := range ftAsset {
-		tickName := common.TickerName{TypeName: common.ASSET_TYPE_FT, Name: k}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
 	}
 
@@ -200,7 +203,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	exAssets := b.getExoticSummaryByAddress(plainUtxoMap)
 	for k, v := range exAssets {
 		// 如果该range有其他铸造出来的资产，过滤掉（直接使用utxoId过滤）
-		tickName := common.TickerName{TypeName: common.ASSET_TYPE_EXOTIC, Name: k}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
 		result[tickName] = v
 	}
 
@@ -208,31 +211,31 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 }
 
 // return: ticker -> []utxoId
-func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[*common.TickerName][]uint64 {
+func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerName][]uint64 {
 	utxos, err := b.rpcService.GetUTXOs(address)
 	if err != nil {
 		return nil
 	}
 
-	result := make(map[*common.TickerName][]uint64)
+	result := make(map[common.TickerName][]uint64)
 
 	ret := b.getExoticUtxos(utxos)
 	for k, v := range ret {
-		tickName := &common.TickerName{TypeName: common.ASSET_TYPE_EXOTIC, Name: k}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
 		result[tickName] = append(result[tickName], v...)
 	}
 
 	for utxoId := range utxos {
 		ids := b.GetNftsWithUtxo(utxoId)
 		if len(ids) > 0 {
-			tickName := &common.TickerName{TypeName: common.ASSET_TYPE_NFT, Name: ""}
+			tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: ""}
 			result[tickName] = append(result[tickName], utxoId)
 		}
 
 		names := b.GetNamesWithUtxo(utxoId)
 		if len(names) > 0 {
 			for _, name := range names {
-				tickName := &common.TickerName{TypeName: common.ASSET_TYPE_NS, Name: name}
+				tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: name}
 				result[tickName] = append(result[tickName], utxoId)
 			}
 		}
@@ -240,7 +243,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[*common.TickerNa
 
 	ret = b.ftIndexer.GetAssetUtxos(utxos)
 	for k, v := range ret {
-		tickName := &common.TickerName{TypeName: common.ASSET_TYPE_FT, Name: k}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
 	}
 
@@ -248,24 +251,24 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[*common.TickerNa
 }
 
 // return: ticker -> assets(inscriptionId->Ranges)
-func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[*common.TickerName]map[string][]*common.Range {
-	result := make(map[*common.TickerName]map[string][]*common.Range)
+func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[string][]*common.Range {
+	result := make(map[common.TickerName]map[string][]*common.Range)
 	ftAssets := b.ftIndexer.GetAssetsWithUtxo(utxoId)
 	if len(ftAssets) > 0 {
 		for k, v := range ftAssets {
-			tickName := &common.TickerName{TypeName: common.ASSET_TYPE_FT, Name: k}
+			tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 			result[tickName] = v
 		}
 	}
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
-		tickName := &common.TickerName{TypeName: common.ASSET_TYPE_NFT, Name: ""}
+		tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: ""}
 		result[tickName] = nfts
 	}
 	names := b.getNamesWithUtxo(utxoId)
 	if len(names) > 0 {
 		for k, v := range names {
-			tickName := &common.TickerName{TypeName: common.ASSET_TYPE_NS, Name: k}
+			tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
 			result[tickName] = v
 		}
 	}
@@ -279,7 +282,7 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[*common.TickerName]map
 			if b.nft.HasNftInUtxo(utxoId) {
 				continue
 			}
-			tickName := &common.TickerName{TypeName: common.ASSET_TYPE_EXOTIC, Name: k}
+			tickName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
 			result[tickName] = v
 		}
 	}
@@ -335,7 +338,7 @@ func (b *IndexerMgr) GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRa
 					if rng2.Assets == nil {
 						rng2.Assets = make([]*common.TickerName, 0)
 					}
-					rng2.Assets = append(rng2.Assets, ticker)
+					rng2.Assets = append(rng2.Assets, &ticker)
 
 					// 后不相交部分
 					rng3 := rng.Clone()
@@ -409,7 +412,7 @@ func (b *IndexerMgr) GetMintHistory(tick string, start, limit int) []*common.Min
 
 func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.TickerName, start, limit int) ([]*common.MintAbbrInfo, int) {
 	addressId := b.GetAddressId(address)
-	switch tick.TypeName {
+	switch tick.Type {
 	case common.ASSET_TYPE_NFT:
 		return b.GetNftHistoryWithAddress(addressId, start, limit)
 	case common.ASSET_TYPE_NS:
@@ -419,7 +422,7 @@ func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.Tick
 	default:
 
 	}
-	return b.ftIndexer.GetMintHistoryWithAddress(addressId, tick.Name, start, limit)
+	return b.ftIndexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 }
 
 func (b *IndexerMgr) GetMintInfo(inscriptionId string) *common.Mint {
@@ -461,7 +464,7 @@ func (b *IndexerMgr) AddCollection(ntype, ticker string, ids []string) error {
 			common.Log.Errorf("AddCollection %s %s failed: %v", ntype, ticker, err)
 		} else {
 			b.mutex.Lock()
-			b.clmap[common.TickerName{TypeName: ntype, Name: ticker}] = inscriptionIdsToCollectionMap(ids)
+			b.clmap[common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: ntype, Ticker: ticker}] = inscriptionIdsToCollectionMap(ids)
 			b.mutex.Unlock()
 		}
 		return err
@@ -489,3 +492,44 @@ func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string
 
 	return nil, fmt.Errorf("not support asset type %s", ntype)
 }
+
+
+func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
+	info, err := b.rpcService.GetUtxoValue(utxo)
+	if err != nil {
+		return nil
+	}
+
+	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
+
+	var assets []*common.AssetInfo_MainNet
+	for k, v := range assetmap {
+		asset := common.AssetInfo_MainNet{}
+		value := int64(0)
+		var offsets []*common.OffsetRange
+		for _, rngs := range v {
+			size := common.GetOrdinalsSize(rngs)
+			offsets = append(offsets, &common.OffsetRange{Start: value, End: size})
+			value += size
+		}
+		asset.AssetInfo = swire.AssetInfo{
+			Name: k,
+			Amount: value,
+			BindingSat: 1,
+		}
+		asset.AssetOffsets = offsets
+
+		assets = append(assets, &asset)
+	}
+
+	return &common.TxOutput{
+		OutPoint: utxo,
+		OutValue: wire.TxOut{
+			Value: common.GetOrdinalsSize(info.Ordinals),
+			PkScript: info.PkScript,
+		},
+		Sats: info.Ordinals,
+		Assets: assets,
+	}
+}
+

@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	ordx "github.com/sat20-labs/indexer/common"
 	serverOrdx "github.com/sat20-labs/indexer/server/define"
 	"github.com/sat20-labs/indexer/share/base_indexer"
-	"github.com/gin-gonic/gin"
 )
 
 const QueryParamDefaultLimit = "100"
@@ -634,7 +634,7 @@ func (s *Handle) getAddressMintHistory(c *gin.Context) {
 // @Failure 401 "Invalid API Key"
 // @Router /address/assets/{utxo} [get]
 func (s *Handle) getAssetDetailInfo(c *gin.Context) {
-	resp := &AssetsResp{
+	resp := &AssetsResp_deprecated{
 		BaseResp: serverOrdx.BaseResp{
 			Code: 0,
 			Msg:  "ok",
@@ -660,7 +660,6 @@ func (s *Handle) getAssetDetailInfo(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
-
 
 func (s *Handle) getAssetOffset(c *gin.Context) {
 	resp := &AssetOffsetResp{
@@ -689,7 +688,6 @@ func (s *Handle) getAssetOffset(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
-
 
 // @Summary Get assets with abbreviated info in the UTXO
 // @Description Get assets with abbreviated info in the UTXO
@@ -769,7 +767,7 @@ func (s *Handle) getSatRangeWithUtxo(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
+func (s *Handle) getAssetsWithUtxos_deprecated(c *gin.Context) {
 	resp := &AbbrAssetsWithUtxosResp{
 		BaseResp: serverOrdx.BaseResp{
 			Code: 0,
@@ -785,7 +783,7 @@ func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
 		return
 	}
 
-	result, err := s.model.GetAssetsWithUtxos(&req)
+	result, err := s.model.GetAssetsWithUtxos_deprecated(&req)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -795,7 +793,6 @@ func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
-
 
 func (s *Handle) getExistingUtxos(c *gin.Context) {
 	resp := &ExistingUtxoResp{
@@ -824,7 +821,6 @@ func (s *Handle) getExistingUtxos(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-
 // @Summary Get asset details in a range
 // @Description Get asset details in a range
 // @Tags ordx.range
@@ -836,7 +832,7 @@ func (s *Handle) getExistingUtxos(c *gin.Context) {
 // @Failure 401 "Invalid API Key"
 // @Router /range/{start}/{size} [get]
 func (s *Handle) getAssetDetailInfoWithRange(c *gin.Context) {
-	resp := &AssetsResp{
+	resp := &AssetsResp_deprecated{
 		BaseResp: serverOrdx.BaseResp{
 			Code: 0,
 			Msg:  "ok",
@@ -886,7 +882,7 @@ func (s *Handle) getAssetDetailInfoWithRange(c *gin.Context) {
 // @Failure 401 "Invalid API Key"
 // @Router /ranges [post]
 func (s *Handle) getAssetDetailInfoWithRanges(c *gin.Context) {
-	resp := &AssetsResp{
+	resp := &AssetsResp_deprecated{
 		BaseResp: serverOrdx.BaseResp{
 			Code: 0,
 			Msg:  "ok",
@@ -1325,6 +1321,131 @@ func (s *Handle) getNftWithInscriptionId(c *gin.Context) {
 	inscriptionId := c.Param("id")
 
 	result, err := s.model.GetNftInfoWithInscriptionId(inscriptionId)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	} else {
+		resp.Data = result
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Handle) getAssetSummary(c *gin.Context) {
+	resp := &AssetSummaryResp{
+		BaseResp: serverOrdx.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+
+	address := c.Param("address")
+	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
+	if err != nil {
+		start = 0
+	}
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	if err != nil {
+		limit = 100
+	}
+
+	result, err := s.model.GetAssetSummary(address, int(start), limit)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	resp.Data = result
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Handle) getUtxosWithTicker(c *gin.Context) {
+	resp := &UtxosWithAssetResp{
+		BaseResp: serverOrdx.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+
+	address := c.Param("address")
+	ticker := c.Param("ticker")
+	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
+	if err != nil {
+		start = 0
+	}
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	if err != nil {
+		limit = 100
+	}
+
+	result, total, err := s.model.GetUtxosWithAssetName(address, ticker, int(start), limit)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	resp.ListResp = serverOrdx.ListResp{
+		Total: uint64(total),
+		Start: start,
+	}
+	resp.Data = result
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// @Summary Get asset details in a UTXO
+// @Description Get asset details in a UTXO
+// @Tags ordx.utxo
+// @Produce json
+// @Param utxo path string true "UTXO"
+// @Security Bearer
+// @Success 200 {object} AssetsResp "Successful response"
+// @Failure 401 "Invalid API Key"
+// @Router /address/assets/{utxo} [get]
+func (s *Handle) getAssetInfo(c *gin.Context) {
+	resp := &AssetsResp{
+		BaseResp: serverOrdx.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+
+	utxo := c.Param("utxo")
+	result, err := s.model.GetAssetWithUtxo(utxo)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	resp.Data = result
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
+	resp := &AssetsWithUtxosResp{
+		BaseResp: serverOrdx.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+
+	var req UtxosReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	result, err := s.model.GetAssetsWithUtxos(&req)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

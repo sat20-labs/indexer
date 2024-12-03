@@ -54,7 +54,7 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 		// parse the raw tx values
 		for j, v := range tx.MsgTx().TxOut {
 			// Determine the type of the script and extract the address
-			scyptClass, addrs, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, b.chaincfgParam)
+			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, b.chaincfgParam)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
 				return nil
@@ -63,7 +63,11 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 
 			addrsString := make([]string, len(addrs))
 			for i, x := range addrs {
-				addrsString[i] = x.EncodeAddress()
+				if scyptClass == txscript.MultiSigTy {
+					addrsString[i] = hex.EncodeToString(x.ScriptAddress()) // pubkey
+				} else {
+					addrsString[i] = x.EncodeAddress()
+				}
 			}
 
 			var receiver common.ScriptPubKey
@@ -75,12 +79,16 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 				}
 				receiver = common.ScriptPubKey{
 					Addresses: []string{address},
-					Type:      scyptClass,
+					Type:      int(scyptClass),
+					PkScript: v.PkScript,
+					ReqSig:   reqSig,
 				}
 			} else {
 				receiver = common.ScriptPubKey{
 					Addresses: addrsString,
-					Type:      scyptClass,
+					Type:      int(scyptClass),
+					PkScript: v.PkScript,
+					ReqSig:   reqSig,
 				}
 			}
 

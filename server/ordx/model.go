@@ -2,10 +2,13 @@ package ordx
 
 import (
 	"fmt"
+	"sort"
 
+	"github.com/sat20-labs/indexer/common"
 	ordx "github.com/sat20-labs/indexer/common"
 	serverOrdx "github.com/sat20-labs/indexer/server/define"
 	"github.com/sat20-labs/indexer/share/base_indexer"
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 type Model struct {
@@ -76,3 +79,73 @@ func (s *Model) getTicker(tickerName string) (*serverOrdx.TickerStatus, error) {
 
 	return tickerStatusResp, nil
 }
+
+
+func IsAssetBindingSat(asset *swire.AssetName) uint16 {
+	if asset.Protocol == common.PROTOCOL_NAME_ORD ||
+		asset.Protocol == common.PROTOCOL_NAME_ORDX {
+		return 1
+	}
+	return 0
+}
+
+func (s *Model) GetAssetSummary(address string, start int, limit int) (*AssetSummary, error) {
+	tickerMap := s.indexer.GetAssetSummaryInAddress(address)
+
+	result := AssetSummary{}
+	for tickName, balance := range tickerMap {
+		resp := &swire.AssetInfo{}
+		resp.Name = tickName
+		resp.Amount = balance
+		resp.BindingSat = IsAssetBindingSat(&tickName)
+		result.Data = append(result.Data, resp)
+	}
+	result.Start = 0
+	result.Total = uint64(len(result.Data))
+
+	sort.Slice(result.Data, func(i, j int) bool {
+		return result.Data[i].Amount > result.Data[j].Amount
+	})
+
+	return &result, nil
+}
+
+func (s *Model) GetAssetWithUtxo(utxo string) (*TxOutput, error) {
+
+	txOut := s.indexer.GetTxOutputWithUtxo(utxo)
+	if txOut == nil {
+		return nil, fmt.Errorf("can't get txout from %s", utxo)
+	}
+
+	output := TxOutput{
+		OutPoint: utxo,
+		OutValue: txOut.OutValue,
+		Sats: txOut.Sats,
+		Assets: txOut.Assets,
+	}
+
+	return &output, nil
+}
+
+
+func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*TxOutput, error) {
+	result := make([]*TxOutput, 0)
+	for _, utxo := range req.Utxos {
+		
+		txOutput, err := s.GetAssetWithUtxo(utxo)
+		if err != nil {
+			continue
+		}
+
+		result = append(result, txOutput)
+	}
+
+	return result, nil
+}
+
+func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*TxOutput, int, error) {
+	
+
+	return nil, 0, nil
+}
+

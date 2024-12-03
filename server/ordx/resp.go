@@ -1,9 +1,11 @@
 package ordx
 
 import (
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	ordx "github.com/sat20-labs/indexer/common"
 	serverOrdx "github.com/sat20-labs/indexer/server/define"
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 type BestHeightResp struct {
@@ -127,9 +129,14 @@ type RangesReq struct {
 	Ranges []*ordx.Range `json:"ranges"`
 }
 
-type AssetsResp struct {
+type AssetsResp_deprecated struct {
 	serverOrdx.BaseResp
 	Data *AssetsData `json:"data"`
+}
+
+type AssetsResp struct {
+	serverOrdx.BaseResp
+	Data *TxOutput `json:"data"`
 }
 
 type AssetListResp struct {
@@ -240,4 +247,33 @@ type NamesWithAddressData struct {
 type NamesWithAddressResp struct {
 	serverOrdx.BaseResp
 	Data *NamesWithAddressData `json:"data"`
+}
+
+type TxOutput struct {
+	OutPoint string      `json:"outpoint"`
+	OutValue wire.TxOut  `json:"outvalue"`
+	Sats     []*common.Range `json:"rangs"`
+	Assets   []*common.AssetInfo_MainNet  `json:"assets"`
+}
+
+type AssetSummary struct {
+	serverOrdx.ListResp
+	Data []*swire.AssetInfo `json:"data"`
+}
+
+type AssetSummaryResp struct {
+	serverOrdx.BaseResp
+	Data *AssetSummary `json:"data"`
+}
+
+type UtxosWithAssetResp struct {
+	serverOrdx.BaseResp
+	Name swire.AssetName
+	serverOrdx.ListResp
+	Data []*TxOutput `json:"data"`
+}
+
+type AssetsWithUtxosResp struct {
+	serverOrdx.BaseResp
+	Data []*TxOutput `json:"data"`
 }

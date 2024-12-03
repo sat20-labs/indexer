@@ -34,14 +34,14 @@ type Indexer interface {
 	// return: tick->amount
 	GetAssetSummaryInAddress(address string) map[common.TickerName]int64
 	// return: tick->UTXOs
-	GetAssetUTXOsInAddress(address string) map[*common.TickerName][]uint64
+	GetAssetUTXOsInAddress(address string) map[common.TickerName][]uint64
 	// return: utxo->asset amount
 	GetAssetUTXOsInAddressWithTick(address string, tickerName *common.TickerName) (map[uint64]int64, error)
 	// return: mint info sorted by inscribed time
 	GetMintHistoryWithAddress(address string, tickerName *common.TickerName, start, limit int) ([]*common.MintAbbrInfo, int)
 	HasAssetInUtxo(utxo string, excludingExotic bool) bool
 	// return: ticker -> asset info (inscriptinId -> asset ranges)
-	GetAssetsWithUtxo(utxo uint64) map[*common.TickerName]map[string][]*common.Range
+	GetAssetsWithUtxo(utxo uint64) map[common.TickerName]map[string][]*common.Range
 	// return: all asset pieces in the utxo in original sequence, including blank sats
 	GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRange
 	// return: ticker -> asset info (inscriptinId -> asset ranges)
@@ -96,4 +96,7 @@ type Indexer interface {
 	GetNftsWithAddress(address string, start int, limit int) ([]*common.Nft, int)
 	GetNftHistory(start int, limit int) ([]*common.MintAbbrInfo, int)
 	GetNftHistoryWithAddress(addressId uint64, start int, limit int) ([]*common.MintAbbrInfo, int)
+
+	// new interface
+	GetTxOutputWithUtxo(utxo string) *common.TxOutput
 }

@@ -67,13 +67,13 @@ func (s *Model) GetAddressMintHistory(tickerName, address string, start, limit i
 
 	var ticker common.TickerName
 	if len(tickerName) < common.MIN_NAME_LEN {
-		ticker.TypeName = tickerName
-		ticker.Name = ""
+		ticker.Type = tickerName
+		ticker.Ticker = ""
 	} else {
-		ticker.TypeName = common.ASSET_TYPE_FT
-		ticker.Name = tickerName
+		ticker.Type = common.ASSET_TYPE_FT
+		ticker.Ticker = tickerName
 	}
-	result := serverOrdx.MintHistory{TypeName: ticker.TypeName, Ticker: tickerName}
+	result := serverOrdx.MintHistory{TypeName: ticker.Type, Ticker: tickerName}
 	mintmap, total := s.indexer.GetMintHistoryWithAddress(address, &ticker, start, limit)
 
 	result.Total = total
@@ -149,7 +149,8 @@ func (s *Model) GetMintPermissionInfo(ticker, address string) (*serverOrdx.MintP
 }
 
 func (s *Model) GetFeeInfo(address string) (*serverOrdx.FeeInfo, error) {
-	utxomap, err := s.indexer.GetAssetUTXOsInAddressWithTick(address, &common.TickerName{TypeName: common.ASSET_TYPE_FT, Name: "pearl"})
+	utxomap, err := s.indexer.GetAssetUTXOsInAddressWithTick(address, 
+		&common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: "pearl"})
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +202,8 @@ func (s *Model) GetBalanceSummaryList(address string, start int, limit int) ([]*
 	result := make([]*serverOrdx.BalanceSummary, 0)
 	for tickName, balance := range tickerMap {
 		resp := &serverOrdx.BalanceSummary{
-			TypeName: tickName.TypeName,
-			Ticker:   tickName.Name,
+			TypeName: tickName.Type,
+			Ticker:   tickName.Ticker,
 			Balance:  balance,
 		}
 		resp.Balance = balance
@@ -216,7 +217,7 @@ func (s *Model) GetBalanceSummaryList(address string, start int, limit int) ([]*
 	return result, nil
 }
 
-func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*serverOrdx.UtxoAbbrAssets, error) {
+func (s *Model) GetAssetsWithUtxos_deprecated(req *UtxosReq) ([]*serverOrdx.UtxoAbbrAssets, error) {
 	result := make([]*serverOrdx.UtxoAbbrAssets, 0)
 	for _, utxo := range req.Utxos {
 		utxoId := s.indexer.GetUtxoId(utxo)
@@ -231,8 +232,8 @@ func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*serverOrdx.UtxoAbbrAssets,
 			}
 
 			utxoAssets.Assets = append(utxoAssets.Assets, &serverOrdx.AssetAbbrInfo{
-				TypeName: ticker.Name,
-				Ticker:   ticker.Name,
+				TypeName: ticker.Type,
+				Ticker:   ticker.Ticker,
 				Amount:   amount,
 			})
 		}
@@ -266,11 +267,11 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 
 	var ticker common.TickerName
 	if len(tickerName) < common.MIN_NAME_LEN {
-		ticker.TypeName = tickerName
-		ticker.Name = common.ALL_TICKERS
+		ticker.Type = tickerName
+		ticker.Ticker = common.ALL_TICKERS
 	} else {
-		ticker.TypeName = common.ASSET_TYPE_FT
-		ticker.Name = tickerName
+		ticker.Type = common.ASSET_TYPE_FT
+		ticker.Ticker = tickerName
 	}
 
 	utxos, err := s.indexer.GetAssetUTXOsInAddressWithTick(address, &ticker)
@@ -320,13 +321,13 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 
 		assets := s.indexer.GetAssetsWithUtxo(utxoAsset.Utxo)
 		for k, mintinfo := range assets {
-			if k.TypeName != ticker.TypeName || (ticker.Name != "" && k.Name != ticker.Name) {
+			if k.Type != ticker.Type || (ticker.Ticker != "" && k.Ticker != ticker.Ticker) {
 				continue
 			}
 
 			resp := &serverOrdx.TickerAsset{
-				TypeName: ticker.TypeName,
-				Ticker:   ticker.Name,
+				TypeName: ticker.Type,
+				Ticker:   ticker.Ticker,
 				Utxo:     s.indexer.GetUtxoById(utxoAsset.Utxo),
 			}
 			resp.Amount = common.GetOrdinalsSize(rngs)
@@ -358,11 +359,11 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int) ([]*serverOrdx.TickerAsset, int, error) {
 	var ticker common.TickerName
 	if len(tickerName) < common.MIN_NAME_LEN {
-		ticker.TypeName = tickerName
-		ticker.Name = common.ALL_TICKERS
+		ticker.Type = tickerName
+		ticker.Ticker = common.ALL_TICKERS
 	} else {
-		ticker.TypeName = common.ASSET_TYPE_FT
-		ticker.Name = tickerName
+		ticker.Type = common.ASSET_TYPE_FT
+		ticker.Ticker = tickerName
 	}
 
 	utxos, err := s.indexer.GetAssetUTXOsInAddressWithTick(address, &ticker)
@@ -421,8 +422,8 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
 			for inscId, ranges := range tickAbbrInfo {
 				asset := serverOrdx.InscriptionAsset{}
-				asset.TypeName = ticker.TypeName
-				asset.Ticker = ticker.Name
+				asset.TypeName = ticker.Type
+				asset.Ticker = ticker.Ticker
 				asset.AssetAmount = common.GetOrdinalsSize(ranges)
 				asset.Ranges = ranges
 				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
@@ -453,7 +454,7 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*serverOrdx.Ti
 				common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
 				continue
 			}
-			a := &UtxoAsset{Utxo: u, Ticker: key}
+			a := &UtxoAsset{Utxo: u, Ticker: &key}
 			utxosort = append(utxosort, a)
 		}
 	}
@@ -491,8 +492,8 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*serverOrdx.Ti
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
 			for inscId, ranges := range tickAbbrInfo {
 				asset := serverOrdx.InscriptionAsset{}
-				asset.TypeName = ticker.TypeName
-				asset.Ticker = ticker.Name
+				asset.TypeName = ticker.Type
+				asset.Ticker = ticker.Ticker
 				asset.AssetAmount = common.GetOrdinalsSize(ranges)
 				asset.Ranges = ranges
 				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
@@ -527,8 +528,8 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*serverOrdx.AssetDetailInfo
 	for ticker, mintinfo := range assets {
 
 		var tickinfo serverOrdx.TickerAsset
-		tickinfo.TypeName = ticker.TypeName
-		tickinfo.Ticker = ticker.Name
+		tickinfo.TypeName = ticker.Type
+		tickinfo.Ticker = ticker.Ticker
 		tickinfo.Utxo = ""
 		tickinfo.Amount = 0
 
@@ -622,8 +623,8 @@ func (s *Model) GetAbbrAssetsWithUtxo(utxo string) ([]*serverOrdx.AssetAbbrInfo,
 		}
 
 		result = append(result, &serverOrdx.AssetAbbrInfo{
-			TypeName: ticker.Name,
-			Ticker:   ticker.Name,
+			TypeName: ticker.Type,
+			Ticker:   ticker.Ticker,
 			Amount:   amount,
 		})
 	}
@@ -643,7 +644,7 @@ func (s *Model) GetSeedsWithUtxo(utxo string) ([]*serverOrdx.Seed, error) {
 		for _, rngs := range info {
 			assetRanges = append(assetRanges, rngs...)
 		}
-		seed := serverOrdx.Seed{TypeName: ticker.TypeName, Ticker: ticker.Name, Seed: common.GenerateSeed2(assetRanges)}
+		seed := serverOrdx.Seed{TypeName: ticker.Type, Ticker: ticker.Ticker, Seed: common.GenerateSeed2(assetRanges)}
 		result = append(result, &seed)
 	}
 

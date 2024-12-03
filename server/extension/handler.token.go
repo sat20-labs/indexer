@@ -141,7 +141,7 @@ func (s *Service) token_list(c *gin.Context) {
 		return
 	}
 
-	curTickerName := common.TickerName{TypeName: common.ASSET_TYPE_FT, Name: req.Ticker}
+	curTickerName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: req.Ticker}
 	ftUtxoAssetMap, err := indexer.ShareBaseIndexer.GetAssetUTXOsInAddressWithTick(req.Address, &curTickerName)
 	if err != nil {
 		resp.Code = -1
@@ -177,10 +177,10 @@ func (s *Service) token_list(c *gin.Context) {
 
 		utxoAssetMap := indexer.ShareBaseIndexer.GetAssetsWithUtxo(ftUtxoAssetSummary.UtxoId)
 		for tickerName, mintInfo := range utxoAssetMap {
-			if tickerName.TypeName != curTickerName.TypeName || (curTickerName.Name != "" && tickerName.Name != curTickerName.Name) {
+			if tickerName != curTickerName {
 				continue
 			}
-			tickerName := curTickerName.Name
+			tickerName := curTickerName.Ticker
 			utxo := indexer.ShareBaseIndexer.GetUtxoById(ftUtxoAssetSummary.UtxoId)
 			amount := common.GetOrdinalsSize(rangeList)
 			for inscriptionId, ranges := range mintInfo {

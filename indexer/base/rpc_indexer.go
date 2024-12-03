@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 
 	"github.com/dgraph-io/badger/v4"
@@ -69,6 +70,74 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	}
 
 	return output.UtxoId, output.Ordinals, nil
+}
+
+func (b *RpcIndexer) GetUtxoValue(utxo string) (*common.UtxoInfo, error) {
+
+	// 有可能还没有写入数据库，所以先读缓存
+	utxoInfo, ok := b.utxoIndex.Index[utxo]
+	if ok {
+		value := &common.UtxoInfo{
+			UtxoId:      common.GetUtxoId(utxoInfo),
+			Value: utxoInfo.Value,
+			PkScript: utxoInfo.Address.PkScript,
+			Ordinals:    utxoInfo.Ordinals,
+		}
+		return value, nil
+	}
+
+	output := &common.UtxoValueInDB{}
+	err := b.db.View(func(txn *badger.Txn) error {
+		key := common.GetUTXODBKey(utxo)
+		//err := common.GetValueFromDB(key, txn, output)
+		err := common.GetValueFromDBWithProto3(key, txn, output)
+		if err != nil {
+			common.Log.Errorf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
+			return err
+		}
+		return nil
+	})
+
+	info := common.UtxoInfo{}
+	var pkScript []byte
+	addrType, reqSig := common.FromAddrType(output.AddressType)
+	if addrType == int(txscript.MultiSigTy) {
+		var addresses []string
+		for _, id := range output.AddressIds {
+			addr, err := b.GetAddressByID(id)
+			if err != nil {
+				return nil, err
+			}
+			addresses = append(addresses, addr)
+		}
+		pkScript, err = common.MultiSigToPkScript(reqSig, addresses, b.IsMainnet())
+		if err != nil {
+			return nil, err
+		}
+	} else if addrType == int(txscript.NullDataTy) {
+		pkScript, err = txscript.NullDataScript(nil)
+	} else {
+		addr, err := b.GetAddressByID(output.AddressIds[0])
+		if err != nil {
+			return nil, err
+		}
+		pkScript, err = common.AddressToPkScript(addr, b.IsMainnet())
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+
+	info.UtxoId = output.UtxoId
+	info.Value = common.GetOrdinalsSize(output.Ordinals)
+	info.PkScript = pkScript
+	info.Ordinals = output.Ordinals
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &info, nil
 }
 
 // only for api access

@@ -175,7 +175,7 @@ func (s *Service) tx_decodePsbt(c *gin.Context) {
 		inputRanges = append(inputRanges, rngs...)
 		assets := base_indexer.ShareBaseIndexer.GetAssetsWithUtxo(utxoId)
 		for ticker, mintinfo := range assets {
-			if ticker.TypeName == common.ASSET_TYPE_EXOTIC {
+			if ticker.Type == common.ASSET_TYPE_EXOTIC {
 				// TODO 稀有聪需要有所表示出来
 				continue
 			}

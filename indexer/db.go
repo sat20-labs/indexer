@@ -107,7 +107,7 @@ func (p *IndexerMgr) initCollections() {
 				} else {
 					err = common.DecodeBytes(value, &ids)
 					if err == nil {
-						p.clmap[common.TickerName{TypeName: nty, Name: name}] = inscriptionIdsToCollectionMap(ids)
+						p.clmap[common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: nty, Ticker: name}] = inscriptionIdsToCollectionMap(ids)
 					} else {
 						common.Log.Errorln("initCollections DecodeBytes " + err.Error())
 					}

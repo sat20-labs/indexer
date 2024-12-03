@@ -2,8 +2,12 @@ package common
 
 import (
 	"math"
+	"strconv"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common/pb"
+
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 const (
@@ -18,6 +22,14 @@ const (
 // Address Type defined in txscript.ScriptClass
 
 type UtxoValueInDB = pb.MyUtxoValueInDB
+
+func ToAddrType(tp, reqSig int) uint32 {
+	return uint32(tp << 16 + reqSig)
+}
+
+func FromAddrType(u uint32) (int, int) {
+	return int(u >> 16), int(0xffff & u) 
+}
 
 type UtxoIdInDB struct {
 	UtxoId uint64
@@ -63,11 +75,9 @@ type BlockInfo struct {
 const INVALID_ID = math.MaxUint64
 
 const ALL_TICKERS = "*"
-type TickerName struct {
-	Protocol string `json:"protocol,omitempty"` // 默认是ordx, 可以是任意协议，brc-20, runes, 甚至是eth
-	TypeName string `json:"type"`     // 默认是FT， ASSET_TYPE_FT
-	Name     string `json:"ticker"`   // * 所有ticker
-}
+
+type TickerName = swire.AssetName
+
 
 type AssetOffsetRange struct {
 	Range  *Range        `json:"range"`
@@ -82,5 +92,120 @@ func (a *AssetOffsetRange) Clone() *AssetOffsetRange {
 		Range:  &Range{Start: a.Range.Start, Size: a.Range.Size},
 		Offset: a.Offset,
 		Assets: asset,
+	}
+}
+
+type UtxoInfo struct {
+	UtxoId   uint64
+	Value    int64
+	PkScript []byte
+	Ordinals []*Range
+}
+
+// offset range in a UTXO, not satoshi ordinals
+type OffsetRange struct {
+	Start int64
+	End   int64  // 不包括End
+}
+
+type AssetInfo_MainNet struct {
+	swire.AssetInfo
+	AssetOffsets []*OffsetRange // 绑定了资产的聪的位置
+}
+
+func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
+	n := &AssetInfo_MainNet{
+		AssetInfo: swire.AssetInfo{
+			Name: p.Name,
+			Amount: p.Amount,
+			BindingSat: p.BindingSat,
+		},
+	}
+	n.AssetOffsets = make([]*OffsetRange, len(p.AssetOffsets))
+	for i := 0; i < len(p.AssetOffsets); i++ {
+		n.AssetOffsets[i] = &OffsetRange{Start: p.AssetOffsets[i].Start, End: p.AssetOffsets[i].End}
+	}
+	return n
+}
+
+type TxOutput struct {
+	OutPoint string
+	OutValue wire.TxOut
+	Sats     []*Range
+	Assets   []*AssetInfo_MainNet 
+	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
+	// Assets数组中任何一个AssetInfo.BindingSat
+}
+
+
+func (p *TxOutput) Clone() *TxOutput {
+	n := &TxOutput{
+		OutPoint: p.OutPoint,
+		OutValue: p.OutValue,
+	}
+	for _, u := range p.Sats {
+		n.Sats = append(n.Sats, &Range{Start: u.Start, Size:u.Size})
+	}
+	for _, u := range p.Assets {
+		n.Assets = append(n.Assets, u.Clone())
+	}
+	return n
+}
+
+func (p *TxOutput) Value() int64 {
+	return p.OutValue.Value
+}
+
+func (p *TxOutput) SizeOfBindingSats() int64 {
+	bindingSats := int64(0)
+	for _, asset := range p.Assets {
+		amount := int64(0)
+		if asset.BindingSat != 0 {
+			amount = (asset.Amount)
+		}
+		
+		if amount > (bindingSats) {
+			bindingSats = amount
+		}
+	}
+	return bindingSats
+}
+
+type TxOutput_SatsNet struct {
+	OutPoint string
+	OutValue swire.TxOut
+}
+
+func (p *TxOutput_SatsNet) Value() int64 {
+	return p.OutValue.Value
+}
+
+func (p *TxOutput_SatsNet) SizeOfBindingSats() int64 {
+	bindingSats := int64(0)
+	for _, asset := range p.OutValue.Assets {
+		amount := int64(0)
+		if asset.BindingSat != 0 {
+			amount = (asset.Amount)
+		}
+		
+		if amount > (bindingSats) {
+			bindingSats = amount
+		}
+	}
+	return bindingSats
+}
+
+// should fill out Sats and Assets parameters.
+func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
+	return &TxOutput{
+		OutPoint: tx.TxHash().String()+":"+strconv.Itoa(index),
+		OutValue: *tx.TxOut[index],
+	}
+}
+
+func GenerateTxOutput_SatsNet(tx *swire.MsgTx, index int) *TxOutput_SatsNet {
+	return &TxOutput_SatsNet{
+		OutPoint: tx.TxHash().String()+":"+strconv.Itoa(index),
+		OutValue: *tx.TxOut[index],
 	}
 }

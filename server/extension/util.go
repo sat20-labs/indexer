@@ -131,7 +131,7 @@ func newUtxoDataWithId(utxoId uint64, address string, bAvailable bool) *Utxo {
 	if !bAvailable {
 		assets := base_indexer.ShareBaseIndexer.GetAssetsWithUtxo(utxoId)
 		for ticker, mintinfo := range assets {
-			if ticker.TypeName == common.ASSET_TYPE_EXOTIC {
+			if ticker.Type == common.ASSET_TYPE_EXOTIC {
 				// TODO 稀有聪需要有所表示出来
 				continue
 			}

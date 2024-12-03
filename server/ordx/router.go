@@ -37,14 +37,13 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// utxo
 	// 获取某个UTXO上所有的资产信息
 	r.GET(proxy+"/utxo/assets/:utxo", s.handle.getAssetDetailInfo)
-	r.GET(proxy+"/utxo/assetoffset/:utxo", s.handle.getAssetOffset)
 	//查询utxo上的资产和数量
 	r.GET(proxy+"/utxo/abbrassets/:utxo", s.handle.getAbbrAssetsWithUtxo)
 	//获取utxo上的资产类型和对应的seed，seed由聪的属性（资产类型，数量，序号）决定
 	r.GET(proxy+"/utxo/seed/:utxo", s.handle.getSeedWithUtxo)
 	// for test
 	r.GET(proxy+"/utxo/range/:utxo", s.handle.getSatRangeWithUtxo)
-	r.POST(proxy+"/utxos/assets", s.handle.getAssetsWithUtxos)
+	r.POST(proxy+"/utxos/assets", s.handle.getAssetsWithUtxos_deprecated)
 	r.POST(proxy+"/utxos/exist", s.handle.getExistingUtxos)
 
 	// range
@@ -91,46 +90,20 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/nft/sat/:sat", s.handle.getNftsWithSat)
 	r.GET(proxy+"/nft/inscription/:id", s.handle.getNftWithInscriptionId)
 
-	// // 下面的接口全部删除，跟前端同步，使用上面的接口，保持数据结构一致
-	// // 获取铭文列表
-	// r.GET(proxy+"/inscription/list", s.handle.getInscriptionList)
-	// // 获取地址拥有铭文列表
-	// r.GET(proxy+"/inscription/address/:address", s.handle.getAddrInscriptionList)
-	// // 获取创世地址拥有铭文列表
-	// r.GET(proxy+"/inscription/genesesaddress/:address", s.handle.getGenesesAddrInscriptionList) //
-	// // 获取铭文通过id （保留）
-	// r.GET(proxy+"/inscription/id/:id", s.handle.getInscriptionWithId)
-	// // r.GET(proxy+"/inscription/number/:number", s.handle.getInscriptionWithNumber)
-	// // 获取铭文通过sat
-	// r.GET(proxy+"/inscription/sat/:sat", s.handle.getInscriptionListWithSat)
 
-	// v1.0 正式版本的接口
-	// 对于数据量大的接口，提供翻页拉取数据功能
-	//proxy += "/v2"
 
+	/////////////////////////////////////////
+	// version 2.0 interface for STP
 	// address
-	// 获取地址的所有utxo
-	// 获取地址的所有资产（返回：资产类别和对应的数量的列表。资产种类：ft，nft，ns，稀有聪...）
-	// 获取地址的某类资产（返回：ticker和对应的数量的列表）
-	// 获取地址的某个ticker资产的详细信息（返回：utxo对应的资产数量的列表）
-	// 获取地址的铸造历史（可以区分资产种类）
+	// 获取某个地址上所有资产和数量的列表
+	r.GET(proxy+"/v2/address/summary/:address", s.handle.getAssetSummary)
+	// 获取某个地址上某个资产的utxo数据列表(utxo包含其他资产), ticker格式：wire.AssetName.String()
+	r.GET(proxy+"/v2/address/asset/:address/:ticker", s.handle.getUtxosWithTicker)
 
 	// utxo
-	// 获取utxo的range列表
-	// 获取utxo的资产列表（返回列表：资产类型-ticker名称-资产数量-Ranges等）
-	// 根据utxo生成一个seed
-
-	// sat
-	// 获取聪的基础信息，包括绑定的资产种类（nft，ft，ns，exotic）
-	// 聪<->InscriptionId<->名字  这三者的相互转换，其中InscriptionId和Ordinals协议对应
-	// 获取聪绑定的数据（需要绑定名字，才能获取各种跟名字绑定的数据）
-
-	// ticker
-	// 获取支持的资产种类：nft，ft，ns，exotic...
-	// 根据资产种类，获取所有ticker的基础信息
-	// 获取ticker的实时持有列表，按地址集合
-	// 获取ticker的铸造历史，按inscriptionId的时间顺序排序
-
-	//
-
+	// 获取某个UTXO上所有的资产信息
+	r.GET(proxy+"/v2/utxo/assetoffset/:utxo", s.handle.getAssetOffset)
+	r.GET(proxy+"/v2/utxo/assets/:utxo", s.handle.getAssetInfo)
+	r.POST(proxy+"/v2/utxos/assets", s.handle.getAssetsWithUtxos)
+	r.POST(proxy+"/v2/utxos/exist", s.handle.getExistingUtxos)
 }

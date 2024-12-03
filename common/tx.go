@@ -3,7 +3,6 @@ package common
 import (
 	"time"
 
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common/pb"
 )
@@ -11,8 +10,8 @@ import (
 type Range = pb.MyRange
 
 type Input struct {
-	Txid     string `json:"txid"`
-	UtxoId   uint64
+	Txid     string         `json:"txid"`
+	UtxoId   uint64         `json:"utxoid"`
 	Address  *ScriptPubKey  `json:"scriptPubKey"`
 	Vout     int64          `json:"vout"`
 	Ordinals []*Range       `json:"ordinals"`
@@ -21,7 +20,9 @@ type Input struct {
 
 type ScriptPubKey struct {
 	Addresses []string             `json:"addresses"`
-	Type      txscript.ScriptClass `json:"type"`
+	Type     int                   `json:"type"`
+	ReqSig   int                   `json:"reqSig"`
+	PkScript []byte        		   `json:"pkscript"`
 }
 
 type Output struct {

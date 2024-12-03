@@ -106,10 +106,10 @@ func (b *IndexerMgr) GetNftAmountWithAddress(address string) map[string]int64 {
 	b.mutex.RLock()
 	for _, nft := range nfts {
 		for k, v := range b.clmap {
-			if k.TypeName == common.ASSET_TYPE_NFT {
+			if k.Type == common.ASSET_TYPE_NFT {
 				_, ok := v[nft.Base.InscriptionId]
 				if ok {
-					result[k.Name] += 1
+					result[k.Ticker] += 1
 				}
 			}
 		}

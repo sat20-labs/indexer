@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -82,4 +83,54 @@ func SignalsReplacement(tx *wire.MsgTx) bool {
 		}
 	}
 	return false
+}
+
+
+func AddressToPkScript(address string, isMainnet bool) ([]byte, error) {
+	var params *chaincfg.Params
+	if isMainnet {
+        params = &chaincfg.MainNetParams
+    } else {
+        params = &chaincfg.TestNet3Params
+    }
+
+    // 解析地址
+    addr, err := btcutil.DecodeAddress(address, params)
+    if err != nil {
+        return nil, err
+    }
+
+    // 创建支付脚本
+    return txscript.PayToAddrScript(addr)
+}
+
+func MultiSigToPkScript(n int, addresses []string, isMainnet bool) ([]byte, error) {
+	var params *chaincfg.Params
+	if isMainnet {
+        params = &chaincfg.MainNetParams
+    } else {
+        params = &chaincfg.TestNet3Params
+    }
+
+	pubKeys := make([]*btcutil.AddressPubKey, len(addresses))
+	for i, address := range addresses {
+		addr, err := hex.DecodeString(address)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode address %s: %w", address, err)
+		}
+
+		pk, err := btcutil.NewAddressPubKey(addr, params)
+		if err != nil {
+			return nil, err
+		}
+
+        pubKeys[i] = pk
+	}
+
+	pkScript, err := txscript.MultiSigScript(pubKeys, n)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create multi-sig script: %w", err)
+	}
+
+	return pkScript, nil
 }

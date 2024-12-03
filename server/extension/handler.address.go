@@ -47,17 +47,17 @@ func getAssetSummary(address string) (*AssetSummary, error) {
 
 	assetsList := base_indexer.ShareBaseIndexer.GetAssetSummaryInAddress(address)
 	for ticker, balance := range assetsList {
-		switch ticker.TypeName {
+		switch ticker.Type {
 		case common.ASSET_TYPE_NS:
 			ret.NameSummaryList = append(ret.NameSummaryList, NameSummary{
 				Balance: uint64(balance),
 				Count:   uint64(balance),
-				Name:    ticker.Name,
+				Name:    ticker.Ticker,
 			})
 			continue
 		case common.ASSET_TYPE_FT:
 			ret.TokenSummaryList = append(ret.TokenSummaryList, TokenSummary{
-				Name:    ticker.Name,
+				Name:    ticker.Ticker,
 				Balance: uint64(balance),
 			})
 			continue
@@ -65,7 +65,7 @@ func getAssetSummary(address string) (*AssetSummary, error) {
 			continue
 		case common.ASSET_TYPE_EXOTIC:
 			ret.ExoticSummaryList = append(ret.ExoticSummaryList, ExoticSummary{
-				Name:    ticker.Name,
+				Name:    ticker.Ticker,
 				Balance: uint64(balance),
 			})
 			continue
