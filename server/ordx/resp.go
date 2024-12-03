@@ -134,7 +134,7 @@ type AssetsResp_deprecated struct {
 	Data *AssetsData `json:"data"`
 }
 
-type AssetsResp struct {
+type TxOutputResp struct {
 	serverOrdx.BaseResp
 	Data *TxOutput `json:"data"`
 }
@@ -250,10 +250,10 @@ type NamesWithAddressResp struct {
 }
 
 type TxOutput struct {
-	OutPoint string      `json:"outpoint"`
-	OutValue wire.TxOut  `json:"outvalue"`
-	Sats     []*common.Range `json:"rangs"`
-	Assets   []*common.AssetInfo_MainNet  `json:"assets"`
+	OutPoint string                      `json:"outpoint"`
+	OutValue wire.TxOut                  `json:"outvalue"`
+	Sats     []*common.Range             `json:"rangs"`
+	Assets   []*common.AssetInfo_MainNet `json:"assets"`
 }
 
 type AssetSummary struct {
@@ -273,7 +273,7 @@ type UtxosWithAssetResp struct {
 	Data []*TxOutput `json:"data"`
 }
 
-type AssetsWithUtxosResp struct {
+type TxOutputListResp struct {
 	serverOrdx.BaseResp
 	Data []*TxOutput `json:"data"`
 }

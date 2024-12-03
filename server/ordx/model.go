@@ -80,7 +80,6 @@ func (s *Model) getTicker(tickerName string) (*serverOrdx.TickerStatus, error) {
 	return tickerStatusResp, nil
 }
 
-
 func IsAssetBindingSat(asset *swire.AssetName) uint16 {
 	if asset.Protocol == common.PROTOCOL_NAME_ORD ||
 		asset.Protocol == common.PROTOCOL_NAME_ORDX {
@@ -110,7 +109,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*AssetSum
 	return &result, nil
 }
 
-func (s *Model) GetAssetWithUtxo(utxo string) (*TxOutput, error) {
+func (s *Model) GetUtxoInfo(utxo string) (*TxOutput, error) {
 
 	txOut := s.indexer.GetTxOutputWithUtxo(utxo)
 	if txOut == nil {
@@ -120,19 +119,18 @@ func (s *Model) GetAssetWithUtxo(utxo string) (*TxOutput, error) {
 	output := TxOutput{
 		OutPoint: utxo,
 		OutValue: txOut.OutValue,
-		Sats: txOut.Sats,
-		Assets: txOut.Assets,
+		Sats:     txOut.Sats,
+		Assets:   txOut.Assets,
 	}
 
 	return &output, nil
 }
 
-
-func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*TxOutput, error) {
+func (s *Model) GetUtxoInfoList(req *UtxosReq) ([]*TxOutput, error) {
 	result := make([]*TxOutput, 0)
 	for _, utxo := range req.Utxos {
-		
-		txOutput, err := s.GetAssetWithUtxo(utxo)
+
+		txOutput, err := s.GetUtxoInfo(utxo)
 		if err != nil {
 			continue
 		}
@@ -144,8 +142,6 @@ func (s *Model) GetAssetsWithUtxos(req *UtxosReq) ([]*TxOutput, error) {
 }
 
 func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*TxOutput, int, error) {
-	
 
 	return nil, 0, nil
 }
-

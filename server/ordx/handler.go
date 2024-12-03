@@ -1398,17 +1398,8 @@ func (s *Handle) getUtxosWithTicker(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// @Summary Get asset details in a UTXO
-// @Description Get asset details in a UTXO
-// @Tags ordx.utxo
-// @Produce json
-// @Param utxo path string true "UTXO"
-// @Security Bearer
-// @Success 200 {object} AssetsResp "Successful response"
-// @Failure 401 "Invalid API Key"
-// @Router /address/assets/{utxo} [get]
-func (s *Handle) getAssetInfo(c *gin.Context) {
-	resp := &AssetsResp{
+func (s *Handle) getUtxoInfo(c *gin.Context) {
+	resp := &TxOutputResp{
 		BaseResp: serverOrdx.BaseResp{
 			Code: 0,
 			Msg:  "ok",
@@ -1417,7 +1408,7 @@ func (s *Handle) getAssetInfo(c *gin.Context) {
 	}
 
 	utxo := c.Param("utxo")
-	result, err := s.model.GetAssetWithUtxo(utxo)
+	result, err := s.model.GetUtxoInfo(utxo)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -1429,8 +1420,8 @@ func (s *Handle) getAssetInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
-	resp := &AssetsWithUtxosResp{
+func (s *Handle) getUtxoInfoList(c *gin.Context) {
+	resp := &TxOutputListResp{
 		BaseResp: serverOrdx.BaseResp{
 			Code: 0,
 			Msg:  "ok",
@@ -1445,7 +1436,7 @@ func (s *Handle) getAssetsWithUtxos(c *gin.Context) {
 		return
 	}
 
-	result, err := s.model.GetAssetsWithUtxos(&req)
+	result, err := s.model.GetUtxoInfoList(&req)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

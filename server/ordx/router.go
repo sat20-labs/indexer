@@ -90,8 +90,6 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/nft/sat/:sat", s.handle.getNftsWithSat)
 	r.GET(proxy+"/nft/inscription/:id", s.handle.getNftWithInscriptionId)
 
-
-
 	/////////////////////////////////////////
 	// version 2.0 interface for STP
 	// address
@@ -101,9 +99,10 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/v2/address/asset/:address/:ticker", s.handle.getUtxosWithTicker)
 
 	// utxo
+	r.GET(proxy+"/v2/utxo/info/:utxo", s.handle.getUtxoInfo)
+	r.POST(proxy+"/v2/utxos/info", s.handle.getUtxoInfoList)
+	r.POST(proxy+"/v2/utxos/existing", s.handle.getExistingUtxos)
+
 	// 获取某个UTXO上所有的资产信息
 	r.GET(proxy+"/v2/utxo/assetoffset/:utxo", s.handle.getAssetOffset)
-	r.GET(proxy+"/v2/utxo/assets/:utxo", s.handle.getAssetInfo)
-	r.POST(proxy+"/v2/utxos/assets", s.handle.getAssetsWithUtxos)
-	r.POST(proxy+"/v2/utxos/exist", s.handle.getExistingUtxos)
 }
