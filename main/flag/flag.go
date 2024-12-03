@@ -80,5 +80,5 @@ func InitConf(cfgPath string) error {
 	if err == nil {
 		return nil
 	}
-	return nil
+	return err
 }
