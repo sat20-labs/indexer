@@ -72,16 +72,16 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	return output.UtxoId, output.Ordinals, nil
 }
 
-func (b *RpcIndexer) GetUtxoValue(utxo string) (*common.UtxoInfo, error) {
+func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 
 	// 有可能还没有写入数据库，所以先读缓存
 	utxoInfo, ok := b.utxoIndex.Index[utxo]
 	if ok {
 		value := &common.UtxoInfo{
-			UtxoId:      common.GetUtxoId(utxoInfo),
-			Value: utxoInfo.Value,
+			UtxoId:   common.GetUtxoId(utxoInfo),
+			Value:    utxoInfo.Value,
 			PkScript: utxoInfo.Address.PkScript,
-			Ordinals:    utxoInfo.Ordinals,
+			Ordinals: utxoInfo.Ordinals,
 		}
 		return value, nil
 	}
@@ -126,7 +126,6 @@ func (b *RpcIndexer) GetUtxoValue(utxo string) (*common.UtxoInfo, error) {
 			return nil, err
 		}
 	}
-	
 
 	info.UtxoId = output.UtxoId
 	info.Value = common.GetOrdinalsSize(output.Ordinals)
@@ -290,12 +289,12 @@ func (b *RpcIndexer) GetUTXOs2(address string) []string {
 }
 
 func (b *RpcIndexer) searhing(sat int64) {
-	
+
 	var address, utxo string
 	bFound := false
 
 	// search in buffer
-	for k,v := range b.utxoIndex.Index {
+	for k, v := range b.utxoIndex.Index {
 		if common.IsSatInRanges(sat, v.Ordinals) {
 			common.Log.Infof("find sat %d in utxo %s in address %s", sat, k, v.Address.Addresses[0])
 			bFound = true
@@ -312,16 +311,16 @@ func (b *RpcIndexer) searhing(sat int64) {
 			prefix := []byte(common.DB_KEY_UTXO)
 			itr := txn.NewIterator(badger.DefaultIteratorOptions)
 			defer itr.Close()
-	
+
 			startTime := time.Now()
 			common.Log.Infof("Search sat in %s table ...", common.DB_KEY_UTXO)
-	
+
 			for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
 				item := itr.Item()
 				if item.IsDeletedOrExpired() {
 					continue
 				}
-	
+
 				err = item.Value(func(data []byte) error {
 					return common.DecodeBytesWithProto3(data, &value)
 				})
@@ -329,7 +328,7 @@ func (b *RpcIndexer) searhing(sat int64) {
 					common.Log.Errorf("item.Value error: %v", err)
 					continue
 				}
-	
+
 				if common.IsSatInRanges(sat, value.Ordinals) {
 					common.Log.Infof("find sat %d in utxo %d in address %d", sat, value.UtxoId, value.AddressIds[0])
 					bFound = true
@@ -337,7 +336,7 @@ func (b *RpcIndexer) searhing(sat int64) {
 				}
 			}
 			common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime))
-	
+
 			return nil
 		})
 		if bFound {
@@ -345,7 +344,6 @@ func (b *RpcIndexer) searhing(sat int64) {
 			utxo, _ = common.GetUtxoByID(b.db, value.UtxoId)
 		}
 	}
-	
 
 	b.mutex.Lock()
 	status, ok := b.satSearchingStatus[sat]
@@ -374,7 +372,6 @@ func (b *RpcIndexer) searhing(sat int64) {
 
 	b.bSearching = false
 }
-
 
 // address, utxo, message
 func (b *RpcIndexer) FindSat(sat int64) (string, string, error) {
