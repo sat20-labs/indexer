@@ -20,3 +20,18 @@ type ListResp struct {
 	Total uint64 `json:"total" example:"9992"`
 }
 
+
+// /default/fee-summary
+type FeeSummary struct {
+	Title   string `json:"title"`
+	Desc    string `json:"desc"`
+	FeeRate string `json:"feeRate"`
+}
+type FeeSummaryList struct {
+	List []*FeeSummary `json:"list"`
+}
+
+type FeeSummaryResp struct {
+	BaseResp
+	Data *FeeSummaryList `json:"data"`
+}

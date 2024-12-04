@@ -129,11 +129,22 @@ func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
 	return n
 }
 
+type TxAssets = swire.TxAssets
+type TxAssets_MainNet []*AssetInfo_MainNet
+
+func (p *TxAssets_MainNet) ToTxAssets() TxAssets {
+	result := make([]swire.AssetInfo, len(*p))
+	for i, a := range *p {
+		result[i] = a.AssetInfo
+	}
+	return result
+}
+
 type TxOutput struct {
 	OutPointStr string
 	OutValue    wire.TxOut
 	Sats        TxRanges
-	Assets      []*AssetInfo_MainNet
+	Assets      TxAssets_MainNet
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }

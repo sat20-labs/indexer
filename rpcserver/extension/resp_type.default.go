@@ -61,18 +61,3 @@ type CheckWebSiteResp struct {
 	IsScammer bool   `json:"isScammer"`
 	Warning   string `json:"warning"`
 }
-
-// /default/fee-summary
-type FeeSummary struct {
-	Title   string `json:"title"`
-	Desc    string `json:"desc"`
-	FeeRate string `json:"feeRate"`
-}
-type FeeSummaryList struct {
-	List []*FeeSummary `json:"list"`
-}
-
-type FeeSummaryResp struct {
-	rpcwire.BaseResp
-	Data *FeeSummaryList `json:"data"`
-}

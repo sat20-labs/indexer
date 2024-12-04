@@ -152,13 +152,13 @@ func (s *Service) inscriptionSummary(c *gin.Context) {
 }
 
 func (s *Service) feeSummary(c *gin.Context) {
-	resp := &FeeSummaryResp{
+	resp := &rpcwire.FeeSummaryResp{
 		BaseResp: rpcwire.BaseResp{
 			Code: 0,
 			Msg:  "ok",
 		},
-		Data: &FeeSummaryList{
-			List: []*FeeSummary{
+		Data: &rpcwire.FeeSummaryList{
+			List: []*rpcwire.FeeSummary{
 				{
 					Title:   "Slow",
 					Desc:    "About 1 hours",
