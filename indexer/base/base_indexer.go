@@ -641,7 +641,10 @@ func appendRanges(rngs1, rngs2 []*common.Range) []*common.Range {
 func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	first := b.lastSats
 	coinbaseOrdinals := []*common.Range{{Start: first, Size: 0}}
-	blockValue := &common.BlockValueInDB{Height: block.Height, Timestamp: block.Timestamp.Unix()}
+	blockValue := &common.BlockValueInDB{Height: block.Height, 
+		Timestamp: block.Timestamp.Unix(),
+		TxAmount: len(block.Transactions),
+	}
 	firstblock := block.Height
 	if len(b.blockVector) > 0 {
 		firstblock = b.blockVector[0].Height

@@ -13,7 +13,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
-	mainCommon "github.com/sat20-labs/indexer/main/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -135,7 +134,7 @@ func (s *Service) tx_decodePsbt(c *gin.Context) {
 		ShouldWarnFeeRate:  shouldWarnFeeRate,
 	}
 
-	chain := mainCommon.GetChain()
+	chain := base_indexer.ShareBaseIndexer.GetChainParam().Name
 
 	// handle inputs
 	inputRanges := make([]*common.Range, 0)

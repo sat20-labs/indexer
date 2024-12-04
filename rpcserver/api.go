@@ -1,4 +1,4 @@
-package server
+package rpcserver
 
 import (
 	"net"
@@ -10,9 +10,8 @@ import (
 	"github.com/didip/tollbooth/v7/limiter"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/docs"
-	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
-	"gopkg.in/yaml.v2"
 )
 
 //	@contact.name	API Support
@@ -42,23 +41,15 @@ func (s *Rpc) InitApiDoc(swaggerHost, schemes, basePath string) {
 	docs.SwaggerInfo.BasePath = basePath
 }
 
-func (s *Rpc) InitApiConf(cfgData any) error {
+func (s *Rpc) InitApiConf(cfgData *config.API) error {
 	if cfgData == nil {
 		return nil
 	}
 	readApiAuthConf := func() error {
 		s.apiConfMutex.Lock()
 		defer s.apiConfMutex.Unlock()
-
-		raw, err := yaml.Marshal(cfgData)
-		if err != nil {
-			return err
-		}
-		s.api = &rpcwire.API{}
-		err = yaml.Unmarshal(raw, s.api)
-		if err != nil {
-			return err
-		}
+		
+		s.api = cfgData
 		s.initApiConf = true
 		return nil
 	}

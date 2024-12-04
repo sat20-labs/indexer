@@ -59,6 +59,7 @@ type AddressValue struct {
 type BlockValueInDB struct {
 	Height     int
 	Timestamp  int64
+	TxAmount   int
 	InputUtxo  int
 	OutputUtxo int
 	InputSats  int64

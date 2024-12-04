@@ -1,4 +1,4 @@
-package flag
+package config
 
 import (
 	"fmt"
@@ -7,19 +7,74 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/sat20-labs/indexer/main/conf"
-	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sirupsen/logrus"
 )
 
-func LoadYamlConf(cfgPath string) (*conf.YamlConf, error) {
+
+type YamlConf struct {
+	Chain      string     `yaml:"chain"`
+	DB         DB         `yaml:"db"`
+	ShareRPC   ShareRPC   `yaml:"share_rpc"`
+	Log        Log        `yaml:"log"`
+	BasicIndex BasicIndex `yaml:"basic_index"`
+	RPCService RPCService `yaml:"rpc_service"`
+}
+
+type DB struct {
+	Path string `yaml:"path"`
+}
+
+type ShareRPC struct {
+	Bitcoin Bitcoin `yaml:"bitcoin"`
+}
+
+type Bitcoin struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
+type Log struct {
+	Level string `yaml:"level"`
+	Path  string `yaml:"path"`
+}
+
+type BasicIndex struct {
+	MaxIndexHeight  int64 `yaml:"max_index_height"`
+	PeriodFlushToDB int   `yaml:"period_flush_to_db"`
+}
+
+
+func GetBaseDir() string {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "./."
+	}
+	execPath = filepath.Dir(execPath)
+	// if strings.Contains(execPath, "/cli") {
+	// 	execPath, _ = strings.CutSuffix(execPath, "/cli")
+	// }
+	return execPath
+}
+
+func InitConfig() *YamlConf {
+	cfgFile := GetBaseDir()+"/.env"
+	cfg, err := LoadYamlConf(cfgFile)
+	if err != nil {
+		return nil
+	}
+	return cfg
+}
+
+func LoadYamlConf(cfgPath string) (*YamlConf, error) {
 	confFile, err := os.Open(cfgPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open cfg: %s, error: %s", cfgPath, err)
 	}
 	defer confFile.Close()
 
-	ret := &conf.YamlConf{}
+	ret := &YamlConf{}
 	decoder := yaml.NewDecoder(confFile)
 	err = decoder.Decode(ret)
 	if err != nil {
@@ -55,10 +110,7 @@ func LoadYamlConf(cfgPath string) (*conf.YamlConf, error) {
 		ret.DB.Path += string(filepath.Separator)
 	}
 
-	rpcService, err := rpcwire.ParseRpcService(ret.RPCService)
-	if err != nil {
-		return nil, err
-	}
+	rpcService := ret.RPCService
 	if rpcService.Addr == "" {
 		rpcService.Addr = "0.0.0.0:80"
 	}
@@ -82,66 +134,7 @@ func LoadYamlConf(cfgPath string) (*conf.YamlConf, error) {
 		rpcService.Swagger.Schemes = []string{"http"}
 	}
 
-	ret.RPCService = rpcService
 
 	return ret, nil
 }
 
-func NewDefaultYamlConf(chain string) (*conf.YamlConf, error) {
-	bitcoinPort := 18332
-	switch chain {
-	case "mainnet":
-		bitcoinPort = 8332
-	case "testnet":
-		bitcoinPort = 18332
-	case "testnet4":
-		bitcoinPort = 28332
-	default:
-		return nil, fmt.Errorf("unsupported chain: %s", chain)
-	}
-	ret := &conf.YamlConf{
-		Chain: chain,
-		DB: conf.DB{
-			Path: "db",
-		},
-		ShareRPC: conf.ShareRPC{
-			Bitcoin: conf.Bitcoin{
-				Host:     "host",
-				Port:     bitcoinPort,
-				User:     "user",
-				Password: "password",
-			},
-		},
-		Log: conf.Log{
-			Level: "error",
-			Path:  "log",
-		},
-		BasicIndex: conf.BasicIndex{
-			MaxIndexHeight:  0,
-			PeriodFlushToDB: 12,
-		},
-		RPCService: rpcwire.RPCService{
-			Addr:  "0.0.0.0:80",
-			Proxy: chain,
-			Swagger: rpcwire.Swagger{
-				Host:    "127.0.0.0",
-				Schemes: []string{"http"},
-			},
-			API: rpcwire.API{
-				APIKeyList:      make(map[string]*rpcwire.APIKey),
-				NoLimitApiList:  []string{"/health"},
-				NoLimitHostList: []string{},
-			},
-		},
-	}
-
-	return ret, nil
-}
-
-func SaveYamlConf(conf *conf.YamlConf, filePath string) error {
-	data, err := yaml.Marshal(conf)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filePath, data, 0644)
-}

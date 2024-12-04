@@ -4,21 +4,8 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
-	"gopkg.in/yaml.v2"
 )
 
-func ParseRpcService(data any) (*RPCService, error) {
-	rpcServiceRaw, err := yaml.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	ret := &RPCService{}
-	err = yaml.Unmarshal(rpcServiceRaw, ret)
-	if err != nil {
-		return nil, err
-	}
-	return ret, nil
-}
 
 func IsExistUtxoInMemPool(utxo string) bool {
 	isExist, err := bitcoin_rpc.IsExistUtxoInMemPool(utxo)

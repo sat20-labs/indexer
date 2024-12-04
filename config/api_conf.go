@@ -1,4 +1,4 @@
-package wire
+package config
 
 type RPCService struct {
 	Addr    string  `yaml:"addr"`

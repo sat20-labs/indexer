@@ -1,4 +1,4 @@
-package server
+package rpcserver
 
 import (
 	"fmt"
@@ -16,10 +16,10 @@ import (
 	"github.com/gin-gonic/gin"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rs/zerolog"
+	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/rpcserver/base"
 	"github.com/sat20-labs/indexer/rpcserver/bitcoind"
-	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/rpcserver/extension"
 	"github.com/sat20-labs/indexer/rpcserver/ord"
 	"github.com/sat20-labs/indexer/rpcserver/ordx"
@@ -53,7 +53,7 @@ type Rpc struct {
 	ordService       *ord.Service
 	btcdService      *bitcoind.Service
 	extensionService *extension.Service
-	api              *rpcwire.API
+	api              *config.API
 	initApiConf      bool
 	apiConfMutex     sync.Mutex
 	apiLimitMap      sync.Map
@@ -69,7 +69,7 @@ func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
 	}
 }
 
-func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile string, apiConf any) error {
+func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile string, apiConf *config.API) error {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	var writers []io.Writer

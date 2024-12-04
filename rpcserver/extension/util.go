@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/sat20-labs/indexer/common"
-	mainCommon "github.com/sat20-labs/indexer/main/common"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
@@ -44,7 +43,7 @@ func calcOffset(sat int64, rngs []*common.Range) int64 {
 }
 
 func GetScriptPK(address string) string {
-	chain := mainCommon.GetChain()
+	chain := base_indexer.ShareBaseIndexer.GetChainParam().Name
 	pkScript, _ := common.AddrToPkScript(address, chain)
 	return hex.EncodeToString(pkScript)
 }
