@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/didip/tollbooth/v7"
@@ -14,6 +15,13 @@ import (
 	"github.com/sat20-labs/indexer/docs"
 )
 
+type APIDoc struct {
+	api          *config.API
+	initApiConf  bool
+	apiConfMutex sync.Mutex
+	apiLimitMap  sync.Map
+}
+
 //	@contact.name	API Support
 //	@contact.url	https://ordx.space
 //	@contact.email	support@tinyverse.space
@@ -21,7 +29,7 @@ import (
 // @securityDefinitions.apikey	Bearer
 // @in							header
 // @name						Authorization
-func (s *Rpc) InitApiDoc(swaggerHost, schemes, basePath string) {
+func InitApiDoc(swaggerHost, schemes, basePath string) {
 	docs.SwaggerInfo.Title = "ordx api"
 	docs.SwaggerInfo.Version = "v0.1.0"
 	schemeList := strings.Split(schemes, ",")
@@ -41,14 +49,15 @@ func (s *Rpc) InitApiDoc(swaggerHost, schemes, basePath string) {
 	docs.SwaggerInfo.BasePath = basePath
 }
 
-func (s *Rpc) InitApiConf(cfgData *config.API) error {
+func (s *APIDoc) InitApiConf(cfgData *config.API) error {
 	if cfgData == nil {
 		return nil
 	}
+	s.api = cfgData
 	readApiAuthConf := func() error {
 		s.apiConfMutex.Lock()
 		defer s.apiConfMutex.Unlock()
-		
+
 		s.api = cfgData
 		s.initApiConf = true
 		return nil
@@ -71,7 +80,7 @@ func (s *Rpc) InitApiConf(cfgData *config.API) error {
 	return nil
 }
 
-func (s *Rpc) applyApiConf(r *gin.Engine, basePath string) error {
+func (s *APIDoc) ApplyApiConf(r *gin.Engine, basePath string) error {
 	localIpList := make([]string, 0)
 	if len(localIpList) == 0 {
 		addrs, err := net.InterfaceAddrs()

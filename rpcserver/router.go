@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/didip/tollbooth/v7/limiter"
@@ -53,10 +52,7 @@ type Rpc struct {
 	ordService       *ord.Service
 	btcdService      *bitcoind.Service
 	extensionService *extension.Service
-	api              *config.API
-	initApiConf      bool
-	apiConfMutex     sync.Mutex
-	apiLimitMap      sync.Map
+	apidoc           *APIDoc
 }
 
 func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
@@ -66,6 +62,7 @@ func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
 		ordService:       ord.NewService(),
 		btcdService:      bitcoind.NewService(),
 		extensionService: extension.NewService(chain),
+		apidoc:           &APIDoc{},
 	}
 }
 
@@ -117,16 +114,16 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	r.Use(cors.New(config))
 
 	// doc
-	s.InitApiDoc(swaggerHost, swaggerSchemes, rpcProxy)
+	InitApiDoc(swaggerHost, swaggerSchemes, rpcProxy)
 	r.GET(rpcProxy+"/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// api config
-	err := s.InitApiConf(apiConf)
+	err := s.apidoc.InitApiConf(apiConf)
 	if err != nil {
 		return err
 	}
 
-	err = s.applyApiConf(r, rpcProxy)
+	err = s.apidoc.ApplyApiConf(r, rpcProxy)
 	if err != nil {
 		return err
 	}
@@ -196,12 +193,12 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 }
 
 func checkPort(port string) error {
-    // 方法1: 尝试监听该端口
-    addr := fmt.Sprintf(":%s", port)
-    l, err := net.Listen("tcp", addr)
-    if err != nil {
-        return fmt.Errorf("port %s is in use: %v", port, err)
-    }
-    l.Close()
-    return nil
+	// 方法1: 尝试监听该端口
+	addr := fmt.Sprintf(":%s", port)
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("port %s is in use: %v", port, err)
+	}
+	l.Close()
+	return nil
 }
