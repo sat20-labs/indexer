@@ -49,7 +49,7 @@ func getRawBlock(blockHash string) (string, error) {
 	if err != nil {
 		n := 1
 		for n < 10 {
-			common.Log.Infof("GetRawBlock failed. try again ...")
+			common.Log.Infof("GetRawBlock failed %v. try again ...", err)
 			time.Sleep(time.Duration(n) * time.Second)
 			n++
 			h, err = bitcoin_rpc.ShareBitconRpc.GetRawBlock(blockHash)
