@@ -4,8 +4,8 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer"
 	mainCommon "github.com/sat20-labs/indexer/main/common"
-	"github.com/sat20-labs/indexer/server"
-	serverCommon "github.com/sat20-labs/indexer/server/define"
+	"github.com/sat20-labs/indexer/rpcserver"
+	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 )
 
 func InitRpcService(indexerMgr *indexer.IndexerMgr) (*server.Rpc, error) {
@@ -18,7 +18,7 @@ func InitRpcService(indexerMgr *indexer.IndexerMgr) (*server.Rpc, error) {
 	var apiCfgData any
 	if mainCommon.YamlCfg != nil {
 		maxIndexHeight = mainCommon.YamlCfg.BasicIndex.MaxIndexHeight
-		rpcService, err := serverCommon.ParseRpcService(mainCommon.YamlCfg.RPCService)
+		rpcService, err := rpcwire.ParseRpcService(mainCommon.YamlCfg.RPCService)
 		if err != nil {
 			return nil, err
 		}

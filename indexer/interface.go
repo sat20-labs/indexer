@@ -522,7 +522,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	}
 
 	return &common.TxOutput{
-		OutPoint: utxo,
+		OutPointStr: utxo,
 		OutValue: wire.TxOut{
 			Value:    common.GetOrdinalsSize(info.Ordinals),
 			PkScript: info.PkScript,

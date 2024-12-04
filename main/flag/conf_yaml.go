@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/sat20-labs/indexer/main/conf"
-	serverCommon "github.com/sat20-labs/indexer/server/define"
+	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sirupsen/logrus"
 )
 
@@ -55,7 +55,7 @@ func LoadYamlConf(cfgPath string) (*conf.YamlConf, error) {
 		ret.DB.Path += string(filepath.Separator)
 	}
 
-	rpcService, err := serverCommon.ParseRpcService(ret.RPCService)
+	rpcService, err := rpcwire.ParseRpcService(ret.RPCService)
 	if err != nil {
 		return nil, err
 	}
@@ -120,15 +120,15 @@ func NewDefaultYamlConf(chain string) (*conf.YamlConf, error) {
 			MaxIndexHeight:  0,
 			PeriodFlushToDB: 12,
 		},
-		RPCService: serverCommon.RPCService{
+		RPCService: rpcwire.RPCService{
 			Addr:  "0.0.0.0:80",
 			Proxy: chain,
-			Swagger: serverCommon.Swagger{
+			Swagger: rpcwire.Swagger{
 				Host:    "127.0.0.0",
 				Schemes: []string{"http"},
 			},
-			API: serverCommon.API{
-				APIKeyList:      make(map[string]*serverCommon.APIKey),
+			API: rpcwire.API{
+				APIKeyList:      make(map[string]*rpcwire.APIKey),
 				NoLimitApiList:  []string{"/health"},
 				NoLimitHostList: []string{},
 			},
