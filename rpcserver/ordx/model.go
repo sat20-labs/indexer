@@ -117,7 +117,7 @@ func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutput, error) {
 	}
 
 	output := rpcwire.TxOutput{
-		OutPoint: utxo,
+		OutPointStr: utxo,
 		OutValue: txOut.OutValue,
 		Sats:     txOut.Sats,
 		Assets:   txOut.Assets,
