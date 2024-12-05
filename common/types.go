@@ -130,6 +130,64 @@ func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
 	return n
 }
 
+
+// 只有一种资产存在
+func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error) {
+	result := &AssetInfo_MainNet{}
+	result.Name = p.Name
+	
+	if amt > p.Amount {
+		err := errors.New("pickup count is too big")
+		return nil, err
+	}
+
+	if amt == 0 {
+		// Nothing to pickup
+		return result, nil
+	}
+
+	if amt == p.Amount {
+		//All ranges are pickup
+		return p.Clone(), nil
+	}
+
+	pickupRanges := make([]*OffsetRange, 0)
+	remainingValue := amt
+	for _, currentRange := range p.AssetOffsets {
+		if currentRange.End <= offset {
+			continue
+		}
+		var start int64
+		if currentRange.Start <= offset {
+			start = offset
+		} else {
+			start = currentRange.Start
+		}
+		rangeSize := currentRange.End - start
+		if rangeSize > remainingValue {
+			rangeSize = remainingValue
+		}
+		newRange := &OffsetRange{Start: start, End: start+rangeSize}
+		pickupRanges = append(pickupRanges, newRange)
+		remainingValue = remainingValue - rangeSize
+
+		if remainingValue <= 0 {
+			break
+		}
+	}
+	
+	// check valid
+	if remainingValue != 0 {
+		err := errors.New("pickup count is wrong")
+		return nil, err
+	}
+	result.Amount = amt
+	result.AssetOffsets = pickupRanges
+
+	return result, nil
+}
+
+
 type TxAssets = swire.TxAssets
 type TxAssets_MainNet []*AssetInfo_MainNet
 
@@ -198,7 +256,7 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 		if asset.BindingSat != 0 {
 			amount = (asset.Amount)
 		}
-
+	
 		if amount > (bindingSats) {
 			bindingSats = amount
 		}
