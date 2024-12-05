@@ -206,64 +206,11 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 	return bindingSats
 }
 
-type TxOutput_SatsNet struct {
-	OutPointStr string
-	OutValue swire.TxOut
-}
-
-func (p *TxOutput_SatsNet) Value() int64 {
-	return p.OutValue.Value
-}
-
-func (p *TxOutput_SatsNet) OutPoint() *swire.OutPoint {
-	outpoint, _ := swire.NewOutPointFromString(p.OutPointStr)
-	return outpoint
-}
-
-
-func (p *TxOutput_SatsNet) TxID() string {
-	parts := strings.Split(p.OutPointStr, ":")
-	if len(parts) != 2 {
-		return ""
-	}
-	return parts[0]
-}
-
-func (p *TxOutput_SatsNet) TxIn() *swire.TxIn {
-	outpoint, err := swire.NewOutPointFromString(p.OutPointStr)
-	if err != nil {
-		return nil
-	}
-	return swire.NewTxIn(outpoint, nil, nil)
-}
-
-func (p *TxOutput_SatsNet) SizeOfBindingSats() int64 {
-	bindingSats := int64(0)
-	for _, asset := range p.OutValue.Assets {
-		amount := int64(0)
-		if asset.BindingSat != 0 {
-			amount = (asset.Amount)
-		}
-
-		if amount > (bindingSats) {
-			bindingSats = amount
-		}
-	}
-	return bindingSats
-}
-
 // should fill out Sats and Assets parameters.
 func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 	return &TxOutput{
 		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
 		OutValue:    *tx.TxOut[index],
-	}
-}
-
-func GenerateTxOutput_SatsNet(tx *swire.MsgTx, index int) *TxOutput_SatsNet {
-	return &TxOutput_SatsNet{
-		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
-		OutValue: *tx.TxOut[index],
 	}
 }
 
