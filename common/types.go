@@ -2,7 +2,9 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -190,7 +192,7 @@ func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error
 
 
 type TxAssets = swire.TxAssets
-type TxAssets_MainNet []*AssetInfo_MainNet
+type TxAssets_MainNet []AssetInfo_MainNet
 
 func (p *TxAssets_MainNet) ToTxAssets() TxAssets {
 	result := make([]swire.AssetInfo, len(*p))
@@ -198,6 +200,91 @@ func (p *TxAssets_MainNet) ToTxAssets() TxAssets {
 		result[i] = a.AssetInfo
 	}
 	return result
+}
+
+
+func (p *TxAssets_MainNet) Clone() TxAssets_MainNet {
+	if p == nil {
+		return nil
+	}
+
+	newAssets := make(TxAssets_MainNet, len(*p))
+	for i, asset := range *p {
+		newAssets[i] = *asset.Clone()
+	}
+
+	return newAssets
+}
+
+
+// Add 将另一个资产列表合并到当前列表中
+func (p *TxAssets_MainNet) Add(asset *AssetInfo_MainNet) error {
+	if asset == nil {
+		return nil
+	}
+
+	index, found := p.findIndex(&asset.Name)
+	if found {
+		if (*p)[index].Amount+asset.Amount < 0 {
+			return fmt.Errorf("out of bounds")
+		}
+		(*p)[index].Amount += asset.Amount
+	} else {
+		*p = append(*p, AssetInfo_MainNet{}) // Extend slice
+		copy((*p)[index+1:], (*p)[index:])
+		(*p)[index] = *asset
+		// TODO 调整offset？
+	}
+	return nil
+}
+
+// Subtract 从当前列表中减去另一个资产列表
+func (p *TxAssets_MainNet) Subtract(asset *AssetInfo_MainNet) error {
+	if asset == nil {
+		return nil
+	}
+	if asset.Amount == 0 {
+		return nil
+	}
+
+	index, found := p.findIndex(&asset.Name)
+	if !found {
+		return errors.New("asset not found")
+	}
+	if (*p)[index].Amount < asset.Amount {
+		return errors.New("insufficient asset amount")
+	}
+	(*p)[index].Amount -= asset.Amount
+	if (*p)[index].Amount == 0 {
+		*p = append((*p)[:index], (*p)[index+1:]...)
+	}
+	return nil
+}
+
+// Binary search to find the index of an AssetName
+func (p *TxAssets_MainNet) findIndex(name *swire.AssetName) (int, bool) {
+	index := sort.Search(len(*p), func(i int) bool {
+		if (*p)[i].Name.Protocol != name.Protocol {
+			return (*p)[i].Name.Protocol >= name.Protocol
+		}
+		if (*p)[i].Name.Type != name.Type {
+			return (*p)[i].Name.Type >= name.Type
+		}
+		return (*p)[i].Name.Ticker >= name.Ticker
+	})
+	if index < len(*p) && (*p)[index].Name == *name {
+		return index, true
+	}
+	return index, false
+}
+
+
+func (p *TxAssets_MainNet) Find(asset *swire.AssetName) (*AssetInfo_MainNet, error) {
+	index, found := p.findIndex(asset)
+	if !found {
+		return nil, errors.New("asset not found")
+	}
+	return &(*p)[index], nil
 }
 
 type TxOutput struct {
@@ -218,9 +305,9 @@ func (p *TxOutput) Clone() *TxOutput {
 	for i, u := range p.Sats {
 		n.Sats[i] = &Range{Start: u.Start, Size: u.Size}
 	}
-	n.Assets = make([]*AssetInfo_MainNet, len(p.Assets))
+	n.Assets = make([]AssetInfo_MainNet, len(p.Assets))
 	for i, u := range p.Assets {
-		n.Assets[i] = u.Clone()
+		n.Assets[i] = *u.Clone()
 	}
 	return n
 }
@@ -277,6 +364,16 @@ func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 	}
 }
 
+func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
+	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
+		return p.Value()
+	}
+	asset, err := p.Assets.Find(assetName)
+	if err != nil {
+		return 0
+	}
+	return asset.Amount
+}
 
 type TxRanges []*Range
 
