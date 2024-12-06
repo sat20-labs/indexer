@@ -1064,20 +1064,13 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_ADDRESSVALUE)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
-		ids := b.printfUtxos(utxos1)
-		b.deleteUtxos(ids)
-		// 因为badger数据库的bug，在DB_KEY_UTXO中删除的数据可能还会出现，在检查后需要重新删除，再次检查，但只重新检查一次
-		if !b.reCheck {
-			b.reCheck = true
-			return b.CheckSelf()
-		}
+		b.printfUtxos(utxos1)
 	}
 
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_UTXO)
 	utxos2 := findDifferentItems(utxosInT2, utxosInT1)
 	if len(utxos2) > 0 {
-		ids := b.printfUtxos(utxos2)
-		b.deleteUtxos(ids)
+		b.printfUtxos(utxos2)
 	}
 
 	common.Log.Infof("address not in table %s", common.DB_KEY_ADDRESSVALUE)
@@ -1212,34 +1205,6 @@ func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 	})
 
 	return result
-}
-
-// only for test
-func (b *BaseIndexer) deleteUtxos(utxos map[uint64]string) {
-	wb := b.db.NewWriteBatch()
-	defer wb.Cancel()
-
-	for utxoId, utxo := range utxos {
-		key := common.GetUTXODBKey(utxo)
-		err := wb.Delete([]byte(key))
-		if err != nil {
-			common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
-		} else {
-			common.Log.Infof("utxo deled: %s", utxo)
-		}
-
-		err = common.UnBindUtxoId(utxoId, wb)
-		if err != nil {
-			common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
-		} else {
-			common.Log.Infof("utxo unbind: %d", utxoId)
-		}
-	}
-
-	err := wb.Flush()
-	if err != nil {
-		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
-	}
 }
 
 func (b *BaseIndexer) setDBVersion() {

@@ -651,7 +651,6 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 	utxos2 := findDifferentItems(utxosInT2, utxosInT1)
 	if len(utxos2) > 0 {
 		p.printfUtxos(utxos2, baseDB)
-		p.deleteUtxos(utxos2)
 		common.Log.Panicf("utxo2 wrong %d", len(utxos2))
 	}
 
@@ -684,27 +683,6 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 	}
 
 	return differentItems
-}
-
-func (b *NftIndexer) deleteUtxos(utxos map[uint64]bool) map[uint64]bool {
-	wb := b.db.NewWriteBatch()
-	defer wb.Cancel()
-
-	for utxoId := range utxos {
-		key := GetUtxoKey(utxoId)
-		err := wb.Delete([]byte(key))
-		if err != nil {
-			common.Log.Errorf("NftIndexer.deleteUtxos-> Error deleting db: %v\n", err)
-		} else {
-			common.Log.Infof("NftIndexer utxo deled: %d", utxoId)
-		}
-	}
-
-	err := wb.Flush()
-	if err != nil {
-		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
-	}
-	return utxos
 }
 
 // only for test
