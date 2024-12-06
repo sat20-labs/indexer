@@ -32,6 +32,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v2 v2.4.0
+	lukechampine.com/uint128 v1.3.0
 )
 
 require (
