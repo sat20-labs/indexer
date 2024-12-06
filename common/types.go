@@ -80,6 +80,8 @@ const INVALID_ID = math.MaxUint64
 const ALL_TICKERS = "*"
 
 type TickerName = swire.AssetName
+// 白聪
+var ASSET_PLAIN_SAT TickerName = TickerName{}
 
 type AssetOffsetRange struct {
 	Range  *Range        `json:"range"`
@@ -129,7 +131,6 @@ func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
 	}
 	return n
 }
-
 
 // 只有一种资产存在
 func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error) {
@@ -226,6 +227,10 @@ func (p *TxOutput) Clone() *TxOutput {
 
 func (p *TxOutput) Value() int64 {
 	return p.OutValue.Value
+}
+
+func (p *TxOutput) Zero() bool {
+	return p.OutValue.Value == 0 && len(p.Assets) == 0
 }
 
 func (p *TxOutput) OutPoint() *wire.OutPoint {
