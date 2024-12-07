@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -82,6 +81,7 @@ const INVALID_ID = math.MaxUint64
 const ALL_TICKERS = "*"
 
 type TickerName = swire.AssetName
+
 // 白聪
 var ASSET_PLAIN_SAT TickerName = TickerName{}
 
@@ -114,9 +114,18 @@ type OffsetRange struct {
 	End   int64 // 不包括End
 }
 
+type AssetOffsets []*OffsetRange
+func (p *AssetOffsets) Clone() AssetOffsets {
+	result := make([]*OffsetRange, len(*p))
+	for i, u := range *p {
+		result[i] = &OffsetRange{Start:u.Start, End:u.End}
+	}
+	return result
+}
+
 type AssetInfo_MainNet struct {
 	swire.AssetInfo
-	AssetOffsets []*OffsetRange // 绑定了资产的聪的位置
+	Offsets AssetOffsets // 绑定了资产的聪的位置
 }
 
 func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
@@ -127,9 +136,9 @@ func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
 			BindingSat: p.BindingSat,
 		},
 	}
-	n.AssetOffsets = make([]*OffsetRange, len(p.AssetOffsets))
-	for i := 0; i < len(p.AssetOffsets); i++ {
-		n.AssetOffsets[i] = &OffsetRange{Start: p.AssetOffsets[i].Start, End: p.AssetOffsets[i].End}
+	n.Offsets = make([]*OffsetRange, len(p.Offsets))
+	for i := 0; i < len(p.Offsets); i++ {
+		n.Offsets[i] = &OffsetRange{Start: p.Offsets[i].Start, End: p.Offsets[i].End}
 	}
 	return n
 }
@@ -138,7 +147,7 @@ func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
 func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error) {
 	result := &AssetInfo_MainNet{}
 	result.Name = p.Name
-	
+
 	if amt > p.Amount {
 		err := errors.New("pickup count is too big")
 		return nil, err
@@ -156,7 +165,7 @@ func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error
 
 	pickupRanges := make([]*OffsetRange, 0)
 	remainingValue := amt
-	for _, currentRange := range p.AssetOffsets {
+	for _, currentRange := range p.Offsets {
 		if currentRange.End <= offset {
 			continue
 		}
@@ -170,7 +179,7 @@ func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error
 		if rangeSize > remainingValue {
 			rangeSize = remainingValue
 		}
-		newRange := &OffsetRange{Start: start, End: start+rangeSize}
+		newRange := &OffsetRange{Start: start, End: start + rangeSize}
 		pickupRanges = append(pickupRanges, newRange)
 		remainingValue = remainingValue - rangeSize
 
@@ -178,120 +187,26 @@ func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error
 			break
 		}
 	}
-	
+
 	// check valid
 	if remainingValue != 0 {
 		err := errors.New("pickup count is wrong")
 		return nil, err
 	}
 	result.Amount = amt
-	result.AssetOffsets = pickupRanges
+	result.Offsets = pickupRanges
 
 	return result, nil
 }
 
-
 type TxAssets = swire.TxAssets
-type TxAssets_MainNet []AssetInfo_MainNet
-
-func (p *TxAssets_MainNet) ToTxAssets() TxAssets {
-	result := make([]swire.AssetInfo, len(*p))
-	for i, a := range *p {
-		result[i] = a.AssetInfo
-	}
-	return result
-}
-
-
-func (p *TxAssets_MainNet) Clone() TxAssets_MainNet {
-	if p == nil {
-		return nil
-	}
-
-	newAssets := make(TxAssets_MainNet, len(*p))
-	for i, asset := range *p {
-		newAssets[i] = *asset.Clone()
-	}
-
-	return newAssets
-}
-
-
-// Add 将另一个资产列表合并到当前列表中
-func (p *TxAssets_MainNet) Add(asset *AssetInfo_MainNet) error {
-	if asset == nil {
-		return nil
-	}
-
-	index, found := p.findIndex(&asset.Name)
-	if found {
-		if (*p)[index].Amount+asset.Amount < 0 {
-			return fmt.Errorf("out of bounds")
-		}
-		(*p)[index].Amount += asset.Amount
-	} else {
-		*p = append(*p, AssetInfo_MainNet{}) // Extend slice
-		copy((*p)[index+1:], (*p)[index:])
-		(*p)[index] = *asset
-		// TODO 调整offset？
-	}
-	return nil
-}
-
-// Subtract 从当前列表中减去另一个资产列表
-func (p *TxAssets_MainNet) Subtract(asset *AssetInfo_MainNet) error {
-	if asset == nil {
-		return nil
-	}
-	if asset.Amount == 0 {
-		return nil
-	}
-
-	index, found := p.findIndex(&asset.Name)
-	if !found {
-		return errors.New("asset not found")
-	}
-	if (*p)[index].Amount < asset.Amount {
-		return errors.New("insufficient asset amount")
-	}
-	(*p)[index].Amount -= asset.Amount
-	if (*p)[index].Amount == 0 {
-		*p = append((*p)[:index], (*p)[index+1:]...)
-	}
-	return nil
-}
-
-// Binary search to find the index of an AssetName
-func (p *TxAssets_MainNet) findIndex(name *swire.AssetName) (int, bool) {
-	index := sort.Search(len(*p), func(i int) bool {
-		if (*p)[i].Name.Protocol != name.Protocol {
-			return (*p)[i].Name.Protocol >= name.Protocol
-		}
-		if (*p)[i].Name.Type != name.Type {
-			return (*p)[i].Name.Type >= name.Type
-		}
-		return (*p)[i].Name.Ticker >= name.Ticker
-	})
-	if index < len(*p) && (*p)[index].Name == *name {
-		return index, true
-	}
-	return index, false
-}
-
-
-func (p *TxAssets_MainNet) Find(asset *swire.AssetName) (*AssetInfo_MainNet, error) {
-	index, found := p.findIndex(asset)
-	if !found {
-		return nil, errors.New("asset not found")
-	}
-	return &(*p)[index], nil
-}
 
 type TxOutput struct {
 	OutPointStr string
 	OutValue    wire.TxOut
-	Sats        TxRanges
-	Assets      TxAssets_MainNet
+	//Sats        TxRanges  废弃。需要时重新获取
+	Assets TxAssets
+	Offsets map[swire.AssetName]AssetOffsets
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }
@@ -300,14 +215,12 @@ func (p *TxOutput) Clone() *TxOutput {
 	n := &TxOutput{
 		OutPointStr: p.OutPointStr,
 		OutValue:    p.OutValue,
+		Assets:      p.Assets.Clone(),
 	}
-	n.Sats = make(TxRanges, len(p.Sats))
-	for i, u := range p.Sats {
-		n.Sats[i] = &Range{Start: u.Start, Size: u.Size}
-	}
-	n.Assets = make([]AssetInfo_MainNet, len(p.Assets))
-	for i, u := range p.Assets {
-		n.Assets[i] = *u.Clone()
+
+	n.Offsets = make(map[swire.AssetName]AssetOffsets)
+	for i, u := range p.Offsets {
+		n.Offsets[i] = u.Clone()
 	}
 	return n
 }
@@ -348,7 +261,7 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 		if asset.BindingSat != 0 {
 			amount = (asset.Amount)
 		}
-	
+
 		if amount > (bindingSats) {
 			bindingSats = amount
 		}
@@ -356,12 +269,39 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 	return bindingSats
 }
 
-// should fill out Sats and Assets parameters.
-func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
-	return &TxOutput{
-		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
-		OutValue:    *tx.TxOut[index],
+func (p *TxOutput) Append(another *TxOutput) error {
+	if another == nil {
+		return nil
 	}
+
+	if p.OutValue.Value + another.OutValue.Value < 0 {
+		return fmt.Errorf("out of bounds")
+	}
+	value := p.OutValue.Value
+	for _, asset := range another.Assets {
+		offsets := another.Offsets[asset.Name]
+		for j := 0; j < len(offsets); j++ {
+			offsets[j].Start += value
+			offsets[j].End += value
+		}
+		existingAsset, err := p.Assets.Find(&asset.Name)
+		if err != nil {
+			p.Assets.Add(&asset)
+		} else {
+			existingAsset.Amount += asset.Amount
+		}
+
+		existingOffsets, ok := p.Offsets[asset.Name]
+		if ok {
+			existingOffsets = append(existingOffsets, offsets...)
+		} else {
+			existingOffsets = offsets
+		}
+		p.Offsets[asset.Name] = existingOffsets
+	}
+	p.OutValue.Value += another.OutValue.Value
+	
+	return nil
 }
 
 func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
@@ -374,6 +314,15 @@ func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
 	}
 	return asset.Amount
 }
+
+// should fill out Sats and Assets parameters.
+func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
+	return &TxOutput{
+		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
+		OutValue:    *tx.TxOut[index],
+	}
+}
+
 
 type TxRanges []*Range
 
@@ -408,7 +357,7 @@ func (p *TxRanges) Clone() TxRanges {
 	return result
 }
 
-// Pickup an TxRanges with the given offset and count from the current TxRanges, 
+// Pickup an TxRanges with the given offset and count from the current TxRanges,
 // current TxRanges is not changed
 func (p *TxRanges) PickUp(offset, count int64) (TxRanges, error) {
 	size := p.GetSize()
@@ -475,8 +424,7 @@ func (p *TxRanges) PickUp(offset, count int64) (TxRanges, error) {
 	return pickupRanges, nil
 }
 
-
-func (p *TxRanges) Resize(amt int64)  {
+func (p *TxRanges) Resize(amt int64) {
 	result := make([]*Range, 0)
 	size := int64(0)
 	for _, rng := range *p {
@@ -558,7 +506,6 @@ func (p *TxRanges) AppendRange(rngs2 *Range) {
 		*p = append(*p, rngs2)
 	}
 }
-
 
 // 确保输出是第一个参数。只需要检查第一组的最后一个和第二组的第一个
 func AppendOffsetRange(rngs1 []*OffsetRange, rngs2 *OffsetRange) []*OffsetRange {

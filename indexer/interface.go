@@ -501,9 +501,9 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 
-	var assets common.TxAssets_MainNet
+	var assets common.TxAssets
+	offsetmap := make(map[swire.AssetName]common.AssetOffsets)
 	for k, v := range assetmap {
-		asset := common.AssetInfo_MainNet{}
 		value := int64(0)
 		var offsets []*common.OffsetRange
 		for _, rngs := range v {
@@ -511,18 +511,19 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			offsets = append(offsets, &common.OffsetRange{Start: value, End: size})
 			value += size
 		}
-		asset.AssetInfo = swire.AssetInfo{
+		asset := swire.AssetInfo{
 			Name:       k,
 			Amount:     value,
 			BindingSat: 1,
 		}
-		asset.AssetOffsets = offsets
-
+		
 		if assets == nil {
-			assets = common.TxAssets_MainNet{asset}
+			assets = swire.TxAssets{asset}
 		} else {
 			assets.Add(&asset)
 		}
+
+		offsetmap[k] = offsets
 	}
 
 	return &common.TxOutput{
@@ -531,7 +532,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			Value:    common.GetOrdinalsSize(info.Ordinals),
 			PkScript: info.PkScript,
 		},
-		Sats:   info.Ordinals,
 		Assets: assets,
+		Offsets: offsetmap,
 	}
 }
