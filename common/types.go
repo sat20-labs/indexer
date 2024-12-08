@@ -315,11 +315,12 @@ func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
 	return asset.Amount
 }
 
-// should fill out Sats and Assets parameters.
+// should fill out Assets parameters.
 func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 	return &TxOutput{
 		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
 		OutValue:    *tx.TxOut[index],
+		Offsets:     make(map[swire.AssetName]AssetOffsets),
 	}
 }
 
