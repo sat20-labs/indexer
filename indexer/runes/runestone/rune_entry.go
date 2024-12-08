@@ -6,15 +6,18 @@ import (
 	"lukechampine.com/uint128"
 )
 
+type InscriptionId string
+
 type RuneEntry struct {
-	Block        uint64
-	Burned       *uint128.Uint128
+	RuneId       RuneId
+	Burned       uint128.Uint128
 	Divisibility uint8
 	Etching      [32]byte // Txid
-	Mints        *uint128.Uint128
+	Parent       InscriptionId
+	Mints        uint128.Uint128
 	Number       uint64
-	Premine      *uint128.Uint128
-	SpacedRune   *SpacedRune
+	Premine      uint128.Uint128
+	SpacedRune   SpacedRune
 	Symbol       *rune
 	Terms        *Terms
 	Timestamp    uint64
@@ -112,8 +115,8 @@ func (re *RuneEntry) Start() *uint64 {
 
 	var relative, absolute *uint64
 	if re.Terms.Offset[0] != nil {
-		if re.Block <= math.MaxUint64-*re.Terms.Offset[0] {
-			relVal := re.Block + *re.Terms.Offset[0]
+		if re.RuneId.Block <= math.MaxUint64-*re.Terms.Offset[0] {
+			relVal := re.RuneId.Block + *re.Terms.Offset[0]
 			relative = &relVal
 		} else {
 			maxVal := uint64(math.MaxUint64)
@@ -140,8 +143,8 @@ func (re *RuneEntry) End() *uint64 {
 
 	var relative, absolute *uint64
 	if re.Terms.Offset[1] != nil {
-		if re.Block <= math.MaxUint64-*re.Terms.Offset[0] {
-			relVal := re.Block + *re.Terms.Offset[0]
+		if re.RuneId.Block <= math.MaxUint64-*re.Terms.Offset[0] {
+			relVal := re.RuneId.Block + *re.Terms.Offset[0]
 			relative = &relVal
 		} else {
 			maxVal := uint64(math.MaxUint64)

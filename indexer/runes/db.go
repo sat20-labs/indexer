@@ -7,6 +7,25 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
+func initStatusFromDB(db *badger.DB) *RunesStatus {
+	stats := &RunesStatus{}
+	db.View(func(txn *badger.Txn) error {
+		err := common.GetValueFromDB([]byte(STATUS_KEY), txn, stats)
+		if err == badger.ErrKeyNotFound {
+			stats.Version = DB_VERSION
+		} else if err != nil {
+			common.Log.Panicf("Runes.Indexer->initStatusFromDB: err: %v", err)
+			return err
+		}
+		common.Log.Infof("Runes.Indexer->initStatusFromDB: stats: %v", stats)
+		if stats.Version != DB_VERSION {
+			common.Log.Panicf("Runes.Indexer->initStatusFromDB: db version inconsistent %s", DB_VERSION)
+		}
+		return nil
+	})
+	return stats
+}
+
 func (s *Indexer) getMintFromDB(runeName, inscriptionId string) *common.Mint {
 	var result common.Mint
 	err := s.db.View(func(txn *badger.Txn) error {

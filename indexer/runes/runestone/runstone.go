@@ -36,6 +36,8 @@ type Runestone struct {
 	Pointer *uint32
 }
 
+var ErrNoOpReturn = errors.New("no OP_RETURN output found")
+
 func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, int, error) {
 	payload, voutIndex, err := r.payload(transaction)
 	if err != nil {
@@ -284,7 +286,7 @@ func (r *Runestone) payload(transaction *wire.MsgTx) (*Payload, int, error) {
 		return &Payload{Valid: payload}, index, nil
 	}
 
-	return nil, 0, errors.New("no OP_RETURN output found")
+	return nil, 0, ErrNoOpReturn
 }
 func isPushBytes(opCode byte) bool {
 	return opCode >= txscript.OP_0 && opCode <= txscript.OP_PUSHDATA4

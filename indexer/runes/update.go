@@ -14,17 +14,22 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		// handle runestone
 		artifact, voutIndex, err := parserArtifact(transaction)
 		if err != nil {
-			common.Log.Errorf("RuneIndexer->UpdateTransfer: parserArtifact error: %v", err)
+			if err != runestone.ErrNoOpReturn {
+				common.Log.Errorf("RuneIndexer->UpdateTransfer: parserArtifact error: %v", err)
+			} else {
+				common.Log.Debugf("RuneIndexer->UpdateTransfer: parserArtifact no op return")
+			}
 			continue
 		}
 
 		if artifact.Runestone != nil {
 			if artifact.Runestone.Etching != nil { // etching， 当 mint 时，必须要存在这个Etching，否则MintError::Unmintable
 				r := artifact.Runestone.Etching.Rune
-				(*s.runeMap)[runestone.RuneId{
+				runeId := runestone.RuneId{
 					Block: uint64(block.Height),
-					Tx:    uint32(voutIndex),
-				}] = artifact.Runestone.Etching.Rune
+					Tx:    uint32(txIndex),
+				}
+				(*s.runeMap)[runeId] = artifact.Runestone.Etching.Rune
 
 				runeInfo := (*s.runeInfoMap)[*r]
 				if runeInfo != nil {
@@ -75,24 +80,24 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 				}
 				addressAsset := (*s.addressAssetMap)[address]
 				if addressAsset == nil {
-					addressAsset = &AddressAsset{}
+					addressAsset = &RuneAddressAsset{}
 					(*s.addressAssetMap)[address] = addressAsset
 				}
 				if addressAsset.Mints == nil {
-					addressAsset.Mints = &MintMap{}
+					addressAsset.Mints = &RuneMintMap{}
 				}
 				if addressAsset.Transfers == nil {
-					addressAsset.Transfers = &TransferMap{}
+					addressAsset.Transfers = &RuneTransferMap{}
 				}
 				if addressAsset.Cenotaphs == nil {
-					addressAsset.Cenotaphs = &CenotaphMap{}
+					addressAsset.Cenotaphs = &RuneCenotaphMap{}
 				}
 				if addressAsset.Assets == nil {
-					addressAsset.Assets = &AssetMap{}
+					addressAsset.Assets = &RuneAssetMap{}
 				}
 				asset := (*addressAsset.Assets)[*r]
 				if asset == nil {
-					asset = &Asset{
+					asset = &RuneAsset{
 						IsEtching: true,
 					}
 					(*addressAsset.Assets)[*r] = asset
@@ -118,15 +123,15 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 					continue
 				}
 				if addressAsset.Mints == nil {
-					addressAsset.Mints = &MintMap{}
+					addressAsset.Mints = &RuneMintMap{}
 				}
 				(*addressAsset.Mints)[*r] = append((*addressAsset.Mints)[*r], artifact.Runestone.Mint)
 				if addressAsset.Assets == nil {
-					addressAsset.Assets = &AssetMap{}
+					addressAsset.Assets = &RuneAssetMap{}
 				}
 				asset := (*addressAsset.Assets)[*r]
 				if asset == nil {
-					asset = &Asset{}
+					asset = &RuneAsset{}
 					(*addressAsset.Assets)[*r] = asset
 				}
 				runeInfo = (*s.runeInfoMap)[*r]
