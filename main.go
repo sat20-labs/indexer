@@ -76,7 +76,7 @@ func GetConfig(conf *config.YamlConf) *Config {
 
 	chainParam := &chaincfg.MainNetParams
 	switch chain {
-	case common.ChainTestnet:
+	case common.ChainTestnet, common.ChainTestnet4:
 		chainParam = &chaincfg.TestNet3Params
 	case common.ChainMainnet:
 		chainParam = &chaincfg.MainNetParams
