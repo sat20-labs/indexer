@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
@@ -433,13 +434,17 @@ type NamesWithAddressResp struct {
 	Data *NamesWithAddressData `json:"data"`
 }
 
-// type TxOutput struct {
-// 	OutPoint string                      `json:"outpoint"`
-// 	OutValue wire.TxOut                  `json:"outvalue"`
-// 	Sats     []*common.Range             `json:"rangs"`
-// 	Assets   []*common.AssetInfo_MainNet `json:"assets"`
-// }
-type TxOutput = common.TxOutput
+type AssetInfo struct {
+	Asset swire.AssetInfo         `json:"asset"`
+	Offsets common.AssetOffsets   `json:"offsets"`
+}
+
+type TxOutput struct {
+	OutPoint string             `json:"outpoint"`
+	OutValue wire.TxOut         `json:"outvalue"`
+	AssetInfo   []*AssetInfo    `json:"assets"`
+}
+//type TxOutput2 = common.TxOutput
 
 type AssetSummary struct {
 	ListResp

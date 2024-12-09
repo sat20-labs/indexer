@@ -116,11 +116,21 @@ func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutput, error) {
 		return nil, fmt.Errorf("can't get txout from %s", utxo)
 	}
 
+	assets := make([]*rpcwire.AssetInfo, 0)
+	for _, asset := range txOut.Assets {
+		offsets := txOut.Offsets[asset.Name]
+
+		info := rpcwire.AssetInfo{
+			Asset: asset,
+			Offsets: offsets,
+		}
+		assets = append(assets, &info)
+	}
+
 	output := rpcwire.TxOutput{
-		OutPointStr: utxo,
+		OutPoint: utxo,
 		OutValue: txOut.OutValue,
-		Assets:   txOut.Assets,
-		Offsets:  txOut.Offsets,
+		AssetInfo: assets,
 	}
 
 	return &output, nil
