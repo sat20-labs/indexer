@@ -26,14 +26,6 @@ const (
 
 type UtxoValueInDB = pb.MyUtxoValueInDB
 
-func ToAddrType(tp, reqSig int) uint32 {
-	return uint32(tp<<16 + reqSig)
-}
-
-func FromAddrType(u uint32) (int, int) {
-	return int(u >> 16), int(0xffff & u)
-}
-
 type UtxoIdInDB struct {
 	UtxoId uint64
 	Value  int64

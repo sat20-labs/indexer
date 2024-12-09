@@ -100,8 +100,9 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 
 	info := common.UtxoInfo{}
 	var pkScript []byte
-	addrType, reqSig := common.FromAddrType(output.AddressType)
-	if addrType == int(txscript.MultiSigTy) {
+	addrType := output.AddressType
+	reqSig := output.ReqSigs
+	if addrType == uint32(txscript.MultiSigTy) {
 		var addresses []string
 		for _, id := range output.AddressIds {
 			addr, err := b.GetAddressByID(id)
@@ -110,11 +111,11 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 			}
 			addresses = append(addresses, addr)
 		}
-		pkScript, err = common.MultiSigToPkScript(reqSig, addresses, b.IsMainnet())
+		pkScript, err = common.MultiSigToPkScript(int(reqSig), addresses, b.IsMainnet())
 		if err != nil {
 			return nil, err
 		}
-	} else if addrType == int(txscript.NullDataTy) {
+	} else if addrType == uint32(txscript.NullDataTy) {
 		pkScript, err = txscript.NullDataScript(nil)
 	} else {
 		addr, err := b.GetAddressByID(output.AddressIds[0])

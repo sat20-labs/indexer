@@ -343,7 +343,8 @@ func (b *BaseIndexer) UpdateDB() {
 
 		saveUTXO := &common.UtxoValueInDB{
 			UtxoId:      utxoId,
-			AddressType: common.ToAddrType(int(v.Address.Type), v.Address.ReqSig),
+			AddressType: uint32(v.Address.Type),
+			ReqSigs: 	 uint32(v.Address.ReqSig),
 			AddressIds:  addressIds,
 			Ordinals:    v.Ordinals,
 		}
@@ -791,7 +792,8 @@ func (b *BaseIndexer) loadUtxoFromDB(txn *badger.Txn, utxostr string) error {
 		b.addressIdMap[address] = &AddressStatus{AddressId: addressId, Op: 0}
 		addresses.Addresses = append(addresses.Addresses, address)
 	}
-	addresses.Type, addresses.ReqSig = common.FromAddrType(utxo.AddressType)
+	addresses.Type = int(utxo.AddressType)
+	addresses.ReqSig = int(utxo.ReqSigs)
 
 	// TODO 对于多签的utxo，目前相当于把这个utxo给第一个地址
 	height, txid, vout := common.FromUtxoId(utxo.UtxoId)

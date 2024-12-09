@@ -11,6 +11,7 @@ message MyRange {
 message MyUtxoValueInDB {
     uint64 utxo_id = 1;
     uint32 address_type = 2;
-    repeated uint64 address_ids = 3;
-    repeated MyRange ordinals = 4;
+    uint32 reqSigs = 3;
+    repeated uint64 address_ids = 4;
+    repeated MyRange ordinals = 5;
 }
