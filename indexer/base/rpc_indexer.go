@@ -98,6 +98,10 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 		return nil
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	info := common.UtxoInfo{}
 	var pkScript []byte
 	addrType := output.AddressType
@@ -133,9 +137,6 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 	info.PkScript = pkScript
 	info.Ordinals = output.Ordinals
 
-	if err != nil {
-		return nil, err
-	}
 
 	return &info, nil
 }
