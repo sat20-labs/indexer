@@ -120,7 +120,7 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 			return nil, err
 		}
 	} else if addrType == uint32(txscript.NullDataTy) {
-		pkScript, err = txscript.NullDataScript(nil)
+		pkScript, _ = txscript.NullDataScript(nil)
 	} else {
 		addr, err := b.GetAddressByID(output.AddressIds[0])
 		if err != nil {
