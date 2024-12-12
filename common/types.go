@@ -155,6 +155,12 @@ func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error
 		return p.Clone(), nil
 	}
 
+	if p.Offsets == nil {
+		// 白聪
+		result.Amount = amt
+		return result, nil
+	}
+
 	pickupRanges := make([]*OffsetRange, 0)
 	remainingValue := amt
 	for _, currentRange := range p.Offsets {
