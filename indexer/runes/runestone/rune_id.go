@@ -1,26 +1,14 @@
-// Copyright 2024 The BxELab studyzy Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package runestone
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 
+	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"lukechampine.com/uint128"
 )
 
@@ -29,11 +17,19 @@ type RuneId struct {
 	Tx    uint32
 }
 
+type RuneIdKey [12]byte
+
 func NewRuneId(block uint64, tx uint32) (*RuneId, error) {
 	if block == 0 && tx > 0 {
 		return nil, errors.New("block=0 but tx>0")
 	}
 	return &RuneId{Block: block, Tx: tx}, nil
+}
+func (r RuneId) ToByte() RuneIdKey {
+	var result RuneIdKey
+	binary.BigEndian.PutUint64(result[:8], r.Block)
+	binary.BigEndian.PutUint32(result[8:], r.Tx)
+	return result
 }
 
 func (r RuneId) Delta(next RuneId) (uint64, uint32, error) {
@@ -112,4 +108,17 @@ var (
 
 func (r RuneId) Cmp(other RuneId) int {
 	return uint128.New(uint64(r.Tx), r.Block).Cmp(uint128.New(uint64(other.Tx), other.Block))
+}
+
+func (s *RuneId) ToPb() *pb.RuneId {
+	pbValue := &pb.RuneId{
+		Block: s.Block,
+		Tx:    s.Tx,
+	}
+	return pbValue
+}
+
+func (s *RuneId) FromPb(pbValue *pb.RuneId) {
+	s.Block = pbValue.Block
+	s.Tx = pbValue.Tx
 }

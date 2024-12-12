@@ -5,26 +5,31 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dgraph-io/badger/v4"
+	"github.com/sat20-labs/indexer/indexer/runes/db"
+	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 )
 
 type Indexer struct {
-	db              *badger.DB
-	chaincfgParam   *chaincfg.Params
-	status          *RunesStatus
-	mutex           sync.RWMutex
-	runeInfoMap     *RuneInfoMap
-	runeMap         *RuneMap
-	mintMap         *RuneMintMap
-	transferMap     *RuneTransferMap
-	cnotaphMap      *RuneCenotaphMap
-	addressAssetMap *AddressAssetMap
+	chaincfgParam         *chaincfg.Params
+	height                uint64
+	status                runestone.RunesStatus
+	minimumRune           *runestone.Rune
+	mutex                 sync.RWMutex
+	runeInfoMap           *RuneInfoMap
+	runeMap               *RuneMap
+	mintMap               *RuneMintMap
+	transferMap           *RuneTransferMap
+	cnotaphMap            *RuneCenotaphMap
+	addressAssetMap       *AddressAssetMap
+	outpointToBalancesTbl runestone.OutpointToBalancesTable
+	runeIdToEntryTbl      runestone.RuneIdToEntryTable
+	runeToRuneIdTbl       runestone.RuneToRuneIdTable
 }
 
-func New(db *badger.DB, chaincfgParam *chaincfg.Params) *Indexer {
+func New(newDb *badger.DB, chaincfgParam *chaincfg.Params) *Indexer {
+	db.SetDB(newDb)
 	return &Indexer{
-		db:              db,
 		chaincfgParam:   chaincfgParam,
-		status:          &RunesStatus{},
 		runeInfoMap:     &RuneInfoMap{},
 		runeMap:         &RuneMap{},
 		mintMap:         &RuneMintMap{},
@@ -35,11 +40,11 @@ func New(db *badger.DB, chaincfgParam *chaincfg.Params) *Indexer {
 }
 
 func (s *Indexer) Init() {
-	s.status = initStatusFromDB(s.db)
+	s.status.Init()
 }
 
 func (s *Indexer) Clone() *Indexer {
-	newInst := New(s.db, s.chaincfgParam)
+	newInst := New(db.GetDB(), s.chaincfgParam)
 	newInst.status = s.status
 	newInst.runeInfoMap = s.runeInfoMap
 	newInst.runeMap = s.runeMap

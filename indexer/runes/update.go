@@ -1,195 +1,200 @@
 package runes
 
 import (
-	"time"
+	"bytes"
+	"strings"
 
+	"github.com/OLProtocol/go-bitcoind"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
-	"lukechampine.com/uint128"
+	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
+func (s *Indexer) UpdateDB() {}
+
 func (s *Indexer) UpdateTransfer(block *common.Block) {
+	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
+	s.minimumRune = &minimum
+	s.height = uint64(block.Height)
 	for txIndex, transaction := range block.Transactions {
-		parent := tryGetFirstInscriptionId(transaction)
-		// handle runestone
-		artifact, voutIndex, err := parserArtifact(transaction)
+		err := s.index_runes(uint32(txIndex), transaction)
 		if err != nil {
-			if err != runestone.ErrNoOpReturn {
-				common.Log.Errorf("RuneIndexer->UpdateTransfer: parserArtifact error: %v", err)
-			} else {
-				common.Log.Debugf("RuneIndexer->UpdateTransfer: parserArtifact no op return")
-			}
-			continue
+			common.Log.Debugf("RuneIndexer->UpdateTransfer: index_runes error: %v", err)
 		}
-
-		if artifact.Runestone != nil {
-			if artifact.Runestone.Etching != nil { // etching， 当 mint 时，必须要存在这个Etching，否则MintError::Unmintable
-				r := artifact.Runestone.Etching.Rune
-				runeId := runestone.RuneId{
-					Block: uint64(block.Height),
-					Tx:    uint32(txIndex),
-				}
-				(*s.runeMap)[runeId] = artifact.Runestone.Etching.Rune
-
-				runeInfo := (*s.runeInfoMap)[*r]
-				if runeInfo != nil {
-					continue
-				}
-				runeInfo = &RuneInfo{
-					Etching: artifact.Runestone.Etching,
-					Parent:  parent,
-				}
-				// pass rust source code
-				if runeInfo.Etching.Divisibility == nil {
-					zero := uint8(0)
-					runeInfo.Etching.Divisibility = &zero
-				}
-				// pass rust source code
-				if runeInfo.Etching.Premine == nil {
-					runeInfo.Etching.Premine = &uint128.Zero
-				}
-				if runeInfo.Etching.Rune == nil {
-					r := runestone.Reserved(uint64(block.Height), uint32(txIndex))
-					runeInfo.Etching.Rune = &r
-				}
-				// pass rust source code
-				if runeInfo.Etching.Spacers == nil {
-					zero := uint32(0)
-					runeInfo.Etching.Spacers = &zero
-				}
-				// runeInfo.Etching.Symbol: default is None,可选项，如果没有可以不显示，一般都是有的, 另外显示 pile时会默认显示 ¤
-				if runeInfo.Etching.Symbol == nil {
-					runeInfo.Etching.Symbol = nil
-				}
-				// Terms: 可选项 没有设置，显示时就是无
-				if runeInfo.Etching.Terms == nil {
-					runeInfo.Etching.Terms = &runestone.Terms{
-						// Amount: &one, // 可选项 没有设置，显示时就是不显示或者无，在 mint时，amount为 0，也是可以 mint操作的
-						// Cap:    &uint128.Max, // 可选项，没有设置时， 显示就是 0
-						// Height: [2]*uint64{nil, nil}, // 可选项，没有设置时，显示就是无
-						// Offset: [2]*uint64{nil, nil}, // 可选项，没有设置时，显示就是无
-					}
-				}
-
-				(*s.runeInfoMap)[*r] = runeInfo
-
-				address, err := parseTxVoutScriptAddress(transaction, voutIndex, *s.chaincfgParam)
-				if err != nil {
-					common.Log.Errorf("RuneIndexer->UpdateTransfer: parseTxVoutScriptAddress error: %v", err)
-					continue
-				}
-				addressAsset := (*s.addressAssetMap)[address]
-				if addressAsset == nil {
-					addressAsset = &RuneAddressAsset{}
-					(*s.addressAssetMap)[address] = addressAsset
-				}
-				if addressAsset.Mints == nil {
-					addressAsset.Mints = &RuneMintMap{}
-				}
-				if addressAsset.Transfers == nil {
-					addressAsset.Transfers = &RuneTransferMap{}
-				}
-				if addressAsset.Cenotaphs == nil {
-					addressAsset.Cenotaphs = &RuneCenotaphMap{}
-				}
-				if addressAsset.Assets == nil {
-					addressAsset.Assets = &RuneAssetMap{}
-				}
-				asset := (*addressAsset.Assets)[*r]
-				if asset == nil {
-					asset = &RuneAsset{
-						IsEtching: true,
-					}
-					(*addressAsset.Assets)[*r] = asset
-				}
-			}
-
-			if artifact.Runestone.Mint != nil { // mint
-				r := (*s.runeMap)[*artifact.Runestone.Mint]
-				runeInfo := (*s.runeInfoMap)[*r]
-				if runeInfo == nil {
-					common.Log.Errorf("RuneIndexer->UpdateTransfer: runeInfo is nil, rune: %s", r)
-					continue
-				}
-				(*s.mintMap)[*r] = append((*s.mintMap)[*r], artifact.Runestone.Mint)
-				address, err := parseTxVoutScriptAddress(transaction, voutIndex, *s.chaincfgParam)
-				if err != nil {
-					common.Log.Errorf("RuneIndexer->UpdateTransfer: parseTxVoutScriptAddress error: %v", err)
-					continue
-				}
-				addressAsset := (*s.addressAssetMap)[address]
-				if addressAsset == nil {
-					common.Log.Errorf("RuneIndexer->UpdateTransfer: addressAsset is nil, address: %s", address)
-					continue
-				}
-				if addressAsset.Mints == nil {
-					addressAsset.Mints = &RuneMintMap{}
-				}
-				(*addressAsset.Mints)[*r] = append((*addressAsset.Mints)[*r], artifact.Runestone.Mint)
-				if addressAsset.Assets == nil {
-					addressAsset.Assets = &RuneAssetMap{}
-				}
-				asset := (*addressAsset.Assets)[*r]
-				if asset == nil {
-					asset = &RuneAsset{}
-					(*addressAsset.Assets)[*r] = asset
-				}
-				runeInfo = (*s.runeInfoMap)[*r]
-				if runeInfo == nil {
-					common.Log.Errorf("RuneIndexer->UpdateTransfer: runeInfo is nil, rune: %s", r)
-					continue
-				}
-
-				asset.Amount.Add(*(runeInfo.Etching.Terms.Amount))
-
-			}
-
-			if len(artifact.Runestone.Edicts) > 0 { // transfer
-
-			}
-
-		} else if artifact.Cenotaph != nil {
-
-		}
+		s.status.Height = uint64(block.Height)
+		s.status.Update()
 	}
 
 }
 
-func (p *Indexer) UpdateDB() {
-	//common.Log.Infof("OrdxIndexer->UpdateDB start...")
-	startTime := time.Now()
-
-	wb := p.db.NewWriteBatch()
-	defer wb.Cancel()
-
-	// for _, v := range p.tickerAdded {
-	// 	key := GetTickerKey(v.Name)
-	// 	err := common.SetDB([]byte(key), v, wb)
-	// 	if err != nil {
-	// 		common.Log.Panicf("Error setting %s in db %v", key, err)
-	// 	}
-	// }
-
-	// for _, ticker := range p.runesMap {
-	// 	for _, v := range ticker.MintAdded {
-	// 		key := GetMintHistoryKey(ticker.Name, v.Base.InscriptionId)
-	// 		err := common.SetDB([]byte(key), v, wb)
-	// 		if err != nil {
-	// 			common.Log.Panicf("Error setting %s in db %v", key, err)
-	// 		}
-	// 	}
-	// }
-
-	err := wb.Flush()
+func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
+	// parent := tryGetFirstInscriptionId(tx)
+	// txid := tx.Txid
+	artifact, _, err := parserArtifact(tx)
 	if err != nil {
-		common.Log.Panicf("Error ordxwb flushing writes to db %v", err)
+		if err != runestone.ErrNoOpReturn {
+			common.Log.Debugf("RuneIndexer->index_runes: parserArtifact error: %v", err)
+		} else {
+			common.Log.Debugf("RuneIndexer->index_runes: parserArtifact no op return")
+		}
+		return nil
+	}
+	unallocated := s.unallocated(tx)
+	// allocated := make(runestone.RuneIdLogMapVec, len(tx.Outputs))
+
+	if artifact != nil {
+		mintRuneId := artifact.Mint()
+		if mintRuneId != nil {
+			amount, err := s.mint(mintRuneId)
+			if err != nil {
+				return err
+			}
+			unallocated.GetOrDefault(mintRuneId).Add(*amount)
+		}
+	}
+	_, _, err = s.etched(tx_index, tx, artifact)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMap) {
+	ret = make(runestone.RuneIdLotMap)
+	for _, input := range tx.Inputs {
+		outpointKey := &runestone.OutpointToBalanceKey{
+			Txid: input.Txid,
+			Vout: uint32(input.Vout),
+		}
+		oldValue, err := s.outpointToBalancesTbl.Remove(outpointKey)
+		if err != nil {
+			common.Log.Errorf("RuneIndexer->unallocated: outpointToBalancesTbl.Remove error: %v", err)
+			continue
+		}
+
+		for _, val := range oldValue {
+			ret[val.RuneId.ToByte()] = &val.Lot
+		}
+
+	}
+	return
+}
+
+func (s *Indexer) mint(runeId *runestone.RuneId) (lot *runestone.Lot, err error) {
+	runeEntry, err := s.runeIdToEntryTbl.Get(runeId)
+	if err != nil {
+		return nil, err
 	}
 
-	// reset memory buffer
-	// p.tickerAdded = make(map[string]*common.Ticker)
-	// for _, info := range p.runesMap {
-	// 	info.MintAdded = make([]*common.Mint, 0)
-	// }
+	amount, err := runeEntry.Mintable(s.height)
+	if err != nil {
+		return nil, err
+	}
 
-	common.Log.Infof("OrdxIndexer->UpdateDB takse: %v", time.Since(startTime))
+	runeEntry.Mints.Add64(1)
+
+	_, err = s.runeIdToEntryTbl.Insert(runeId, *runeEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	lot = &runestone.Lot{
+		Value: amount,
+	}
+	return
+}
+
+func (s *Indexer) etched(
+	txIndex uint32,
+	tx *common.Transaction,
+	artifact *runestone.Artifact,
+) (runeId *runestone.RuneId, runeData *runestone.Rune, err error) {
+	if artifact.Runestone != nil {
+		runeData = artifact.Runestone.Etching.Rune
+		if runeData == nil {
+			reserved_runes := s.status.ReservedRunes
+			s.status.ReservedRunes = reserved_runes + 1
+			s.status.Update()
+			runeData = runestone.Reserved(s.height, txIndex)
+			runeId = &runestone.RuneId{
+				Block: s.height,
+				Tx:    txIndex,
+			}
+			return runeId, runeData, nil
+		} else {
+			if runeData.Value.Cmp(s.minimumRune.Value) < 0 {
+				return nil, nil, nil
+			}
+			if runeData.IsReserved() {
+				return nil, nil, nil
+			}
+			val, err := s.runeToRuneIdTbl.Get(runeData)
+			if err != nil {
+				return nil, nil, err
+			}
+			if val == nil {
+				return nil, nil, nil
+			}
+			isCommitsToRune, err := s.txCommitsToRune(tx, *runeData)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !isCommitsToRune {
+				return nil, nil, nil
+			}
+			return &runestone.RuneId{
+				Block: s.height,
+				Tx:    txIndex,
+			}, runeData, nil
+		}
+	} else if artifact.Cenotaph != nil {
+		runeData = artifact.Cenotaph.Etching
+		if runeData == nil {
+			return nil, nil, nil
+		}
+	}
+	return nil, nil, nil
+}
+
+func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runestone.Rune) (bool, error) {
+	commitment := rune.Commitment()
+	for _, input := range transaction.Inputs {
+		tapscript, err := parseTapscript(input.Witness)
+		if err != nil {
+			continue
+		}
+
+		if !bytes.Equal(tapscript, commitment) {
+			continue
+		}
+
+		resp, err := bitcoin_rpc.ShareBitconRpc.GetRawTransaction(input.Txid, true)
+		if err != nil {
+			return false, err
+		}
+		txInfo, _ := resp.(bitcoind.RawTransaction)
+		taproot := strings.HasPrefix(txInfo.Vout[input.Vout].ScriptPubKey.Asm, "OP_1")
+		// taproot := strings.HasPrefix(txInfo.Vout[input.Vout].ScriptPubKey.Hex, "51")
+
+		if !taproot {
+			continue
+		}
+		blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockheader(txInfo.BlockHash)
+		if err != nil {
+			return false, err
+		}
+
+		commitTxHeight := uint64(blockHeader.Height)
+		currentBlockHeight, err := bitcoin_rpc.ShareBitconRpc.GetBlockCount()
+		if err != nil {
+			return false, err
+		}
+		confirmations := currentBlockHeight - commitTxHeight + 1
+
+		if confirmations >= 6 {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

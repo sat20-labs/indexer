@@ -4,13 +4,14 @@ package pb.runes;
 
 option go_package = "/runes/pb";
 
+// common
 message Uint128 {
     uint64 lo = 1;
     uint64 hi = 2;
 }
 
 message Uint8 {
-    uint64 value = 1;
+    uint32 value = 1;
 }
 
 message RuneId {
@@ -32,14 +33,14 @@ message SpacedRune {
 }
 
 message Symbol {
-    bytes value = 1;
+    int32 value = 1;
 }
 
 message Terms {
     Uint128 amount = 1;
     Uint128 cap = 2;
-    Uint128 start_height = 3;
-    Uint128 end_height = 4;
+    uint64 start_height = 3;
+    uint64 end_height = 4;
     uint64 start_offset = 5;
     uint64 end_offset = 6;
 }
@@ -48,15 +49,36 @@ message RuneEntry {
     RuneId runeId = 1;
     Uint128 burned = 2;
     Uint8 divisibility = 3;
-    bytes etching = 4;
+    string etching = 4;
     InscriptionId parent = 5;
     Uint128 mints = 6;
     uint64 number = 7;
     Uint128 premine = 8;
     SpacedRune spaced_rune = 9;
     Symbol symbol = 10;
-    Terms terms = 11;
-    uint64 timestamp = 12;
-    bool turbo = 13;
+    Terms terms = 12;
+    uint64 timestamp = 13;
+    bool turbo = 14;
 }
 
+// runesStatus
+message RunesStatus {
+    string version = 1;
+    uint64 height = 2;
+    uint64 number = 3;
+    uint64 reserved_runes = 4;
+}
+
+
+// OutpointToBalances
+// message OutpointToBalances { map<string, OutpointToBalanceValue> outpoint_to_balance_value_map = 1; }
+
+message Lot {
+    Uint128 value = 1;   
+}
+message RuneIdLot {
+    RuneId runeId = 1;
+    Lot lot = 2;
+}
+
+message OutpointToBalanceValue { repeated RuneIdLot rune_id_lots = 1; }

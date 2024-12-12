@@ -1,20 +1,17 @@
 package runes
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
-	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
 func parseRuneListKey(input string) (string, error) {
@@ -102,47 +99,4 @@ func parseTapscript(witness wire.TxWitness) ([]byte, error) {
 		}
 	}
 	return nil, errors.New("no TAPSCRIPT found in witness")
-}
-
-func TxCommitsToRune(transaction *common.Transaction, rune runestone.Rune) (bool, error) {
-	commitment := rune.Commitment()
-	for _, input := range transaction.Inputs {
-		tapscript, err := parseTapscript(input.Witness)
-		if err != nil {
-			continue
-		}
-
-		if !bytes.Equal(tapscript, commitment) {
-			continue
-		}
-
-		resp, err := bitcoin_rpc.ShareBitconRpc.GetRawTransaction(input.Txid, true)
-		if err != nil {
-			return false, err
-		}
-		txInfo, _ := resp.(bitcoind.RawTransaction)
-		taproot := strings.HasPrefix(txInfo.Vout[input.Vout].ScriptPubKey.Asm, "OP_1")
-		// taproot := strings.HasPrefix(txInfo.Vout[input.Vout].ScriptPubKey.Hex, "51")
-
-		if !taproot {
-			continue
-		}
-		blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockheader(txInfo.BlockHash)
-		if err != nil {
-			return false, err
-		}
-
-		commitTxHeight := uint64(blockHeader.Height)
-		currentBlockHeight, err := bitcoin_rpc.ShareBitconRpc.GetBlockCount()
-		if err != nil {
-			return false, err
-		}
-		confirmations := currentBlockHeight - commitTxHeight + 1
-
-		if confirmations >= 6 {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

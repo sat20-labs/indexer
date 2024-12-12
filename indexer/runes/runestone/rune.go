@@ -1,17 +1,3 @@
-// Copyright 2024 The BxELab studyzy Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package runestone
 
 import (
@@ -65,11 +51,11 @@ var STEPS = []uint128.Uint128{
 	Uint128FromString("166461473448801533683942072758341510102"),
 }
 
-func NewRune(value uint128.Uint128) Rune {
-	return Rune{Value: value}
+func NewRune(value uint128.Uint128) *Rune {
+	return &Rune{Value: value}
 }
 
-func (r Rune) N() uint128.Uint128 {
+func (r *Rune) N() uint128.Uint128 {
 	return r.Value
 }
 
@@ -84,6 +70,8 @@ func FirstRuneHeight(network wire.BitcoinNet) uint32 {
 		multiplier = 0
 	case wire.TestNet3:
 		multiplier = 12
+	case wire.TestNet4:
+		multiplier = 0
 	default:
 		multiplier = 0
 	}
@@ -100,8 +88,8 @@ func MinimumAtHeight(chain wire.BitcoinNet, height uint64) Rune {
 	if offset >= uint64(end) {
 		return Rune{}
 	}
-	progress := offset - uint64(start)
-	length := 12 - progress/uint64(interval)
+	progress := saturatingSub(offset, uint64(start))
+	length := saturatingSub(12, progress/uint64(interval))
 	endStep := STEPS[length-1]
 	startStep := STEPS[length]
 	remainder := progress % uint64(interval)
@@ -112,18 +100,18 @@ func MinimumAtHeight(chain wire.BitcoinNet, height uint64) Rune {
 
 }
 
-func (r Rune) IsReserved() bool {
+func (r *Rune) IsReserved() bool {
 	return r.Value.Cmp(RESERVED) >= 0
 }
 
-func Reserved(block uint64, tx uint32) Rune {
+func Reserved(block uint64, tx uint32) *Rune {
 	v := RESERVED.Add(uint128.From64(block).Lsh(32).Or(uint128.From64(uint64(tx))))
-	return Rune{
+	return &Rune{
 		Value: v,
 	}
 }
 
-func (r Rune) Commitment() []byte {
+func (r *Rune) Commitment() []byte {
 	bytes := r.Value.Big().Bytes()
 
 	// Reverse bytes to get little-endian representation
@@ -138,7 +126,7 @@ func (r Rune) Commitment() []byte {
 
 	return bytes[:end]
 }
-func (r Rune) String() string {
+func (r *Rune) String() string {
 	n := r.Value
 	if n.Cmp(uint128.Max) == 0 {
 		return "BCGDENLQRQWDSLRUGSNLBTMFIJAV"
@@ -200,6 +188,13 @@ func (e Error) Error() string {
 }
 
 // MarshalJSON json marshal
-func (r Rune) MarshalJSON() ([]byte, error) {
+func (r *Rune) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + r.String() + `"`), nil
+}
+
+func saturatingSub(a, b uint64) uint64 {
+	if a > b {
+		return a - b
+	}
+	return 0
 }
