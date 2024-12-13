@@ -109,7 +109,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 	return &result, nil
 }
 
-func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutput, error) {
+func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutputInfo, error) {
 
 	txOut := s.indexer.GetTxOutputWithUtxo(utxo)
 	if txOut == nil {
@@ -121,23 +121,23 @@ func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutput, error) {
 		offsets := txOut.Offsets[asset.Name]
 
 		info := rpcwire.AssetInfo{
-			Asset: asset,
+			Asset:   asset,
 			Offsets: offsets,
 		}
 		assets = append(assets, &info)
 	}
 
-	output := rpcwire.TxOutput{
-		OutPoint: utxo,
-		OutValue: txOut.OutValue,
+	output := rpcwire.TxOutputInfo{
+		OutPoint:  utxo,
+		OutValue:  txOut.OutValue,
 		AssetInfo: assets,
 	}
 
 	return &output, nil
 }
 
-func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutput, error) {
-	result := make([]*rpcwire.TxOutput, 0)
+func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutputInfo, error) {
+	result := make([]*rpcwire.TxOutputInfo, 0)
 	for _, utxo := range req.Utxos {
 
 		txOutput, err := s.GetUtxoInfo(utxo)
@@ -151,7 +151,7 @@ func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutput, err
 	return result, nil
 }
 
-func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*rpcwire.TxOutput, int, error) {
+func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*rpcwire.TxOutputInfo, int, error) {
 
 	return nil, 0, nil
 }

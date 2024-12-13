@@ -192,7 +192,6 @@ type NftInfo struct {
 	Delegate     string `json:"delegate"`
 }
 
-
 type BestHeightResp struct {
 	BaseResp
 	Data map[string]int `json:"data" example:"height:100"`
@@ -205,7 +204,7 @@ type BlockInfoData struct {
 
 type StatusListData struct {
 	ListResp
-	Height uint64                     `json:"height"`
+	Height uint64          `json:"height"`
 	Detail []*TickerStatus `json:"detail"`
 }
 
@@ -321,7 +320,7 @@ type AssetsResp_deprecated struct {
 
 type TxOutputResp struct {
 	BaseResp
-	Data *TxOutput `json:"data"`
+	Data *TxOutputInfo `json:"data"`
 }
 
 type AssetListResp struct {
@@ -350,9 +349,9 @@ type UtxoInfoResp struct {
 }
 
 type NSStatusData struct {
-	Version string                `json:"version"`
-	Total   uint64                `json:"total"`
-	Start   uint64                `json:"start"`
+	Version string     `json:"version"`
+	Total   uint64     `json:"total"`
+	Start   uint64     `json:"start"`
 	Names   []*NftItem `json:"names"`
 }
 
@@ -381,8 +380,8 @@ type NameCheckResp struct {
 }
 
 type AddCollectionReq struct {
-	Type   string                      `json:"type"`
-	Ticker string                      `json:"ticker"`
+	Type   string           `json:"type"`
+	Ticker string           `json:"ticker"`
 	Data   []*InscriptionId `json:"data"`
 }
 
@@ -395,9 +394,9 @@ type UtxosReq struct {
 }
 
 type NftStatusData struct {
-	Version string                `json:"version"`
-	Total   uint64                `json:"total"`
-	Start   uint64                `json:"start"`
+	Version string     `json:"version"`
+	Total   uint64     `json:"total"`
+	Start   uint64     `json:"start"`
 	Nfts    []*NftItem `json:"nfts"`
 }
 
@@ -413,8 +412,8 @@ type NftInfoResp struct {
 
 type NftsWithAddressData struct {
 	ListResp
-	Address string                `json:"address"`
-	Amount  int                   `json:"amount"`
+	Address string     `json:"address"`
+	Amount  int        `json:"amount"`
 	Nfts    []*NftItem `json:"nfts"`
 }
 
@@ -424,8 +423,8 @@ type NftsWithAddressResp struct {
 }
 
 type NamesWithAddressData struct {
-	Address string                     `json:"address"`
-	Total   int                        `json:"total"`
+	Address string          `json:"address"`
+	Total   int             `json:"total"`
 	Names   []*OrdinalsName `json:"names"`
 }
 
@@ -435,15 +434,16 @@ type NamesWithAddressResp struct {
 }
 
 type AssetInfo struct {
-	Asset swire.AssetInfo         `json:"asset"`
-	Offsets common.AssetOffsets   `json:"offsets"`
+	Asset   swire.AssetInfo     `json:"asset"`
+	Offsets common.AssetOffsets `json:"offsets"`
 }
 
-type TxOutput struct {
-	OutPoint string             `json:"outpoint"`
-	OutValue wire.TxOut         `json:"outvalue"`
-	AssetInfo   []*AssetInfo    `json:"assets"`
+type TxOutputInfo struct {
+	OutPoint  string       `json:"outpoint"`
+	OutValue  wire.TxOut   `json:"outvalue"`
+	AssetInfo []*AssetInfo `json:"assets"`
 }
+
 //type TxOutput2 = common.TxOutput
 
 type AssetSummary struct {
@@ -460,11 +460,10 @@ type UtxosWithAssetResp struct {
 	BaseResp
 	Name swire.AssetName
 	ListResp
-	Data []*TxOutput `json:"data"`
+	Data []*TxOutputInfo `json:"data"`
 }
 
 type TxOutputListResp struct {
 	BaseResp
-	Data []*TxOutput `json:"data"`
+	Data []*TxOutputInfo `json:"data"`
 }
-
