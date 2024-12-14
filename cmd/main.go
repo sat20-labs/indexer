@@ -208,7 +208,7 @@ func logpbOutout(pboutput *psbt.POutput) {
 }
 
 func PkScriptToAddr(pkScript []byte) (string, error) {
-	NetParams := &chaincfg.TestNet3Params
+	NetParams := &chaincfg.TestNet4Params
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(pkScript, NetParams)
 	if err != nil {
 		return "", err
