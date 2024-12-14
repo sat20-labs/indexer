@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
@@ -512,8 +513,12 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
 				value += rng.Size
 			}
-			
 		}
+
+		sort.Slice(offsets, func(i, j int) bool {
+			return offsets[i].Start < offsets[j].Start
+		})
+
 		asset := swire.AssetInfo{
 			Name:       k,
 			Amount:     value,
