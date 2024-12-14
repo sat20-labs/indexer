@@ -52,7 +52,7 @@ type Rpc struct {
 	ordService       *ord.Service
 	btcdService      *bitcoind.Service
 	extensionService *extension.Service
-	apidoc           *APIDoc
+	//apidoc           *APIDoc
 }
 
 func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
@@ -62,7 +62,7 @@ func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
 		ordService:       ord.NewService(),
 		btcdService:      bitcoind.NewService(),
 		extensionService: extension.NewService(chain),
-		apidoc:           &APIDoc{},
+		//apidoc:           &APIDoc{},
 	}
 }
 
@@ -118,15 +118,15 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	r.GET(rpcProxy+"/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// api config
-	err := s.apidoc.InitApiConf(apiConf)
-	if err != nil {
-		return err
-	}
+	// err := s.apidoc.InitApiConf(apiConf)
+	// if err != nil {
+	// 	return err
+	// }
 
-	err = s.apidoc.ApplyApiConf(r, rpcProxy)
-	if err != nil {
-		return err
-	}
+	// err = s.apidoc.ApplyApiConf(r, rpcProxy)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// common header
 	r.Use(func(c *gin.Context) {
