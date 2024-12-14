@@ -124,6 +124,18 @@ func GetOrdinalsSize(ordinals []*Range) int64 {
 	return size
 }
 
+func GetSatOffset(ordinals []*Range, sat int64) int64 {
+	offset := int64(0)
+	for _, rng := range ordinals {
+		if sat >= rng.Start && sat < rng.Start + rng.Size {
+			offset += sat - rng.Start
+			break
+		}
+		offset += (rng.Size)
+	}
+	return offset
+}
+
 // rng1 contains rng2
 func RangesContained(rng1, rng2 []*Range) bool {
 

@@ -507,9 +507,12 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		value := int64(0)
 		var offsets []*common.OffsetRange
 		for _, rngs := range v {
-			size := common.GetOrdinalsSize(rngs)
-			offsets = append(offsets, &common.OffsetRange{Start: value, End: size})
-			value += size
+			for _, rng := range rngs {
+				start := common.GetSatOffset(info.Ordinals, rng.Start)
+				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
+				value += rng.Size
+			}
+			
 		}
 		asset := swire.AssetInfo{
 			Name:       k,
