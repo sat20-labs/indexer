@@ -1,6 +1,5 @@
 package common
 
-
 import (
 	"fmt"
 	"strconv"
@@ -11,10 +10,8 @@ import (
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
-
 // 白聪
 var ASSET_PLAIN_SAT swire.AssetName = swire.AssetName{}
-
 
 // offset range in a UTXO, not satoshi ordinals
 type OffsetRange struct {
@@ -24,7 +21,7 @@ type OffsetRange struct {
 
 func (p *OffsetRange) Clone() *OffsetRange {
 	n := *p
-	return &n 
+	return &n
 }
 
 type AssetOffsets []*OffsetRange
@@ -32,9 +29,29 @@ type AssetOffsets []*OffsetRange
 func (p *AssetOffsets) Clone() AssetOffsets {
 	result := make([]*OffsetRange, len(*p))
 	for i, u := range *p {
-		result[i] = &OffsetRange{Start:u.Start, End:u.End}
+		result[i] = &OffsetRange{Start: u.Start, End: u.End}
 	}
 	return result
+}
+
+func (p *AssetOffsets) Split(offset int64) (AssetOffsets, AssetOffsets) {
+	var left, right []*OffsetRange
+
+	for _, r := range *p {
+		if r.End <= offset {
+			// 完全在左边
+			left = append(left, r)
+		} else if r.Start >= offset {
+			// 完全在右边
+			right = append(right, r)
+		} else {
+			// 跨越 offset，需要拆分
+			left = append(left, &OffsetRange{Start: r.Start, End: offset})
+			right = append(right, &OffsetRange{Start: offset, End: r.End})
+		}
+	}
+
+	return left, right
 }
 
 type TxAssets = swire.TxAssets
@@ -43,16 +60,16 @@ type TxOutput struct {
 	OutPointStr string
 	OutValue    wire.TxOut
 	//Sats        TxRanges  废弃。需要时重新获取
-	Assets TxAssets
+	Assets  TxAssets
 	Offsets map[swire.AssetName]AssetOffsets
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }
 
 func NewTxOutput(value int64) *TxOutput {
-	return  &TxOutput{
+	return &TxOutput{
 		OutPointStr: "",
-		OutValue:    wire.TxOut{Value:value},
+		OutValue:    wire.TxOut{Value: value},
 		Assets:      nil,
 		Offsets:     make(map[swire.AssetName]AssetOffsets),
 	}
@@ -121,7 +138,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		return nil
 	}
 
-	if p.OutValue.Value + another.OutValue.Value < 0 {
+	if p.OutValue.Value+another.OutValue.Value < 0 {
 		return fmt.Errorf("out of bounds")
 	}
 	value := p.OutValue.Value
@@ -147,66 +164,61 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		p.Offsets[asset.Name] = existingOffsets
 	}
 	p.OutValue.Value += another.OutValue.Value
-	
+
 	return nil
 }
 
-func (p *TxOutput) PickUp(name *swire.AssetName, amt int64) (*TxOutput, error) {
+func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput, error) {
 
-	result := NewTxOutput(amt)
+	part1 := NewTxOutput(amt)
+	part2 := NewTxOutput(p.Value() - amt)
 	if name == nil || *name == ASSET_PLAIN_SAT {
-		if p.Value() < amt { 
-			return nil, fmt.Errorf("amount too large")
+		if p.Value() < amt {
+			return nil, nil, fmt.Errorf("amount too large")
 		}
-		return result, nil
+		return part1, part2, nil
 	}
-	
+
 	asset, err := p.Assets.Find(name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	newAsset := asset.Clone()
 
-	if newAsset.Amount < amt {
-		return nil, fmt.Errorf("amount too large")
+	if asset.Amount < amt {
+		return nil, nil, fmt.Errorf("amount too large")
 	}
+	asset1 := asset.Clone()
+	asset1.Amount = amt
+	asset2 := asset.Clone()
+	asset2.Amount = asset.Amount - amt
 
 	if IsBindingSat(name) == 0 {
-		newAsset.Amount = amt
-		result.Assets = swire.TxAssets{*newAsset}
-		return result, nil
+		// no offsets
+		part1.Assets = swire.TxAssets{*asset1}
+		part2.Assets = swire.TxAssets{*asset2}
+		return part1, part2, nil
 	}
 
 	offsets, ok := p.Offsets[*name]
 	if !ok {
-		return nil, fmt.Errorf("can't find asset offset")
-	}
-	
-	if newAsset.Amount == amt {
-		result.Assets = swire.TxAssets{*newAsset}
-		result.Offsets[*name] = offsets.Clone()
-		return result, nil
+		return nil, nil, fmt.Errorf("can't find asset offset")
 	}
 
-	var newOffsets AssetOffsets
-	for _, off := range offsets {
-		if amt >= off.End-off.Start {
-			amt -= off.End - off.Start
-			newOffsets = append(newOffsets, off.Clone())
-		} else {
-			newOffsets = append(newOffsets, &OffsetRange{Start:off.Start, End:off.Start+amt})
-			amt = 0
-			break
-		}
+	if asset.Amount == amt {
+		part1.Assets = swire.TxAssets{*asset1}
+		part1.Offsets[*name] = offsets.Clone()
+		return part1, nil, nil
 	}
-	if amt != 0 {
-		return nil, fmt.Errorf("offsets are wrong")
-	}
-	
-	result.Assets = swire.TxAssets{*newAsset}
-	result.Offsets[*name] = newOffsets
-	
-	return result, nil
+
+	offset1, offset2 := offsets.Split(amt)
+
+	part1.Assets = swire.TxAssets{*asset1}
+	part1.Offsets[*name] = offset1
+
+	part2.Assets = swire.TxAssets{*asset2}
+	part2.Offsets[*name] = offset2
+
+	return part1, part2, nil
 }
 
 func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, error) {
@@ -240,7 +252,6 @@ func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, erro
 
 	return 0, fmt.Errorf("offsets are wrong")
 }
-
 
 func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
