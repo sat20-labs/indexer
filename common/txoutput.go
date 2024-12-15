@@ -1,0 +1,243 @@
+package common
+
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/btcsuite/btcd/wire"
+
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
+)
+
+
+// 白聪
+var ASSET_PLAIN_SAT swire.AssetName = swire.AssetName{}
+
+
+// offset range in a UTXO, not satoshi ordinals
+type OffsetRange struct {
+	Start int64
+	End   int64 // 不包括End
+}
+
+type AssetOffsets []*OffsetRange
+
+func (p *AssetOffsets) Clone() AssetOffsets {
+	result := make([]*OffsetRange, len(*p))
+	for i, u := range *p {
+		result[i] = &OffsetRange{Start:u.Start, End:u.End}
+	}
+	return result
+}
+
+type TxAssets = swire.TxAssets
+
+type TxOutput struct {
+	OutPointStr string
+	OutValue    wire.TxOut
+	//Sats        TxRanges  废弃。需要时重新获取
+	Assets TxAssets
+	Offsets map[swire.AssetName]AssetOffsets
+	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
+	// Assets数组中任何一个AssetInfo.BindingSat
+}
+
+func NewTxOutput(value int64) *TxOutput {
+	return  &TxOutput{
+		OutPointStr: "",
+		OutValue:    wire.TxOut{Value:value},
+		Assets:      nil,
+		Offsets:     make(map[swire.AssetName]AssetOffsets),
+	}
+}
+
+func (p *TxOutput) Clone() *TxOutput {
+	n := &TxOutput{
+		OutPointStr: p.OutPointStr,
+		OutValue:    p.OutValue,
+		Assets:      p.Assets.Clone(),
+	}
+
+	n.Offsets = make(map[swire.AssetName]AssetOffsets)
+	for i, u := range p.Offsets {
+		n.Offsets[i] = u.Clone()
+	}
+	return n
+}
+
+func (p *TxOutput) Value() int64 {
+	return p.OutValue.Value
+}
+
+func (p *TxOutput) Zero() bool {
+	return p.OutValue.Value == 0 && len(p.Assets) == 0
+}
+
+func (p *TxOutput) OutPoint() *wire.OutPoint {
+	outpoint, _ := wire.NewOutPointFromString(p.OutPointStr)
+	return outpoint
+}
+
+func (p *TxOutput) TxID() string {
+	parts := strings.Split(p.OutPointStr, ":")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
+}
+
+func (p *TxOutput) TxIn() *wire.TxIn {
+	outpoint, err := wire.NewOutPointFromString(p.OutPointStr)
+	if err != nil {
+		return nil
+	}
+	return wire.NewTxIn(outpoint, nil, nil)
+}
+
+func (p *TxOutput) SizeOfBindingSats() int64 {
+	bindingSats := int64(0)
+	for _, asset := range p.Assets {
+		amount := int64(0)
+		if asset.BindingSat != 0 {
+			amount = (asset.Amount)
+		}
+
+		if amount > (bindingSats) {
+			bindingSats = amount
+		}
+	}
+	return bindingSats
+}
+
+func (p *TxOutput) Append(another *TxOutput) error {
+	if another == nil {
+		return nil
+	}
+
+	if p.OutValue.Value + another.OutValue.Value < 0 {
+		return fmt.Errorf("out of bounds")
+	}
+	value := p.OutValue.Value
+	for _, asset := range another.Assets {
+		p.Assets.Add(&asset)
+
+		offsets, ok := another.Offsets[asset.Name]
+		if !ok {
+			continue
+		}
+		newOffsets := offsets.Clone()
+		for j := 0; j < len(newOffsets); j++ {
+			newOffsets[j].Start += value
+			newOffsets[j].End += value
+		}
+		existingOffsets, ok := p.Offsets[asset.Name]
+		if ok {
+			existingOffsets = append(existingOffsets, newOffsets...)
+		} else {
+			existingOffsets = newOffsets
+		}
+		p.Offsets[asset.Name] = existingOffsets
+	}
+	p.OutValue.Value += another.OutValue.Value
+	
+	return nil
+}
+
+func (p *TxOutput) PickUp(name *swire.AssetName, amt int64) (*TxOutput, error) {
+
+	result := NewTxOutput(amt)
+	if name == nil || *name == ASSET_PLAIN_SAT {
+		if p.Value() < amt { 
+			return nil, fmt.Errorf("amount too large")
+		}
+		return result, nil
+	}
+
+	offsets, ok := p.Offsets[*name]
+	if !ok {
+		return nil, fmt.Errorf("can't find asset offset")
+	}
+
+	asset, err := p.Assets.Find(name)
+	if err != nil {
+		return nil, err
+	}
+	if asset.Amount < amt {
+		return nil, fmt.Errorf("amount too large")
+	} else if asset.Amount == amt {
+		result.Assets = swire.TxAssets{*asset}
+		result.Offsets[*name] = offsets
+		return result, nil
+	}
+
+	var newOffsets AssetOffsets
+	for _, off := range offsets {
+		if amt >= off.End-off.Start {
+			amt -= off.End - off.Start
+			newOffsets = append(newOffsets, off)
+		} else {
+			newOffsets = append(newOffsets, &OffsetRange{Start:off.Start, End:off.Start+amt})
+			amt = 0
+			break
+		}
+	}
+	if amt != 0 {
+		return nil, fmt.Errorf("offsets are wrong")
+	}
+	
+	result.Assets = swire.TxAssets{*asset}
+	result.Offsets[*name] = newOffsets
+	
+	return result, nil
+}
+
+func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, error) {
+
+	offsets, ok := p.Offsets[*name]
+	if !ok {
+		return 0, fmt.Errorf("no asset in %s", p.OutPointStr)
+	}
+	if len(offsets) == 0 {
+		return 0, fmt.Errorf("no asset in %s", p.OutPointStr)
+	}
+
+	total := p.GetAsset(name)
+	if amt > total {
+		return 0, fmt.Errorf("amt too large")
+	} else if amt == total {
+		return offsets[len(offsets)-1].End, nil
+	}
+
+	for _, off := range offsets {
+		if amt >= off.End-off.Start {
+			amt -= off.End - off.Start
+		} else {
+			return off.Start + amt, nil
+		}
+	}
+
+	return 0, fmt.Errorf("offsets are wrong")
+}
+
+
+func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
+	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
+		return p.Value()
+	}
+	asset, err := p.Assets.Find(assetName)
+	if err != nil {
+		return 0
+	}
+	return asset.Amount
+}
+
+// should fill out Assets parameters.
+func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
+	return &TxOutput{
+		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
+		OutValue:    *tx.TxOut[index],
+		Offsets:     make(map[swire.AssetName]AssetOffsets),
+	}
+}

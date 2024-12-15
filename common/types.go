@@ -2,12 +2,8 @@ package common
 
 import (
 	"errors"
-	"fmt"
 	"math"
-	"strconv"
-	"strings"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common/pb"
 
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
@@ -74,8 +70,12 @@ const ALL_TICKERS = "*"
 
 type TickerName = swire.AssetName
 
-// 白聪
-var ASSET_PLAIN_SAT TickerName = TickerName{}
+type UtxoInfo struct {
+	UtxoId   uint64
+	Value    int64
+	PkScript []byte
+	Ordinals []*Range
+}
 
 type AssetOffsetRange struct {
 	Range  *Range        `json:"range"`
@@ -92,154 +92,6 @@ func (a *AssetOffsetRange) Clone() *AssetOffsetRange {
 		Assets: asset,
 	}
 }
-
-type UtxoInfo struct {
-	UtxoId   uint64
-	Value    int64
-	PkScript []byte
-	Ordinals []*Range
-}
-
-// offset range in a UTXO, not satoshi ordinals
-type OffsetRange struct {
-	Start int64
-	End   int64 // 不包括End
-}
-
-type AssetOffsets []*OffsetRange
-func (p *AssetOffsets) Clone() AssetOffsets {
-	result := make([]*OffsetRange, len(*p))
-	for i, u := range *p {
-		result[i] = &OffsetRange{Start:u.Start, End:u.End}
-	}
-	return result
-}
-
-type TxAssets = swire.TxAssets
-
-type TxOutput struct {
-	OutPointStr string
-	OutValue    wire.TxOut
-	//Sats        TxRanges  废弃。需要时重新获取
-	Assets TxAssets
-	Offsets map[swire.AssetName]AssetOffsets
-	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
-	// Assets数组中任何一个AssetInfo.BindingSat
-}
-
-func (p *TxOutput) Clone() *TxOutput {
-	n := &TxOutput{
-		OutPointStr: p.OutPointStr,
-		OutValue:    p.OutValue,
-		Assets:      p.Assets.Clone(),
-	}
-
-	n.Offsets = make(map[swire.AssetName]AssetOffsets)
-	for i, u := range p.Offsets {
-		n.Offsets[i] = u.Clone()
-	}
-	return n
-}
-
-func (p *TxOutput) Value() int64 {
-	return p.OutValue.Value
-}
-
-func (p *TxOutput) Zero() bool {
-	return p.OutValue.Value == 0 && len(p.Assets) == 0
-}
-
-func (p *TxOutput) OutPoint() *wire.OutPoint {
-	outpoint, _ := wire.NewOutPointFromString(p.OutPointStr)
-	return outpoint
-}
-
-func (p *TxOutput) TxID() string {
-	parts := strings.Split(p.OutPointStr, ":")
-	if len(parts) != 2 {
-		return ""
-	}
-	return parts[0]
-}
-
-func (p *TxOutput) TxIn() *wire.TxIn {
-	outpoint, err := wire.NewOutPointFromString(p.OutPointStr)
-	if err != nil {
-		return nil
-	}
-	return wire.NewTxIn(outpoint, nil, nil)
-}
-
-func (p *TxOutput) SizeOfBindingSats() int64 {
-	bindingSats := int64(0)
-	for _, asset := range p.Assets {
-		amount := int64(0)
-		if asset.BindingSat != 0 {
-			amount = (asset.Amount)
-		}
-
-		if amount > (bindingSats) {
-			bindingSats = amount
-		}
-	}
-	return bindingSats
-}
-
-func (p *TxOutput) Append(another *TxOutput) error {
-	if another == nil {
-		return nil
-	}
-
-	if p.OutValue.Value + another.OutValue.Value < 0 {
-		return fmt.Errorf("out of bounds")
-	}
-	value := p.OutValue.Value
-	for _, asset := range another.Assets {
-		offsets := another.Offsets[asset.Name]
-		for j := 0; j < len(offsets); j++ {
-			offsets[j].Start += value
-			offsets[j].End += value
-		}
-		existingAsset, err := p.Assets.Find(&asset.Name)
-		if err != nil {
-			p.Assets.Add(&asset)
-		} else {
-			existingAsset.Amount += asset.Amount
-		}
-
-		existingOffsets, ok := p.Offsets[asset.Name]
-		if ok {
-			existingOffsets = append(existingOffsets, offsets...)
-		} else {
-			existingOffsets = offsets
-		}
-		p.Offsets[asset.Name] = existingOffsets
-	}
-	p.OutValue.Value += another.OutValue.Value
-	
-	return nil
-}
-
-func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
-	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
-		return p.Value()
-	}
-	asset, err := p.Assets.Find(assetName)
-	if err != nil {
-		return 0
-	}
-	return asset.Amount
-}
-
-// should fill out Assets parameters.
-func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
-	return &TxOutput{
-		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
-		OutValue:    *tx.TxOut[index],
-		Offsets:     make(map[swire.AssetName]AssetOffsets),
-	}
-}
-
 
 type TxRanges []*Range
 
