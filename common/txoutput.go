@@ -22,6 +22,11 @@ type OffsetRange struct {
 	End   int64 // 不包括End
 }
 
+func (p *OffsetRange) Clone() *OffsetRange {
+	n := *p
+	return &n 
+}
+
 type AssetOffsets []*OffsetRange
 
 func (p *AssetOffsets) Clone() AssetOffsets {
@@ -125,6 +130,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 
 		offsets, ok := another.Offsets[asset.Name]
 		if !ok {
+			// 非绑定资产没有offset
 			continue
 		}
 		newOffsets := offsets.Clone()
@@ -154,21 +160,31 @@ func (p *TxOutput) PickUp(name *swire.AssetName, amt int64) (*TxOutput, error) {
 		}
 		return result, nil
 	}
+	
+	asset, err := p.Assets.Find(name)
+	if err != nil {
+		return nil, err
+	}
+	newAsset := asset.Clone()
+
+	if newAsset.Amount < amt {
+		return nil, fmt.Errorf("amount too large")
+	}
+
+	if IsBindingSat(name) == 0 {
+		newAsset.Amount = amt
+		result.Assets = swire.TxAssets{*newAsset}
+		return result, nil
+	}
 
 	offsets, ok := p.Offsets[*name]
 	if !ok {
 		return nil, fmt.Errorf("can't find asset offset")
 	}
-
-	asset, err := p.Assets.Find(name)
-	if err != nil {
-		return nil, err
-	}
-	if asset.Amount < amt {
-		return nil, fmt.Errorf("amount too large")
-	} else if asset.Amount == amt {
-		result.Assets = swire.TxAssets{*asset}
-		result.Offsets[*name] = offsets
+	
+	if newAsset.Amount == amt {
+		result.Assets = swire.TxAssets{*newAsset}
+		result.Offsets[*name] = offsets.Clone()
 		return result, nil
 	}
 
@@ -176,7 +192,7 @@ func (p *TxOutput) PickUp(name *swire.AssetName, amt int64) (*TxOutput, error) {
 	for _, off := range offsets {
 		if amt >= off.End-off.Start {
 			amt -= off.End - off.Start
-			newOffsets = append(newOffsets, off)
+			newOffsets = append(newOffsets, off.Clone())
 		} else {
 			newOffsets = append(newOffsets, &OffsetRange{Start:off.Start, End:off.Start+amt})
 			amt = 0
@@ -187,13 +203,17 @@ func (p *TxOutput) PickUp(name *swire.AssetName, amt int64) (*TxOutput, error) {
 		return nil, fmt.Errorf("offsets are wrong")
 	}
 	
-	result.Assets = swire.TxAssets{*asset}
+	result.Assets = swire.TxAssets{*newAsset}
 	result.Offsets[*name] = newOffsets
 	
 	return result, nil
 }
 
 func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, error) {
+
+	if IsBindingSat(name) == 0 {
+		return 330, nil
+	}
 
 	offsets, ok := p.Offsets[*name]
 	if !ok {
@@ -240,4 +260,27 @@ func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 		OutValue:    *tx.TxOut[index],
 		Offsets:     make(map[swire.AssetName]AssetOffsets),
 	}
+}
+
+func IsNft(assetType string) bool {
+	return assetType == ASSET_TYPE_NFT || assetType == ASSET_TYPE_NS
+}
+
+func IsPlainAsset(assetName *swire.AssetName) bool {
+	if assetName == nil {
+		return true
+	}
+	return ASSET_PLAIN_SAT == *assetName
+}
+
+func IsBindingSat(name *swire.AssetName) uint16 {
+	if name == nil {
+		return 1 // ordx asset
+	}
+	if name.Protocol == PROTOCOL_NAME_ORD ||
+		name.Protocol == PROTOCOL_NAME_ORDX ||
+		name.Protocol == "" {
+		return 1
+	}
+	return 0
 }
