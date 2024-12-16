@@ -52,6 +52,10 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 		return common.GetUtxoId(utxoInfo), utxoInfo.Ordinals, nil
 	}
 
+	if err := common.CheckUtxoFormat(utxo); err != nil {
+		return 0, nil, err
+	}
+
 	output := &common.UtxoValueInDB{}
 	err := b.db.View(func(txn *badger.Txn) error {
 		key := common.GetUTXODBKey(utxo)
@@ -84,6 +88,10 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 			Ordinals: utxoInfo.Ordinals,
 		}
 		return value, nil
+	}
+
+	if err := common.CheckUtxoFormat(utxo); err != nil {
+		return nil, err
 	}
 
 	output := &common.UtxoValueInDB{}
