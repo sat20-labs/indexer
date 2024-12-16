@@ -212,8 +212,10 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	for _, u := range plainUtxos {
 		value += utxos[u]
 	}
-	result[common.ASSET_PLAIN_SAT] = value
-
+	if value != 0 {
+		result[common.ASSET_PLAIN_SAT] = value
+	}
+	
 	return result
 }
 
