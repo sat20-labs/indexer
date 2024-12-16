@@ -170,6 +170,9 @@ func (p *TxOutput) Append(another *TxOutput) error {
 
 func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput, error) {
 
+	if p.Value() < 660 {
+		return nil, nil, fmt.Errorf("output value too small")
+	}
 	part1 := NewTxOutput(amt)
 	part2 := NewTxOutput(p.Value() - amt)
 	if name == nil || *name == ASSET_PLAIN_SAT {
@@ -194,7 +197,9 @@ func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput
 
 	if IsBindingSat(name) == 0 {
 		// no offsets
+		part1.OutValue.Value = 330
 		part1.Assets = swire.TxAssets{*asset1}
+		part2.OutValue.Value = p.Value()-330
 		part2.Assets = swire.TxAssets{*asset2}
 		return part1, part2, nil
 	}
