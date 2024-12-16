@@ -201,12 +201,18 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 		}
 		plainUtxoMap[utxoId] = v
 	}
-	exAssets := b.getExoticSummaryByAddress(plainUtxoMap)
+	exAssets, plainUtxos := b.getExoticSummaryByAddress(plainUtxoMap)
 	for k, v := range exAssets {
 		// 如果该range有其他铸造出来的资产，过滤掉（直接使用utxoId过滤）
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
 		result[tickName] = v
 	}
+
+	var value int64
+	for _, u := range plainUtxos {
+		value += utxos[u]
+	}
+	result[common.ASSET_PLAIN_SAT] = value
 
 	return result
 }

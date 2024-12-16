@@ -54,12 +54,14 @@ func (b *IndexerMgr) getExoticUtxos(utxos map[uint64]int64) map[string][]uint64 
 }
 
 // return: name -> utxoId
-func (b *IndexerMgr) getExoticSummaryByAddress(utxos map[uint64]int64) map[string]int64 {
+func (b *IndexerMgr) getExoticSummaryByAddress(utxos map[uint64]int64) (map[string]int64, []uint64) {
 	result := make(map[string]int64, 0)
+	var plainUtxo []uint64
 	for utxoId := range utxos {
 		_, rng, err := b.GetOrdinalsWithUtxoId(utxoId)
 		if err != nil {
 			common.Log.Errorf("GetOrdinalsWithUtxoId failed, %d", utxoId)
+			plainUtxo = append(plainUtxo, utxoId)
 			continue
 		}
 
@@ -69,5 +71,5 @@ func (b *IndexerMgr) getExoticSummaryByAddress(utxos map[uint64]int64) map[strin
 		}
 	}
 
-	return result
+	return result, plainUtxo
 }
