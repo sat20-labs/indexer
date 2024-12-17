@@ -300,3 +300,12 @@ func IsBindingSat(name *swire.AssetName) uint16 {
 	}
 	return 0
 }
+
+
+func IsFungibleToken(name *swire.AssetName) bool {
+	if name == nil {
+		return true
+	}
+	
+	return name.Type == ASSET_TYPE_FT
+}
