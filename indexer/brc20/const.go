@@ -7,6 +7,5 @@ const (
 	DB_PREFIX_MINTHISTORY   = "mh-"
 	DB_PREFIX_TICKER        = "tick-"
 	DB_PREFIX_TICKER_HOLDER = "th-"
-	DB_PREFIX_TICKER_UTXO   = "tu-"
 	DB_PREFIX_IMAGE         = "img-"
 )
