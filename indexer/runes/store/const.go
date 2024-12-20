@@ -1,4 +1,4 @@
-package db
+package store
 
 const (
 	DB_VERSION     = "0.1.0"
@@ -7,9 +7,11 @@ const (
 )
 
 const (
-	OUTPOINT_TO_BALANCES_KEY = "o2b"
-	RUNEID_TO_ENTRY_KEY      = "r2e"
-	RUNE_TO_RUNEID_KEY       = "r2ri"
+	OUTPOINT_TO_BALANCES   = "o2b-"
+	ID_TO_ENTRY            = "i2e-"
+	RUNE_TO_ID             = "r2i-"
+	TRANSACTION_ID_TO_RUNE = "ti2r-"
+	RUNE_LEDGER            = "rl-"
 )
 
 const (

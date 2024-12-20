@@ -48,7 +48,7 @@ func (p Pile) String() string {
 
 func calculateCutoff(divisibility uint8) (uint128.Uint128, error) {
 	if divisibility >= 39 {
-		return uint128.Zero, ErrDivisibilityTooLarge
+		return uint128.Uint128{}, ErrDivisibilityTooLarge
 	}
 
 	cutoff := uint128.From64(1)
@@ -56,7 +56,7 @@ func calculateCutoff(divisibility uint8) (uint128.Uint128, error) {
 	for i := uint8(0); i < divisibility; i++ {
 		cutoff = cutoff.Mul(ten)
 		if cutoff.IsZero() {
-			return uint128.Zero, ErrDivisibilityTooLarge
+			return uint128.Uint128{}, ErrDivisibilityTooLarge
 		}
 	}
 	return cutoff, nil

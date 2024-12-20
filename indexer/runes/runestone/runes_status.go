@@ -1,47 +1,45 @@
 package runestone
 
 import (
-	badger "github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/runes/db"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
+	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
 
 type RunesStatus struct {
+	Table[pb.RunesStatus]
 	Version       string
 	Height        uint64
 	Number        uint64
 	ReservedRunes uint64
 }
 
-func (s *RunesStatus) Init() *RunesStatus {
-	stats, err := db.Get[pb.RunesStatus]([]byte(db.STATUS_KEY))
-	if err == badger.ErrKeyNotFound {
-		stats.Version = db.DB_VERSION
-	} else if err != nil {
-		common.Log.Panicf("Runes.RunesStatus->Load: err: %v", err)
-		return nil
+func (s *RunesStatus) Init() (ret bool) {
+	stats := s.store.Get([]byte(store.STATUS_KEY))
+	common.Log.Infof("Runes.RunesStatus->Init: stats: %v", stats)
+	if stats == nil {
+		s.Version = store.DB_VERSION
+		ret = false
+	} else {
+		if stats.Version != store.DB_VERSION {
+			common.Log.Panicf("Runes.RunesStatus->Init: db version inconsistent %s", store.DB_VERSION)
+		}
+		s.Version = stats.Version
+		s.Height = stats.Height
+		s.Number = stats.Number
+		s.ReservedRunes = stats.ReservedRunes
+		ret = true
 	}
-	common.Log.Infof("Runes.RunesStatus->Load: stats: %v", stats)
-	if stats.Version != db.DB_VERSION {
-		common.Log.Panicf("Runes.RunesStatus->Load: db version inconsistent %s", db.DB_VERSION)
-	}
-	ret := &RunesStatus{
-		Version:       stats.Version,
-		Height:        stats.Height,
-		Number:        stats.Number,
-		ReservedRunes: stats.ReservedRunes,
-	}
-	return ret
+	return
 }
 
-func (s *RunesStatus) Update() error {
-	key := []byte(db.STATUS_KEY)
+func (s *RunesStatus) Update() {
+	key := []byte(store.STATUS_KEY)
 	value := &pb.RunesStatus{
 		Version:       s.Version,
 		Height:        s.Height,
 		Number:        s.Number,
 		ReservedRunes: s.ReservedRunes,
 	}
-	return db.Set(key, value)
+	s.store.Insert(key, value)
 }

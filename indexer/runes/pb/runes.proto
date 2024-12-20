@@ -71,7 +71,7 @@ message RunesStatus {
 
 
 // OutpointToBalances
-// message OutpointToBalances { map<string, OutpointToBalanceValue> outpoint_to_balance_value_map = 1; }
+// message OutpointToBalances { map<string, OutpointToRuneBalances> outpoint_to_balance_value_map = 1; }
 
 message Lot {
     Uint128 value = 1;   
@@ -81,4 +81,33 @@ message RuneIdLot {
     Lot lot = 2;
 }
 
-message OutpointToBalanceValue { repeated RuneIdLot rune_id_lots = 1; }
+message OutpointToRuneBalances { repeated RuneIdLot rune_id_lots = 1; }
+
+message OutPoint {
+	string txid = 1;
+	uint32 vout = 2;
+}
+
+message Edict {
+	RuneId id = 1;
+	Uint128 amount = 2;
+    uint32 output = 3;
+}
+
+message Cenotaph {
+    Rune Etching = 1;
+    int32 Flaw = 2;
+    RuneId mint = 3;
+}
+
+message RuneAsset { 
+    Uint128 balance = 1;
+    bool is_etching = 2;
+    repeated OutPoint mints = 3;
+    repeated Edict transfers = 4;
+    repeated Cenotaph cenotaphs = 5;
+}
+
+message RuneLedger { 
+    map<string, RuneAsset> assets = 1; 
+}

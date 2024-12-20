@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"lukechampine.com/uint128"
 )
 
@@ -126,6 +127,7 @@ func (r *Rune) Commitment() []byte {
 
 	return bytes[:end]
 }
+
 func (r *Rune) String() string {
 	n := r.Value
 	if n.Cmp(uint128.Max) == 0 {
@@ -197,4 +199,16 @@ func saturatingSub(a, b uint64) uint64 {
 		return a - b
 	}
 	return 0
+}
+
+func (s *Rune) ToPb() *pb.Rune {
+	pbValue := &pb.Rune{
+		Value: &pb.Uint128{Lo: s.Value.Lo, Hi: s.Value.Hi},
+	}
+	return pbValue
+}
+
+func (s *Rune) FromPb(pbValue *pb.Rune) {
+	s.Value.Lo = pbValue.Value.Lo
+	s.Value.Hi = pbValue.Value.Hi
 }

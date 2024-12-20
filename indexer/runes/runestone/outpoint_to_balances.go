@@ -3,26 +3,25 @@ package runestone
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/indexer/indexer/runes/db"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
+	"github.com/sat20-labs/indexer/indexer/runes/store"
 	"lukechampine.com/uint128"
 )
 
-// type OutpointToBalances map[*OutpointToBalanceKey]OutpointToBalanceValue
-
-type OutpointToBalanceKey struct {
+type OutPoint struct {
 	Txid string
 	Vout uint32
 }
 
-func (s *OutpointToBalanceKey) String() string {
+func (s *OutPoint) String() string {
 	return fmt.Sprintf("%s:%d", s.Txid, s.Vout)
 }
 
-func (s *OutpointToBalanceKey) From(str string) error {
+func (s *OutPoint) From(str string) error {
 	parts := strings.Split(str, ":")
 	if len(parts) != 2 {
 		return errors.New("invalid format: expected 'txid:vout'")
@@ -41,22 +40,37 @@ type RuneIdLot struct {
 	Lot    Lot
 }
 
-type RuneIdLotMap map[RuneIdKey]*Lot
+type RuneIdLotMap map[RuneId]*Lot
+
+func (s RuneIdLotMap) Get(id *RuneId) *Lot {
+	return s[*id]
+}
 
 func (s RuneIdLotMap) GetOrDefault(id *RuneId) *Lot {
-	key := id.ToByte()
+	key := *id
 	if s[key] == nil {
-		s[key] = &Lot{Value: uint128.Zero}
+		s[key] = &Lot{Value: &uint128.Uint128{}}
 	}
 	return s[key]
 }
 
-type RuneIdLogMapVec map[uint32]RuneIdLotMap
+func (s RuneIdLotMap) GetSortArray() OutpointToRuneBalances {
+	slice := make(OutpointToRuneBalances, 0, len(s))
+	for k, v := range s {
+		slice = append(slice, RuneIdLot{RuneId: k, Lot: *v})
+	}
+	sort.Slice(slice, func(i, j int) bool {
+		return slice[i].RuneId.Block < slice[j].RuneId.Block ||
+			(slice[i].RuneId.Block == slice[j].RuneId.Block && slice[i].RuneId.Tx < slice[j].RuneId.Tx) ||
+			(slice[i].RuneId.Block == slice[j].RuneId.Block && slice[i].RuneId.Tx == slice[j].RuneId.Tx && slice[i].Lot.Cmp(slice[j].Lot.Value) < 0)
+	})
+	return slice
+}
 
-type OutpointToBalanceValue []RuneIdLot
+type OutpointToRuneBalances []RuneIdLot
 
-func (s OutpointToBalanceValue) ToPb() *pb.OutpointToBalanceValue {
-	pbValue := &pb.OutpointToBalanceValue{
+func (s OutpointToRuneBalances) ToPb() *pb.OutpointToRuneBalances {
+	pbValue := &pb.OutpointToRuneBalances{
 		RuneIdLots: make([]*pb.RuneIdLot, len(s)),
 	}
 	for i, runeIdLot := range s {
@@ -78,15 +92,15 @@ func (s OutpointToBalanceValue) ToPb() *pb.OutpointToBalanceValue {
 	return pbValue
 }
 
-func (s OutpointToBalanceValue) FromPb(pbValue *pb.OutpointToBalanceValue) {
-	s = make(OutpointToBalanceValue, len(pbValue.RuneIdLots))
+func (s OutpointToRuneBalances) FromPb(pbValue *pb.OutpointToRuneBalances) {
+	s = make(OutpointToRuneBalances, len(pbValue.RuneIdLots))
 	for i, pbRuneIdLot := range pbValue.RuneIdLots {
 		runeId := RuneId{
 			Block: pbRuneIdLot.RuneId.Block,
 			Tx:    pbRuneIdLot.RuneId.Tx,
 		}
 		lot := Lot{
-			Value: uint128.Uint128{
+			Value: &uint128.Uint128{
 				Hi: pbRuneIdLot.Lot.Value.Hi,
 				Lo: pbRuneIdLot.Lot.Value.Lo,
 			},
@@ -98,27 +112,30 @@ func (s OutpointToBalanceValue) FromPb(pbValue *pb.OutpointToBalanceValue) {
 	}
 }
 
-type OutpointToBalancesTable struct {
+type OutpointToRuneBalancesTable struct {
+	Table[pb.OutpointToRuneBalances]
 }
 
-func (s OutpointToBalancesTable) Insert(key *OutpointToBalanceKey, value OutpointToBalanceValue) (oldValue *OutpointToBalanceValue, err error) {
-	tableKey := []byte(db.OUTPOINT_TO_BALANCES_KEY + key.String())
-	oldPbValue, err := db.Get[pb.OutpointToBalanceValue](tableKey)
-	if err != nil {
-		return nil, err
+func NewOutpointToRuneBalancesTable(s *store.Store[pb.OutpointToRuneBalances]) *OutpointToRuneBalancesTable {
+	return &OutpointToRuneBalancesTable{Table: Table[pb.OutpointToRuneBalances]{store: s}}
+}
+
+func (s *OutpointToRuneBalancesTable) Insert(key *OutPoint, value OutpointToRuneBalances) (ret *OutpointToRuneBalances) {
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	pbVal := s.store.Insert(tblKey, value.ToPb())
+	if pbVal != nil {
+		ret = &OutpointToRuneBalances{}
+		ret.FromPb(pbVal)
 	}
-	oldValue.FromPb(oldPbValue)
-	pbValue := value.ToPb()
-	err = db.Set(tableKey, pbValue)
 	return
 }
 
-func (s OutpointToBalancesTable) Remove(key *OutpointToBalanceKey) (oldValue OutpointToBalanceValue, err error) {
-	tableKey := []byte(db.OUTPOINT_TO_BALANCES_KEY + key.String())
-	pbOldValue, err := db.Remove[pb.OutpointToBalanceValue](tableKey)
-	if err != nil {
-		return nil, err
+func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRuneBalances) {
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	pbVal := s.store.Remove(tblKey)
+	if pbVal != nil {
+		ret = &OutpointToRuneBalances{}
+		ret.FromPb(pbVal)
 	}
-	oldValue.FromPb(pbOldValue)
 	return
 }

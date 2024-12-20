@@ -1,36 +1,41 @@
 package runestone
 
 import (
-	badger "github.com/dgraph-io/badger/v4"
-	"github.com/sat20-labs/indexer/indexer/runes/db"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
+	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
 
 type RuneIdToEntry map[*RuneId]*RuneEntry
 
 type RuneIdToEntryTable struct {
+	Table[pb.RuneEntry]
 }
 
-func (s *RuneIdToEntryTable) Insert(key *RuneId, value RuneEntry) (oldValue *RuneEntry, err error) {
-	tableKey := []byte(db.RUNEID_TO_ENTRY_KEY + key.String())
-	oldPbValue, err := db.Get[pb.RuneEntry](tableKey)
-	if err != nil {
-		return nil, err
+func NewRuneIdToEntryTable(store *store.Store[pb.RuneEntry]) *RuneIdToEntryTable {
+	return &RuneIdToEntryTable{Table: Table[pb.RuneEntry]{store: store}}
+}
+
+func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEntry) {
+	tblKey := []byte(store.ID_TO_ENTRY + key.String())
+	pbVal := s.store.Insert(tblKey, value.ToPb())
+	if pbVal != nil {
+		ret = &RuneEntry{}
+		ret.FromPb(pbVal)
 	}
-	oldValue.FromPb(oldPbValue)
-	pbValue := value.ToPb()
-	err = db.Set(tableKey, pbValue)
 	return
 }
-func (s *RuneIdToEntryTable) Get(key *RuneId) (value *RuneEntry, err error) {
-	tableKey := []byte(db.RUNEID_TO_ENTRY_KEY + key.String())
-	pbValue, err := db.Get[pb.RuneEntry](tableKey)
-	if err != nil {
-		if err == badger.ErrKeyNotFound {
-			return nil, nil
-		}
-		return nil, err
+
+func (s *RuneIdToEntryTable) InsertNoTransaction(key *RuneId, value *RuneEntry) {
+	tblKey := []byte(store.ID_TO_ENTRY + key.String())
+	s.store.InsertNoTransaction(tblKey, value.ToPb())
+}
+
+func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
+	tblKey := []byte(store.ID_TO_ENTRY + key.String())
+	pbVal := s.store.Get(tblKey)
+	if pbVal != nil {
+		ret = &RuneEntry{}
+		ret.FromPb(pbVal)
 	}
-	value.FromPb(pbValue)
 	return
 }

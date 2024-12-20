@@ -1,7 +1,6 @@
 package runestone
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -17,19 +16,11 @@ type RuneId struct {
 	Tx    uint32
 }
 
-type RuneIdKey [12]byte
-
 func NewRuneId(block uint64, tx uint32) (*RuneId, error) {
 	if block == 0 && tx > 0 {
 		return nil, errors.New("block=0 but tx>0")
 	}
 	return &RuneId{Block: block, Tx: tx}, nil
-}
-func (r RuneId) ToByte() RuneIdKey {
-	var result RuneIdKey
-	binary.BigEndian.PutUint64(result[:8], r.Block)
-	binary.BigEndian.PutUint32(result[8:], r.Tx)
-	return result
 }
 
 func (r RuneId) Delta(next RuneId) (uint64, uint32, error) {

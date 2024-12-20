@@ -14,7 +14,7 @@ type RuneEntry struct {
 	Burned       uint128.Uint128
 	Divisibility uint8
 	Etching      string // Txid
-	Parent       InscriptionId
+	Parent       *InscriptionId
 	Mints        uint128.Uint128
 	Number       uint64
 	Premine      uint128.Uint128
@@ -49,38 +49,38 @@ func (e MintError) Error() string {
 	}
 }
 
-func (re *RuneEntry) Mintable(height uint64) (uint128.Uint128, error) {
+func (re *RuneEntry) Mintable(height uint64) (*uint128.Uint128, error) {
 	if re.Terms == nil {
-		return uint128.Zero, MintErrorUnmintable
+		return &uint128.Uint128{}, MintErrorUnmintable
 	}
 
 	if start := re.Start(); start != nil && height < *start {
-		return uint128.Zero, MintErrorStart
+		return &uint128.Uint128{}, MintErrorStart
 	}
 
 	if end := re.End(); end != nil && height >= *end {
-		return uint128.Zero, MintErrorEnd
+		return &uint128.Uint128{}, MintErrorEnd
 	}
 
-	cap := uint128.Zero
+	cap := uint128.Uint128{}
 	if re.Terms.Cap != nil {
 		cap = *re.Terms.Cap
 	}
 
 	if re.Mints.Cmp(cap) >= 0 {
-		return uint128.Zero, MintErrorCap
+		return &uint128.Uint128{}, MintErrorCap
 	}
 
-	amount := uint128.Zero
+	amount := uint128.Uint128{}
 	if re.Terms.Amount != nil {
 		amount = *re.Terms.Amount
 	}
 
-	return amount, nil
+	return &amount, nil
 }
 
 func (re *RuneEntry) Supply() uint128.Uint128 {
-	amount := uint128.Zero
+	amount := uint128.Uint128{}
 	if re.Terms != nil && re.Terms.Amount != nil {
 		amount = *re.Terms.Amount
 	}
@@ -88,8 +88,8 @@ func (re *RuneEntry) Supply() uint128.Uint128 {
 }
 
 func (re *RuneEntry) MaxSupply() uint128.Uint128 {
-	cap := uint128.Zero
-	amount := uint128.Zero
+	cap := uint128.Uint128{}
+	amount := uint128.Uint128{}
 	if re.Terms != nil {
 		if re.Terms.Cap != nil {
 			cap = *re.Terms.Cap
@@ -174,7 +174,7 @@ func (s *RuneEntry) ToPb() *pb.RuneEntry {
 		Burned:       &pb.Uint128{Hi: s.Burned.Hi, Lo: s.Burned.Lo},
 		Divisibility: &pb.Uint8{Value: uint32(s.Divisibility)},
 		Etching:      s.Etching,
-		Parent:       &pb.InscriptionId{Value: string(s.Parent)},
+		Parent:       &pb.InscriptionId{Value: string(*s.Parent)},
 		Mints:        &pb.Uint128{Hi: s.Mints.Hi, Lo: s.Mints.Lo},
 		Number:       s.Number,
 		Premine:      &pb.Uint128{Hi: s.Premine.Hi, Lo: s.Premine.Lo},
@@ -222,7 +222,8 @@ func (s *RuneEntry) FromPb(pbValue *pb.RuneEntry) {
 	s.Burned = uint128.Uint128{Hi: pbValue.Burned.Hi, Lo: pbValue.Burned.Lo}
 	s.Divisibility = uint8(pbValue.Divisibility.Value)
 	s.Etching = pbValue.Etching
-	s.Parent = InscriptionId(pbValue.Parent.Value)
+	parent := InscriptionId(pbValue.Parent.Value)
+	s.Parent = &parent
 	s.Mints = uint128.Uint128{Hi: pbValue.Mints.Hi, Lo: pbValue.Mints.Lo}
 	s.Number = pbValue.Number
 	s.Premine = uint128.Uint128{Hi: pbValue.Premine.Hi, Lo: pbValue.Premine.Lo}

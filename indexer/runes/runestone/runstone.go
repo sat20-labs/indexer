@@ -54,7 +54,7 @@ func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, int, error) {
 		}, 1)
 	if flags == nil {
 		//unwrap_or_default
-		flags = &uint128.Zero
+		flags = &uint128.Uint128{}
 	}
 	var etching *Etching
 	if FlagEtching.Take(flags) {
@@ -287,27 +287,28 @@ func (r *Runestone) integers(payload []byte) ([]uint128.Uint128, error) {
 		if err != nil {
 			return nil, err
 		}
-		integers = append(integers, integer)
+		integers = append(integers, *integer)
 		i += length
 	}
 
 	return integers, nil
 }
-func uvarint128(buf []byte) (uint128.Uint128, int, error) {
+func uvarint128(buf []byte) (*uint128.Uint128, int, error) {
 	n := big.NewInt(0)
 	for i, tick := range buf {
 		if i > 18 {
-			return uint128.Zero, 0, errors.New("varint too long")
+			return &uint128.Uint128{}, 0, errors.New("varint too long")
 		}
 		value := uint64(tick) & 0b0111_1111
 		if i == 18 && value&0b0111_1100 != 0 {
-			return uint128.Zero, 0, errors.New("varint too large")
+			return &uint128.Uint128{}, 0, errors.New("varint too large")
 		}
 		temp := new(big.Int).SetUint64(value)
 		n.Or(n, temp.Lsh(temp, uint(7*i)))
 		if tick&0b1000_0000 == 0 {
-			return uint128.FromBig(n), i + 1, nil
+			ret := uint128.FromBig(n)
+			return &ret, i + 1, nil
 		}
 	}
-	return uint128.Zero, 0, errors.New("varint too short")
+	return &uint128.Uint128{}, 0, errors.New("varint too short")
 }

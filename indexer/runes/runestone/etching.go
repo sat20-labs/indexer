@@ -33,13 +33,13 @@ func (e *Etching) Supply() *uint128.Uint128 {
 			return
 		}
 	}()
-	premine := uint128.Zero
+	premine := uint128.Uint128{}
 	if e.Premine != nil {
 		premine = *e.Premine
 	}
 
-	cap := uint128.Zero
-	amount := uint128.Zero
+	cap := uint128.Uint128{}
+	amount := uint128.Uint128{}
 	if e.Terms != nil {
 		if e.Terms.Cap != nil {
 			cap = *e.Terms.Cap
