@@ -21,14 +21,22 @@ type BRC20TickInfo struct {
 type HolderAction struct {
 	AddressId uint64
 	Index     int // 地址坐标
-	Tickers   map[string]common.Decimal
-	Action    int // -1 删除; 1 增加
+	Ticker    string
+	Amount    common.Decimal
+	Action    int // -1 删除; 1 增加; 0 只更新 HolderInfo
 }
 
 type HolderInfo struct {
 	AddressId uint64
 	Index     int                                  // 地址坐标
 	Tickers   map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
+}
+
+type TransferNftInfo struct {
+	AddressId      uint64
+	Index        int
+	Ticker       string
+	TransferNft  *common.TransferNFT
 }
 
 type BRC20Indexer struct {
@@ -41,7 +49,8 @@ type BRC20Indexer struct {
 	mutex             sync.RWMutex               // 只保护这几个结构
 	tickerMap         map[string]*BRC20TickInfo  // ticker -> TickerInfo.  name 小写。 数据由mint数据构造
 	holderMap         map[uint64]*HolderInfo     // addrId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
-	tickerToHolderMap map[string]map[uint64]bool // ticker -> addrId. 动态数据，跟随Holder变更，需要保存在数据库中。
+	tickerToHolderMap map[string]map[uint64]bool // ticker -> addrId. 动态数据，跟随Holder变更，内存数据。
+	transferNftMap    map[uint64]*TransferNftInfo // utxoId -> HolderInfo中的TransferableData的Nft
 
 	// 其他辅助信息
 	holderActionList []*HolderAction                // 在同一个block中，状态变迁需要按顺序执行
@@ -106,16 +115,9 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 			}
 		}
 
-		for tickerName := range action.Tickers {
-			if action.Action > 0 {
-				value, ok := s.tickerToHolderMap[tickerName]
-				if ok {
-					newInst.tickerToHolderMap[tickerName] = value
-				} //else {
-				// 已经被删除，不存在了
-				// common.Log.Panicf("can find ticker %s in utxoMap", tickerName)
-				//}
-			}
+		value, ok := s.tickerToHolderMap[action.Ticker]
+		if ok {
+			newInst.tickerToHolderMap[action.Ticker] = value
 		}
 	}
 

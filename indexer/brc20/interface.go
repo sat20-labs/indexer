@@ -65,7 +65,7 @@ func (p *BRC20Indexer) GetMint(inscriptionId string) *common.BRC20Mint {
 	}
 
 	for _, mint := range ticker.MintAdded {
-		if mint.Base.InscriptionId == inscriptionId {
+		if mint.Base.Base.InscriptionId == inscriptionId {
 			return mint
 		}
 	}

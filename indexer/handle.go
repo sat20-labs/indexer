@@ -377,7 +377,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	content *common.BRC20DeployContent, nft *common.Nft) *common.BRC20Ticker {
 
 	ticker := &common.BRC20Ticker{
-		Base: common.CloneBaseContent(nft.Base),
+		Base: nft,
 		Name: content.Ticker,
 		// Limit:      lim,
 		// SelfMint:   selfmint,
@@ -467,7 +467,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 	}
 
 	mint := &common.BRC20Mint{
-		Base: common.CloneBaseContent(nft.Base),
+		Base: nft,
 		Name: content.Ticker,
 	}
 
@@ -497,7 +497,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 	}
 
 	transfer := &common.BRC20Transfer{
-		Base: common.CloneBaseContent(nft.Base),
+		Base: nft,
 		Name: content.Ticker,
 	}
 
@@ -746,7 +746,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 			return
 		}
 
-		s.brc20Indexer.UpdateInscribeMint(inUtxoId, mint)
+		s.brc20Indexer.UpdateInscribeMint(mint)
 
 	case "transfer":
 		transferInfo := common.ParseBrc20TransferContent(content)
@@ -759,7 +759,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 			return
 		}
 
-		s.brc20Indexer.UpdateInscribeTransfer(inUtxoId, transfer)
+		s.brc20Indexer.UpdateInscribeTransfer(transfer)
 
 	default:
 		//common.Log.Warnf("handleOrdX unknown ordx type: %s, content: %s, txid: %s", ordxType, content, tx.Txid)

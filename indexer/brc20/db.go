@@ -21,7 +21,7 @@ func (s *BRC20Indexer) loadMintInfoFromDB(tickinfo *BRC20TickInfo) {
 		// 	tickinfo.MintInfo.AddMintInfo(rng, mint.Base.InscriptionId)
 		// }
 
-		tickinfo.InscriptionMap[mint.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
+		tickinfo.InscriptionMap[mint.Base.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
 	}
 }
 
@@ -31,6 +31,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 	common.Log.Info("loadHolderInfoFromDB ...")
 	holderMap := make(map[uint64]*HolderInfo, 0)
 	tickerToHolderMap := make(map[string]map[uint64]bool)
+	transferNftMap := make(map[uint64]*TransferNftInfo)
 	err := s.db.View(func(txn *badger.Txn) error {
 		// 设置前缀扫描选项
 		prefixBytes := []byte(DB_PREFIX_TICKER_HOLDER)
@@ -61,7 +62,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 					err = common.DecodeBytes(value, &info)
 					if err == nil {
 						holderMap[addrId] = &info
-						for name:= range info.Tickers {
+						for name, tickInfo:= range info.Tickers {
 							holders, ok := tickerToHolderMap[name]
 							if ok {
 								holders[addrId] = true
@@ -70,6 +71,14 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 								holders[addrId] = true
 							}
 							tickerToHolderMap[name] = holders
+							for _, nft := range tickInfo.TransferableData {
+								transferNftMap[nft.UtxoId] = &TransferNftInfo{
+									AddressId: info.AddressId,
+									Index: info.Index,
+									Ticker: name,
+									TransferNft: nft,
+								}
+							}
 						}
 						
 					} else {
@@ -91,6 +100,8 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 
 	s.holderMap = holderMap
 	s.tickerToHolderMap = tickerToHolderMap
+	s.transferNftMap = transferNftMap
+
 
 	return nil
 }

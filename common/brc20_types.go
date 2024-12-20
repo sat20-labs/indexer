@@ -1,7 +1,7 @@
 package common
 
 type BRC20Mint struct {
-	Base *InscribeBaseContent
+	Base *Nft
 	Id   int64
 	Name string
 	Amt  Decimal `json:"amt"`
@@ -10,14 +10,14 @@ type BRC20Mint struct {
 }
 
 type BRC20Transfer struct {
-	Base *InscribeBaseContent
-	Id   int64
+	Base *Nft
+	UtxoId   uint64
 	Name string
 	Amt  Decimal `json:"amt"`
 }
 
 type BRC20Ticker struct {
-	Base *InscribeBaseContent
+	Base *Nft
 	Id   int64
 	Name string
 
@@ -92,15 +92,21 @@ type BRC20MintAbbrInfo struct {
 	Height         int
 }
 
+type TransferNFT struct {
+	NftId         int64
+	UtxoId        uint64
+	Amount        Decimal
+}
+
 // key: mint时的inscriptionId。 value: 某个资产对应的数值
 type BRC20TickAbbrInfo struct {
 	AvailableBalance     Decimal
-	TransferableBalance  Decimal
+	TransferableData     []*TransferNFT
+	InvalidTransferableData []*TransferNFT
 }
 
-
 func NewBRC20MintAbbrInfo(mint *BRC20Mint) *BRC20MintAbbrInfo {
-	info := NewBRC20MintAbbrInfo2(mint.Base)
+	info := NewBRC20MintAbbrInfo2(mint.Base.Base)
 	info.Amount = mint.Amt
 	return info
 }
