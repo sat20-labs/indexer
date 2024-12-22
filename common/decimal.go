@@ -9,6 +9,7 @@ import (
 )
 
 const MAX_PRECISION = 18
+const DEFAULT_PRECISION = 0
 
 var MAX_PRECISION_STRING = "18"
 
@@ -38,6 +39,10 @@ var precisionFactor [19]*big.Int = [19]*big.Int{
 type Decimal struct {
 	Precition uint
 	Value     *big.Int
+}
+
+func NewDefaultDecimal(v uint64) *Decimal {
+	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetUint64(v)}
 }
 
 func NewDecimal(v uint64, p uint) *Decimal {
@@ -257,9 +262,10 @@ func (d *Decimal) Float64() float64 {
 	}
 	value := new(big.Int).Abs(d.Value)
 	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
-	f := float64(quotient.Uint64()) + float64(remainder.Uint64())/math.MaxFloat64
+	decimalPart := float64(remainder.Int64()) / float64(precisionFactor[d.Precition].Int64())
+	result := float64(quotient.Int64()) + decimalPart
 	if d.Value.Sign() < 0 {
-		return -f
+		return -result
 	}
-	return f
+	return result
 }
