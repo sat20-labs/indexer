@@ -13,7 +13,7 @@ type RuneAsset struct {
 	Mints     []*OutPoint
 	Transfers []*Edict
 	Cenotaphs []*Cenotaph
-	BurnedMap RuneIdLotMap
+	Burned    uint128.Uint128
 }
 
 type RuneLedger struct {

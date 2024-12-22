@@ -113,6 +113,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 				unallocated.GetOrDefault(mintRuneId).AddAssign(amount)
 				// ledger
 				mintRuneEntry := s.idToEntryTbl.Get(mintRuneId)
+				if mintRuneEntry == nil {
+					common.Log.Panicf("RuneIndexer->index_runes: mintRuneEntry is nil")
+				}
 				if s.runeLedger.Assets[mintRuneEntry.SpacedRune.Rune] == nil {
 					s.runeLedger.Assets[mintRuneEntry.SpacedRune.Rune] = s.getInitRuneAsset()
 				}
@@ -206,28 +209,36 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 
 				// ledger
 				var r *runestone.Rune
+				var transferId *runestone.RuneId
 				if edict.ID.Cmp(zeroId) == 0 {
 					if etchedRune == nil {
 						common.Log.Panicf("RuneIndexer->index_runes: etched rune not found")
 					}
 					r = etchedRune
+					transferId = etchedId
 				} else {
 					runeEntry := s.idToEntryTbl.Get(id)
 					if runeEntry == nil {
 						common.Log.Panicf("RuneIndexer->index_runes: rune entry not found")
 					}
 					r = &runeEntry.SpacedRune.Rune
+					transferId = id
 				}
 				if s.runeLedger.Assets[*r] == nil {
 					s.runeLedger.Assets[*r] = s.getInitRuneAsset()
 				}
+				s.runeLedger.Assets[*r].Transfers = append(s.runeLedger.Assets[*r].Transfers, &runestone.Edict{
+					ID:     *transferId,
+					Amount: *amount.Value,
+					Output: output,
+				})
 			}
 		}
 
-		var runeEntry *runestone.RuneEntry
+		// var runeEntry *runestone.RuneEntry
 		if etchedRune != nil {
 			s.runeToIdTbl.Insert(etchedRune, etchedId)
-			runeEntry = s.create_rune_entry(tx, artifact, etchedId, etchedRune)
+			runeEntry := s.create_rune_entry(tx, artifact, etchedId, etchedRune)
 			s.idToEntryTbl.Insert(etchedId, runeEntry)
 			// ledger
 			if s.runeLedger.Assets[runeEntry.SpacedRune.Rune] != nil {
@@ -243,11 +254,18 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 				burned.GetOrDefault(&id).AddAssign(v)
 			}
 			// ledger
-			if s.runeLedger.Assets[runeEntry.SpacedRune.Rune] == nil {
-				s.runeLedger.Assets[runeEntry.SpacedRune.Rune] = s.getInitRuneAsset()
+			cenotaphRuneId := artifact.Cenotaph.Etching
+			if cenotaphRuneId == nil {
+				common.Log.Panicf("RuneIndexer->index_runes: cenotaph rune not found")
 			}
-			s.runeLedger.Assets[runeEntry.SpacedRune.Rune].Mints = append(s.runeLedger.Assets[runeEntry.SpacedRune.Rune].Mints,
-				&runestone.OutPoint{Txid: tx.Txid, Vout: tx_index})
+			if s.runeLedger.Assets[*cenotaphRuneId] == nil {
+				s.runeLedger.Assets[*cenotaphRuneId] = s.getInitRuneAsset()
+			}
+			s.runeLedger.Assets[*cenotaphRuneId].Cenotaphs = append(s.runeLedger.Assets[*cenotaphRuneId].Cenotaphs, &runestone.Cenotaph{
+				Etching: cenotaphRuneId,
+				Flaw:    artifact.Cenotaph.Flaw,
+				Mint:    artifact.Cenotaph.Mint,
+			})
 		} else if artifact.Runestone != nil {
 			pointer := artifact.Runestone.Pointer
 			// assign all un-allocated runes to the default output, or the first non
@@ -299,12 +317,39 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 			s.outpointToRuneBalancesTbl.Insert(&outPoint, balances)
 		}
 
+		// ledger
+		for vout, balances := range allocated {
+			if len(balances) == 0 {
+				continue
+			}
+			if tx.Outputs[vout].Address.PkScript[0] == txscript.OP_RETURN {
+				continue
+			}
+			for id, balance := range balances {
+				queryRuneEntry := s.idToEntryTbl.Get(&id)
+				if queryRuneEntry == nil {
+					common.Log.Panicf("RuneIndexer->index_runes: rune entry not found, id: %v", id)
+				}
+				r := queryRuneEntry.SpacedRune.Rune
+				s.runeLedger.Assets[r].Balance = s.runeLedger.Assets[r].Balance.Add(*balance.Value)
+			}
+		}
+		for id, amount := range burned {
+			queryRuneEntry := s.idToEntryTbl.Get(&id)
+			if queryRuneEntry == nil {
+				common.Log.Panicf("RuneIndexer->index_runes: rune entry not found, id: %v", id)
+			}
+			r := queryRuneEntry.SpacedRune.Rune
+			s.runeLedger.Assets[r].Burned = s.runeLedger.Assets[r].Burned.Add(*amount.Value)
+		}
+
 		// increment entries with burned runes
 		for id, amount := range burned {
 			s.burnedMap.GetOrDefault(&id).AddAssign(amount)
 		}
 
 		// update ledger
+		s.runeLedgerTable.Insert(address, s.runeLedger)
 	}
 
 	return nil
