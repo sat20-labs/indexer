@@ -19,16 +19,20 @@ type BRC20TickInfo struct {
 }
 
 type HolderAction struct {
-	AddressId uint64
-	Index     int // 地址坐标
+	Height    int
+	Utxo      string   
+	NftId     int64
+	FromAddr  uint64
+	ToAddr    uint64
+	
 	Ticker    string
 	Amount    common.Decimal
-	Action    int // -1 删除; 1 增加; 0 只更新 HolderInfo
+
+	Action    int  // 0: inscribe-mint  1: inscribe-transfer  2: transfer
 }
 
 type HolderInfo struct {
 	AddressId uint64
-	Index     int                                  // 地址坐标
 	Tickers   map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
 }
 
@@ -107,17 +111,22 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	newInst.holderMap = make(map[uint64]*HolderInfo, 0)
 	newInst.tickerToHolderMap = make(map[string]map[uint64]bool, 0)
 	for _, action := range s.holderActionList {
-		if action.Action > 0 {
-			value, ok := s.holderMap[action.AddressId]
-			if ok {
-				info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
-				newInst.holderMap[action.AddressId] = &info
-			}
+		
+		value, ok := s.holderMap[action.FromAddr]
+		if ok {
+			info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+			newInst.holderMap[action.FromAddr] = &info
 		}
 
-		value, ok := s.tickerToHolderMap[action.Ticker]
+		value, ok = s.holderMap[action.ToAddr]
 		if ok {
-			newInst.tickerToHolderMap[action.Ticker] = value
+			info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+			newInst.holderMap[action.ToAddr] = &info
+		}
+		
+		holders, ok := s.tickerToHolderMap[action.Ticker]
+		if ok {
+			newInst.tickerToHolderMap[action.Ticker] = holders
 		}
 	}
 

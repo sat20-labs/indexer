@@ -239,10 +239,7 @@ func (d *Decimal) IsOverflowUint64() bool {
 
 	integerPart := new(big.Int).SetUint64(math.MaxUint64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
-	if d.Value.Cmp(value) > 0 {
-		return true
-	}
-	return false
+	return d.Value.Cmp(value) > 0
 }
 
 func (d *Decimal) GetMaxUint64() *Decimal {

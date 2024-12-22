@@ -1,7 +1,6 @@
 package brc20
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -48,31 +47,6 @@ func (p *BRC20Indexer) GetTicker(tickerName string) *common.BRC20Ticker {
 	return ret.Ticker
 }
 
-func (p *BRC20Indexer) GetMint(inscriptionId string) *common.BRC20Mint {
-
-	tickerName, err := p.GetTickerWithInscriptionId(inscriptionId)
-	if err != nil {
-		common.Log.Errorf(err.Error())
-		return nil
-	}
-
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	ticker := p.tickerMap[strings.ToLower(tickerName)]
-	if ticker == nil {
-		return nil
-	}
-
-	for _, mint := range ticker.MintAdded {
-		if mint.Base.Base.InscriptionId == inscriptionId {
-			return mint
-		}
-	}
-
-	return p.getMintFromDB(tickerName, inscriptionId)
-}
-
 // 获取该ticker的holder和持有的utxo
 // return: key, address; value, amt
 func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]common.Decimal {
@@ -102,7 +76,7 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]common.D
 }
 
 // 获取某个地址下的资产 return: ticker->amount
-func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common.Decimal {
+func (p *BRC20Indexer) GetSummaryByAddress(addrId uint64) map[string]common.Decimal {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -119,25 +93,8 @@ func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common
 		org.Add(&v.AvailableBalance)
 		result[k] = org
 	}
-	
+
 	return result
-}
-
-
-// return: mint的ticker名字
-func (p *BRC20Indexer) GetTickerWithInscriptionId(inscriptionId string) (string, error) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	for _, tickinfo := range p.tickerMap {
-		for k := range tickinfo.InscriptionMap {
-			if k == inscriptionId {
-				return tickinfo.Name, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("can't find inscription id %s", inscriptionId)
 }
 
 // return: 按铸造时间排序的铸造历史
@@ -219,4 +176,45 @@ func (p *BRC20Indexer) GetMintAmount(tick string) (common.Decimal, int64) {
 	}
 
 	return amount, int64(len(tickinfo.InscriptionMap))
+}
+
+func (p *BRC20Indexer) GetMint(tickerName, inscriptionId string) *common.BRC20Mint {
+
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	ticker := p.tickerMap[strings.ToLower(tickerName)]
+	if ticker == nil {
+		return nil
+	}
+
+	for _, mint := range ticker.MintAdded {
+		if mint.Nft.Base.InscriptionId == inscriptionId {
+			return mint
+		}
+	}
+
+	return p.getMintFromDB(tickerName, inscriptionId)
+}
+
+// return: 按铸造时间排序的铸造历史
+func (p *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*common.BRC20TransferHistory {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	result := p.loadTransferHistoryFromDB(tick)
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].NftId < result[j].NftId
+	})
+
+	end := len(result)
+	if start >= end {
+		return nil
+	}
+	if start+limit < end {
+		end = start + limit
+	}
+
+	return result[start:end]
 }

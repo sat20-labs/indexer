@@ -377,7 +377,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	content *common.BRC20DeployContent, nft *common.Nft) *common.BRC20Ticker {
 
 	ticker := &common.BRC20Ticker{
-		Base: nft,
+		Nft:  nft,
 		Name: content.Ticker,
 		// Limit:      lim,
 		// SelfMint:   selfmint,
@@ -467,7 +467,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 	}
 
 	mint := &common.BRC20Mint{
-		Base: nft,
+		Nft:  nft,
 		Name: content.Ticker,
 	}
 
@@ -497,7 +497,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 	}
 
 	transfer := &common.BRC20Transfer{
-		Base: nft,
+		Nft:  nft,
 		Name: content.Ticker,
 	}
 
@@ -712,7 +712,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 				return
 			}
 
-			if nft.Base.BlockHeight < 837090 {
+			if s.IsMainnet() && nft.Base.BlockHeight < 837090 {
 				common.Log.Errorf("deploy, tick length 5, but not enabled")
 				return
 			}
@@ -845,7 +845,10 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			}
 		}
 	case "brc-20":
-		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		if inscriptionId == 0 {
+			// TODO brc20 只处理tx中的第一个铭文？
+			s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		}
 
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))

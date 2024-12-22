@@ -1,7 +1,7 @@
 package common
 
 type BRC20Mint struct {
-	Base *Nft
+	Nft  *Nft
 	Id   int64
 	Name string
 	Amt  Decimal `json:"amt"`
@@ -10,18 +10,18 @@ type BRC20Mint struct {
 }
 
 type BRC20Transfer struct {
-	Base *Nft
-	UtxoId   uint64
-	Name string
-	Amt  Decimal `json:"amt"`
+	Nft    *Nft
+	UtxoId uint64
+	Name   string
+	Amt    Decimal `json:"amt"`
 }
 
 type BRC20Ticker struct {
-	Base *Nft
+	Nft  *Nft
 	Id   int64
 	Name string
 
-	SelfMint bool     `json:"self_mint,omitempty"`
+	SelfMint bool    `json:"self_mint,omitempty"`
 	Limit    Decimal `json:"limit,omitempty"`
 	Max      Decimal `json:"max,omitempty"`
 
@@ -54,34 +54,16 @@ type BRC20TransferContent struct {
 	Amt string `json:"amt"`
 }
 
-type BRC20HistoryBase struct {
-	Type uint8 // inscribe-deploy/inscribe-mint/inscribe-transfer/transfer/send/receive
+type BRC20TransferHistory struct {
+	Height int
+	Utxo   string // transferring utxo
+	NftId  int64  // transfer nft
 
-	TxId   string
-	Idx    uint32
-	Vout   uint32
-	Offset uint64
+	FromAddr uint64
+	ToAddr   uint64
 
-	PkScriptFrom string
-	PkScriptTo   string
-	Satoshi      uint64
-
-	Height uint32
-}
-
-// history
-type BRC20History struct {
-	BRC20HistoryBase
-
-	Inscription *InscribeBaseContent
-
-	// param
+	Ticker string
 	Amount string
-
-	// state
-	OverallBalance      string
-	TransferableBalance string
-	AvailableBalance    string
 }
 
 type BRC20MintAbbrInfo struct {
@@ -93,30 +75,37 @@ type BRC20MintAbbrInfo struct {
 }
 
 type TransferNFT struct {
-	NftId         int64
-	UtxoId        uint64
-	Amount        Decimal
+	NftId  int64
+	UtxoId uint64
+	Amount Decimal
 }
 
 // key: mint时的inscriptionId。 value: 某个资产对应的数值
 type BRC20TickAbbrInfo struct {
-	AvailableBalance     Decimal
-	TransferableData     []*TransferNFT
-	InvalidTransferableData []*TransferNFT
+	AvailableBalance        Decimal
+	TransferableData        map[uint64]*TransferNFT // key:utxoId
+	InvalidTransferableData map[uint64]*TransferNFT // key:utxoId
+}
+
+func NewBRC20TickAbbrInfo(amt Decimal) *BRC20TickAbbrInfo {
+	return &BRC20TickAbbrInfo{
+		AvailableBalance:        amt,
+		TransferableData:        make(map[uint64]*TransferNFT),
+		InvalidTransferableData: make(map[uint64]*TransferNFT),
+	}
 }
 
 func NewBRC20MintAbbrInfo(mint *BRC20Mint) *BRC20MintAbbrInfo {
-	info := NewBRC20MintAbbrInfo2(mint.Base.Base)
+	info := NewBRC20MintAbbrInfo2(mint.Nft.Base)
 	info.Amount = mint.Amt
 	return info
 }
 
-
 func NewBRC20MintAbbrInfo2(base *InscribeBaseContent) *BRC20MintAbbrInfo {
 	return &BRC20MintAbbrInfo{
 		Address: base.InscriptionAddress,
-		//Amount: 1, 
-		InscriptionId: base.InscriptionId, 
+		//Amount: 1,
+		InscriptionId:  base.InscriptionId,
 		InscriptionNum: base.Id,
-		Height: int(base.BlockHeight)}
+		Height:         int(base.BlockHeight)}
 }

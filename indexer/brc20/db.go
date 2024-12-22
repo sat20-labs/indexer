@@ -21,7 +21,7 @@ func (s *BRC20Indexer) loadMintInfoFromDB(tickinfo *BRC20TickInfo) {
 		// 	tickinfo.MintInfo.AddMintInfo(rng, mint.Base.InscriptionId)
 		// }
 
-		tickinfo.InscriptionMap[mint.Base.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
+		tickinfo.InscriptionMap[mint.Nft.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
 	}
 }
 
@@ -50,37 +50,45 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 			}
 			key := string(item.Key())
 
-			addrId, err := parseHolderInfoKey(key)
+			addrId, ticker, err := parseHolderInfoKey(key)
 			if err != nil {
 				common.Log.Errorln(key + " " + err.Error())
 			} else {
-				var info HolderInfo
+				var info common.BRC20TickAbbrInfo
 				value, err := item.ValueCopy(nil)
 				if err != nil {
 					common.Log.Errorln("ValueCopy " + key + " " + err.Error())
 				} else {
 					err = common.DecodeBytes(value, &info)
 					if err == nil {
-						holderMap[addrId] = &info
-						for name, tickInfo:= range info.Tickers {
-							holders, ok := tickerToHolderMap[name]
-							if ok {
-								holders[addrId] = true
-							} else {
-								holders = make(map[uint64]bool)
-								holders[addrId] = true
+						holder, ok := holderMap[addrId]
+						if ok {
+							holder.Tickers[ticker] = &info
+						} else {
+							holder = &HolderInfo{
+								AddressId: addrId,
+								Tickers:   make(map[string]*common.BRC20TickAbbrInfo),
 							}
-							tickerToHolderMap[name] = holders
-							for _, nft := range tickInfo.TransferableData {
-								transferNftMap[nft.UtxoId] = &TransferNftInfo{
-									AddressId: info.AddressId,
-									Index: info.Index,
-									Ticker: name,
-									TransferNft: nft,
-								}
+							holder.Tickers[ticker] = &info
+							holderMap[addrId] = holder
+						}
+
+						holders, ok := tickerToHolderMap[ticker]
+						if ok {
+							holders[addrId] = true
+						} else {
+							holders = make(map[uint64]bool)
+							holders[addrId] = true
+						}
+						tickerToHolderMap[ticker] = holders
+
+						for _, nft := range info.TransferableData {
+							transferNftMap[nft.UtxoId] = &TransferNftInfo{
+								AddressId:   addrId,
+								Ticker:      ticker,
+								TransferNft: nft,
 							}
 						}
-						
 					} else {
 						common.Log.Errorln("DecodeBytes " + err.Error())
 					}
@@ -102,10 +110,8 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 	s.tickerToHolderMap = tickerToHolderMap
 	s.transferNftMap = transferNftMap
 
-
 	return nil
 }
-
 
 func (s *BRC20Indexer) loadTickListFromDB() []string {
 	result := make([]string, 0)
@@ -147,7 +153,7 @@ func (s *BRC20Indexer) getTickListFromDB() []string {
 	return s.loadTickListFromDB()
 }
 
-// key: utxo
+// key: inscriptionId
 func (s *BRC20Indexer) getMintListFromDB(tickname string) map[string]*common.BRC20Mint {
 	return s.loadMintDataFromDB(tickname)
 }
@@ -192,7 +198,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 			}
 			key := string(item.Key())
 
-			tick, utxo, _ := ParseMintHistoryKey(key)
+			tick, inscriptionId, _ := ParseMintHistoryKey(key)
 			if tick == tickerName {
 				var mint common.BRC20Mint
 				value, err := item.ValueCopy(nil)
@@ -201,7 +207,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 				} else {
 					err = common.DecodeBytes(value, &mint)
 					if err == nil {
-						result[utxo] = &mint
+						result[inscriptionId] = &mint
 					} else {
 						common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
 					}
@@ -219,6 +225,55 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("loadMintDataFromDB %s loaded %d records in %d ms\n", tickerName, count, elapsed)
+
+	return result
+}
+
+func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BRC20TransferHistory {
+	result := make([]*common.BRC20TransferHistory, 0)
+	count := 0
+	startTime := time.Now()
+	common.Log.Info("loadTransferHistoryFromDB ...")
+	err := s.db.View(func(txn *badger.Txn) error {
+		prefixBytes := []byte(DB_PREFIX_TRANSFER_HISTORY + strings.ToLower(tickerName) + "-")
+		prefixOptions := badger.DefaultIteratorOptions
+		prefixOptions.Prefix = prefixBytes
+		it := txn.NewIterator(prefixOptions)
+		defer it.Close()
+		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
+			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
+			key := string(item.Key())
+
+			tick, _, _ := ParseTransferHistoryKey(key)
+			if tick == tickerName {
+				var history common.BRC20TransferHistory
+				value, err := item.ValueCopy(nil)
+				if err != nil {
+					common.Log.Errorln("loadTransferHistoryFromDB ValueCopy " + key + " " + err.Error())
+				} else {
+					err = common.DecodeBytes(value, &history)
+					if err == nil {
+						result = append(result, &history)
+					} else {
+						common.Log.Errorln("loadTransferHistoryFromDB DecodeBytes " + err.Error())
+					}
+				}
+			}
+			count++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		common.Log.Panicf("loadTransferHistoryFromDB %s from db: %v", tickerName, err)
+	}
+
+	elapsed := time.Since(startTime).Milliseconds()
+	common.Log.Infof("loadTransferHistoryFromDB %s loaded %d records in %d ms\n", tickerName, count, elapsed)
 
 	return result
 }

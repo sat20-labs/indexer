@@ -16,10 +16,23 @@ func GetMintHistoryKey(tickname, inscriptionId string) string {
 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, strings.ToLower(tickname), inscriptionId)
 }
 
-func GetImageKey(ticker, utxo string) string {
-	return DB_PREFIX_IMAGE + strings.ToLower(ticker) + "-" + utxo
+func GetTransferHistoryKey(tickname string, utxo string) string {
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, strings.ToLower(tickname), utxo)
 }
 
+func ParseTransferHistoryKey(input string) (string, string, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_TRANSFER_HISTORY) {
+		return "", "", fmt.Errorf("invalid string format")
+	}
+	str := strings.TrimPrefix(input, DB_PREFIX_TRANSFER_HISTORY)
+	parts := strings.Split(str, "-")
+
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid string format")
+	}
+
+	return parts[0], parts[1], nil
+}
 
 func parseTickListKey(input string) (string, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TICKER) {
@@ -42,26 +55,26 @@ func ParseMintHistoryKey(input string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-func GetHolderInfoKey(addrId uint64) string {
-	return fmt.Sprintf("%s%d", DB_PREFIX_TICKER_HOLDER, addrId)
+func GetHolderInfoKey(addrId uint64, ticker string) string {
+	return fmt.Sprintf("%s%d-%s", DB_PREFIX_TICKER_HOLDER, addrId, ticker)
 }
 
-func parseHolderInfoKey(input string) (uint64, error) {
+func parseHolderInfoKey(input string) (uint64, string, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TICKER_HOLDER) {
-		return common.INVALID_ID, fmt.Errorf("invalid string format")
+		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
 	}
 	str := strings.TrimPrefix(input, DB_PREFIX_TICKER_HOLDER)
 	parts := strings.Split(str, "-")
-	if len(parts) != 1 {
-		return common.INVALID_ID, fmt.Errorf("invalid string format")
+	if len(parts) != 2 {
+		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
 	}
 
 	addrId, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
-		return common.INVALID_ID, err
+		return common.INVALID_ID, "", err
 	}
 
-	return addrId, nil
+	return addrId, parts[1], nil
 }
 
 func newTickerInfo(name string) *BRC20TickInfo {

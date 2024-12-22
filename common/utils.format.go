@@ -31,6 +31,14 @@ func ConvertTimestampToISO8601(timestamp int64) string {
 	return iso8601
 }
 
+func TxIdFromUtxo(utxo string) string {
+	parts := strings.Split(utxo, ":")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
+}
+
 func ParseUtxo(utxo string) (txid string, vout int, err error) {
 	parts := strings.Split(utxo, ":")
 	if len(parts) != 2 {
@@ -73,6 +81,10 @@ func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, typ,
 		}
 	}
 	return addressId, utxoId, typ, index, err
+}
+
+func ToUtxo(txid string, vout int) string {
+	return txid+":"+strconv.Itoa(vout)
 }
 
 /*

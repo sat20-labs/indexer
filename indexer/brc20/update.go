@@ -39,12 +39,20 @@ func (p *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 	}
 	mint.Id = int64(len(ticker.InscriptionMap))
 	ticker.MintAdded = append(ticker.MintAdded, mint)
-	ticker.InscriptionMap[mint.Base.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
+	ticker.InscriptionMap[mint.Nft.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
 
-	action := HolderAction{AddressId: mint.Base.Base.InscriptionAddress, Ticker: mint.Name, Amount: mint.Amt, Action: 1}
+	action := HolderAction{
+		Height:   int(mint.Nft.Base.BlockHeight),
+		Utxo:     mint.Nft.Base.InscriptionId,
+		NftId:    mint.Nft.Base.Id,
+		FromAddr: common.INVALID_ID,
+		ToAddr:   mint.Nft.OwnerAddressId,
+		Ticker:   mint.Name,
+		Amount:   mint.Amt,
+		Action:   0,
+	}
 	p.holderActionList = append(p.holderActionList, &action)
-	// 仅仅为了让UpdateTransfer能检查到输入的input中有资产，所以该tx的output才会进行资产检查工作
-	p.addHolderBalance(mint.Name, mint.Base.Base.InscriptionAddress, 0, mint.Amt)
+	p.addHolderBalance(mint.Name, mint.Nft.OwnerAddressId, mint.Amt)
 }
 
 // transfer
@@ -53,50 +61,47 @@ func (p *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 	defer p.mutex.Unlock()
 
 	nft := common.TransferNFT{
-		NftId: transfer.Base.Base.Id,
+		NftId:  transfer.Nft.Base.Id,
 		UtxoId: transfer.UtxoId,
 		Amount: transfer.Amt,
 	}
-
-	holder, ok := p.holderMap[transfer.Base.Base.InscriptionAddress]
-	if ok {
-		tickInfo, ok := holder.Tickers[transfer.Name]
-		if ok {
-			tickInfo.TransferableData = append(tickInfo.TransferableData, &nft)
-			return 
-		} 
+	transferInfo := &TransferNftInfo{
+		AddressId:   transfer.Nft.OwnerAddressId,
+		Ticker:      transfer.Name,
+		TransferNft: &nft,
 	}
-	
-	// 异常路径：没有可用余额，保存起来
-	availableBalance := common.NewDecimal(0, transfer.Amt.Precition)
-	p.addHolderBalance(transfer.Name, transfer.Base.OwnerAddressId, 0, *availableBalance)
+	p.addTransferNft(transferInfo)
 
-	holder = p.holderMap[transfer.Base.OwnerAddressId]
-	tickInfo := holder.Tickers[transfer.Name]
-	tickInfo.InvalidTransferableData = []*common.TransferNFT{&nft}
-
-	action := HolderAction{AddressId: transfer.Base.OwnerAddressId, Ticker: transfer.Name, Amount: transfer.Amt, Action: 0}
+	action := HolderAction{
+		Height:   int(transfer.Nft.Base.BlockHeight),
+		Utxo:     transfer.Nft.Base.InscriptionId,
+		NftId:    transfer.Nft.Base.Id,
+		FromAddr: common.INVALID_ID,
+		ToAddr:   transfer.Nft.OwnerAddressId,
+		Ticker:   transfer.Name,
+		Amount:   transfer.Amt,
+		Action:   1,
+	}
 	p.holderActionList = append(p.holderActionList, &action)
 }
 
 // 增加该address下的资产数据
-func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, index int, amt common.Decimal) {
+func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, amt common.Decimal) {
 	ticker = strings.ToLower(ticker)
 
 	info, ok := p.holderMap[address]
 	if !ok {
-		tickinfo := common.BRC20TickAbbrInfo{AvailableBalance: amt}
+		tickinfo := common.NewBRC20TickAbbrInfo(amt)
 		tickers := make(map[string]*common.BRC20TickAbbrInfo)
-		tickers[ticker] = &tickinfo
-		info = &HolderInfo{AddressId: address, Index: index, Tickers: tickers}
+		tickers[ticker] = tickinfo
+		info = &HolderInfo{AddressId: address, Tickers: tickers}
 		p.holderMap[address] = info
 	} else {
 		info.AddressId = address
-		info.Index = index
 		tickinfo, ok := info.Tickers[ticker]
 		if !ok {
-			tickinfo := common.BRC20TickAbbrInfo{AvailableBalance: amt}
-			info.Tickers[ticker] = &tickinfo
+			tickinfo := common.NewBRC20TickAbbrInfo(amt)
+			info.Tickers[ticker] = tickinfo
 		} else {
 			tickinfo.AvailableBalance.Add(&amt)
 		}
@@ -113,18 +118,16 @@ func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, index int
 	}
 }
 
-
 // 减少该address下的资产数据
-func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, index int, amt common.Decimal) error {
+func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt common.Decimal) error {
 	ticker = strings.ToLower(ticker)
 
 	info, ok := p.holderMap[address]
 	if ok {
 		info.AddressId = address
-		info.Index = index
 		tickinfo, ok := info.Tickers[ticker]
 		if ok {
-			cmp := tickinfo.AvailableBalance.Cmp(&amt) 
+			cmp := tickinfo.AvailableBalance.Cmp(&amt)
 			if cmp >= 0 {
 				tickinfo.AvailableBalance.Sub(&amt)
 				if cmp == 0 {
@@ -139,11 +142,43 @@ func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, index int
 	return fmt.Errorf("no enough balance")
 }
 
-func (p *BRC20Indexer) deleteHolderMap(ticker string, address uint64) {
-	holders, ok := p.tickerToHolderMap[ticker]
+func (p *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
+	delete(p.transferNftMap, nft.TransferNft.UtxoId)
+	holder, ok := p.holderMap[nft.AddressId]
 	if ok {
-		delete(holders, address)
-		p.tickerToHolderMap[ticker] = holders
+		tickInfo, ok := holder.Tickers[nft.Ticker]
+		if ok {
+			delete(tickInfo.TransferableData, nft.TransferNft.UtxoId)
+		} else {
+			common.Log.Panic("can't find ticker info")
+		}
+	} else {
+		common.Log.Panic("can't find ticker info")
+	}
+}
+
+func (p *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
+	p.transferNftMap[nft.TransferNft.UtxoId] = nft
+
+	bValid := false
+	holder, ok := p.holderMap[nft.AddressId]
+	if ok {
+		tickInfo, ok := holder.Tickers[nft.Ticker]
+		if ok {
+			tickInfo.TransferableData[nft.TransferNft.UtxoId] = nft.TransferNft
+			bValid = true
+		}
+	}
+
+	if !bValid {
+		// 异常路径：没有可用余额，先将transfer铭文保存起来，以后可能可以用（TODO 要看BRC20协议是否这样处理）
+		availableBalance := common.NewDecimal(0, nft.TransferNft.Amount.Precition)
+		// 仅为了创建tickInfo
+		p.addHolderBalance(nft.Ticker, nft.AddressId, *availableBalance)
+
+		holder = p.holderMap[nft.AddressId]
+		tickInfo := holder.Tickers[nft.Ticker]
+		tickInfo.InvalidTransferableData[nft.TransferNft.UtxoId] = nft.TransferNft
 	}
 }
 
@@ -157,28 +192,27 @@ func (p *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	for _, tx := range block.Transactions[1:] {
 		hasTransfer := false
 		for _, input := range tx.Inputs {
-			nft, ok := p.transferNftMap[input.UtxoId] 
+			nft, ok := p.transferNftMap[input.UtxoId]
 			if ok {
-				inputTransferNfts[nft.TransferNft.NftId]= nft
+				inputTransferNfts[nft.TransferNft.NftId] = nft
 				hasTransfer = true
-				delete(p.transferNftMap, input.UtxoId)
+				p.removeTransferNft(nft)
 			}
 		}
 
 		if hasTransfer {
 			for _, output := range tx.Outputs {
-				p.innerUpdateTransfer(output, &inputTransferNfts)
+				p.innerUpdateTransfer(tx.Txid, output, &inputTransferNfts)
 			}
 		}
 	}
-	
+
 	if len(inputTransferNfts) != 0 {
 		tx := block.Transactions[0]
 		for _, output := range tx.Outputs {
-			p.innerUpdateTransfer(output, &inputTransferNfts)
+			p.innerUpdateTransfer(tx.Txid, output, &inputTransferNfts)
 		}
 	}
-	
 
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 
@@ -186,7 +220,7 @@ func (p *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	p.CheckSelf(block.Height)
 }
 
-func (p *BRC20Indexer) innerUpdateTransfer(output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
+func (p *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
 
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := common.GetUtxoId(output)
@@ -196,18 +230,24 @@ func (p *BRC20Indexer) innerUpdateTransfer(output *common.Output, inputTransferN
 		if ok {
 			// transfer occur
 
-			err := p.subHolderBalance(transferNft.Ticker, transferNft.AddressId, transferNft.Index, transferNft.TransferNft.Amount)
+			err := p.subHolderBalance(transferNft.Ticker, transferNft.AddressId,
+				transferNft.TransferNft.Amount)
 			if err != nil {
 				return
 			}
-			action := HolderAction{AddressId: transferNft.AddressId, Index: transferNft.Index, 
-				Ticker: transferNft.Ticker, Amount: transferNft.TransferNft.Amount, Action: -1}
+			p.addHolderBalance(transferNft.Ticker, transferNft.AddressId,
+				transferNft.TransferNft.Amount)
+			action := HolderAction{
+				Height:   output.Height,
+				Utxo:     common.ToUtxo(txId, int(output.N)),
+				NftId:    transferNft.TransferNft.NftId,
+				FromAddr: transferNft.AddressId,
+				ToAddr:   nft.OwnerAddressId,
+				Ticker:   transferNft.Ticker,
+				Amount:   transferNft.TransferNft.Amount,
+				Action:   2,
+			}
 			p.holderActionList = append(p.holderActionList, &action)
-
-			p.addHolderBalance(transferNft.Ticker, nft.OwnerAddressId, 0, transferNft.TransferNft.Amount)
-			action2 := HolderAction{AddressId: nft.OwnerAddressId, Index: 0, 
-				Ticker: transferNft.Ticker, Amount: transferNft.TransferNft.Amount, Action: 1}
-			p.holderActionList = append(p.holderActionList, &action2)
 
 			delete((*inputTransferNfts), nft.Base.Id)
 		}
@@ -216,12 +256,13 @@ func (p *BRC20Indexer) innerUpdateTransfer(output *common.Output, inputTransferN
 
 // 跟basic数据库同步
 func (p *BRC20Indexer) UpdateDB() {
-	//common.Log.Infof("OrdxIndexer->UpdateDB start...")
+	//common.Log.Infof("BRC20Indexer->UpdateDB start...")
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
 	defer wb.Cancel()
 
+	// new ticker
 	for _, v := range p.tickerAdded {
 		key := GetTickerKey(v.Name)
 		err := common.SetDB([]byte(key), v, wb)
@@ -229,70 +270,77 @@ func (p *BRC20Indexer) UpdateDB() {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}
 	}
-	// common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(tickerAdded:%d), cost: %.6fs", len(tickerAdded), time.Since(startTime).Seconds())
 
-	//startTime = time.Now()
+	// mint history
 	for _, ticker := range p.tickerMap {
 		for _, v := range ticker.MintAdded {
-			key := GetMintHistoryKey(ticker.Name, v.Base.Base.InscriptionId)
+			key := GetMintHistoryKey(ticker.Name, v.Nft.Base.InscriptionId)
 			err := common.SetDB([]byte(key), v, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", key, err)
 			}
 		}
 	}
-	//common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(ticker.MintAdded(), cost: %v", time.Since(startTime))
-	//startTime = time.Now()
 
+	// holder status
+	// transfer history
 	for _, action := range p.holderActionList {
-		key := GetHolderInfoKey(action.AddressId)
-		if action.Action < 0 {
-			err := wb.Delete([]byte(key))
-			if err != nil {
-				common.Log.Infof("Error deleting db %s: %v\n", key, err)
-			}
-		} else if action.Action > 0 {
-			value, ok := p.holderMap[action.AddressId]
+		switch action.Action {
+		case 0: // inscribe-mint
+		case 1: // inscribe-transfer
+		case 2: // transfer
+		}
+		// 更新holder数据
+		if action.FromAddr != common.INVALID_ID {
+			fromKey := GetHolderInfoKey(action.FromAddr, action.Ticker)
+			value, ok := p.holderMap[action.FromAddr]
 			if ok {
-				err := common.SetDB([]byte(key), value, wb)
+				err := common.SetDB([]byte(fromKey), value, wb)
 				if err != nil {
-					common.Log.Panicf("Error setting %s in db %v", key, err)
+					common.Log.Panicf("Error setting %s in db %v", fromKey, err)
 				}
-			} //else {
+			} else {
+				//已经被删除
+				err := wb.Delete([]byte(fromKey))
+				if err != nil {
+					common.Log.Infof("Error deleting db %s: %v\n", fromKey, err)
+				}
+			}
+		}
+		toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+		value, ok := p.holderMap[action.ToAddr]
+		if ok {
+			err := common.SetDB([]byte(toKey), value, wb)
+			if err != nil {
+				common.Log.Panicf("Error setting %s in db %v", toKey, err)
+			}
+		} else {
 			//已经被删除
-			//common.Log.Panicf("can't find %s in map of holderInfo", key)
-			//}
+			err := wb.Delete([]byte(toKey))
+			if err != nil {
+				common.Log.Infof("Error deleting db %s: %v\n", toKey, err)
+			}
 		}
 
-		// for tickerName := range action.Tickers {
-		// 	key := GetHolderInfoKey(tickerName, action.AddressId)
-		// 	if action.Action < 0 {
-		// 		err := wb.Delete([]byte(key))
-		// 		if err != nil {
-		// 			common.Log.Infof("Error deleting db %s: %v\n", key, err)
-		// 		}
-		// 	} else if action.Action > 0 {
-		// 		amount := int64(0)
-		// 		value, ok := p.tickerToHolderMap[tickerName]
-		// 		if ok {
-		// 			amount, ok = (value)[action.AddressId]
-		// 			if ok {
-		// 				err := common.SetDB([]byte(key), &amount, wb)
-		// 				if err != nil {
-		// 					common.Log.Panicf("Error setting %s in db %v", key, err)
-		// 				}
-		// 			} //else {
-		// 			// 已经被删除
-		// 			// common.Log.Panicf("can't find %s in map of utxo", action.Utxo)
-		// 			//}
-		// 		} //else {
-		// 		// 已经被删除
-		// 		// common.Log.Panicf("can't find %s in map of utxo", tickerName)
-		// 		//}
-		// 	}
-		// }
+		if action.Action == 2 {
+			// 保存历史记录
+			history := common.BRC20TransferHistory{
+				Height:   action.Height,
+				Utxo:     action.Utxo,
+				NftId:    action.NftId,
+				FromAddr: action.FromAddr,
+				ToAddr:   action.ToAddr,
+				Ticker:   action.Ticker,
+				Amount:   action.Amount.String(),
+			}
+
+			key := GetTransferHistoryKey(action.Ticker, action.Utxo)
+			err := common.SetDB([]byte(key), &history, wb)
+			if err != nil {
+				common.Log.Panicf("Error setting %s in db %v", key, err)
+			}
+		}
 	}
-	//common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(ticker.HolderActionList(%d), cost: %v",len(p.holderActionList), time.Since(startTime))
 
 	err := wb.Flush()
 	if err != nil {
@@ -306,5 +354,5 @@ func (p *BRC20Indexer) UpdateDB() {
 		info.MintAdded = make([]*common.BRC20Mint, 0)
 	}
 
-	common.Log.Infof("OrdxIndexer->UpdateDB takse: %v", time.Since(startTime))
+	common.Log.Infof("BRC20Indexer->UpdateDB takse: %v", time.Since(startTime))
 }
