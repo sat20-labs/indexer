@@ -102,10 +102,11 @@ message Cenotaph {
 
 message RuneAsset { 
     Uint128 balance = 1;
-    bool is_etching = 2;
-    repeated OutPoint mints = 3;
-    repeated Edict transfers = 4;
-    repeated Cenotaph cenotaphs = 5;
+    Uint128 burned = 2;
+    bool is_etching = 3;
+    repeated OutPoint mints = 4;
+    repeated Edict transfers = 5;
+    repeated Cenotaph cenotaphs = 6;
 }
 
 message RuneLedger { 

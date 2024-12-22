@@ -31,6 +31,7 @@ func (s *RuneLedger) ToPb() (ret *pb.RuneLedger) {
 		key := r.String()
 		runeAsset := &pb.RuneAsset{
 			Balance:   &pb.Uint128{Lo: asset.Balance.Lo, Hi: asset.Balance.Hi},
+			Burned:    &pb.Uint128{Lo: asset.Burned.Lo, Hi: asset.Burned.Hi},
 			IsEtching: asset.IsEtching,
 			Mints:     make([]*pb.OutPoint, len(asset.Mints)),
 			Transfers: make([]*pb.Edict, len(asset.Transfers)),
@@ -82,6 +83,7 @@ func (s *RuneLedger) FromPb(pbVal *pb.RuneLedger) {
 		r := *prune
 		s.Assets[r] = &RuneAsset{
 			Balance:   uint128.Uint128{Lo: v.Balance.Lo, Hi: v.Balance.Hi},
+			Burned:    uint128.Uint128{Lo: v.Burned.Lo, Hi: v.Burned.Hi},
 			IsEtching: v.IsEtching,
 			Mints:     make([]*OutPoint, len(v.Mints)),
 			Transfers: make([]*Edict, len(v.Transfers)),

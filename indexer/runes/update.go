@@ -75,6 +75,7 @@ func (s *Indexer) getOutPoints(address string) (ret []*runestone.OutPoint) {
 func (s *Indexer) getInitRuneAsset() *runestone.RuneAsset {
 	return &runestone.RuneAsset{
 		Balance:   uint128.Zero,
+		Burned:    uint128.Zero,
 		IsEtching: false,
 		Mints:     make([]*runestone.OutPoint, 0),
 		Transfers: make([]*runestone.Edict, 0),
