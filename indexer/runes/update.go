@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"lukechampine.com/uint128"
 )
@@ -46,6 +47,41 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	s.update()
 }
 
+func (s *Indexer) getOutPoints(address string) (ret []*runestone.OutPoint) {
+	address = ""
+	utxoid_to_value_map, err := base_indexer.ShareBaseIndexer.GetUTXOsWithAddress(address)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer->getOutPoints: GetUTXOsWithAddress error: %v", err)
+	}
+	for id := range utxoid_to_value_map {
+		utxo, _, err := base_indexer.ShareBaseIndexer.GetOrdinalsWithUtxoId(id)
+		if err != nil {
+			common.Log.Panicf("RuneIndexer->getOutPoints: GetOrdinalsWithUtxoId error: %v", err)
+		}
+		txid, vout, err := common.ParseUtxo(utxo)
+		if err != nil {
+			common.Log.Panicf("RuneIndexer->getOutPoints: ParseUtxo error: %v", err)
+		}
+
+		outpoint := &runestone.OutPoint{
+			Txid: txid,
+			Vout: uint32(vout),
+		}
+		ret = append(ret, outpoint)
+	}
+	return
+}
+
+func (s *Indexer) getInitRuneAsset() *runestone.RuneAsset {
+	return &runestone.RuneAsset{
+		Balance:   uint128.Zero,
+		IsEtching: false,
+		Mints:     make([]*runestone.OutPoint, 0),
+		Transfers: make([]*runestone.Edict, 0),
+		Cenotaphs: make([]*runestone.Cenotaph, 0),
+	}
+}
+
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 	artifact, voutIndex, err := parserArtifact(tx)
 	if err != nil {
@@ -72,33 +108,31 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 	if artifact != nil {
 		mintRuneId := artifact.Mint()
 		if mintRuneId != nil {
-			runeEntry, amount, err := s.mint(mintRuneId)
-			if err != nil {
-				return err
-			}
-			unallocated.GetOrDefault(mintRuneId).AddAssign(amount)
-			// update ledger
-			if s.runeLedger.Assets[runeEntry.SpacedRune.Rune] == nil {
-				s.runeLedger.Assets[runeEntry.SpacedRune.Rune] = &runestone.RuneAsset{
-					Balance:   uint128.Zero,
-					IsEtching: false,
-					Mints:     make([]*runestone.OutPoint, 0),
-					Transfers: make([]*runestone.Edict, 0),
-					Cenotaphs: make([]*runestone.Cenotaph, 0),
+			amount, err := s.mint(mintRuneId)
+			if err == nil {
+				unallocated.GetOrDefault(mintRuneId).AddAssign(amount)
+				// ledger
+				mintRuneEntry := s.idToEntryTbl.Get(mintRuneId)
+				if s.runeLedger.Assets[mintRuneEntry.SpacedRune.Rune] == nil {
+					s.runeLedger.Assets[mintRuneEntry.SpacedRune.Rune] = s.getInitRuneAsset()
 				}
+				s.runeLedger.Assets[mintRuneEntry.SpacedRune.Rune].Mints =
+					append(
+						s.runeLedger.Assets[mintRuneEntry.SpacedRune.Rune].Mints,
+						&runestone.OutPoint{Txid: tx.Txid, Vout: tx_index},
+					)
 			}
-
 		}
 
-		id, r := s.etched(tx_index, tx, artifact)
+		etchedId, etchedRune := s.etched(tx_index, tx, artifact)
 		if artifact.Runestone != nil {
-			if id != nil {
+			if etchedId != nil {
 				premine := &uint128.Uint128{}
 				if artifact.Runestone.Etching.Premine != nil {
 					premine = artifact.Runestone.Etching.Premine
 				}
 				premineAmount := runestone.NewLot(premine)
-				unallocated.GetOrDefault(id).AddAssign(premineAmount)
+				unallocated.GetOrDefault(etchedId).AddAssign(premineAmount)
 			}
 			zeroId := runestone.RuneId{Block: uint64(0), Tx: uint32(0)}
 			for _, edict := range artifact.Runestone.Edicts {
@@ -110,7 +144,15 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 				if output >= uint32(len(tx.Outputs)) {
 					common.Log.Panicf("RuneIndexer->index_runes: output is greater than transaction output count")
 				}
+
+				var id *runestone.RuneId
 				if edict.ID.Cmp(zeroId) == 0 {
+					if etchedId != nil {
+						id = etchedId
+					} else {
+						continue
+					}
+				} else {
 					id = &edict.ID
 				}
 				balance := unallocated.Get(id)
@@ -161,30 +203,38 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 					}
 					allocate(balance, amount, output)
 				}
+
+				// ledger
+				var r *runestone.Rune
+				if edict.ID.Cmp(zeroId) == 0 {
+					if etchedRune == nil {
+						common.Log.Panicf("RuneIndexer->index_runes: etched rune not found")
+					}
+					r = etchedRune
+				} else {
+					runeEntry := s.idToEntryTbl.Get(id)
+					if runeEntry == nil {
+						common.Log.Panicf("RuneIndexer->index_runes: rune entry not found")
+					}
+					r = &runeEntry.SpacedRune.Rune
+				}
+				if s.runeLedger.Assets[*r] == nil {
+					s.runeLedger.Assets[*r] = s.getInitRuneAsset()
+				}
 			}
 		}
 
 		var runeEntry *runestone.RuneEntry
-		if r != nil {
-			s.runeToIdTbl.Insert(r, id)
-			runeEntry = s.create_rune_entry(tx, artifact, id, r)
-			s.idToEntryTbl.Insert(id, runeEntry)
+		if etchedRune != nil {
+			s.runeToIdTbl.Insert(etchedRune, etchedId)
+			runeEntry = s.create_rune_entry(tx, artifact, etchedId, etchedRune)
+			s.idToEntryTbl.Insert(etchedId, runeEntry)
 			// ledger
 			if s.runeLedger.Assets[runeEntry.SpacedRune.Rune] != nil {
-				common.Log.Panicf("RuneIndexer->index_runes: rune asset already exists, id: %v", id)
+				common.Log.Panicf("RuneIndexer->index_runes: rune asset already exists, id: %v", etchedId)
 			}
-			s.runeLedger.Assets[runeEntry.SpacedRune.Rune] = &runestone.RuneAsset{
-				Balance:   uint128.Zero,
-				IsEtching: true,
-				Mints:     make([]*runestone.OutPoint, 0),
-				Transfers: make([]*runestone.Edict, 0),
-				Cenotaphs: make([]*runestone.Cenotaph, 0),
-			}
-		} else {
-			runeEntry = s.idToEntryTbl.Get(id)
-			if runeEntry == nil {
-				common.Log.Panicf("RuneIndexer->index_runes: rune entry not found")
-			}
+			s.runeLedger.Assets[runeEntry.SpacedRune.Rune] = s.getInitRuneAsset()
+			s.runeLedger.Assets[runeEntry.SpacedRune.Rune].IsEtching = true
 		}
 
 		burned := make(runestone.RuneIdLotMap)
@@ -192,6 +242,12 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) error {
 			for id, v := range unallocated {
 				burned.GetOrDefault(&id).AddAssign(v)
 			}
+			// ledger
+			if s.runeLedger.Assets[runeEntry.SpacedRune.Rune] == nil {
+				s.runeLedger.Assets[runeEntry.SpacedRune.Rune] = s.getInitRuneAsset()
+			}
+			s.runeLedger.Assets[runeEntry.SpacedRune.Rune].Mints = append(s.runeLedger.Assets[runeEntry.SpacedRune.Rune].Mints,
+				&runestone.OutPoint{Txid: tx.Txid, Vout: tx_index})
 		} else if artifact.Runestone != nil {
 			pointer := artifact.Runestone.Pointer
 			// assign all un-allocated runes to the default output, or the first non
@@ -314,11 +370,14 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMap) {
 	ret = make(runestone.RuneIdLotMap)
 	for _, input := range tx.Inputs {
-		outpointKey := &runestone.OutPoint{
+		outpoint := &runestone.OutPoint{
 			Txid: input.Txid,
 			Vout: uint32(input.Vout),
 		}
-		oldValue := s.outpointToRuneBalancesTbl.Remove(outpointKey)
+		oldValue := s.outpointToRuneBalancesTbl.Remove(outpoint)
+		if oldValue == nil {
+			continue
+		}
 		for _, val := range *oldValue {
 			ret[val.RuneId] = &val.Lot
 		}
@@ -326,12 +385,13 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 	return
 }
 
-func (s *Indexer) mint(runeId *runestone.RuneId) (runeEntry *runestone.RuneEntry, lot *runestone.Lot, err error) {
-	runeEntry = s.idToEntryTbl.Get(runeId)
+func (s *Indexer) mint(runeId *runestone.RuneId) (lot *runestone.Lot, err error) {
+	runeEntry := s.idToEntryTbl.Get(runeId)
 	if runeEntry == nil {
 		return
 	}
-	amount, err := runeEntry.Mintable(s.height)
+	var amount *uint128.Uint128
+	amount, err = runeEntry.Mintable(s.height)
 	if err != nil {
 		return
 	}

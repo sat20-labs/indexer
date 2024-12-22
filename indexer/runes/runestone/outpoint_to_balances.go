@@ -139,3 +139,13 @@ func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRune
 	}
 	return
 }
+
+func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret *OutpointToRuneBalances) {
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	pbVal := s.store.Get(tblKey)
+	if pbVal != nil {
+		ret = &OutpointToRuneBalances{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
