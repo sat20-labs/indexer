@@ -293,9 +293,11 @@ func IsBindingSat(name *swire.AssetName) uint16 {
 	if name == nil {
 		return 1 // ordx asset
 	}
+	if IsPlainAsset(name) {
+		return 1
+	}
 	if name.Protocol == PROTOCOL_NAME_ORD ||
-		name.Protocol == PROTOCOL_NAME_ORDX ||
-		name.Protocol == "" {
+		name.Protocol == PROTOCOL_NAME_ORDX {
 		return 1
 	}
 	return 0

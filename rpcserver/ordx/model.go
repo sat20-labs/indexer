@@ -80,14 +80,6 @@ func (s *Model) getTicker(tickerName string) (*rpcwire.TickerStatus, error) {
 	return tickerStatusResp, nil
 }
 
-func IsAssetBindingSat(asset *swire.AssetName) uint16 {
-	if asset.Protocol == common.PROTOCOL_NAME_ORD ||
-		asset.Protocol == common.PROTOCOL_NAME_ORDX {
-		return 1
-	}
-	return 0
-}
-
 func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.AssetSummary, error) {
 	tickerMap := s.indexer.GetAssetSummaryInAddress(address)
 
@@ -96,7 +88,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 		resp := &swire.AssetInfo{}
 		resp.Name = tickName
 		resp.Amount = balance
-		resp.BindingSat = IsAssetBindingSat(&tickName)
+		resp.BindingSat = common.IsBindingSat(&tickName)
 		result.Data = append(result.Data, resp)
 	}
 	result.Start = 0
