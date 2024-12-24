@@ -149,6 +149,40 @@ func (p *IndexerMgr) listMintHistory() bool {
 	return true
 }
 
+func (p *IndexerMgr) listValidPearl() bool {
+	filepath := "./pearl.json"
+	os.Remove(filepath)
+	file, err := os.OpenFile(filepath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		common.Log.Infof("OpenFile failed %v", err)
+		return true
+	}
+
+	file.WriteString("[\n")
+	mintInfos := p.ftIndexer.GetMintHistory("pearl", 0, 200000)
+	splitted := p.ftIndexer.GetSplittedInscriptionsWithTick("pearl")
+	splittedMap := make(map[string]bool)
+	for _, v := range splitted {
+		splittedMap[v] = true
+	}
+
+	for i := 0; i < len(mintInfos)-1; i++ {
+		info := mintInfos[i]
+		_, ok := splittedMap[info.InscriptionId]
+		if ok {
+			continue
+		}
+		file.WriteString(fmt.Sprintf("{\"id\":\"%s\"},\n", info.InscriptionId))
+	}
+	info := mintInfos[len(mintInfos)-1]
+	file.WriteString(fmt.Sprintf("{\"id\":\"%s\"}\n", info.InscriptionId))
+	file.WriteString("]")
+
+	file.Close()
+
+	return true
+}
+
 func (p *IndexerMgr) searchName() bool {
 	//	p.searchName3("3letters.txt", "")
 	//	p.searchName3("3letters-btc.txt", ".btc")
