@@ -76,7 +76,7 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]common.D
 }
 
 // 获取某个地址下的资产 return: ticker->amount
-func (p *BRC20Indexer) GetSummaryByAddress(addrId uint64) map[string]common.Decimal {
+func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common.Decimal {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 

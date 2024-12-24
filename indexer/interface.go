@@ -165,6 +165,39 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 	return result, nil
 }
 
+
+// return: utxoId->asset amount
+func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *swire.AssetName) (map[uint64]*common.TxOutput, error) {
+	utxos, err := b.rpcService.GetUTXOs(address)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uint64]*common.TxOutput)
+	for utxoId, _ := range utxos {
+		utxo, err := b.rpcService.GetUtxoByID(utxoId)
+		if err != nil {
+			continue
+		}
+		info := b.GetTxOutputWithUtxo(utxo)
+		if info == nil {
+			continue
+		}
+
+		if ticker == nil || common.IsPlainAsset(ticker) {
+			result[utxoId] = info
+		} else {
+			asset, err := info.Assets.Find(ticker)
+			if err != nil || asset.Amount == 0 {
+				continue
+			}
+			result[utxoId] = info
+		}
+	}
+	
+	return result, nil
+}
+
 // return: ticker -> amount
 func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerName]int64 {
 	utxos, err := b.rpcService.GetUTXOs(address)
@@ -189,6 +222,12 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	for k, v := range ftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
+	}
+
+	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
+	for k, v := range brc20Asset {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
+		result[tickName] = int64(v.Float64())
 	}
 
 	plainUtxoMap := make(map[uint64]int64)
@@ -419,19 +458,32 @@ func (b *IndexerMgr) GetMintHistory(tick string, start, limit int) []*common.Min
 	return b.ftIndexer.GetMintHistory(tick, start, limit)
 }
 
-func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.TickerName, start, limit int) ([]*common.MintAbbrInfo, int) {
+func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.TickerName, 
+	start, limit int) ([]*common.MintAbbrInfo, int) {
 	addressId := b.GetAddressId(address)
-	switch tick.Type {
-	case common.ASSET_TYPE_NFT:
-		return b.GetNftHistoryWithAddress(addressId, start, limit)
-	case common.ASSET_TYPE_NS:
-		return b.GetNameHistoryWithAddress(addressId, start, limit)
-	case common.ASSET_TYPE_EXOTIC:
-		return nil, 0
-	default:
+	
+	switch tick.Protocol {
+	case common.PROTOCOL_NAME_ORDX:
+		switch tick.Type {
+		case common.ASSET_TYPE_FT:
+			return b.ftIndexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
+		case common.ASSET_TYPE_NFT:
+			return b.GetNftHistoryWithAddress(addressId, start, limit)
+		case common.ASSET_TYPE_NS:
+			return b.GetNameHistoryWithAddress(addressId, start, limit)
+		case common.ASSET_TYPE_EXOTIC:
+			return nil, 0
+		default:
+		}
+		
+	case common.PROTOCOL_NAME_BRC20:
+		//return b.brc20Indexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
+	case common.PROTOCOL_NAME_RUNES:
 
 	}
-	return b.ftIndexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
+	
+	return nil, 0
+	
 }
 
 func (b *IndexerMgr) GetMintInfo(inscriptionId string) *common.Mint {

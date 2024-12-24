@@ -152,6 +152,32 @@ func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutputInfo,
 }
 
 func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*rpcwire.TxOutputInfo, int, error) {
+	result := make([]*rpcwire.TxOutputInfo, 0)
+	assetName := swire.NewAssetNameFromString(name)
+	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV2(address, assetName)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, txOut := range outputMap {
+		assets := make([]*rpcwire.AssetInfo, 0)
+		for _, asset := range txOut.Assets {
+			offsets := txOut.Offsets[asset.Name]
 
-	return nil, 0, nil
+			info := rpcwire.AssetInfo{
+				Asset:   asset,
+				Offsets: offsets,
+			}
+			assets = append(assets, &info)
+		}
+
+		output := rpcwire.TxOutputInfo{
+			OutPoint:  txOut.OutPointStr,
+			OutValue:  txOut.OutValue,
+			AssetInfo: assets,
+		}
+
+		result = append(result, &output)
+	}
+
+	return result, len(result), nil
 }
