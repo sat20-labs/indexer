@@ -43,15 +43,40 @@ func (p *AssetOffsets) Split(offset int64) (AssetOffsets, AssetOffsets) {
 			left = append(left, r)
 		} else if r.Start >= offset {
 			// 完全在右边
-			right = append(right, r)
+			n := r.Clone()
+			n.Start -= offset
+			n.End -= offset
+			right = append(right, n)
 		} else {
 			// 跨越 offset，需要拆分
 			left = append(left, &OffsetRange{Start: r.Start, End: offset})
-			right = append(right, &OffsetRange{Start: offset, End: r.End})
+			right = append(right, &OffsetRange{Start: 0, End: r.End-offset})
 		}
 	}
 
 	return left, right
+}
+
+// another 已经调整过偏移值
+func (p *AssetOffsets) Append(another AssetOffsets) {
+	var r1, r2 *OffsetRange
+	len1 := len(*p)
+	len2 := len(another)
+	if len1 > 0 {
+		if len2 == 0 {
+			return
+		}
+		r1 = (*p)[len1-1]
+		r2 = another[0]
+		if r1.End == r2.Start {
+			r1.End = r2.End
+			*p = append(*p, another[1:]...)
+		} else {
+			*p = append(*p, another...)
+		}
+	} else {
+		*p = append(*p, another...)
+	}
 }
 
 type TxAssets = swire.TxAssets
@@ -157,7 +182,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		}
 		existingOffsets, ok := p.Offsets[asset.Name]
 		if ok {
-			existingOffsets = append(existingOffsets, newOffsets...)
+			existingOffsets.Append(newOffsets)
 		} else {
 			existingOffsets = newOffsets
 		}
@@ -232,6 +257,13 @@ func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, erro
 		return 330, nil
 	}
 
+	if IsPlainAsset(name) {
+		if p.Value() < amt {
+			return 0, fmt.Errorf("amount too large")
+		}
+		return amt, nil
+	}
+
 	offsets, ok := p.Offsets[*name]
 	if !ok {
 		return 0, fmt.Errorf("no asset in %s", p.OutPointStr)
@@ -293,11 +325,9 @@ func IsBindingSat(name *swire.AssetName) uint16 {
 	if name == nil {
 		return 1 // ordx asset
 	}
-	if IsPlainAsset(name) {
-		return 1
-	}
 	if name.Protocol == PROTOCOL_NAME_ORD ||
-		name.Protocol == PROTOCOL_NAME_ORDX {
+		name.Protocol == PROTOCOL_NAME_ORDX ||
+		name.Protocol == "" {
 		return 1
 	}
 	return 0
