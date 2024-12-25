@@ -144,8 +144,8 @@ func (re *RuneEntry) End() *uint64 {
 
 	var relative, absolute *uint64
 	if re.Terms.Offset[1] != nil {
-		if re.RuneId.Block <= math.MaxUint64-*re.Terms.Offset[0] {
-			relVal := re.RuneId.Block + *re.Terms.Offset[0]
+		if re.RuneId.Block <= math.MaxUint64-*re.Terms.Offset[1] {
+			relVal := re.RuneId.Block + *re.Terms.Offset[1]
 			relative = &relVal
 		} else {
 			maxVal := uint64(math.MaxUint64)
