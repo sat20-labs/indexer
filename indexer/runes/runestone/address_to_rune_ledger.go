@@ -119,3 +119,7 @@ func (s *RuneLedgerTable) Insert(key Address, value *RuneLedger) (ret *RuneLedge
 	}
 	return
 }
+
+func (s *RuneLedgerTable) Flush() {
+	s.store.Flush()
+}

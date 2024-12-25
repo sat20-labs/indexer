@@ -51,3 +51,7 @@ func (s *RuneToIdTable) GetNoTransaction(key *Rune) (ret *RuneId) {
 	}
 	return
 }
+
+func (s *RuneToIdTable) Flush() {
+	s.store.Flush()
+}

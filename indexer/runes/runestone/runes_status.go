@@ -59,6 +59,9 @@ func (s *RunesStatus) UpdateNoTransaction() {
 		Number:        s.Number,
 		ReservedRunes: s.ReservedRunes,
 	}
-
 	s.store.InsertNoTransaction(key, value)
+}
+
+func (s *RunesStatus) Flush() {
+	s.store.Flush()
 }

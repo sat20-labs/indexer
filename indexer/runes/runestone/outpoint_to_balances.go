@@ -160,3 +160,7 @@ func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRune
 	}
 	return
 }
+
+func (s *OutpointToRuneBalancesTable) Flush() {
+	s.store.Flush()
+}

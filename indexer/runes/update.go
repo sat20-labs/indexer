@@ -18,6 +18,8 @@ func (s *Indexer) UpdateDB() {
 	if s.txn == nil {
 		return
 	}
+
+	s.FlushTable()
 	err := s.txn.Commit()
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.UpdateDB-> txn.Commit err:%s", err.Error())
@@ -25,6 +27,15 @@ func (s *Indexer) UpdateDB() {
 	s.txn.Discard()
 	s.txn = nil
 	common.Log.Debugf("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
+}
+func (s *Indexer) FlushTable() {
+	s.status.Flush()
+	s.outpointToRuneBalancesTbl.Flush()
+	s.idToEntryTbl.Flush()
+	s.runeToIdTbl.Flush()
+	s.runeLedgerTbl.Flush()
+	s.runeHolderTbl.Flush()
+	s.runeMintHistorysTbl.Flush()
 }
 
 func (s *Indexer) setTblTxn() {
@@ -543,8 +554,22 @@ func (s *Indexer) mint(runeId *runestone.RuneId) (lot *runestone.Lot, err error)
 	}
 	runeEntry.Mints = runeEntry.Mints.Add64(1)
 	s.idToEntryTbl.Insert(runeId, runeEntry)
+	// oldRuneEntry := s.idToEntryTbl.Insert(runeId, runeEntry)
+	// if oldRuneEntry != nil {
+	// 	common.Log.Debugf("%v", oldRuneEntry.Mints.String())
+	// }
 	lot = &runestone.Lot{
 		Value: amount,
+	}
+	runeEntry1 := s.idToEntryTbl.Get(runeId)
+	if runeEntry1 == nil {
+		for {
+			oldRuneEntry := s.idToEntryTbl.Insert(runeId, runeEntry)
+			if oldRuneEntry != nil {
+				common.Log.Debugf("%v", oldRuneEntry.Mints.String())
+			}
+		}
+		// common.Log.Panicf("test")
 	}
 	return
 }

@@ -9,13 +9,15 @@ import (
 )
 
 type Store[T any] struct {
-	db  *badger.DB
-	txn *badger.Txn
+	pval map[string][]byte
+	db   *badger.DB
+	txn  *badger.Txn
 }
 
 func NewStore[T any](db *badger.DB) *Store[T] {
 	return &Store[T]{
-		db: db,
+		db:   db,
+		pval: make(map[string][]byte),
 	}
 }
 
@@ -24,6 +26,13 @@ func (s *Store[T]) SetTxn(txn *badger.Txn) {
 }
 
 func (s *Store[T]) Get(key []byte) (ret *T) {
+	var val T
+	if s.pval[string(key)] != nil {
+		msg := any(&val).(proto.Message)
+		proto.Unmarshal(s.pval[string(key)], msg)
+		ret = &val
+		return
+	}
 	item, err := s.txn.Get(key)
 	if err != nil && err != badger.ErrKeyNotFound {
 		common.Log.Panicf("Store.Get-> err: %v", err)
@@ -31,7 +40,7 @@ func (s *Store[T]) Get(key []byte) (ret *T) {
 	if item == nil {
 		return nil
 	}
-	var val T
+
 	err = item.Value(func(v []byte) error {
 		msg, ok := any(&val).(proto.Message)
 		if !ok {
@@ -42,6 +51,7 @@ func (s *Store[T]) Get(key []byte) (ret *T) {
 			return err
 		}
 		ret = &val
+		s.pval[string(key)] = v
 		return nil
 	})
 
@@ -53,6 +63,9 @@ func (s *Store[T]) Get(key []byte) (ret *T) {
 
 func (s *Store[T]) Remove(key []byte) (ret *T) {
 	ret = s.Get(key)
+	if ret == nil {
+		return
+	}
 	err := s.txn.Delete(key)
 	if err != nil {
 		common.Log.Panicf("Store.Remove-> err: %v", err)
@@ -64,10 +77,20 @@ func (s *Store[T]) Insert(key []byte, msg proto.Message) (ret *T) {
 	ret = s.Remove(key)
 	val, err := proto.Marshal(msg)
 	if err != nil {
-		common.Log.Panicf("Store.Insert-> err: %v", err.Error())
+		common.Log.Panicf("Store.Insert-> key: %s, proto.Marshal err: %v", string(key), err.Error())
 	}
-	s.txn.Set(key, val)
+	s.pval[string(key)] = val
 	return
+}
+
+func (s *Store[T]) Flush() {
+	for key, val := range s.pval {
+		err := s.txn.Set([]byte(key), val)
+		if err != nil {
+			common.Log.Panicf("Store.Flush-> key: %s, txn.Set err: %v", key, err.Error())
+		}
+	}
+	s.pval = make(map[string][]byte, 0)
 }
 
 func (s *Store[T]) InsertNoTransaction(key []byte, val proto.Message) {

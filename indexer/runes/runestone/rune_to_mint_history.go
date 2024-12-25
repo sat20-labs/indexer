@@ -83,3 +83,7 @@ func (s *RuneMintHistorysTable) Insert(key *Rune, value RuneMintHistorys) (ret R
 	}
 	return
 }
+
+func (s *RuneMintHistorysTable) Flush() {
+	s.store.Flush()
+}

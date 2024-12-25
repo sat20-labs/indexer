@@ -49,3 +49,7 @@ func (s *RuneIdToEntryTable) InsertNoTransaction(key *RuneId, value *RuneEntry) 
 	tblKey := []byte(store.ID_TO_ENTRY + key.String())
 	s.store.InsertNoTransaction(tblKey, value.ToPb())
 }
+
+func (s *RuneIdToEntryTable) Flush() {
+	s.store.Flush()
+}
