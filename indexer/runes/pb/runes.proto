@@ -102,13 +102,24 @@ message Cenotaph {
 
 message RuneAsset { 
     Uint128 balance = 1;
-    Uint128 burned = 2;
-    bool is_etching = 3;
-    repeated OutPoint mints = 4;
-    repeated Edict transfers = 5;
-    repeated Cenotaph cenotaphs = 6;
+    bool is_etching = 2;
+    repeated OutPoint mints = 3;
+    repeated Edict transfers = 4;
 }
 
 message RuneLedger { 
     map<string, RuneAsset> assets = 1; 
 }
+
+message RuneHolder { 
+    string address = 1;
+    Uint128 balance = 2;
+}
+message RuneHolders { repeated RuneHolder holders = 1; }
+
+message RuneMintHistory { 
+    string address = 1;
+    Rune rune = 2;
+    string Utxo = 3;
+}
+message RuneMintHistorys { repeated RuneMintHistory mintHistorys = 1; }

@@ -1,62 +1,79 @@
 package runes
 
 import (
-	"sort"
-
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 )
 
-func (p *Indexer) GetRune(runeName string) *common.Ticker {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	return nil
-}
-
-func (p *Indexer) GetMint(runeName string) *common.Mint {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	return nil
-}
-
-// 获取该ticker的holder和持有的utxo
-// return: key, address; value, utxos
-func (p *Indexer) GetHoldersWithRune(runeName string) map[uint64][]uint64 {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	mp := make(map[uint64][]uint64, 0)
-	return mp
-}
-
-// return: 按铸造时间排序的铸造历史
-func (p *Indexer) GetMintHistory(runeName string, start, limit int) []any {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	result := make([]any, 0)
-	sort.Slice(result, func(i, j int) bool {
-		return true
-	})
-
-	end := len(result)
-	if start >= end {
+func (s *Indexer) GetRuneInfo(ticker string) *runestone.RuneEntry {
+	r, err := runestone.RuneFromString(ticker)
+	if err != nil {
+		common.Log.Debugf("RuneIndexer.GetRuneInfo-> runestone.RuneFromString(%s) err:%s", ticker, err.Error())
 		return nil
+	}
+	runeId := s.runeToIdTbl.GetNoTransaction(r)
+	if runeId == nil {
+		common.Log.Infof("RuneIndexer.GetRuneInfo-> runeToIdTbl.GetNoTransaction(%s) rune not found, ticker: %s", r.String(), ticker)
+		return nil
+	}
+	runeEntry := s.idToEntryTbl.GetNoTransaction(runeId)
+	return runeEntry
+}
+
+func (s *Indexer) GetHolders(ticker string, start, limit int) ([]*runestone.RuneHolder, int) {
+	r, err := runestone.RuneFromString(ticker)
+	if err != nil {
+		common.Log.Debugf("RuneIndexer.GetHolders-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
+		return nil, 0
+	}
+	holders := s.runeHolderTbl.GetNoTransaction(r)
+	return holders, 0
+}
+
+func (s *Indexer) GetMintHistory(ticker string, start, limit int) (runestone.RuneMintHistorys, int) {
+	r, err := runestone.RuneFromString(ticker)
+	if err != nil {
+		common.Log.Debugf("RuneIndexer.GetMintHistory-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
+		return nil, 0
+	}
+	mintHistorys := s.runeMintHistorysTbl.GetNoTransaction(r)
+	if mintHistorys == nil {
+		return nil, 0
+	}
+	end := len(mintHistorys)
+	if start >= end {
+		return nil, 0
 	}
 	if start+limit < end {
 		end = start + limit
 	}
-
-	return result[start:end]
+	return mintHistorys[start:end], end
 }
 
-func (p *Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start, limit int) ([]any, int) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
+func (s *Indexer) GetAddressMintHistory(address runestone.Address, ticker string, start, limit int) (runestone.RuneMintHistorys, int) {
+	r, err := runestone.RuneFromString(ticker)
+	if err != nil {
+		common.Log.Debugf("RuneIndexer.GetAddressMintHistory-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
+		return nil, 0
+	}
+	ledger := s.runeLedgerTbl.GetNoTransaction(address)
+	if ledger == nil {
+		common.Log.Infof("RuneIndexer.GetAddressMintHistory-> runeLedgerTbl.GetNoTransaction(%s) rune not found, ticker: %s", address, ticker)
+		return nil, 0
+	}
 
-	result := make([]any, 0)
-	sort.Slice(result, func(i, j int) bool {
-		return true
-	})
+	mintHistorys := make(runestone.RuneMintHistorys, len(ledger.Assets[*r].Mints))
+	mints := ledger.Assets[*r].Mints
+	for i, mint := range mints {
+		mintHistory := &runestone.RuneMintHistory{
+			Address: address,
+			Rune:    *r,
+			Utxo:    mint.String(),
+		}
+		mintHistorys[i] = mintHistory
+	}
 
-	total := len(result)
+	total := len(mintHistorys)
 	end := total
 	if start >= end {
 		return nil, 0
@@ -65,14 +82,15 @@ func (p *Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start
 		end = start + limit
 	}
 
-	return result[start:end], total
+	return mintHistorys[start:end], total
 }
 
-func (p *Indexer) GetMintAmount(tick string) (int64, int64) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	amount := int64(0)
-
-	return amount, 0
+func (s *Indexer) GetMintAmount(ticker string) (mint uint64, supply uint64) {
+	runeEntry := s.GetRuneInfo(ticker)
+	if runeEntry == nil {
+		return 0, 0
+	}
+	mint = runeEntry.Mints.Big().Uint64()
+	supply = runeEntry.Supply().Big().Uint64()
+	return mint, supply
 }

@@ -174,7 +174,6 @@ func (s *RuneEntry) ToPb() *pb.RuneEntry {
 		Burned:       &pb.Uint128{Hi: s.Burned.Hi, Lo: s.Burned.Lo},
 		Divisibility: &pb.Uint8{Value: uint32(s.Divisibility)},
 		Etching:      s.Etching,
-		Parent:       &pb.InscriptionId{Value: string(*s.Parent)},
 		Mints:        &pb.Uint128{Hi: s.Mints.Hi, Lo: s.Mints.Lo},
 		Number:       s.Number,
 		Premine:      &pb.Uint128{Hi: s.Premine.Hi, Lo: s.Premine.Lo},
@@ -184,6 +183,12 @@ func (s *RuneEntry) ToPb() *pb.RuneEntry {
 		},
 		Timestamp: s.Timestamp,
 		Turbo:     s.Turbo,
+	}
+
+	if s.Parent == nil {
+		pbValue.Parent = nil
+	} else {
+		pbValue.Parent = &pb.InscriptionId{Value: string(*s.Parent)}
 	}
 
 	// set symbol

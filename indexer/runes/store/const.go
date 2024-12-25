@@ -12,6 +12,8 @@ const (
 	RUNE_TO_ID             = "r2i-"
 	TRANSACTION_ID_TO_RUNE = "ti2r-"
 	RUNE_LEDGER            = "rl-"
+	RUNE_TO_ADDRESS_HOLDER = "r2a-"
+	RUNE_TO_MINT_HISTORYS  = "r2m-"
 )
 
 const (

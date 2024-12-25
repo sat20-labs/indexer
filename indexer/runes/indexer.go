@@ -1,8 +1,6 @@
 package runes
 
 import (
-	"sync"
-
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
@@ -14,32 +12,38 @@ import (
 )
 
 type Indexer struct {
-	mutex                     sync.RWMutex
+	// mutex                     sync.RWMutex
 	db                        *badger.DB
 	txn                       *badger.Txn
 	chaincfgParam             *chaincfg.Params
 	height                    uint64
 	blockTime                 uint64
-	status                    runestone.RunesStatus
+	status                    *runestone.RunesStatus
 	minimumRune               *runestone.Rune
 	runeLedger                *runestone.RuneLedger
 	burnedMap                 runestone.RuneIdLotMap
-	runeLedgerTable           *runestone.RuneLedgerTable
+	runeLedgerTbl             *runestone.RuneLedgerTable
 	outpointToRuneBalancesTbl *runestone.OutpointToRuneBalancesTable
 	idToEntryTbl              *runestone.RuneIdToEntryTable
 	runeToIdTbl               *runestone.RuneToIdTable
+	runeHolderTbl             *runestone.RuneHoldersTable
+	runeMintHistorysTbl       *runestone.RuneMintHistorysTable
 }
 
-func New(db *badger.DB, param *chaincfg.Params) *Indexer {
-	db.NewTransaction(true)
+func NewIndexer(db *badger.DB, param *chaincfg.Params) *Indexer {
 	return &Indexer{
+		db:                        db,
+		txn:                       nil,
 		chaincfgParam:             param,
 		runeLedger:                nil,
 		burnedMap:                 nil,
+		status:                    runestone.NewRunesStatus(store.NewStore[pb.RunesStatus](db)),
 		outpointToRuneBalancesTbl: runestone.NewOutpointToRuneBalancesTable(store.NewStore[pb.OutpointToRuneBalances](db)),
 		idToEntryTbl:              runestone.NewRuneIdToEntryTable(store.NewStore[pb.RuneEntry](db)),
 		runeToIdTbl:               runestone.NewRuneToIdTable(store.NewStore[pb.RuneId](db)),
-		runeLedgerTable:           runestone.NewRuneLedgerTable(store.NewStore[pb.RuneLedger](db)),
+		runeLedgerTbl:             runestone.NewRuneLedgerTable(store.NewStore[pb.RuneLedger](db)),
+		runeHolderTbl:             runestone.NewRuneHoldersTable(store.NewStore[pb.RuneHolders](db)),
+		runeMintHistorysTbl:       runestone.NewRuneMintHistorysTable(store.NewStore[pb.RuneMintHistorys](db)),
 	}
 }
 
@@ -48,7 +52,7 @@ func (s *Indexer) Init() {
 	if !isExist && s.chaincfgParam.Net == wire.MainNet {
 		firstRuneValue, err := uint128.FromString("2055900680524219742")
 		if err != nil {
-			common.Log.Panicf("Runes.Indexer->Init: err: %v", err)
+			common.Log.Panicf("RuneIndexer.Init-> uint128.FromString(2055900680524219742) err: %v", err)
 		}
 		r := runestone.Rune{
 			Value: firstRuneValue,
@@ -58,7 +62,7 @@ func (s *Indexer) Init() {
 		s.runeToIdTbl.InsertNoTransaction(&r, id)
 
 		s.status.Number = 1
-		s.status.Update()
+		s.status.UpdateNoTransaction()
 
 		symbol := '\u29C9'
 		startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)

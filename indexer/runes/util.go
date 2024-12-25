@@ -3,7 +3,6 @@ package runes
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -13,13 +12,6 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 )
-
-func parseRuneListKey(input string) (string, error) {
-	if !strings.HasPrefix(input, DB_PREFIX_RUNE) {
-		return "", fmt.Errorf("invalid string format")
-	}
-	return strings.TrimPrefix(input, DB_PREFIX_RUNE), nil
-}
 
 func ParseMintHistoryKey(input string) (string, string, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_MINT_HISTORY) {
@@ -33,19 +25,6 @@ func ParseMintHistoryKey(input string) (string, string, error) {
 	}
 
 	return parts[0], parts[1], nil
-}
-
-func parseHolderInfoKey(input string) (uint64, error) {
-	if !strings.HasPrefix(input, DB_PREFIX_RUNE_HOLDER) {
-		return common.INVALID_ID, fmt.Errorf("invalid string format")
-	}
-	str := strings.TrimPrefix(input, DB_PREFIX_RUNE_HOLDER)
-	parts := strings.Split(str, "-")
-	if len(parts) != 1 {
-		return common.INVALID_ID, errors.New("invalid string format")
-	}
-
-	return strconv.ParseUint(parts[0], 10, 64)
 }
 
 /**
@@ -64,14 +43,14 @@ func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.I
 	return ret
 }
 
-func parserArtifact(transaction *common.Transaction) (ret *runestone.Artifact, voutIndex int, err error) {
+func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, err error) {
 	var msgTx wire.MsgTx
 	for _, output := range transaction.Outputs {
 		pkScript := output.Address.PkScript
 		msgTx.AddTxOut(wire.NewTxOut(0, pkScript))
 	}
 	runestone := &runestone.Runestone{}
-	ret, voutIndex, err = runestone.Decipher(&msgTx)
+	ret, err = runestone.Decipher(&msgTx)
 	return
 }
 
@@ -122,6 +101,7 @@ func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 	// Opcode.classify(self, ctx: ClassifyContext) -> Class
 	for i := 0; i < len(tapscript); {
 		b := tapscript[i]
+		i++
 		switch b {
 		// 0x65 0x66 0xff, All/IllegalOp
 		case txscript.OP_VERIF, txscript.OP_VERIFY, txscript.OP_INVALIDOPCODE:
@@ -165,13 +145,14 @@ func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 				break
 			}
 			// All/Ordinary(b)
-			return
+			ret = append(ret, []byte{b})
+			continue
 		}
 		var n int = int(b)
 		if len(tapscript) >= n {
-			slice := tapscript[i:n]
+			slice := tapscript[i : i+n]
 			if n > 0 {
-				i += (n - 1)
+				i += n
 			}
 			ret = append(ret, slice)
 		}

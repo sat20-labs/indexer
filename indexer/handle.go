@@ -46,7 +46,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 	s.ns.UpdateTransfer(block)
 	s.ftIndexer.UpdateTransfer(block)
 	s.brc20Indexer.UpdateTransfer(block)
-	//s.runesIndexer.UpdateTransfer(block)
+	s.runesIndexer.UpdateTransfer(block)
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 
@@ -89,7 +89,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 			}
 		}
 	}
-	
+
 	var err error
 	lim := int64(1)
 	if content.Lim != "" {
@@ -189,7 +189,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 				return nil
 			}
 		} else {
-			if blockStart > 0 &&  int(height)+5 > blockStart {
+			if blockStart > 0 && int(height)+5 > blockStart {
 				common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, start of block should be larger than: %d",
 					nft.Base.InscriptionId, content.Ticker, height+5)
 				return nil
@@ -244,11 +244,11 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 				Nft:  nft,
 				Name: strings.ToLower(ticker.Name),
 			}
-	
+
 			s.ns.NameRegister(reg)
 		}
 	}
-	
+
 	return ticker
 }
 
@@ -395,7 +395,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 			}
 		}
 	}
-	
+
 	var err error
 	lim := int64(1)
 	if content.Lim != "" {
@@ -449,18 +449,15 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		}
 	}
 
-	
 	if selfmint < 100 && s.isSat20Actived(int(height)) {
-		
 
 	}
-
 
 	nft.Base.TypeName = common.ASSET_TYPE_NS
 	nft.Base.UserData = []byte(content.Ticker)
 	ticker := &common.Brc20Ticker{
-		Base:       common.CloneBaseContent(nft.Base),
-		Name:       content.Ticker,
+		Base: common.CloneBaseContent(nft.Base),
+		Name: content.Ticker,
 		// Limit:      lim,
 		// SelfMint:   selfmint,
 		// Max:        max,
@@ -472,11 +469,11 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 				Nft:  nft,
 				Name: strings.ToLower(ticker.Name),
 			}
-	
+
 			s.ns.NameRegister(reg)
 		}
 	}
-	
+
 	return ticker
 }
 
@@ -591,15 +588,14 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 
 	nft.Base.TypeName = common.ASSET_TYPE_FT
 	mint := &common.Brc20Mint{
-		Base:     common.CloneBaseContent(nft.Base),
-		Name:     content.Ticker,
+		Base: common.CloneBaseContent(nft.Base),
+		Name: content.Ticker,
 
 		//Amt:      int64(amt),
 	}
 
 	return mint
 }
-
 
 func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint int, out *common.Output,
 	content *common.Brc20TransferContent, nft *common.Nft) *common.Brc20Transfer {
@@ -712,11 +708,11 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 
 	nft.Base.TypeName = common.ASSET_TYPE_FT
 	mint := &common.Brc20Transfer{
-		Base:     common.CloneBaseContent(nft.Base),
-		Name:     content.Ticker,
-	
+		Base: common.CloneBaseContent(nft.Base),
+		Name: content.Ticker,
+
 		//Amt:      int64(amt),
-		
+
 	}
 
 	return mint
@@ -894,18 +890,15 @@ func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint
 	}
 }
 
-
 func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoint int, out *common.Output,
 	fields map[int][]byte, nft *common.Nft) {
 
-	
 	content := string(fields[common.FIELD_CONTENT])
 	brc20Content := common.ParseBrc20Content(content)
 	if brc20Content == nil {
 		common.Log.Errorf("invalid content %s", content)
-		return 
+		return
 	}
-
 
 	switch brc20Content.Op {
 	case "deploy":
@@ -943,7 +936,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		}
 
 		s.brc20Indexer.UpdateMint(inUtxoId, mint)
-	
+
 	case "transfer":
 		transferInfo := common.ParseBrc20TransferContent(content)
 		if transferInfo == nil {
@@ -961,7 +954,6 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		//common.Log.Warnf("handleOrdX unknown ordx type: %s, content: %s, txid: %s", ordxType, content, tx.Txid)
 	}
 }
-
 
 func (s *IndexerMgr) handleOrd(input *common.Input,
 	fields map[int][]byte, inscriptionId int, tx *common.Transaction, block *common.Block) {
@@ -1043,7 +1035,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		}
 	case "brc-20":
 		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
-		
+
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))
 		if primaryNameContent != nil {

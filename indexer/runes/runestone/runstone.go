@@ -24,17 +24,17 @@ type Runestone struct {
 
 var ErrNoOpReturn = errors.New("no OP_RETURN output found")
 
-func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, int, error) {
-	payload, voutIndex, err := r.payload(transaction)
+func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, error) {
+	payload, err := r.payload(transaction)
 	if err != nil {
 		if payload != nil {
 			return &Artifact{
 				Cenotaph: &Cenotaph{
 					Flaw: &payload.Invalid,
-				}}, voutIndex, nil
+				}}, nil
 		}
 
-		return nil, voutIndex, err
+		return nil, err
 	}
 
 	integers, err := r.integers(payload.Valid)
@@ -44,7 +44,7 @@ func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, int, error) {
 			Cenotaph: &Cenotaph{
 				Flaw: &flaw,
 			},
-		}, voutIndex, err
+		}, err
 	}
 
 	message, err := MessageFromIntegers(transaction, integers)
@@ -219,7 +219,7 @@ func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, int, error) {
 		if etching != nil {
 			a.Cenotaph.Etching = etching.Rune
 		}
-		return a, voutIndex, nil
+		return a, nil
 
 	}
 
@@ -230,7 +230,7 @@ func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, int, error) {
 			Mint:    mint,
 			Pointer: pointer,
 		},
-	}, voutIndex, nil
+	}, nil
 }
 
 type Payload struct {
@@ -238,8 +238,8 @@ type Payload struct {
 	Invalid Flaw
 }
 
-func (r *Runestone) payload(transaction *wire.MsgTx) (*Payload, int, error) {
-	for index, output := range transaction.TxOut {
+func (r *Runestone) payload(transaction *wire.MsgTx) (*Payload, error) {
+	for _, output := range transaction.TxOut {
 		tokenizer := txscript.MakeScriptTokenizer(0, output.PkScript)
 		if !tokenizer.Next() || tokenizer.Err() != nil || tokenizer.Opcode() != txscript.OP_RETURN {
 			// Check for OP_RETURN
@@ -258,7 +258,7 @@ func (r *Runestone) payload(transaction *wire.MsgTx) (*Payload, int, error) {
 				payload = append(payload, tokenizer.Data()...)
 				continue
 			} else {
-				return &Payload{Invalid: Opcode}, index, Opcode.Error()
+				return &Payload{Invalid: Opcode}, Opcode.Error()
 			}
 
 		}
@@ -266,13 +266,13 @@ func (r *Runestone) payload(transaction *wire.MsgTx) (*Payload, int, error) {
 		//            return Some(Payload::Invalid(Flaw::InvalidScript));
 		//          }
 		if tokenizer.Err() != nil {
-			return &Payload{Invalid: InvalidScript}, index, InvalidScript.Error()
+			return &Payload{Invalid: InvalidScript}, InvalidScript.Error()
 		}
 
-		return &Payload{Valid: payload}, index, nil
+		return &Payload{Valid: payload}, nil
 	}
 
-	return nil, 0, ErrNoOpReturn
+	return nil, ErrNoOpReturn
 }
 func isPushBytes(opCode byte) bool {
 	return opCode >= txscript.OP_0 && opCode <= txscript.OP_PUSHDATA4

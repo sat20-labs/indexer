@@ -41,3 +41,13 @@ func (s *RuneToIdTable) Get(key *Rune) (ret *RuneId) {
 	}
 	return
 }
+
+func (s *RuneToIdTable) GetNoTransaction(key *Rune) (ret *RuneId) {
+	tblKey := []byte(store.RUNE_TO_ID + key.String())
+	pbVal := s.store.GetNoTransaction(tblKey)
+	if pbVal != nil {
+		ret = &RuneId{}
+		ret.FromPb(pbVal)
+	}
+	return
+}

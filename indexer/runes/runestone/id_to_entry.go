@@ -15,6 +15,26 @@ func NewRuneIdToEntryTable(store *store.Store[pb.RuneEntry]) *RuneIdToEntryTable
 	return &RuneIdToEntryTable{Table: Table[pb.RuneEntry]{store: store}}
 }
 
+func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
+	tblKey := []byte(store.ID_TO_ENTRY + key.String())
+	pbVal := s.store.Get(tblKey)
+	if pbVal != nil {
+		ret = &RuneEntry{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
+
+func (s *RuneIdToEntryTable) GetNoTransaction(key *RuneId) (ret *RuneEntry) {
+	tblKey := []byte(store.ID_TO_ENTRY + key.String())
+	pbVal := s.store.GetNoTransaction(tblKey)
+	if pbVal != nil {
+		ret = &RuneEntry{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
+
 func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.String())
 	pbVal := s.store.Insert(tblKey, value.ToPb())
@@ -28,14 +48,4 @@ func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEnt
 func (s *RuneIdToEntryTable) InsertNoTransaction(key *RuneId, value *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.String())
 	s.store.InsertNoTransaction(tblKey, value.ToPb())
-}
-
-func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
-	tblKey := []byte(store.ID_TO_ENTRY + key.String())
-	pbVal := s.store.Get(tblKey)
-	if pbVal != nil {
-		ret = &RuneEntry{}
-		ret.FromPb(pbVal)
-	}
-	return
 }

@@ -12,8 +12,6 @@ type RuneAsset struct {
 	IsEtching bool //Indicates if this address is etching
 	Mints     []*OutPoint
 	Transfers []*Edict
-	Cenotaphs []*Cenotaph
-	Burned    uint128.Uint128
 }
 
 type RuneLedger struct {
@@ -25,48 +23,32 @@ type RuneLedgers map[Address]*RuneLedger
 
 func (s *RuneLedger) ToPb() (ret *pb.RuneLedger) {
 	ret = &pb.RuneLedger{
-		Assets: make(map[string]*pb.RuneAsset),
+		Assets: make(map[string]*pb.RuneAsset, len(s.Assets)),
 	}
 	for r, asset := range s.Assets {
 		key := r.String()
 		runeAsset := &pb.RuneAsset{
 			Balance:   &pb.Uint128{Lo: asset.Balance.Lo, Hi: asset.Balance.Hi},
-			Burned:    &pb.Uint128{Lo: asset.Burned.Lo, Hi: asset.Burned.Hi},
 			IsEtching: asset.IsEtching,
 			Mints:     make([]*pb.OutPoint, len(asset.Mints)),
 			Transfers: make([]*pb.Edict, len(asset.Transfers)),
-			Cenotaphs: make([]*pb.Cenotaph, len(asset.Cenotaphs)),
 		}
 
-		for _, mint := range asset.Mints {
+		for i, mint := range asset.Mints {
 			outpoint := &pb.OutPoint{
 				Txid: mint.Txid,
 				Vout: mint.Vout,
 			}
-			runeAsset.Mints = append(runeAsset.Mints, outpoint)
+			runeAsset.Mints[i] = outpoint
 		}
 
-		for _, transfer := range asset.Transfers {
+		for i, transfer := range asset.Transfers {
 			edict := &pb.Edict{
 				Id:     &pb.RuneId{Block: transfer.ID.Block, Tx: transfer.ID.Tx},
 				Amount: &pb.Uint128{Lo: transfer.Amount.Lo, Hi: transfer.Amount.Hi},
 				Output: transfer.Output,
 			}
-			runeAsset.Transfers = append(runeAsset.Transfers, edict)
-		}
-
-		for _, cenotaph := range asset.Cenotaphs {
-			pbCenotaph := &pb.Cenotaph{}
-			if cenotaph.Etching != nil {
-				pbCenotaph.Etching = &pb.Rune{Value: &pb.Uint128{Lo: cenotaph.Etching.Value.Lo, Hi: cenotaph.Etching.Value.Hi}}
-			}
-			if cenotaph.Flaw != nil {
-				pbCenotaph.Flaw = int32(*cenotaph.Flaw)
-			}
-			if cenotaph.Mint != nil {
-				pbCenotaph.Mint = &pb.RuneId{Block: cenotaph.Mint.Block, Tx: cenotaph.Mint.Tx}
-			}
-			runeAsset.Cenotaphs = append(runeAsset.Cenotaphs, pbCenotaph)
+			runeAsset.Transfers[i] = edict
 		}
 		ret.Assets[key] = runeAsset
 	}
@@ -74,7 +56,7 @@ func (s *RuneLedger) ToPb() (ret *pb.RuneLedger) {
 }
 
 func (s *RuneLedger) FromPb(pbVal *pb.RuneLedger) {
-	s.Assets = make(map[Rune]*RuneAsset)
+	s.Assets = make(map[Rune]*RuneAsset, len(pbVal.Assets))
 	for k, v := range pbVal.Assets {
 		prune, err := RuneFromString(k)
 		if err != nil {
@@ -83,29 +65,19 @@ func (s *RuneLedger) FromPb(pbVal *pb.RuneLedger) {
 		r := *prune
 		s.Assets[r] = &RuneAsset{
 			Balance:   uint128.Uint128{Lo: v.Balance.Lo, Hi: v.Balance.Hi},
-			Burned:    uint128.Uint128{Lo: v.Burned.Lo, Hi: v.Burned.Hi},
 			IsEtching: v.IsEtching,
 			Mints:     make([]*OutPoint, len(v.Mints)),
 			Transfers: make([]*Edict, len(v.Transfers)),
-			Cenotaphs: make([]*Cenotaph, len(v.Cenotaphs)),
 		}
-		for _, mint := range v.Mints {
-			s.Assets[r].Mints = append(s.Assets[r].Mints, &OutPoint{Txid: mint.Txid, Vout: mint.Vout})
+		for i, mint := range v.Mints {
+			s.Assets[r].Mints[i] = &OutPoint{Txid: mint.Txid, Vout: mint.Vout}
 		}
-		for _, transfer := range v.Transfers {
-			s.Assets[r].Transfers = append(s.Assets[r].Transfers, &Edict{
+		for i, transfer := range v.Transfers {
+			s.Assets[r].Transfers[i] = &Edict{
 				ID:     RuneId{Block: transfer.Id.Block, Tx: transfer.Id.Tx},
 				Amount: uint128.Uint128{Lo: transfer.Amount.Lo, Hi: transfer.Amount.Hi},
 				Output: transfer.Output,
-			})
-		}
-		for _, cenotaph := range v.Cenotaphs {
-			flaw := Flaw(cenotaph.Flaw)
-			s.Assets[r].Cenotaphs = append(s.Assets[r].Cenotaphs, &Cenotaph{
-				Etching: &Rune{Value: uint128.Uint128{Lo: cenotaph.Etching.Value.Lo, Hi: cenotaph.Etching.Value.Hi}},
-				Flaw:    &flaw,
-				Mint:    &RuneId{Block: cenotaph.Mint.Block, Tx: cenotaph.Mint.Tx},
-			})
+			}
 		}
 	}
 }
@@ -121,6 +93,16 @@ func NewRuneLedgerTable(store *store.Store[pb.RuneLedger]) *RuneLedgerTable {
 func (s *RuneLedgerTable) Get(key Address) (ret *RuneLedger) {
 	tblKey := []byte(store.RUNE_LEDGER + key)
 	pbVal := s.store.Get(tblKey)
+	if pbVal != nil {
+		ret = &RuneLedger{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
+
+func (s *RuneLedgerTable) GetNoTransaction(key Address) (ret *RuneLedger) {
+	tblKey := []byte(store.RUNE_LEDGER + key)
+	pbVal := s.store.GetNoTransaction(tblKey)
 	if pbVal != nil {
 		ret = &RuneLedger{}
 		ret.FromPb(pbVal)

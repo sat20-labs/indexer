@@ -55,9 +55,11 @@ func (s RuneIdLotMap) GetOrDefault(id *RuneId) *Lot {
 }
 
 func (s RuneIdLotMap) GetSortArray() OutpointToRuneBalances {
-	slice := make(OutpointToRuneBalances, 0, len(s))
+	slice := make(OutpointToRuneBalances, len(s))
+	var i = 0
 	for k, v := range s {
-		slice = append(slice, RuneIdLot{RuneId: k, Lot: *v})
+		slice[i] = RuneIdLot{RuneId: k, Lot: *v}
+		i++
 	}
 	sort.Slice(slice, func(i, j int) bool {
 		return slice[i].RuneId.Block < slice[j].RuneId.Block ||
@@ -69,11 +71,11 @@ func (s RuneIdLotMap) GetSortArray() OutpointToRuneBalances {
 
 type OutpointToRuneBalances []RuneIdLot
 
-func (s OutpointToRuneBalances) ToPb() *pb.OutpointToRuneBalances {
+func (s *OutpointToRuneBalances) ToPb() *pb.OutpointToRuneBalances {
 	pbValue := &pb.OutpointToRuneBalances{
-		RuneIdLots: make([]*pb.RuneIdLot, len(s)),
+		RuneIdLots: make([]*pb.RuneIdLot, len(*s)),
 	}
-	for i, runeIdLot := range s {
+	for i, runeIdLot := range *s {
 		runeId := &pb.RuneId{
 			Block: runeIdLot.RuneId.Block,
 			Tx:    runeIdLot.RuneId.Tx,
@@ -92,9 +94,8 @@ func (s OutpointToRuneBalances) ToPb() *pb.OutpointToRuneBalances {
 	return pbValue
 }
 
-func (s OutpointToRuneBalances) FromPb(pbValue *pb.OutpointToRuneBalances) {
-	s = make(OutpointToRuneBalances, len(pbValue.RuneIdLots))
-	for i, pbRuneIdLot := range pbValue.RuneIdLots {
+func (s *OutpointToRuneBalances) FromPb(pbValue *pb.OutpointToRuneBalances) {
+	for _, pbRuneIdLot := range pbValue.RuneIdLots {
 		runeId := RuneId{
 			Block: pbRuneIdLot.RuneId.Block,
 			Tx:    pbRuneIdLot.RuneId.Tx,
@@ -105,10 +106,10 @@ func (s OutpointToRuneBalances) FromPb(pbValue *pb.OutpointToRuneBalances) {
 				Lo: pbRuneIdLot.Lot.Value.Lo,
 			},
 		}
-		s[i] = RuneIdLot{
+		*s = append(*s, RuneIdLot{
 			RuneId: runeId,
 			Lot:    lot,
-		}
+		})
 	}
 }
 
@@ -118,6 +119,26 @@ type OutpointToRuneBalancesTable struct {
 
 func NewOutpointToRuneBalancesTable(s *store.Store[pb.OutpointToRuneBalances]) *OutpointToRuneBalancesTable {
 	return &OutpointToRuneBalancesTable{Table: Table[pb.OutpointToRuneBalances]{store: s}}
+}
+
+func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret *OutpointToRuneBalances) {
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	pbVal := s.store.Get(tblKey)
+	if pbVal != nil {
+		ret = &OutpointToRuneBalances{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
+
+func (s *OutpointToRuneBalancesTable) GetNoTransaction(key *OutPoint) (ret *OutpointToRuneBalances) {
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	pbVal := s.store.GetNoTransaction(tblKey)
+	if pbVal != nil {
+		ret = &OutpointToRuneBalances{}
+		ret.FromPb(pbVal)
+	}
+	return
 }
 
 func (s *OutpointToRuneBalancesTable) Insert(key *OutPoint, value OutpointToRuneBalances) (ret *OutpointToRuneBalances) {
@@ -133,16 +154,6 @@ func (s *OutpointToRuneBalancesTable) Insert(key *OutPoint, value OutpointToRune
 func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRuneBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
 	pbVal := s.store.Remove(tblKey)
-	if pbVal != nil {
-		ret = &OutpointToRuneBalances{}
-		ret.FromPb(pbVal)
-	}
-	return
-}
-
-func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret *OutpointToRuneBalances) {
-	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
-	pbVal := s.store.Get(tblKey)
 	if pbVal != nil {
 		ret = &OutpointToRuneBalances{}
 		ret.FromPb(pbVal)
