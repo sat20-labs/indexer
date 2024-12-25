@@ -11,6 +11,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/ft"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
+	"github.com/sat20-labs/indexer/indexer/runes"
 
 	"github.com/btcsuite/btcd/chaincfg"
 
@@ -37,12 +38,12 @@ type IndexerMgr struct {
 	periodFlushToDB int
 
 	brc20Indexer *brc20.BRC20Indexer
-	//runesIndexer *ft.FTIndexer
-	exotic    *exotic.ExoticIndexer
-	ftIndexer *ft.FTIndexer
-	ns        *ns.NameService
-	nft       *nft.NftIndexer
-	clmap     map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
+	runesIndexer *runes.Indexer
+	exotic       *exotic.ExoticIndexer
+	ftIndexer    *ft.FTIndexer
+	ns           *ns.NameService
+	nft          *nft.NftIndexer
+	clmap        map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
 
 	mutex sync.RWMutex
 	// 跑数据
@@ -141,8 +142,8 @@ func (b *IndexerMgr) Init() {
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	// b.runesIndexer = brc20.NewIndexer(b.runesDB)
-	// b.runesIndexer.InitIndexer()
+	b.runesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam)
+	b.runesIndexer.Init()
 
 	b.rpcService = base_indexer.NewRpcIndexer(b.compiling)
 
@@ -290,7 +291,7 @@ func (b *IndexerMgr) forceUpdateDB() {
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
 	b.brc20Indexer.UpdateDB()
-	//b.runesIndexer.UpdateDB()
+	b.runesIndexer.UpdateDB()
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
 }

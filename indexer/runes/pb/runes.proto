@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package pb.runes;
+
+option go_package = "/runes/pb";
+
+// common
+message Uint128 {
+    uint64 lo = 1;
+    uint64 hi = 2;
+}
+
+message Uint8 {
+    uint32 value = 1;
+}
+
+message RuneId {
+    uint64 block = 1;
+    uint32 tx = 2;
+}
+
+message Rune {
+    Uint128 value = 1;
+}
+
+message InscriptionId {
+    string value = 1;
+}
+
+message SpacedRune {
+	Rune   rune = 1;
+	uint32 Spacers = 2;
+}
+
+message Symbol {
+    int32 value = 1;
+}
+
+message Terms {
+    Uint128 amount = 1;
+    Uint128 cap = 2;
+    uint64 start_height = 3;
+    uint64 end_height = 4;
+    uint64 start_offset = 5;
+    uint64 end_offset = 6;
+}
+
+message RuneEntry {
+    RuneId runeId = 1;
+    Uint128 burned = 2;
+    Uint8 divisibility = 3;
+    string etching = 4;
+    InscriptionId parent = 5;
+    Uint128 mints = 6;
+    uint64 number = 7;
+    Uint128 premine = 8;
+    SpacedRune spaced_rune = 9;
+    Symbol symbol = 10;
+    Terms terms = 12;
+    uint64 timestamp = 13;
+    bool turbo = 14;
+}
+
+// runesStatus
+message RunesStatus {
+    string version = 1;
+    uint64 height = 2;
+    uint64 number = 3;
+    uint64 reserved_runes = 4;
+}
+
+
+// OutpointToBalances
+// message OutpointToBalances { map<string, OutpointToRuneBalances> outpoint_to_balance_value_map = 1; }
+
+message Lot {
+    Uint128 value = 1;   
+}
+message RuneIdLot {
+    RuneId runeId = 1;
+    Lot lot = 2;
+}
+
+message OutpointToRuneBalances { repeated RuneIdLot rune_id_lots = 1; }
+
+message OutPoint {
+	string txid = 1;
+	uint32 vout = 2;
+}
+
+message Edict {
+	RuneId id = 1;
+	Uint128 amount = 2;
+    uint32 output = 3;
+}
+
+message Cenotaph {
+    Rune Etching = 1;
+    int32 Flaw = 2;
+    RuneId mint = 3;
+}
+
+message RuneAsset { 
+    Uint128 balance = 1;
+    bool is_etching = 2;
+    repeated OutPoint mints = 3;
+    repeated Edict transfers = 4;
+}
+
+message RuneLedger { 
+    map<string, RuneAsset> assets = 1; 
+}
+
+message RuneHolder { 
+    string address = 1;
+    Uint128 balance = 2;
+}
+message RuneHolders { repeated RuneHolder holders = 1; }
+
+message RuneMintHistory { 
+    string address = 1;
+    Rune rune = 2;
+    string Utxo = 3;
+}
+message RuneMintHistorys { repeated RuneMintHistory mintHistorys = 1; }
