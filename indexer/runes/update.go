@@ -400,6 +400,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				if pAddress == nil {
 					pAddress = s.initRuneLedger(tx, int(*addressVout))
 				}
+				if s.runeLedger.Assets[r] == nil {
+					s.runeLedger.Assets[r] = s.newRuneAsset()
+				}
 				s.runeLedger.Assets[r].Balance = s.runeLedger.Assets[r].Balance.Add(*balance.Value)
 			}
 		}
