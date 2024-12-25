@@ -406,42 +406,46 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		// save rune ledger to db
 		if s.runeLedger != nil {
-			s.runeLedgerTbl.Insert(*pAddress, s.runeLedger)
-			// update rune holder
-			for r, runeAsset := range s.runeLedger.Assets {
-				holders := s.runeHolderTbl.Get(&r)
-				if holders == nil {
-					holders = runestone.RuneHolders{}
-					holders = append(holders, &runestone.RuneHolder{
-						Address: *pAddress,
-						Balance: runeAsset.Balance,
-					})
-				} else {
-					for _, runeHolder := range holders {
-						if runeHolder.Address == *pAddress {
-							runeHolder.Balance = runeHolder.Balance.Add(runeAsset.Balance)
+			if len(s.runeLedger.Assets) > 0 {
+				s.runeLedgerTbl.Insert(*pAddress, s.runeLedger)
+				// update rune holder
+				for r, runeAsset := range s.runeLedger.Assets {
+					holders := s.runeHolderTbl.Get(&r)
+					if holders == nil {
+						holders = runestone.RuneHolders{}
+						holders = append(holders, &runestone.RuneHolder{
+							Address: *pAddress,
+							Balance: runeAsset.Balance,
+						})
+					} else {
+						for _, runeHolder := range holders {
+							if runeHolder.Address == *pAddress {
+								runeHolder.Balance = runeHolder.Balance.Add(runeAsset.Balance)
+							}
 						}
 					}
+					s.runeHolderTbl.Insert(&r, holders)
 				}
-				s.runeHolderTbl.Insert(&r, holders)
-			}
 
-			// update mint history
-			for r, runeAsset := range s.runeLedger.Assets {
-				mintHistorys := s.runeMintHistorysTbl.Get(&r)
-				if mintHistorys == nil {
-					mintHistorys = runestone.RuneMintHistorys{}
+				// update mint history
+				for r, runeAsset := range s.runeLedger.Assets {
+					mintHistorys := s.runeMintHistorysTbl.Get(&r)
+					if mintHistorys == nil {
+						mintHistorys = make(runestone.RuneMintHistorys, 0)
+					}
+					for _, v := range runeAsset.Mints {
+						mintHistorys = append(mintHistorys, &runestone.RuneMintHistory{
+							Address: *pAddress,
+							Rune:    r,
+							Utxo:    v.String(),
+						})
+					}
+					if len(mintHistorys) > 0 {
+						s.runeMintHistorysTbl.Insert(&r, mintHistorys)
+					}
 				}
-				for _, v := range runeAsset.Mints {
-					mintHistorys = append(mintHistorys, &runestone.RuneMintHistory{
-						Address: *pAddress,
-						Rune:    r,
-						Utxo:    v.String(),
-					})
-				}
-				s.runeMintHistorysTbl.Insert(&r, mintHistorys)
+				isSave = true
 			}
-			isSave = true
 		}
 		// ledger end
 	}
