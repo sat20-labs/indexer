@@ -1331,6 +1331,7 @@ func (s *Handle) getNftWithInscriptionId(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// include plain sats
 func (s *Handle) getAssetSummary(c *gin.Context) {
 	resp := &rpcwire.AssetSummaryResp{
 		BaseResp: rpcwire.BaseResp{

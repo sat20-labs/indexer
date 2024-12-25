@@ -345,8 +345,8 @@ func ParseMintContent(content string) *OrdxMintContent {
 	return &ret
 }
 
-func ParseBrc20Content(content string) *Brc20BaseContent {
-	var ret Brc20BaseContent
+func ParseBrc20Content(content string) *BRC20BaseContent {
+	var ret BRC20BaseContent
 	err := json.Unmarshal([]byte(content), &ret)
 	if err != nil {
 		Log.Warnf("invalid json: %s, %v", content, err)
@@ -359,21 +359,24 @@ func ParseBrc20Content(content string) *Brc20BaseContent {
 	return &ret
 }
 
-
-func ParseBrc20DeployContent(content string) *Brc20DeployContent {
-	var ret Brc20DeployContent
+func ParseBrc20DeployContent(content string) *BRC20DeployContent {
+	var ret BRC20DeployContent
 	err := json.Unmarshal([]byte(content), &ret)
 	if err != nil {
 		Log.Warnf("invalid json: %s, %v", content, err)
 		return nil
 	}
 	ret.Ticker = strings.ToLower(ret.Ticker)
-	
+
+	if len(ret.Ticker) != 4 && len(ret.Ticker) != 5 {
+		return nil
+	}
+
 	return &ret
 }
 
-func ParseBrc20MintContent(content string) *Brc20MintContent {
-	var ret Brc20MintContent
+func ParseBrc20MintContent(content string) *BRC20MintContent {
+	var ret BRC20MintContent
 	err := json.Unmarshal([]byte(content), &ret)
 	if err != nil {
 		return nil
@@ -381,8 +384,8 @@ func ParseBrc20MintContent(content string) *Brc20MintContent {
 	return &ret
 }
 
-func ParseBrc20TransferContent(content string) *Brc20TransferContent {
-	var ret Brc20TransferContent
+func ParseBrc20TransferContent(content string) *BRC20TransferContent {
+	var ret BRC20TransferContent
 	err := json.Unmarshal([]byte(content), &ret)
 	if err != nil {
 		return nil

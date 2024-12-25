@@ -131,6 +131,15 @@ func BytesToUint64(bytes []byte) uint64 {
 	return binary.BigEndian.Uint64(bytes)
 }
 
+func CheckUtxoFormat(utxo string) error {
+	parts := strings.Split(utxo, ":")
+	_, err := hex.DecodeString(parts[0])
+	if err != nil {
+		return fmt.Errorf("wrong utxo format %v", err)
+	}
+	return nil
+}
+
 func GetUTXODBKey(utxo string) []byte {
 	// 2d0a64a14faa9dc707dc84647a4e0dd1d4f31753e8a85574128bc8110e312e10 (testnet)
 	// 输出有10万个

@@ -80,14 +80,6 @@ func (s *Model) getTicker(tickerName string) (*rpcwire.TickerStatus, error) {
 	return tickerStatusResp, nil
 }
 
-func IsAssetBindingSat(asset *swire.AssetName) uint16 {
-	if asset.Protocol == common.PROTOCOL_NAME_ORD ||
-		asset.Protocol == common.PROTOCOL_NAME_ORDX {
-		return 1
-	}
-	return 0
-}
-
 func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.AssetSummary, error) {
 	tickerMap := s.indexer.GetAssetSummaryInAddress(address)
 
@@ -96,7 +88,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 		resp := &swire.AssetInfo{}
 		resp.Name = tickName
 		resp.Amount = balance
-		resp.BindingSat = IsAssetBindingSat(&tickName)
+		resp.BindingSat = common.IsBindingSat(&tickName)
 		result.Data = append(result.Data, resp)
 	}
 	result.Start = 0
@@ -109,25 +101,35 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 	return &result, nil
 }
 
-func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutput, error) {
+func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutputInfo, error) {
 
 	txOut := s.indexer.GetTxOutputWithUtxo(utxo)
 	if txOut == nil {
 		return nil, fmt.Errorf("can't get txout from %s", utxo)
 	}
 
-	output := rpcwire.TxOutput{
-		OutPointStr: utxo,
-		OutValue: txOut.OutValue,
-		Sats:     txOut.Sats,
-		Assets:   txOut.Assets,
+	assets := make([]*rpcwire.AssetInfo, 0)
+	for _, asset := range txOut.Assets {
+		offsets := txOut.Offsets[asset.Name]
+
+		info := rpcwire.AssetInfo{
+			Asset:   asset,
+			Offsets: offsets,
+		}
+		assets = append(assets, &info)
+	}
+
+	output := rpcwire.TxOutputInfo{
+		OutPoint:  utxo,
+		OutValue:  txOut.OutValue,
+		AssetInfo: assets,
 	}
 
 	return &output, nil
 }
 
-func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutput, error) {
-	result := make([]*rpcwire.TxOutput, 0)
+func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutputInfo, error) {
+	result := make([]*rpcwire.TxOutputInfo, 0)
 	for _, utxo := range req.Utxos {
 
 		txOutput, err := s.GetUtxoInfo(utxo)
@@ -141,7 +143,33 @@ func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutput, err
 	return result, nil
 }
 
-func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*rpcwire.TxOutput, int, error) {
+func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*rpcwire.TxOutputInfo, int, error) {
+	result := make([]*rpcwire.TxOutputInfo, 0)
+	assetName := swire.NewAssetNameFromString(name)
+	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV2(address, assetName)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, txOut := range outputMap {
+		assets := make([]*rpcwire.AssetInfo, 0)
+		for _, asset := range txOut.Assets {
+			offsets := txOut.Offsets[asset.Name]
 
-	return nil, 0, nil
+			info := rpcwire.AssetInfo{
+				Asset:   asset,
+				Offsets: offsets,
+			}
+			assets = append(assets, &info)
+		}
+
+		output := rpcwire.TxOutputInfo{
+			OutPoint:  txOut.OutPointStr,
+			OutValue:  txOut.OutValue,
+			AssetInfo: assets,
+		}
+
+		result = append(result, &output)
+	}
+
+	return result, len(result), nil
 }

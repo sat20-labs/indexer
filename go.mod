@@ -23,7 +23,7 @@ require (
 	github.com/klauspost/compress v1.17.11
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/rs/zerolog v1.33.0
-	github.com/sat20-labs/satsnet_btcd v0.0.0-20241202145616-848ad82621fa
+	github.com/sat20-labs/satsnet_btcd v0.0.0-20241213071731-f5e1b98a4654
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/files v1.0.1

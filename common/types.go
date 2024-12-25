@@ -3,10 +3,7 @@ package common
 import (
 	"errors"
 	"math"
-	"strconv"
-	"strings"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common/pb"
 
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
@@ -24,14 +21,6 @@ const (
 // Address Type defined in txscript.ScriptClass
 
 type UtxoValueInDB = pb.MyUtxoValueInDB
-
-func ToAddrType(tp, reqSig int) uint32 {
-	return uint32(tp<<16 + reqSig)
-}
-
-func FromAddrType(u uint32) (int, int) {
-	return int(u >> 16), int(0xffff & u)
-}
 
 type UtxoIdInDB struct {
 	UtxoId uint64
@@ -81,6 +70,13 @@ const ALL_TICKERS = "*"
 
 type TickerName = swire.AssetName
 
+type UtxoInfo struct {
+	UtxoId   uint64
+	Value    int64
+	PkScript []byte
+	Ordinals []*Range
+}
+
 type AssetOffsetRange struct {
 	Range  *Range        `json:"range"`
 	Offset int64         `json:"offset"`
@@ -96,182 +92,6 @@ func (a *AssetOffsetRange) Clone() *AssetOffsetRange {
 		Assets: asset,
 	}
 }
-
-type UtxoInfo struct {
-	UtxoId   uint64
-	Value    int64
-	PkScript []byte
-	Ordinals []*Range
-}
-
-// offset range in a UTXO, not satoshi ordinals
-type OffsetRange struct {
-	Start int64
-	End   int64 // 不包括End
-}
-
-type AssetInfo_MainNet struct {
-	swire.AssetInfo
-	AssetOffsets []*OffsetRange // 绑定了资产的聪的位置
-}
-
-func (p *AssetInfo_MainNet) Clone() *AssetInfo_MainNet {
-	n := &AssetInfo_MainNet{
-		AssetInfo: swire.AssetInfo{
-			Name:       p.Name,
-			Amount:     p.Amount,
-			BindingSat: p.BindingSat,
-		},
-	}
-	n.AssetOffsets = make([]*OffsetRange, len(p.AssetOffsets))
-	for i := 0; i < len(p.AssetOffsets); i++ {
-		n.AssetOffsets[i] = &OffsetRange{Start: p.AssetOffsets[i].Start, End: p.AssetOffsets[i].End}
-	}
-	return n
-}
-
-
-// 只有一种资产存在
-func (p *AssetInfo_MainNet) PickUp(offset, amt int64) (*AssetInfo_MainNet, error) {
-	result := &AssetInfo_MainNet{}
-	result.Name = p.Name
-	
-	if amt > p.Amount {
-		err := errors.New("pickup count is too big")
-		return nil, err
-	}
-
-	if amt == 0 {
-		// Nothing to pickup
-		return result, nil
-	}
-
-	if amt == p.Amount {
-		//All ranges are pickup
-		return p.Clone(), nil
-	}
-
-	pickupRanges := make([]*OffsetRange, 0)
-	remainingValue := amt
-	for _, currentRange := range p.AssetOffsets {
-		if currentRange.End <= offset {
-			continue
-		}
-		var start int64
-		if currentRange.Start <= offset {
-			start = offset
-		} else {
-			start = currentRange.Start
-		}
-		rangeSize := currentRange.End - start
-		if rangeSize > remainingValue {
-			rangeSize = remainingValue
-		}
-		newRange := &OffsetRange{Start: start, End: start+rangeSize}
-		pickupRanges = append(pickupRanges, newRange)
-		remainingValue = remainingValue - rangeSize
-
-		if remainingValue <= 0 {
-			break
-		}
-	}
-	
-	// check valid
-	if remainingValue != 0 {
-		err := errors.New("pickup count is wrong")
-		return nil, err
-	}
-	result.Amount = amt
-	result.AssetOffsets = pickupRanges
-
-	return result, nil
-}
-
-
-type TxAssets = swire.TxAssets
-type TxAssets_MainNet []*AssetInfo_MainNet
-
-func (p *TxAssets_MainNet) ToTxAssets() TxAssets {
-	result := make([]swire.AssetInfo, len(*p))
-	for i, a := range *p {
-		result[i] = a.AssetInfo
-	}
-	return result
-}
-
-type TxOutput struct {
-	OutPointStr string
-	OutValue    wire.TxOut
-	Sats        TxRanges
-	Assets      TxAssets_MainNet
-	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
-	// Assets数组中任何一个AssetInfo.BindingSat
-}
-
-func (p *TxOutput) Clone() *TxOutput {
-	n := &TxOutput{
-		OutPointStr: p.OutPointStr,
-		OutValue:    p.OutValue,
-	}
-	n.Sats = make(TxRanges, len(p.Sats))
-	for i, u := range p.Sats {
-		n.Sats[i] = &Range{Start: u.Start, Size: u.Size}
-	}
-	n.Assets = make([]*AssetInfo_MainNet, len(p.Assets))
-	for i, u := range p.Assets {
-		n.Assets[i] = u.Clone()
-	}
-	return n
-}
-
-func (p *TxOutput) Value() int64 {
-	return p.OutValue.Value
-}
-
-func (p *TxOutput) OutPoint() *wire.OutPoint {
-	outpoint, _ := wire.NewOutPointFromString(p.OutPointStr)
-	return outpoint
-}
-
-func (p *TxOutput) TxID() string {
-	parts := strings.Split(p.OutPointStr, ":")
-	if len(parts) != 2 {
-		return ""
-	}
-	return parts[0]
-}
-
-func (p *TxOutput) TxIn() *wire.TxIn {
-	outpoint, err := wire.NewOutPointFromString(p.OutPointStr)
-	if err != nil {
-		return nil
-	}
-	return wire.NewTxIn(outpoint, nil, nil)
-}
-
-func (p *TxOutput) SizeOfBindingSats() int64 {
-	bindingSats := int64(0)
-	for _, asset := range p.Assets {
-		amount := int64(0)
-		if asset.BindingSat != 0 {
-			amount = (asset.Amount)
-		}
-	
-		if amount > (bindingSats) {
-			bindingSats = amount
-		}
-	}
-	return bindingSats
-}
-
-// should fill out Sats and Assets parameters.
-func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
-	return &TxOutput{
-		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
-		OutValue:    *tx.TxOut[index],
-	}
-}
-
 
 type TxRanges []*Range
 
@@ -306,7 +126,7 @@ func (p *TxRanges) Clone() TxRanges {
 	return result
 }
 
-// Pickup an TxRanges with the given offset and count from the current TxRanges, 
+// Pickup an TxRanges with the given offset and count from the current TxRanges,
 // current TxRanges is not changed
 func (p *TxRanges) PickUp(offset, count int64) (TxRanges, error) {
 	size := p.GetSize()
@@ -373,8 +193,7 @@ func (p *TxRanges) PickUp(offset, count int64) (TxRanges, error) {
 	return pickupRanges, nil
 }
 
-
-func (p *TxRanges) Resize(amt int64)  {
+func (p *TxRanges) Resize(amt int64) {
 	result := make([]*Range, 0)
 	size := int64(0)
 	for _, rng := range *p {
@@ -456,7 +275,6 @@ func (p *TxRanges) AppendRange(rngs2 *Range) {
 		*p = append(*p, rngs2)
 	}
 }
-
 
 // 确保输出是第一个参数。只需要检查第一组的最后一个和第二组的第一个
 func AppendOffsetRange(rngs1 []*OffsetRange, rngs2 *OffsetRange) []*OffsetRange {

@@ -52,6 +52,10 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 		return common.GetUtxoId(utxoInfo), utxoInfo.Ordinals, nil
 	}
 
+	if err := common.CheckUtxoFormat(utxo); err != nil {
+		return 0, nil, err
+	}
+
 	output := &common.UtxoValueInDB{}
 	err := b.db.View(func(txn *badger.Txn) error {
 		key := common.GetUTXODBKey(utxo)
@@ -86,6 +90,10 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 		return value, nil
 	}
 
+	if err := common.CheckUtxoFormat(utxo); err != nil {
+		return nil, err
+	}
+
 	output := &common.UtxoValueInDB{}
 	err := b.db.View(func(txn *badger.Txn) error {
 		key := common.GetUTXODBKey(utxo)
@@ -98,10 +106,15 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 		return nil
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	info := common.UtxoInfo{}
 	var pkScript []byte
-	addrType, reqSig := common.FromAddrType(output.AddressType)
-	if addrType == int(txscript.MultiSigTy) {
+	addrType := output.AddressType
+	reqSig := output.ReqSigs
+	if addrType == uint32(txscript.MultiSigTy) {
 		var addresses []string
 		for _, id := range output.AddressIds {
 			addr, err := b.GetAddressByID(id)
@@ -110,12 +123,12 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 			}
 			addresses = append(addresses, addr)
 		}
-		pkScript, err = common.MultiSigToPkScript(reqSig, addresses, b.IsMainnet())
+		pkScript, err = common.MultiSigToPkScript(int(reqSig), addresses, b.IsMainnet())
 		if err != nil {
 			return nil, err
 		}
-	} else if addrType == int(txscript.NullDataTy) {
-		pkScript, err = txscript.NullDataScript(nil)
+	} else if addrType == uint32(txscript.NullDataTy) {
+		pkScript, _ = txscript.NullDataScript(nil)
 	} else {
 		addr, err := b.GetAddressByID(output.AddressIds[0])
 		if err != nil {
@@ -132,9 +145,6 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 	info.PkScript = pkScript
 	info.Ordinals = output.Ordinals
 
-	if err != nil {
-		return nil, err
-	}
 
 	return &info, nil
 }

@@ -18,12 +18,12 @@ const (
 )
 
 func PkScriptToAddr(pkScript []byte, chain string) (string, error) {
-	chainParams := &chaincfg.TestNet3Params
+	chainParams := &chaincfg.TestNet4Params
 	switch chain {
 	case ChainTestnet:
-		chainParams = &chaincfg.TestNet3Params
+		chainParams = &chaincfg.TestNet4Params
 	case ChainTestnet4:
-		chainParams = &chaincfg.TestNet3Params
+		chainParams = &chaincfg.TestNet4Params
 	case ChainMainnet:
 		chainParams = &chaincfg.MainNetParams
 	}
@@ -39,12 +39,12 @@ func PkScriptToAddr(pkScript []byte, chain string) (string, error) {
 }
 
 func IsValidAddr(addr string, chain string) (bool, error) {
-	chainParams := &chaincfg.TestNet3Params
+	chainParams := &chaincfg.TestNet4Params
 	switch chain {
 	case ChainTestnet:
-		chainParams = &chaincfg.TestNet3Params
+		chainParams = &chaincfg.TestNet4Params
 	case ChainTestnet4:
-		chainParams = &chaincfg.TestNet3Params
+		chainParams = &chaincfg.TestNet4Params
 	case ChainMainnet:
 		chainParams = &chaincfg.MainNetParams
 	default:
@@ -58,12 +58,12 @@ func IsValidAddr(addr string, chain string) (bool, error) {
 }
 
 func AddrToPkScript(addr string, chain string) ([]byte, error) {
-	chainParams := &chaincfg.TestNet3Params
+	chainParams := &chaincfg.TestNet4Params
 	switch chain {
 	case ChainTestnet:
-		chainParams = &chaincfg.TestNet3Params
+		chainParams = &chaincfg.TestNet4Params
 	case ChainTestnet4:
-		chainParams = &chaincfg.TestNet3Params
+		chainParams = &chaincfg.TestNet4Params
 	case ChainMainnet:
 		chainParams = &chaincfg.MainNetParams
 	default:
@@ -91,7 +91,7 @@ func AddressToPkScript(address string, isMainnet bool) ([]byte, error) {
 	if isMainnet {
         params = &chaincfg.MainNetParams
     } else {
-        params = &chaincfg.TestNet3Params
+        params = &chaincfg.TestNet4Params
     }
 
     // 解析地址
@@ -109,7 +109,7 @@ func MultiSigToPkScript(n int, addresses []string, isMainnet bool) ([]byte, erro
 	if isMainnet {
         params = &chaincfg.MainNetParams
     } else {
-        params = &chaincfg.TestNet3Params
+        params = &chaincfg.TestNet4Params
     }
 
 	pubKeys := make([]*btcutil.AddressPubKey, len(addresses))

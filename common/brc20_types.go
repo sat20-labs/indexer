@@ -1,44 +1,41 @@
 package common
 
-
-
-type Brc20Mint struct {
-	Base     *InscribeBaseContent
-	Id       int64
-	Name     string  
-	Amt      *Decimal `json:"amt"`
+type BRC20Mint struct {
+	Nft  *Nft
+	Id   int64
+	Name string
+	Amt  Decimal `json:"amt"`
 
 	Satoshi int64 `json:"satoshi"`
 }
 
-type Brc20Transfer struct {
-	Base     *InscribeBaseContent
-	Id       int64
-	Name     string  
-	Amt 	 *Decimal `json:"amt"`
+type BRC20Transfer struct {
+	Nft    *Nft
+	UtxoId uint64
+	Name   string
+	Amt    Decimal `json:"amt"`
 }
 
-type Brc20Ticker struct {
-	Base     *InscribeBaseContent
-	Id       int64
-	Name     string  
+type BRC20Ticker struct {
+	Nft  *Nft
+	Id   int64
+	Name string
 
-	SelfMint   bool     `json:"self_mint,omitempty"`
-	Limit      *Decimal   `json:"limit,omitempty"`
-	Max        *Decimal   `json:"max,omitempty"`
+	SelfMint bool    `json:"self_mint,omitempty"`
+	Limit    Decimal `json:"limit,omitempty"`
+	Max      Decimal `json:"max,omitempty"`
 
-	Decimal   uint8  `json:"-"`
+	Decimal uint8 `json:"-"`
 }
 
-
-type Brc20BaseContent struct {
+type BRC20BaseContent struct {
 	OrdxBaseContent
 	Ticker string `json:"tick"`
 }
 
-//{"p":"brc-20","op":"deploy","tick":"doɡe","lim":"3125000000000","max":"1000000000000000","self_mint":"true"}
-type Brc20DeployContent struct {
-	Brc20BaseContent
+// {"p":"brc-20","op":"deploy","tick":"doɡe","lim":"3125000000000","max":"1000000000000000","self_mint":"true"}
+type BRC20DeployContent struct {
+	BRC20BaseContent
 	Lim      string `json:"lim"`
 	Max      string `json:"max"`
 	Decimal  string `json:"dec,omitempty"`
@@ -46,14 +43,69 @@ type Brc20DeployContent struct {
 }
 
 // {"p":"brc-20","op":"mint","tick":"wiki","amt":"1000"}
-type Brc20MintContent struct {
-	Brc20BaseContent
-	Amt    string `json:"amt"`
+type BRC20MintContent struct {
+	BRC20BaseContent
+	Amt string `json:"amt"`
 }
 
-//{"p":"brc-20","op":"transfer","tick":"XXOK","amt":"89000000000"}
-type Brc20TransferContent struct {
-	Brc20BaseContent
-	Amt    string `json:"amt"`
+// {"p":"brc-20","op":"transfer","tick":"XXOK","amt":"89000000000"}
+type BRC20TransferContent struct {
+	BRC20BaseContent
+	Amt string `json:"amt"`
 }
 
+type BRC20TransferHistory struct {
+	Height int
+	Utxo   string // transferring utxo
+	NftId  int64  // transfer nft
+
+	FromAddr uint64
+	ToAddr   uint64
+
+	Ticker string
+	Amount string
+}
+
+type BRC20MintAbbrInfo struct {
+	Address        uint64
+	Amount         Decimal
+	InscriptionId  string
+	InscriptionNum int64
+	Height         int
+}
+
+type TransferNFT struct {
+	NftId  int64
+	UtxoId uint64
+	Amount Decimal
+}
+
+// key: mint时的inscriptionId。 value: 某个资产对应的数值
+type BRC20TickAbbrInfo struct {
+	AvailableBalance        Decimal
+	TransferableData        map[uint64]*TransferNFT // key:utxoId
+	InvalidTransferableData map[uint64]*TransferNFT // key:utxoId
+}
+
+func NewBRC20TickAbbrInfo(amt Decimal) *BRC20TickAbbrInfo {
+	return &BRC20TickAbbrInfo{
+		AvailableBalance:        amt,
+		TransferableData:        make(map[uint64]*TransferNFT),
+		InvalidTransferableData: make(map[uint64]*TransferNFT),
+	}
+}
+
+func NewBRC20MintAbbrInfo(mint *BRC20Mint) *BRC20MintAbbrInfo {
+	info := NewBRC20MintAbbrInfo2(mint.Nft.Base)
+	info.Amount = mint.Amt
+	return info
+}
+
+func NewBRC20MintAbbrInfo2(base *InscribeBaseContent) *BRC20MintAbbrInfo {
+	return &BRC20MintAbbrInfo{
+		Address: base.InscriptionAddress,
+		//Amount: 1,
+		InscriptionId:  base.InscriptionId,
+		InscriptionNum: base.Id,
+		Height:         int(base.BlockHeight)}
+}

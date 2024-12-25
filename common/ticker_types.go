@@ -12,16 +12,6 @@ type Mint struct {
 	Desc     string   `json:"desc,omitempty"`
 }
 
-type Transfer struct {
-	Base     *InscribeBaseContent
-	Id       int64
-	Name     string  
-	Amt int64 `json:"amt"`
-
-	Ordinals []*Range `json:"ordinals"`
-	Desc     string   `json:"desc,omitempty"`
-}
-
 type Ticker struct {
 	Base     *InscribeBaseContent
 	Id       int64

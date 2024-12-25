@@ -9,6 +9,7 @@ import (
 )
 
 const MAX_PRECISION = 18
+const DEFAULT_PRECISION = 0
 
 var MAX_PRECISION_STRING = "18"
 
@@ -38,6 +39,10 @@ var precisionFactor [19]*big.Int = [19]*big.Int{
 type Decimal struct {
 	Precition uint
 	Value     *big.Int
+}
+
+func NewDefaultDecimal(v uint64) *Decimal {
+	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetUint64(v)}
 }
 
 func NewDecimal(v uint64, p uint) *Decimal {
@@ -140,7 +145,7 @@ func (d *Decimal) Add(other *Decimal) *Decimal {
 		return &Decimal{Precition: other.Precition, Value: value}
 	}
 	if d.Precition != other.Precition {
-		panic("precition not match")
+		Log.Panic("precition not match")
 	}
 	value := new(big.Int).Add(d.Value, other.Value)
 	return &Decimal{Precition: d.Precition, Value: value}
@@ -160,39 +165,9 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 		return &Decimal{Precition: other.Precition, Value: value}
 	}
 	if d.Precition != other.Precition {
-		panic(fmt.Sprintf("precition not match, (%d != %d)", d.Precition, other.Precition))
+		Log.Panicf("precition not match, (%d != %d)", d.Precition, other.Precition)
 	}
 	value := new(big.Int).Sub(d.Value, other.Value)
-	return &Decimal{Precition: d.Precition, Value: value}
-}
-
-// Mul muls two Decimal instances and returns a new Decimal instance
-func (d *Decimal) Mul(other *Decimal) *Decimal {
-	if d == nil || other == nil {
-		return nil
-	}
-	value := new(big.Int).Mul(d.Value, other.Value)
-	// value := new(big.Int).Div(value0, precisionFactor[other.Precition])
-	return &Decimal{Precition: d.Precition, Value: value}
-}
-
-// Sqrt muls two Decimal instances and returns a new Decimal instance
-func (d *Decimal) Sqrt() *Decimal {
-	if d == nil {
-		return nil
-	}
-	// value0 := new(big.Int).Mul(d.Value, precisionFactor[d.Precition])
-	value := new(big.Int).Sqrt(d.Value)
-	return &Decimal{Precition: MAX_PRECISION, Value: value}
-}
-
-// Div divs two Decimal instances and returns a new Decimal instance
-func (d *Decimal) Div(other *Decimal) *Decimal {
-	if d == nil || other == nil {
-		return nil
-	}
-	// value0 := new(big.Int).Mul(d.Value, precisionFactor[other.Precition])
-	value := new(big.Int).Div(d.Value, other.Value)
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
@@ -207,7 +182,7 @@ func (d *Decimal) Cmp(other *Decimal) int {
 		return -other.Value.Sign()
 	}
 	if d.Precition != other.Precition {
-		panic(fmt.Sprintf("precition not match, (%d != %d)", d.Precition, other.Precition))
+		Log.Panicf(fmt.Sprintf("precition not match, (%d != %d)", d.Precition, other.Precition))
 	}
 	return d.Value.Cmp(other.Value)
 }
@@ -239,10 +214,7 @@ func (d *Decimal) IsOverflowUint64() bool {
 
 	integerPart := new(big.Int).SetUint64(math.MaxUint64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
-	if d.Value.Cmp(value) > 0 {
-		return true
-	}
-	return false
+	return d.Value.Cmp(value) > 0
 }
 
 func (d *Decimal) GetMaxUint64() *Decimal {
@@ -260,9 +232,76 @@ func (d *Decimal) Float64() float64 {
 	}
 	value := new(big.Int).Abs(d.Value)
 	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
-	f := float64(quotient.Uint64()) + float64(remainder.Uint64())/math.MaxFloat64
+	decimalPart := float64(remainder.Int64()) / float64(precisionFactor[d.Precition].Int64())
+	result := float64(quotient.Int64()) + decimalPart
 	if d.Value.Sign() < 0 {
-		return -f
+		return -result
 	}
-	return f
+	return result
+}
+
+
+func (d *Decimal) IntegerPart() int64 {
+	if d == nil {
+		return 0
+	}
+	value := new(big.Int).Abs(d.Value)
+	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
+	return quotient.Int64()
+}
+
+func (d *Decimal) ToInt64WithMax(max int64) (int64) {
+	if d == nil {
+		return 0
+	}
+
+	if max <= 0 {
+		Log.Panicf("invalid max %d", max)
+	}
+
+	if d.IntegerPart() > max {
+		Log.Panicf("invalid max %d", max)
+	}
+
+	scaleIndex := int(math.Log10(float64(math.MaxInt64) / float64(max)))
+	if scaleIndex < 0 {
+		scaleIndex = 0
+	}
+	scaleFactor := math.Pow10(scaleIndex)
+
+	return int64(d.Float64() * scaleFactor)
+}
+
+func NewDecimalFromInt64WithMax(value int64, max int64, precision uint) (*Decimal, error) {
+	if max <= 0 {
+		return nil, fmt.Errorf("invalid max %d", max)
+	}
+
+	// 根据 max 和 math.MaxInt64 计算放大系数的指数
+	scaleIndex := int(math.Log10(float64(math.MaxInt64) / float64(max)))
+	if scaleIndex < 0 {
+		scaleIndex = 0
+	}
+	scaleFactor := math.Pow10(scaleIndex)
+
+	// 计算浮点值
+	floatValue := float64(value) / scaleFactor
+
+	// 转换浮点值为 Decimal 的整数表示
+	integerPart := int64(floatValue)
+	fractionPart := floatValue - float64(integerPart)
+
+	valueBigInt := new(big.Int).SetInt64(integerPart)
+	if fractionPart > 0 {
+		fractionBigInt := big.NewInt(int64(fractionPart * math.Pow10(int(precision))))
+		valueBigInt.Mul(valueBigInt, precisionFactor[precision])
+		valueBigInt.Add(valueBigInt, fractionBigInt)
+	} else {
+		valueBigInt.Mul(valueBigInt, precisionFactor[precision])
+	}
+
+	return &Decimal{
+		Value:     valueBigInt,
+		Precition: precision,
+	}, nil
 }
