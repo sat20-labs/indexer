@@ -47,7 +47,3 @@ func (s *TransactionIdToRuneTable) SetToDB(key string, value *Rune) {
 	tblKey := []byte(store.RUNE_TO_ID + key)
 	s.cache.SetToDB(tblKey, value.ToPb())
 }
-
-func (s *TransactionIdToRuneTable) Flush() {
-	s.cache.Flush()
-}

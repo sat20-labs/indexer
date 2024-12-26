@@ -81,7 +81,3 @@ func (s *RuneHoldersTable) Insert(key *Rune, value RuneHolders) (ret RuneHolders
 	}
 	return
 }
-
-func (s *RuneHoldersTable) Flush() {
-	s.cache.Flush()
-}

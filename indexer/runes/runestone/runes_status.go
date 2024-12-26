@@ -39,19 +39,7 @@ func (s *RunesStatus) Init() (ret bool) {
 	return
 }
 
-func (s *RunesStatus) Update() {
-	key := []byte(store.STATUS_KEY)
-	value := &pb.RunesStatus{
-		Version:       s.Version,
-		Height:        s.Height,
-		Number:        s.Number,
-		ReservedRunes: s.ReservedRunes,
-	}
-
-	s.cache.Insert(key, value)
-}
-
-func (s *RunesStatus) SetToDB() {
+func (s *RunesStatus) FlushToDB() {
 	key := []byte(store.STATUS_KEY)
 	value := &pb.RunesStatus{
 		Version:       s.Version,
@@ -60,8 +48,4 @@ func (s *RunesStatus) SetToDB() {
 		ReservedRunes: s.ReservedRunes,
 	}
 	s.cache.SetToDB(key, value)
-}
-
-func (s *RunesStatus) Flush() {
-	s.cache.Flush()
 }

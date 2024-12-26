@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
+	"github.com/sat20-labs/indexer/indexer/runes/store"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"lukechampine.com/uint128"
@@ -18,32 +19,9 @@ func (s *Indexer) UpdateDB() {
 	if s.wb == nil {
 		return
 	}
-
-	s.FlushTables()
-	err := s.wb.Flush()
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.UpdateDB-> txn.Commit err:%s", err.Error())
-	}
+	store.FlushToDB()
+	s.status.FlushToDB()
 	common.Log.Debugf("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
-}
-func (s *Indexer) FlushTables() {
-	s.status.Flush()
-	s.outpointToRuneBalancesTbl.Flush()
-	s.idToEntryTbl.Flush()
-	s.runeToIdTbl.Flush()
-	s.runeLedgerTbl.Flush()
-	s.runeHolderTbl.Flush()
-	s.runeMintHistorysTbl.Flush()
-}
-
-func (s *Indexer) setTablesWb() {
-	s.status.SetWb(s.wb)
-	s.outpointToRuneBalancesTbl.SetWb(s.wb)
-	s.idToEntryTbl.SetWb(s.wb)
-	s.runeToIdTbl.SetWb(s.wb)
-	s.runeLedgerTbl.SetWb(s.wb)
-	s.runeHolderTbl.SetWb(s.wb)
-	s.runeMintHistorysTbl.SetWb(s.wb)
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
@@ -62,10 +40,11 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	}
 
 	s.height = uint64(block.Height)
-	if s.wb == nil {
-		s.wb = s.db.NewWriteBatch()
-		s.setTablesWb()
-	}
+
+	s.wb = s.db.NewWriteBatch()
+	store.SetWriteBatch(s.wb)
+	store.ResetCache()
+
 	s.burnedMap = make(runestone.RuneIdLotMap)
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
 	s.minimumRune = &minimum
@@ -79,7 +58,6 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 				block.Height, txIndex, transaction.Txid, isSave)
 		}
 		s.status.Height = uint64(block.Height)
-		s.status.Update()
 	}
 	s.update()
 }
@@ -476,7 +454,6 @@ func (s *Indexer) update() {
 func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.Artifact, id *runestone.RuneId, r *runestone.Rune) (entry *runestone.RuneEntry) {
 	number := s.status.Number
 	s.status.Number++
-	s.status.Update()
 	parent := tryGetFirstInscriptionId(tx)
 	if artifact.Cenotaph != nil {
 		entry = &runestone.RuneEntry{
@@ -589,11 +566,10 @@ func (s *Indexer) etched(txIndex uint32, tx *common.Transaction, artifact *runes
 	if r == nil {
 		reserved_runes := s.status.ReservedRunes
 		s.status.ReservedRunes = reserved_runes + 1
-		s.status.Update()
 		r = runestone.Reserved(s.height, txIndex)
 	} else {
-		test := r.String()
-		common.Log.Debugf("etched rune: %s", test)
+		// test := r.String()
+		// common.Log.Debugf("etched rune: %s", test)
 		// a := r.Value.Cmp(s.minimumRune.Value) < 0
 		// b := r.IsReserved()
 		// c := s.runeToIdTbl.Get(r) != nil

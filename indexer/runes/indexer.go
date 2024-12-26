@@ -30,18 +30,19 @@ type Indexer struct {
 }
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params) *Indexer {
+	store.SetDB(db)
 	return &Indexer{
 		db:                        db,
 		chaincfgParam:             param,
 		runeLedger:                nil,
 		burnedMap:                 nil,
-		status:                    runestone.NewRunesStatus(store.NewCache[pb.RunesStatus](db)),
-		outpointToRuneBalancesTbl: runestone.NewOutpointToRuneBalancesTable(store.NewCache[pb.OutpointToRuneBalances](db)),
-		idToEntryTbl:              runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry](db)),
-		runeToIdTbl:               runestone.NewRuneToIdTable(store.NewCache[pb.RuneId](db)),
-		runeLedgerTbl:             runestone.NewRuneLedgerTable(store.NewCache[pb.RuneLedger](db)),
-		runeHolderTbl:             runestone.NewRuneHoldersTable(store.NewCache[pb.RuneHolders](db)),
-		runeMintHistorysTbl:       runestone.NewRuneMintHistorysTable(store.NewCache[pb.RuneMintHistorys](db)),
+		status:                    runestone.NewRunesStatus(store.NewCache[pb.RunesStatus]()),
+		outpointToRuneBalancesTbl: runestone.NewOutpointToRuneBalancesTable(store.NewCache[pb.OutpointToRuneBalances]()),
+		idToEntryTbl:              runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry]()),
+		runeToIdTbl:               runestone.NewRuneToIdTable(store.NewCache[pb.RuneId]()),
+		runeLedgerTbl:             runestone.NewRuneLedgerTable(store.NewCache[pb.RuneLedger]()),
+		runeHolderTbl:             runestone.NewRuneHoldersTable(store.NewCache[pb.RuneHolders]()),
+		runeMintHistorysTbl:       runestone.NewRuneMintHistorysTable(store.NewCache[pb.RuneMintHistorys]()),
 	}
 }
 
@@ -60,7 +61,7 @@ func (s *Indexer) Init() {
 		s.runeToIdTbl.SetToDB(&r, id)
 
 		s.status.Number = 1
-		s.status.SetToDB()
+		s.status.FlushToDB()
 
 		symbol := '\u29C9'
 		startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)

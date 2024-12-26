@@ -49,7 +49,3 @@ func (s *RuneIdToEntryTable) SetToDB(key *RuneId, value *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.String())
 	s.cache.SetToDB(tblKey, value.ToPb())
 }
-
-func (s *RuneIdToEntryTable) Flush() {
-	s.cache.Flush()
-}

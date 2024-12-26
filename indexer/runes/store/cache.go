@@ -8,35 +8,63 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Cache[T any] struct {
-	pval map[string][]byte
-	db   *badger.DB
-	wb   *badger.WriteBatch
+type Action struct {
+	Key []byte
+	Val []byte
 }
 
-func NewCache[T any](db *badger.DB) *Cache[T] {
-	return &Cache[T]{
-		db:   db,
-		pval: make(map[string][]byte),
+var (
+	// db
+	storeDb           *badger.DB
+	storeDbWriteBatch *badger.WriteBatch
+	// operation
+	actions []Action
+	kvs     map[string][]byte
+)
+
+type Cache[T any] struct{}
+
+func NewCache[T any]() *Cache[T] { return &Cache[T]{} }
+
+func SetDB(v *badger.DB) {
+	storeDb = v
+}
+
+func SetWriteBatch(v *badger.WriteBatch) {
+	storeDbWriteBatch = v
+}
+
+func FlushToDB() {
+	if len(actions) == 0 {
+		return
+	}
+	for _, action := range actions {
+		storeDbWriteBatch.Set(action.Key, action.Val)
+	}
+	err := storeDbWriteBatch.Flush()
+	if err != nil {
+		common.Log.Panicf("Cache::FlushToDb-> err: %v", err.Error())
 	}
 }
 
-func (s *Cache[T]) SetWb(wb *badger.WriteBatch) {
-	s.wb = wb
+func ResetCache() {
+	kvs = make(map[string][]byte)
+	actions = make([]Action, 0)
 }
 
 func (s *Cache[T]) Get(key []byte) (ret *T) {
-	var val T
-	if s.pval[string(key)] != nil {
-		msg := any(&val).(proto.Message)
-		proto.Unmarshal(s.pval[string(key)], msg)
-		ret = &val
+	var out T
+	item := kvs[string(key)]
+	if len(item) > 0 {
+		msg := any(&out).(proto.Message)
+		proto.Unmarshal(item, msg)
+		ret = &out
 		return
 	}
 
-	ret, bytes := s.GetFromDB(key)
-	if len(bytes) > 0 {
-		s.pval[string(key)] = bytes
+	ret, raw := s.GetFromDB(key)
+	if len(raw) > 0 {
+		kvs[string(key)] = raw
 	}
 	return
 }
@@ -46,10 +74,8 @@ func (s *Cache[T]) Remove(key []byte) (ret *T) {
 	if ret == nil {
 		return
 	}
-	err := s.wb.Delete(key)
-	if err != nil {
-		common.Log.Panicf("Store.Remove-> err: %v", err)
-	}
+	delete(kvs, string(key))
+	actions = append(actions, Action{Key: key, Val: []byte{}})
 	return
 }
 
@@ -57,24 +83,15 @@ func (s *Cache[T]) Insert(key []byte, msg proto.Message) (ret *T) {
 	ret = s.Remove(key)
 	val, err := proto.Marshal(msg)
 	if err != nil {
-		common.Log.Panicf("Store.Insert-> key: %s, proto.Marshal err: %v", string(key), err.Error())
+		common.Log.Panicf("Cache.Insert-> key: %s, proto.Marshal err: %v", string(key), err.Error())
 	}
-	s.pval[string(key)] = val
+	kvs[string(key)] = val
+	actions = append(actions, Action{Key: key, Val: val})
 	return
 }
 
-func (s *Cache[T]) Flush() {
-	for key, val := range s.pval {
-		err := s.wb.Set([]byte(key), val)
-		if err != nil {
-			common.Log.Panicf("Store.Flush-> key: %s, wb.Set err: %v", key, err.Error())
-		}
-	}
-	s.pval = make(map[string][]byte, 0)
-}
-
 func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
-	err := s.db.Update(func(txn *badger.Txn) error {
+	err := storeDb.Update(func(txn *badger.Txn) error {
 		val, err := proto.Marshal(val)
 		if err != nil {
 			return err
@@ -82,12 +99,12 @@ func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
 		return txn.Set(key, val)
 	})
 	if err != nil {
-		common.Log.Panicf("Store.SetToDB-> err: %v", err.Error())
+		common.Log.Panicf("Cache.SetToDB-> err: %v", err.Error())
 	}
 }
 
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
-	err := s.db.View(func(txn *badger.Txn) error {
+	err := storeDb.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil && err != badger.ErrKeyNotFound {
 			return err
@@ -97,6 +114,11 @@ func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 		}
 		var val T
 		err = item.Value(func(v []byte) error {
+			if len(v) == 0 {
+				ret = nil
+				raw = nil
+				return nil
+			}
 			msg, ok := any(&val).(proto.Message)
 			if !ok {
 				return fmt.Errorf("type %T does not implement proto.Message", val)
@@ -113,7 +135,7 @@ func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 	})
 
 	if err != nil {
-		common.Log.Panicf("Store.GetFromDB-> err: %v", err)
+		common.Log.Panicf("Cache.GetFromDB-> err: %v", err)
 	}
 
 	return

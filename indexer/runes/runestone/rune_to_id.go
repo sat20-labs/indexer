@@ -51,7 +51,3 @@ func (s *RuneToIdTable) GetFromDB(key *Rune) (ret *RuneId) {
 	}
 	return
 }
-
-func (s *RuneToIdTable) Flush() {
-	s.cache.Flush()
-}

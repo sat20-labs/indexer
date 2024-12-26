@@ -5,6 +5,20 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 )
 
+// TODO
+//  1. 资产数量相关数据采用decimal表达, common.decimal.go NewDecimal
+//  2. 接口：
+//     获取所有tickers的名字, (在接口中的方法里面需要得到所有RUNEINFO)
+//     判断一个ticker是否已经被部署(在接口中的方法里面需要一个判断一个TICKER是否存在)
+//     根据ticker名字获取ticker信息（参考brc20和ft的ticker信息，加上runes特有的信息）
+//     根据ticker名字获取所有持有者地址和持有数量
+//     根据ticker名字获取所有的带有该ticker的utxo和该utxo中的资产数量
+//     根据ticker名字获取铸造历史
+//     根据地址获取该地址所有ticker和持有的数量
+//     根据地址获取指定ticker的铸造历史
+//     根据utxo获取ticker名字和资产数量（多个）
+//     判断utxo中是否有runes资产
+
 func (s *Indexer) GetRuneInfo(ticker string) *runestone.RuneEntry {
 	r, err := runestone.RuneFromString(ticker)
 	if err != nil {
