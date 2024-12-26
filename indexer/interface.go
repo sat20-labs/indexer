@@ -174,7 +174,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *sw
 	}
 
 	result := make(map[uint64]*common.TxOutput)
-	for utxoId, _ := range utxos {
+	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
 		if err != nil {
 			continue
@@ -189,8 +189,8 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *sw
 				result[utxoId] = info
 			}
 		} else {
-			asset, err := info.Assets.Find(ticker)
-			if err != nil || asset.Amount == 0 {
+			amt := info.GetAsset(ticker)
+			if amt == 0 {
 				continue
 			}
 			result[utxoId] = info
