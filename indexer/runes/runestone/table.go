@@ -6,9 +6,13 @@ import (
 )
 
 type Table[T any] struct {
-	store *store.Store[T]
+	cache *store.Cache[T]
 }
 
-func (s *Table[T]) SetTxn(txn *badger.Txn) {
-	s.store.SetTxn(txn)
+func (s *Table[T]) SetWb(wb *badger.WriteBatch) {
+	s.cache.SetWb(wb)
+}
+
+func (s *Table[T]) Flush() {
+	s.cache.Flush()
 }

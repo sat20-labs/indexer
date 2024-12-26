@@ -48,13 +48,13 @@ type RuneHoldersTable struct {
 	Table[pb.RuneHolders]
 }
 
-func NewRuneHoldersTable(store *store.Store[pb.RuneHolders]) *RuneHoldersTable {
-	return &RuneHoldersTable{Table: Table[pb.RuneHolders]{store: store}}
+func NewRuneHoldersTable(store *store.Cache[pb.RuneHolders]) *RuneHoldersTable {
+	return &RuneHoldersTable{Table: Table[pb.RuneHolders]{cache: store}}
 }
 
 func (s *RuneHoldersTable) Get(key *Rune) (ret RuneHolders) {
 	tblKey := []byte(store.RUNE_TO_ADDRESS_HOLDER + key.String())
-	pbVal := s.store.Get(tblKey)
+	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = RuneHolders{}
 		ret.FromPb(pbVal)
@@ -62,9 +62,9 @@ func (s *RuneHoldersTable) Get(key *Rune) (ret RuneHolders) {
 	return
 }
 
-func (s *RuneHoldersTable) GetNoTransaction(key *Rune) (ret RuneHolders) {
+func (s *RuneHoldersTable) GetFromDB(key *Rune) (ret RuneHolders) {
 	tblKey := []byte(store.RUNE_TO_ADDRESS_HOLDER + key.String())
-	pbVal := s.store.GetNoTransaction(tblKey)
+	pbVal, _ := s.cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = RuneHolders{}
 		ret.FromPb(pbVal)
@@ -74,7 +74,7 @@ func (s *RuneHoldersTable) GetNoTransaction(key *Rune) (ret RuneHolders) {
 
 func (s *RuneHoldersTable) Insert(key *Rune, value RuneHolders) (ret RuneHolders) {
 	tblKey := []byte(store.RUNE_TO_ADDRESS_HOLDER + key.String())
-	pbVal := s.store.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Insert(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = RuneHolders{}
 		ret.FromPb(pbVal)
@@ -83,5 +83,5 @@ func (s *RuneHoldersTable) Insert(key *Rune, value RuneHolders) (ret RuneHolders
 }
 
 func (s *RuneHoldersTable) Flush() {
-	s.store.Flush()
+	s.cache.Flush()
 }

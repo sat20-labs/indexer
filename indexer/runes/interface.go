@@ -11,12 +11,12 @@ func (s *Indexer) GetRuneInfo(ticker string) *runestone.RuneEntry {
 		common.Log.Debugf("RuneIndexer.GetRuneInfo-> runestone.RuneFromString(%s) err:%s", ticker, err.Error())
 		return nil
 	}
-	runeId := s.runeToIdTbl.GetNoTransaction(r)
+	runeId := s.runeToIdTbl.GetFromDB(r)
 	if runeId == nil {
-		common.Log.Infof("RuneIndexer.GetRuneInfo-> runeToIdTbl.GetNoTransaction(%s) rune not found, ticker: %s", r.String(), ticker)
+		common.Log.Infof("RuneIndexer.GetRuneInfo-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", r.String(), ticker)
 		return nil
 	}
-	runeEntry := s.idToEntryTbl.GetNoTransaction(runeId)
+	runeEntry := s.idToEntryTbl.GetFromDB(runeId)
 	return runeEntry
 }
 
@@ -26,7 +26,7 @@ func (s *Indexer) GetHolders(ticker string, start, limit int) ([]*runestone.Rune
 		common.Log.Debugf("RuneIndexer.GetHolders-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
 		return nil, 0
 	}
-	holders := s.runeHolderTbl.GetNoTransaction(r)
+	holders := s.runeHolderTbl.GetFromDB(r)
 	return holders, 0
 }
 
@@ -36,7 +36,7 @@ func (s *Indexer) GetMintHistory(ticker string, start, limit int) (runestone.Run
 		common.Log.Debugf("RuneIndexer.GetMintHistory-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
 		return nil, 0
 	}
-	mintHistorys := s.runeMintHistorysTbl.GetNoTransaction(r)
+	mintHistorys := s.runeMintHistorysTbl.GetFromDB(r)
 	if mintHistorys == nil {
 		return nil, 0
 	}
@@ -56,9 +56,9 @@ func (s *Indexer) GetAddressMintHistory(address runestone.Address, ticker string
 		common.Log.Debugf("RuneIndexer.GetAddressMintHistory-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
 		return nil, 0
 	}
-	ledger := s.runeLedgerTbl.GetNoTransaction(address)
+	ledger := s.runeLedgerTbl.GetFromDB(address)
 	if ledger == nil {
-		common.Log.Infof("RuneIndexer.GetAddressMintHistory-> runeLedgerTbl.GetNoTransaction(%s) rune not found, ticker: %s", address, ticker)
+		common.Log.Infof("RuneIndexer.GetAddressMintHistory-> runeLedgerTbl.GetFromDB(%s) rune not found, ticker: %s", address, ticker)
 		return nil, 0
 	}
 

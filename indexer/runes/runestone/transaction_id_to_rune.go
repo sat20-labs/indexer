@@ -9,13 +9,13 @@ type TransactionIdToRuneTable struct {
 	Table[pb.Rune]
 }
 
-func NewTransactionIdToRuneTable(store *store.Store[pb.Rune]) *TransactionIdToRuneTable {
-	return &TransactionIdToRuneTable{Table: Table[pb.Rune]{store: store}}
+func NewTransactionIdToRuneTable(store *store.Cache[pb.Rune]) *TransactionIdToRuneTable {
+	return &TransactionIdToRuneTable{Table: Table[pb.Rune]{cache: store}}
 }
 
 func (s *TransactionIdToRuneTable) Get(key string) (ret *Rune) {
 	tblKey := []byte(store.RUNE_TO_ID + key)
-	pbVal := s.store.Get(tblKey)
+	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = &Rune{}
 		ret.FromPb(pbVal)
@@ -23,9 +23,9 @@ func (s *TransactionIdToRuneTable) Get(key string) (ret *Rune) {
 	return
 }
 
-func (s *TransactionIdToRuneTable) GetNoTransaction(key string) (ret *Rune) {
+func (s *TransactionIdToRuneTable) GetFromDB(key string) (ret *Rune) {
 	tblKey := []byte(store.RUNE_TO_ID + key)
-	pbVal := s.store.GetNoTransaction(tblKey)
+	pbVal, _ := s.cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = &Rune{}
 		ret.FromPb(pbVal)
@@ -35,7 +35,7 @@ func (s *TransactionIdToRuneTable) GetNoTransaction(key string) (ret *Rune) {
 
 func (s *TransactionIdToRuneTable) Insert(key string, value *Rune) (ret *Rune) {
 	tblKey := []byte(store.RUNE_TO_ID + key)
-	pbVal := s.store.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Insert(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &Rune{}
 		ret.FromPb(pbVal)
@@ -43,11 +43,11 @@ func (s *TransactionIdToRuneTable) Insert(key string, value *Rune) (ret *Rune) {
 	return
 }
 
-func (s *TransactionIdToRuneTable) InsertNoTransaction(key string, value *Rune) {
+func (s *TransactionIdToRuneTable) SetToDB(key string, value *Rune) {
 	tblKey := []byte(store.RUNE_TO_ID + key)
-	s.store.InsertNoTransaction(tblKey, value.ToPb())
+	s.cache.SetToDB(tblKey, value.ToPb())
 }
 
 func (s *TransactionIdToRuneTable) Flush() {
-	s.store.Flush()
+	s.cache.Flush()
 }

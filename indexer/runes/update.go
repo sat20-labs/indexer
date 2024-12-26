@@ -15,20 +15,18 @@ import (
 )
 
 func (s *Indexer) UpdateDB() {
-	if s.txn == nil {
+	if s.wb == nil {
 		return
 	}
 
-	s.FlushTable()
-	err := s.txn.Commit()
+	s.FlushTables()
+	err := s.wb.Flush()
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.UpdateDB-> txn.Commit err:%s", err.Error())
 	}
-	s.txn.Discard()
-	s.txn = nil
 	common.Log.Debugf("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
 }
-func (s *Indexer) FlushTable() {
+func (s *Indexer) FlushTables() {
 	s.status.Flush()
 	s.outpointToRuneBalancesTbl.Flush()
 	s.idToEntryTbl.Flush()
@@ -38,14 +36,14 @@ func (s *Indexer) FlushTable() {
 	s.runeMintHistorysTbl.Flush()
 }
 
-func (s *Indexer) setTblTxn() {
-	s.status.SetTxn(s.txn)
-	s.outpointToRuneBalancesTbl.SetTxn(s.txn)
-	s.idToEntryTbl.SetTxn(s.txn)
-	s.runeToIdTbl.SetTxn(s.txn)
-	s.runeLedgerTbl.SetTxn(s.txn)
-	s.runeHolderTbl.SetTxn(s.txn)
-	s.runeMintHistorysTbl.SetTxn(s.txn)
+func (s *Indexer) setTablesWb() {
+	s.status.SetWb(s.wb)
+	s.outpointToRuneBalancesTbl.SetWb(s.wb)
+	s.idToEntryTbl.SetWb(s.wb)
+	s.runeToIdTbl.SetWb(s.wb)
+	s.runeLedgerTbl.SetWb(s.wb)
+	s.runeHolderTbl.SetWb(s.wb)
+	s.runeMintHistorysTbl.SetWb(s.wb)
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
@@ -64,9 +62,9 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	}
 
 	s.height = uint64(block.Height)
-	if s.txn == nil {
-		s.txn = s.db.NewTransaction(true)
-		s.setTblTxn()
+	if s.wb == nil {
+		s.wb = s.db.NewWriteBatch()
+		s.setTablesWb()
 	}
 	s.burnedMap = make(runestone.RuneIdLotMap)
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))

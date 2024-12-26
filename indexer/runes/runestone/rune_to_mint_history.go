@@ -50,13 +50,13 @@ type RuneMintHistorysTable struct {
 	Table[pb.RuneMintHistorys]
 }
 
-func NewRuneMintHistorysTable(store *store.Store[pb.RuneMintHistorys]) *RuneMintHistorysTable {
-	return &RuneMintHistorysTable{Table: Table[pb.RuneMintHistorys]{store: store}}
+func NewRuneMintHistorysTable(store *store.Cache[pb.RuneMintHistorys]) *RuneMintHistorysTable {
+	return &RuneMintHistorysTable{Table: Table[pb.RuneMintHistorys]{cache: store}}
 }
 
 func (s *RuneMintHistorysTable) Get(key *Rune) (ret RuneMintHistorys) {
 	tblKey := []byte(store.RUNE_TO_MINT_HISTORYS + key.String())
-	pbVal := s.store.Get(tblKey)
+	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = RuneMintHistorys{}
 		ret.FromPb(pbVal)
@@ -64,9 +64,9 @@ func (s *RuneMintHistorysTable) Get(key *Rune) (ret RuneMintHistorys) {
 	return
 }
 
-func (s *RuneMintHistorysTable) GetNoTransaction(key *Rune) (ret RuneMintHistorys) {
+func (s *RuneMintHistorysTable) GetFromDB(key *Rune) (ret RuneMintHistorys) {
 	tblKey := []byte(store.RUNE_TO_MINT_HISTORYS + key.String())
-	pbVal := s.store.GetNoTransaction(tblKey)
+	pbVal, _ := s.cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = RuneMintHistorys{}
 		ret.FromPb(pbVal)
@@ -76,7 +76,7 @@ func (s *RuneMintHistorysTable) GetNoTransaction(key *Rune) (ret RuneMintHistory
 
 func (s *RuneMintHistorysTable) Insert(key *Rune, value RuneMintHistorys) (ret RuneMintHistorys) {
 	tblKey := []byte(store.RUNE_TO_MINT_HISTORYS + key.String())
-	pbVal := s.store.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Insert(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = RuneMintHistorys{}
 		ret.FromPb(pbVal)
@@ -85,5 +85,5 @@ func (s *RuneMintHistorysTable) Insert(key *Rune, value RuneMintHistorys) (ret R
 }
 
 func (s *RuneMintHistorysTable) Flush() {
-	s.store.Flush()
+	s.cache.Flush()
 }

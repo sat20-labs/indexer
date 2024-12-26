@@ -117,13 +117,13 @@ type OutpointToRuneBalancesTable struct {
 	Table[pb.OutpointToRuneBalances]
 }
 
-func NewOutpointToRuneBalancesTable(s *store.Store[pb.OutpointToRuneBalances]) *OutpointToRuneBalancesTable {
-	return &OutpointToRuneBalancesTable{Table: Table[pb.OutpointToRuneBalances]{store: s}}
+func NewOutpointToRuneBalancesTable(s *store.Cache[pb.OutpointToRuneBalances]) *OutpointToRuneBalancesTable {
+	return &OutpointToRuneBalancesTable{Table: Table[pb.OutpointToRuneBalances]{cache: s}}
 }
 
 func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret *OutpointToRuneBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
-	pbVal := s.store.Get(tblKey)
+	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = &OutpointToRuneBalances{}
 		ret.FromPb(pbVal)
@@ -131,9 +131,9 @@ func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret *OutpointToRuneBal
 	return
 }
 
-func (s *OutpointToRuneBalancesTable) GetNoTransaction(key *OutPoint) (ret *OutpointToRuneBalances) {
+func (s *OutpointToRuneBalancesTable) GetFromDB(key *OutPoint) (ret *OutpointToRuneBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
-	pbVal := s.store.GetNoTransaction(tblKey)
+	pbVal, _ := s.cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = &OutpointToRuneBalances{}
 		ret.FromPb(pbVal)
@@ -143,7 +143,7 @@ func (s *OutpointToRuneBalancesTable) GetNoTransaction(key *OutPoint) (ret *Outp
 
 func (s *OutpointToRuneBalancesTable) Insert(key *OutPoint, value OutpointToRuneBalances) (ret *OutpointToRuneBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
-	pbVal := s.store.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Insert(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &OutpointToRuneBalances{}
 		ret.FromPb(pbVal)
@@ -153,7 +153,7 @@ func (s *OutpointToRuneBalancesTable) Insert(key *OutPoint, value OutpointToRune
 
 func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRuneBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
-	pbVal := s.store.Remove(tblKey)
+	pbVal := s.cache.Remove(tblKey)
 	if pbVal != nil {
 		ret = &OutpointToRuneBalances{}
 		ret.FromPb(pbVal)
@@ -162,5 +162,5 @@ func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRune
 }
 
 func (s *OutpointToRuneBalancesTable) Flush() {
-	s.store.Flush()
+	s.cache.Flush()
 }

@@ -86,13 +86,13 @@ type RuneLedgerTable struct {
 	Table[pb.RuneLedger]
 }
 
-func NewRuneLedgerTable(store *store.Store[pb.RuneLedger]) *RuneLedgerTable {
-	return &RuneLedgerTable{Table: Table[pb.RuneLedger]{store: store}}
+func NewRuneLedgerTable(store *store.Cache[pb.RuneLedger]) *RuneLedgerTable {
+	return &RuneLedgerTable{Table: Table[pb.RuneLedger]{cache: store}}
 }
 
 func (s *RuneLedgerTable) Get(key Address) (ret *RuneLedger) {
 	tblKey := []byte(store.RUNE_LEDGER + key)
-	pbVal := s.store.Get(tblKey)
+	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = &RuneLedger{}
 		ret.FromPb(pbVal)
@@ -100,9 +100,9 @@ func (s *RuneLedgerTable) Get(key Address) (ret *RuneLedger) {
 	return
 }
 
-func (s *RuneLedgerTable) GetNoTransaction(key Address) (ret *RuneLedger) {
+func (s *RuneLedgerTable) GetFromDB(key Address) (ret *RuneLedger) {
 	tblKey := []byte(store.RUNE_LEDGER + key)
-	pbVal := s.store.GetNoTransaction(tblKey)
+	pbVal, _ := s.cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = &RuneLedger{}
 		ret.FromPb(pbVal)
@@ -112,7 +112,7 @@ func (s *RuneLedgerTable) GetNoTransaction(key Address) (ret *RuneLedger) {
 
 func (s *RuneLedgerTable) Insert(key Address, value *RuneLedger) (ret *RuneLedger) {
 	tblKey := []byte(store.RUNE_LEDGER + key)
-	pbVal := s.store.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Insert(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &RuneLedger{}
 		ret.FromPb(pbVal)
@@ -121,5 +121,5 @@ func (s *RuneLedgerTable) Insert(key Address, value *RuneLedger) (ret *RuneLedge
 }
 
 func (s *RuneLedgerTable) Flush() {
-	s.store.Flush()
+	s.cache.Flush()
 }

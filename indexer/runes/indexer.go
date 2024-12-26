@@ -12,9 +12,8 @@ import (
 )
 
 type Indexer struct {
-	// mutex                     sync.RWMutex
 	db                        *badger.DB
-	txn                       *badger.Txn
+	wb                        *badger.WriteBatch
 	chaincfgParam             *chaincfg.Params
 	height                    uint64
 	blockTime                 uint64
@@ -33,17 +32,16 @@ type Indexer struct {
 func NewIndexer(db *badger.DB, param *chaincfg.Params) *Indexer {
 	return &Indexer{
 		db:                        db,
-		txn:                       nil,
 		chaincfgParam:             param,
 		runeLedger:                nil,
 		burnedMap:                 nil,
-		status:                    runestone.NewRunesStatus(store.NewStore[pb.RunesStatus](db)),
-		outpointToRuneBalancesTbl: runestone.NewOutpointToRuneBalancesTable(store.NewStore[pb.OutpointToRuneBalances](db)),
-		idToEntryTbl:              runestone.NewRuneIdToEntryTable(store.NewStore[pb.RuneEntry](db)),
-		runeToIdTbl:               runestone.NewRuneToIdTable(store.NewStore[pb.RuneId](db)),
-		runeLedgerTbl:             runestone.NewRuneLedgerTable(store.NewStore[pb.RuneLedger](db)),
-		runeHolderTbl:             runestone.NewRuneHoldersTable(store.NewStore[pb.RuneHolders](db)),
-		runeMintHistorysTbl:       runestone.NewRuneMintHistorysTable(store.NewStore[pb.RuneMintHistorys](db)),
+		status:                    runestone.NewRunesStatus(store.NewCache[pb.RunesStatus](db)),
+		outpointToRuneBalancesTbl: runestone.NewOutpointToRuneBalancesTable(store.NewCache[pb.OutpointToRuneBalances](db)),
+		idToEntryTbl:              runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry](db)),
+		runeToIdTbl:               runestone.NewRuneToIdTable(store.NewCache[pb.RuneId](db)),
+		runeLedgerTbl:             runestone.NewRuneLedgerTable(store.NewCache[pb.RuneLedger](db)),
+		runeHolderTbl:             runestone.NewRuneHoldersTable(store.NewCache[pb.RuneHolders](db)),
+		runeMintHistorysTbl:       runestone.NewRuneMintHistorysTable(store.NewCache[pb.RuneMintHistorys](db)),
 	}
 }
 
@@ -59,15 +57,15 @@ func (s *Indexer) Init() {
 		}
 		id := &runestone.RuneId{Block: 1, Tx: 0}
 		etching := "0000000000000000000000000000000000000000000000000000000000000000"
-		s.runeToIdTbl.InsertNoTransaction(&r, id)
+		s.runeToIdTbl.SetToDB(&r, id)
 
 		s.status.Number = 1
-		s.status.UpdateNoTransaction()
+		s.status.SetToDB()
 
 		symbol := '\u29C9'
 		startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)
 		endHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 5)
-		s.idToEntryTbl.InsertNoTransaction(id, &runestone.RuneEntry{
+		s.idToEntryTbl.SetToDB(id, &runestone.RuneEntry{
 			RuneId:       *id,
 			Burned:       uint128.Uint128{},
 			Divisibility: 0,
