@@ -21,6 +21,7 @@ func (s *Indexer) UpdateDB() {
 	}
 	store.FlushToDB()
 	s.status.FlushToDB()
+	s.wb = nil
 	common.Log.Debugf("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
 }
 
@@ -39,26 +40,33 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		}
 	}
 
+	if s.wb == nil {
+		s.wb = s.db.NewWriteBatch()
+		store.SetWriteBatch(s.wb)
+		store.ResetCache()
+	}
+
 	s.height = uint64(block.Height)
-
-	s.wb = s.db.NewWriteBatch()
-	store.SetWriteBatch(s.wb)
-	store.ResetCache()
-
 	s.burnedMap = make(runestone.RuneIdLotMap)
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
 	s.minimumRune = &minimum
 	s.blockTime = uint64(block.Timestamp.Unix())
-	common.Log.Debugf("RuneIndexer.UpdateTransfer-> height:%d, hash:%s, minimumRune:%s(%v)",
+	common.Log.Infof("RuneIndexer.UpdateTransfer-> height:%d, hash:%s, minimumRune:%s(%v)",
 		block.Height, block.Hash, s.minimumRune.String(), s.minimumRune.Value.String())
+	var saveCount int
 	for txIndex, transaction := range block.Transactions {
 		isParseOk, isSave, _ := s.index_runes(uint32(txIndex), transaction)
 		if isParseOk {
 			common.Log.Debugf("RuneIndexer.UpdateTransfer-> height:%d, txIndex:%d, txid:%s, isSave:%v",
 				block.Height, txIndex, transaction.Txid, isSave)
 		}
-		s.status.Height = uint64(block.Height)
+		if isSave {
+			saveCount++
+		}
 	}
+	s.status.Height = uint64(block.Height)
+	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, saveCount:%d",
+		block.Height, len(block.Transactions), saveCount)
 	s.update()
 }
 
