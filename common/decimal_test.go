@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"testing"
 )
 
@@ -10,13 +11,13 @@ func TestDecimal(t *testing.T) {
 	max := int64(21000000)
 	precision := int(3)
 	d0 := NewDecimal(12345, precision)
-	fmt.Printf("Decimal 1: %s\n", d0.String()) // 12.345
-	fmt.Printf("Decimal 1: %d\n", d0.Value.Uint64()) // 12345
-	fmt.Printf("Decimal 1: %f\n", d0.Float64()) // 12.345
+	fmt.Printf("Decimal 1 string: %s\n", d0.String()) // 12.345
+	fmt.Printf("Decimal 1 Int64: %d\n", d0.Int64()) // 12345
+	fmt.Printf("Decimal 1 Float64: %f\n", d0.Float64()) // 12.345
 	value := d0.ToInt64WithMax(max)
-	fmt.Printf("Decimal 1: %d\n", value) // 1234500000000
+	fmt.Printf("Decimal 1 ToInt64WithMax: %d\n", value) // 1234500000000
 	d00, _ := NewDecimalFromInt64WithMax(value, max, precision)
-	fmt.Printf("Decimal 1: %s\n", d00.String()) // 12.345
+	fmt.Printf("Decimal 1 NewDecimalFromInt64WithMax: %s\n", d00.String()) // 12.345
 	fmt.Printf("%s\n", d0.GetMaxInt64().String())
 
 	d1 := NewDecimal(12345000000, 6)
@@ -88,6 +89,7 @@ func TestDecimal128(t *testing.T) {
 	{
 		// 测试通过整数创建 runes
 		precision := int(10)
+		max := int64(math.MaxInt64)
 		d0, err := NewDecimalFromString("123456789012345678901234567890", int(precision))
 		if err != nil {
 			t.Fatalf("Failed to create decimal from string: %v", err)
@@ -103,8 +105,14 @@ func TestDecimal128(t *testing.T) {
 		}
 		fmt.Printf("shift %d\n", shift)
 		fmt.Printf("Decimal 0: %d\n", d0.Int64())
+		value := d0.ToInt64WithMax(max)
+		fmt.Printf("Decimal 0 value: %d\n", value)
 
-		d1 := NewDecimal(d0.Int64(), precision)
+		d1, err := NewDecimalFromInt64WithMax(value, max, precision)
+		if err != nil {
+			t.Fatalf("Failed to create decimal from string: %v", err)
+		}
+		fmt.Printf("Decimal 1: %s\n", d1.String())
 		for shift > 0 {
 			d1 = d1.Mul(d)
 			shift--

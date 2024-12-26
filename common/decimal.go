@@ -304,9 +304,11 @@ func (d *Decimal) ToInt64WithMax(max int64) (int64) {
 	if scaleIndex < 0 {
 		scaleIndex = 0
 	}
-	scaleFactor := math.Pow10(scaleIndex)
+	value := new(big.Int).Mul(d.Value, precisionFactor[scaleIndex])
+	
+	result := &Decimal{Precition: d.Precition, Value: value}
 
-	return int64(d.Float64() * scaleFactor)
+	return result.Int64()
 }
 
 func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal, error) {
@@ -319,26 +321,29 @@ func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal
 	if scaleIndex < 0 {
 		scaleIndex = 0
 	}
-	scaleFactor := math.Pow10(scaleIndex)
+	//scaleFactor := math.Pow10(scaleIndex)
 
 	// 计算浮点值
-	floatValue := float64(value) / scaleFactor
+	//floatValue := float64(value) / scaleFactor
+	bigValue := new(big.Int).Div(new(big.Int).SetInt64(value), precisionFactor[scaleIndex])
+	result := &Decimal{Precition: precision, Value: bigValue}
+	return result, nil
 
-	// 转换浮点值为 Decimal 的整数表示
-	integerPart := int64(floatValue)
-	fractionPart := floatValue - float64(integerPart)
+	// // 转换浮点值为 Decimal 的整数表示
+	// integerPart := result.IntegerPart()
+	// fractionPart := floatValue - float64(integerPart)
 
-	valueBigInt := new(big.Int).SetInt64(integerPart)
-	if fractionPart > 0 {
-		fractionBigInt := big.NewInt(int64(fractionPart * math.Pow10(int(precision))))
-		valueBigInt.Mul(valueBigInt, precisionFactor[precision])
-		valueBigInt.Add(valueBigInt, fractionBigInt)
-	} else {
-		valueBigInt.Mul(valueBigInt, precisionFactor[precision])
-	}
+	// valueBigInt := new(big.Int).SetInt64(integerPart)
+	// if fractionPart > 0 {
+	// 	fractionBigInt := big.NewInt(int64(fractionPart * math.Pow10(int(precision))))
+	// 	valueBigInt.Mul(valueBigInt, precisionFactor[precision])
+	// 	valueBigInt.Add(valueBigInt, fractionBigInt)
+	// } else {
+	// 	valueBigInt.Mul(valueBigInt, precisionFactor[precision])
+	// }
 
-	return &Decimal{
-		Value:     valueBigInt,
-		Precition: precision,
-	}, nil
+	// return &Decimal{
+	// 	Value:     valueBigInt,
+	// 	Precition: precision,
+	// }, nil
 }
