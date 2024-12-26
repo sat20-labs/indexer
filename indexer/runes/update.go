@@ -54,6 +54,7 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	common.Log.Infof("RuneIndexer.UpdateTransfer-> height:%d, hash:%s, minimumRune:%s(%v)",
 		block.Height, block.Hash, s.minimumRune.String(), s.minimumRune.Value.String())
 	var saveCount int
+	startTime := time.Now()
 	for txIndex, transaction := range block.Transactions {
 		isParseOk, isSave, _ := s.index_runes(uint32(txIndex), transaction)
 		if isParseOk {
@@ -65,8 +66,8 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		}
 	}
 	s.status.Height = uint64(block.Height)
-	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, saveCount:%d",
-		block.Height, len(block.Transactions), saveCount)
+	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, saveCount:%d, time took:%v",
+		block.Height, len(block.Transactions), saveCount, time.Since(startTime))
 	s.update()
 }
 
