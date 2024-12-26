@@ -37,19 +37,19 @@ var precisionFactor [19]*big.Int = [19]*big.Int{
 
 // Decimal represents a fixed-point decimal number with 18 decimal places
 type Decimal struct {
-	Precition uint
+	Precition int
 	Value     *big.Int
 }
 
-func NewDefaultDecimal(v uint64) *Decimal {
-	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetUint64(v)}
+func NewDefaultDecimal(v int64) *Decimal {
+	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetInt64(v)}
 }
 
-func NewDecimal(v uint64, p uint) *Decimal {
+func NewDecimal(v int64, p int) *Decimal {
 	if p > MAX_PRECISION {
 		p = MAX_PRECISION
 	}
-	return &Decimal{Precition: p, Value: new(big.Int).SetUint64(v)}
+	return &Decimal{Precition: p, Value: new(big.Int).SetInt64(v)}
 }
 
 func NewDecimalCopy(other *Decimal) *Decimal {
@@ -109,7 +109,7 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 		value = value.Add(value, decimalPart)
 	}
 
-	return &Decimal{Precition: uint(maxPrecision), Value: value}, nil
+	return &Decimal{Precition: int(maxPrecision), Value: value}, nil
 }
 
 // String returns the string representation of a Decimal instance
@@ -171,6 +171,29 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
+
+// Mul muls two Decimal instances and returns a new Decimal instance
+func (d *Decimal) Mul(other *Decimal) *Decimal {
+	if d == nil || other == nil {
+		return nil
+	}
+	value := new(big.Int).Mul(d.Value, other.Value)
+	// value := new(big.Int).Div(value0, precisionFactor[other.Precition])
+	return &Decimal{Precition: d.Precition, Value: value}
+}
+
+
+// Div divs two Decimal instances and returns a new Decimal instance
+func (d *Decimal) Div(other *Decimal) *Decimal {
+	if d == nil || other == nil {
+		return nil
+	}
+	// value0 := new(big.Int).Mul(d.Value, precisionFactor[other.Precition])
+	value := new(big.Int).Div(d.Value, other.Value)
+	return &Decimal{Precition: d.Precition, Value: value}
+}
+
+
 func (d *Decimal) Cmp(other *Decimal) int {
 	if d == nil && other == nil {
 		return 0
@@ -212,16 +235,26 @@ func (d *Decimal) IsOverflowUint64() bool {
 		return false
 	}
 
-	integerPart := new(big.Int).SetUint64(math.MaxUint64)
+	integerPart := new(big.Int).SetInt64(math.MaxInt64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
 	return d.Value.Cmp(value) > 0
 }
 
-func (d *Decimal) GetMaxUint64() *Decimal {
+func (d *Decimal) IsOverflowInt64() bool {
+	if d == nil {
+		return false
+	}
+
+	integerPart := new(big.Int).SetInt64(math.MaxInt64)
+	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
+	return d.Value.Cmp(value) > 0
+}
+
+func (d *Decimal) GetMaxInt64() *Decimal {
 	if d == nil {
 		return nil
 	}
-	integerPart := new(big.Int).SetUint64(math.MaxUint64)
+	integerPart := new(big.Int).SetInt64(math.MaxInt64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
 	return &Decimal{Precition: d.Precition, Value: value}
 }
@@ -250,6 +283,10 @@ func (d *Decimal) IntegerPart() int64 {
 	return quotient.Int64()
 }
 
+func (d *Decimal) Int64() int64 {
+	return d.IntegerPart()
+}
+
 func (d *Decimal) ToInt64WithMax(max int64) (int64) {
 	if d == nil {
 		return 0
@@ -272,7 +309,7 @@ func (d *Decimal) ToInt64WithMax(max int64) (int64) {
 	return int64(d.Float64() * scaleFactor)
 }
 
-func NewDecimalFromInt64WithMax(value int64, max int64, precision uint) (*Decimal, error) {
+func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal, error) {
 	if max <= 0 {
 		return nil, fmt.Errorf("invalid max %d", max)
 	}

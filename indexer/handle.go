@@ -418,7 +418,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 
 	if max.Sign() == 0 {
 		if ticker.SelfMint {
-			ticker.Max = *max.GetMaxUint64()
+			ticker.Max = *max.GetMaxInt64()
 		} else {
 			common.Log.Warnf("deploy, but max invalid (0)")
 			return nil
@@ -443,7 +443,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	}
 	if lim.Sign() == 0 {
 		if ticker.SelfMint {
-			ticker.Limit = *lim.GetMaxUint64()
+			ticker.Limit = *lim.GetMaxInt64()
 		} else {
 			common.Log.Warnf("deploy, but lim invalid (0)")
 			return nil
