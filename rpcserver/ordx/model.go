@@ -171,5 +171,9 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 		result = append(result, &output)
 	}
 
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].OutValue.Value > result[j].OutValue.Value
+	})
+
 	return result, len(result), nil
 }
