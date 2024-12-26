@@ -51,8 +51,8 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
 	s.minimumRune = &minimum
 	s.blockTime = uint64(block.Timestamp.Unix())
-	common.Log.Infof("RuneIndexer.UpdateTransfer-> height:%d, hash:%s, minimumRune:%s(%v)",
-		block.Height, block.Hash, s.minimumRune.String(), s.minimumRune.Value.String())
+	// common.Log.Infof("RuneIndexer.UpdateTransfer->prepare block height:%d, minimumRune:%s(%s)",
+	// 	block.Height, s.minimumRune.String(), s.minimumRune.Value.String())
 	var saveCount int
 	startTime := time.Now()
 	for txIndex, transaction := range block.Transactions {
