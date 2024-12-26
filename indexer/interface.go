@@ -185,7 +185,9 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *sw
 		}
 
 		if ticker == nil || common.IsPlainAsset(ticker) {
-			result[utxoId] = info
+			if len(info.Assets) == 0 {
+				result[utxoId] = info
+			}
 		} else {
 			asset, err := info.Assets.Find(ticker)
 			if err != nil || asset.Amount == 0 {
