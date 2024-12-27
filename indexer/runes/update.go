@@ -541,22 +541,8 @@ func (s *Indexer) mint(runeId *runestone.RuneId) (lot *runestone.Lot, err error)
 	}
 	runeEntry.Mints = runeEntry.Mints.Add64(1)
 	s.idToEntryTbl.Insert(runeId, runeEntry)
-	// oldRuneEntry := s.idToEntryTbl.Insert(runeId, runeEntry)
-	// if oldRuneEntry != nil {
-	// 	common.Log.Debugf("%v", oldRuneEntry.Mints.String())
-	// }
 	lot = &runestone.Lot{
 		Value: amount,
-	}
-	runeEntry1 := s.idToEntryTbl.Get(runeId)
-	if runeEntry1 == nil {
-		for {
-			oldRuneEntry := s.idToEntryTbl.Insert(runeId, runeEntry)
-			if oldRuneEntry != nil {
-				common.Log.Debugf("%v", oldRuneEntry.Mints.String())
-			}
-		}
-		// common.Log.Panicf("test")
 	}
 	return
 }
