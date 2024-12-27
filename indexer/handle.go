@@ -410,7 +410,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		)
 		return nil
 	}
-	if max.Sign() < 0 || max.IsOverflowUint64() {
+	if max.Sign() < 0 || max.IsOverflowInt64() {
 		common.Log.Warnf("deploy, but max invalid (range)")
 		return nil
 		// return
@@ -437,7 +437,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		)
 		return nil
 	}
-	if lim.Sign() < 0 || lim.IsOverflowUint64() {
+	if lim.Sign() < 0 || lim.IsOverflowInt64() {
 		common.Log.Warnf("deploy, but lim invalid (range)")
 		return nil
 	}

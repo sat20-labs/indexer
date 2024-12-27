@@ -40,7 +40,7 @@ func TestDecimal(t *testing.T) {
 	fmt.Printf("Comparison d1 vs d2: %d\n", cmp) // 1 (greater)
 
 	// 测试是否溢出
-	isOverflow := d1.IsOverflowUint64()
+	isOverflow := d1.IsOverflowInt64()
 	fmt.Printf("Is d1 overflow Uint64: %t\n", isOverflow)
 }
 
