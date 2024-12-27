@@ -57,7 +57,7 @@ func FlushToDB() {
 		totalBytes += 4
 		totalBytes += len(key)
 	}
-	common.Log.Infof("Cache::FlushToDB-> actions count: %d, total bytes: %d", count, totalBytes)
+	common.Log.Infof("Cache::FlushToDB-> logs count: %d, total bytes: %d", count, totalBytes)
 
 	for key, action := range logs {
 		if action.Type == PUT {
@@ -127,10 +127,13 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 	if err != nil {
 		common.Log.Panicf("Cache.Set-> key: %s, proto.Marshal err: %v", string(key), err.Error())
 	}
-	logs[string(key)] = &CacheLog{
-		Val:  val,
-		Type: PUT,
+	log := logs[string(key)]
+	if log == nil {
+		logs[string(key)] = &CacheLog{}
+		log = logs[string(key)]
 	}
+	log.Val = val
+	log.Type = PUT
 	return
 }
 
