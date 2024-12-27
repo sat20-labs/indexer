@@ -95,6 +95,9 @@ func (s *Indexer) Init() {
 
 func (s *Indexer) Clone() *Indexer {
 	cloneIndex := NewIndexer(s.db, s.chaincfgParam)
+	if len(s.cacheLogs) == 0 {
+		return cloneIndex
+	}
 	for key, value := range s.cacheLogs {
 		cacheLog := &store.CacheLog{
 			Type:      value.Type,
