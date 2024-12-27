@@ -28,7 +28,7 @@ func (s *BRC20Indexer) loadMintInfoFromDB(tickinfo *BRC20TickInfo) {
 func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadHolderInfoFromDB ...")
+	common.Log.Info("BRC20Indexer loadHolderInfoFromDB ...")
 	holderMap := make(map[uint64]*HolderInfo, 0)
 	tickerToHolderMap := make(map[string]map[uint64]bool)
 	transferNftMap := make(map[uint64]*TransferNftInfo)
@@ -117,7 +117,7 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 	result := make([]string, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadTickListFromDB ...")
+	common.Log.Info("BRC20Indexer loadTickListFromDB ...")
 	err := s.db.View(func(txn *badger.Txn) error {
 		prefixBytes := []byte(DB_PREFIX_TICKER)
 		prefixOptions := badger.DefaultIteratorOptions
@@ -184,7 +184,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 	result := make(map[string]*common.BRC20Mint, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadMintDataFromDB ...")
+	common.Log.Info("BRC20Indexer loadMintDataFromDB ...")
 	err := s.db.View(func(txn *badger.Txn) error {
 		prefixBytes := []byte(DB_PREFIX_MINTHISTORY + strings.ToLower(tickerName) + "-")
 		prefixOptions := badger.DefaultIteratorOptions
@@ -233,7 +233,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 	result := make([]*common.BRC20TransferHistory, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadTransferHistoryFromDB ...")
+	common.Log.Info("BRC20Indexer loadTransferHistoryFromDB ...")
 	err := s.db.View(func(txn *badger.Txn) error {
 		prefixBytes := []byte(DB_PREFIX_TRANSFER_HISTORY + strings.ToLower(tickerName) + "-")
 		prefixOptions := badger.DefaultIteratorOptions

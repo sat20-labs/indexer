@@ -159,8 +159,8 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 	height := nftIndexer.GetBaseIndexer().GetSyncHeight()
 
 	startTime := time.Now()
-	common.Log.Infof("ordx db version: %s", s.GetDBVersion())
-	common.Log.Info("InitOrdxIndexerFromDB ...")
+	common.Log.Infof("brc20 db version: %s", s.GetDBVersion())
+	common.Log.Info("InitIndexer ...")
 
 	ticks := s.getTickListFromDB()
 	if true {
@@ -182,13 +182,13 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 	s.CheckSelf(height)
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("InitSatIndexFromDB %d ms\n", elapsed)
+	common.Log.Infof("InitIndexer %d ms\n", elapsed)
 }
 
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
 
-	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
+	//common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()
 	for name := range s.tickerMap {
 		//common.Log.Infof("checking ticker %s", name)
@@ -237,7 +237,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 
 	// 最后才设置dbver
 	s.setDBVersion()
-	common.Log.Infof("OrdxIndexer->CheckSelf took %v.", time.Since(startTime))
+	common.Log.Infof("BRC20Indexer->CheckSelf took %v.", time.Since(startTime))
 
 	return true
 }
