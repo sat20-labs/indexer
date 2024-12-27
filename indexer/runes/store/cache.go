@@ -8,15 +8,23 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type ActionType int
+
+const (
+	PUT ActionType = 1
+	DEL ActionType = 2
+)
+
 type Action struct {
-	Key []byte
-	Val []byte
+	Key  []byte
+	Val  []byte
+	Type ActionType
 }
 
 var (
 	// db
-	storeDb           *badger.DB
-	storeDbWriteBatch *badger.WriteBatch
+	storeDb         *badger.DB
+	storeWriteBatch *badger.WriteBatch
 	// operation
 	actions []Action
 	kvs     map[string][]byte
@@ -31,7 +39,7 @@ func SetDB(v *badger.DB) {
 }
 
 func SetWriteBatch(v *badger.WriteBatch) {
-	storeDbWriteBatch = v
+	storeWriteBatch = v
 }
 
 func FlushToDB() {
@@ -39,11 +47,11 @@ func FlushToDB() {
 		return
 	}
 	for _, action := range actions {
-		storeDbWriteBatch.Set(action.Key, action.Val)
+		storeWriteBatch.Set(action.Key, action.Val)
 	}
-	err := storeDbWriteBatch.Flush()
+	err := storeWriteBatch.Flush()
 	if err != nil {
-		common.Log.Panicf("Cache::FlushToDb-> err: %v", err.Error())
+		common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
 	}
 }
 
@@ -62,10 +70,12 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 		return
 	}
 
-	ret, raw := s.GetFromDB(key)
+	var raw []byte
+	ret, raw = s.GetFromDB(key)
 	if len(raw) > 0 {
 		kvs[string(key)] = raw
 	}
+
 	return
 }
 
@@ -112,22 +122,22 @@ func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 		if item == nil {
 			return nil
 		}
-		var val T
+		var out T
 		err = item.Value(func(v []byte) error {
 			if len(v) == 0 {
 				ret = nil
 				raw = nil
 				return nil
 			}
-			msg, ok := any(&val).(proto.Message)
+			msg, ok := any(&out).(proto.Message)
 			if !ok {
-				return fmt.Errorf("type %T does not implement proto.Message", val)
+				return fmt.Errorf("type %T does not implement proto.Message", out)
 			}
 			err = proto.Unmarshal(v, msg)
 			if err != nil {
 				return err
 			}
-			ret = &val
+			ret = &out
 			raw = v
 			return nil
 		})

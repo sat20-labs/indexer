@@ -21,8 +21,9 @@ func (s *Indexer) UpdateDB() {
 	}
 	store.FlushToDB()
 	s.status.FlushToDB()
+
 	s.wb = nil
-	common.Log.Debugf("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
+	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
@@ -66,8 +67,10 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		}
 	}
 	s.status.Height = uint64(block.Height)
-	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, saveCount:%d, time took:%v",
-		block.Height, len(block.Transactions), saveCount, time.Since(startTime))
+	sinceTime := time.Since(startTime)
+	txCount := len(block.Transactions)
+	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, saveCount:%d, block took time:%v, tx took avg time:%v",
+		block.Height, txCount, saveCount, sinceTime, sinceTime/time.Duration(txCount))
 	s.update()
 }
 
