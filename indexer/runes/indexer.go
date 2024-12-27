@@ -94,6 +94,10 @@ func (s *Indexer) Clone() *Indexer {
 	return s
 }
 
+func (s *Indexer) Subtract(old *Indexer) {
+	
+}
+
 func (s *Indexer) CheckSelf() bool {
 	return true
 }

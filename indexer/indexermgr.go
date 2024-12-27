@@ -53,7 +53,7 @@ type IndexerMgr struct {
 	compilingBackupDB *base_indexer.BaseIndexer
 	exoticBackupDB    *exotic.ExoticIndexer
 	brc20BackupDB     *brc20.BRC20Indexer
-	//runesBackupDB	  *ft.FTIndexer
+	runesBackupDB	  *runes.Indexer
 	ftBackupDB  *ft.FTIndexer
 	nsBackupDB  *ns.NameService
 	nftBackupDB *nft.NftIndexer
@@ -87,12 +87,6 @@ func NewIndexerMgr(
 		chaincfgParam:     chaincfgParam,
 		maxIndexHeight:    maxIndexHeight,
 		periodFlushToDB:   periodFlushToDB,
-		compilingBackupDB: nil,
-		exoticBackupDB:    nil,
-		ftBackupDB:        nil,
-		nsBackupDB:        nil,
-		nftBackupDB:       nil,
-		rpcService:        nil,
 	}
 
 	instance = mgr
@@ -150,6 +144,8 @@ func (b *IndexerMgr) Init() {
 	b.compilingBackupDB = nil
 	b.exoticBackupDB = nil
 	b.ftBackupDB = nil
+	b.brc20BackupDB = nil
+	b.runesBackupDB = nil
 	b.nsBackupDB = nil
 	b.nftBackupDB = nil
 
@@ -279,7 +275,7 @@ func (b *IndexerMgr) checkSelf() {
 	b.nft.CheckSelf(b.baseDB)
 	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight())
 	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight())
-	//b.runesIndexer.CheckSelf()
+	b.runesIndexer.CheckSelf()
 	b.ns.CheckSelf(b.baseDB)
 	common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
 }
@@ -351,6 +347,8 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.nftBackupDB.UpdateDB()
 	b.nsBackupDB.UpdateDB()
 	b.ftBackupDB.UpdateDB()
+	b.runesBackupDB.UpdateDB()
+	b.brc20BackupDB.UpdateDB()
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
@@ -362,18 +360,18 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.nsBackupDB = b.ns.Clone()
 	b.nftBackupDB = b.nft.Clone()
 	b.brc20BackupDB = b.brc20Indexer.Clone()
-	//b.runesBackupDB = b.runesIndexer.Clone()
+	b.runesBackupDB = b.runesIndexer.Clone()
 	common.Log.Infof("backup instance %d cloned", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
 	b.compiling.Subtract(b.compilingBackupDB)
 	b.exotic.Subtract(b.exoticBackupDB)
+	b.nft.Subtract(b.nftBackupDB)
+	b.ns.Subtract(b.nsBackupDB)
 	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
-	//b.runesIndexer.Subtract(b.runesBackupDB)
-	b.ns.Subtract(b.nsBackupDB)
-	b.nft.Subtract(b.nftBackupDB)
+	b.runesIndexer.Subtract(b.runesBackupDB)
 }
 
 func (b *IndexerMgr) updateServiceInstance() {
