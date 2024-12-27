@@ -19,6 +19,12 @@ import (
 //     根据utxo获取ticker名字和资产数量（多个）
 //     判断utxo中是否有runes资产
 
+// 获取所有tickers的名字, (在接口中的方法里面需要得到所有RUNEINFO)
+func (s *Indexer) GetRuneInfoList(start, limit uint64) ([]*runestone.RuneEntry, uint64) {
+	s.idToEntryTbl.GetFromDB(nil)
+	return nil, 0
+}
+
 func (s *Indexer) GetRuneInfo(ticker string) *runestone.RuneEntry {
 	r, err := runestone.RuneFromString(ticker)
 	if err != nil {

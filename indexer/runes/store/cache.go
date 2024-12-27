@@ -150,6 +150,45 @@ func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
 	}
 }
 
+func (s *Cache[T]) GetListFromDB(keyPrefix []byte) (ret map[string]*T) {
+	err := storeDb.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek(keyPrefix); it.ValidForPrefix(keyPrefix); it.Next() {
+			item := it.Item()
+			if item.IsDeletedOrExpired() {
+				continue
+			}
+
+			key := item.KeyCopy(nil)
+			v, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+
+			var out T
+			msg, ok := any(&out).(proto.Message)
+			if !ok {
+				return fmt.Errorf("type %T does not implement proto.Message", out)
+			}
+			err = proto.Unmarshal(v, msg)
+			if err != nil {
+				return err
+			}
+			if ret == nil {
+				ret = make(map[string]*T)
+			}
+			ret[string(key)] = &out
+		}
+		return nil
+	})
+
+	if err != nil {
+		common.Log.Panicf("Cache.GetListFromDB-> err:%s", err.Error())
+	}
+	return
+}
+
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 	err := storeDb.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
@@ -157,6 +196,9 @@ func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 			return err
 		}
 		if item == nil {
+			return nil
+		}
+		if item.IsDeletedOrExpired() {
 			return nil
 		}
 		var out T
