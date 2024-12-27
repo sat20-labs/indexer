@@ -205,7 +205,7 @@ func (d *Decimal) Cmp(other *Decimal) int {
 		return -other.Value.Sign()
 	}
 	if d.Precition != other.Precition {
-		Log.Panicf(fmt.Sprintf("precition not match, (%d != %d)", d.Precition, other.Precition))
+		Log.Panicf("precition not match, (%d != %d)", d.Precition, other.Precition)
 	}
 	return d.Value.Cmp(other.Value)
 }
