@@ -305,39 +305,44 @@ func (b *IndexerMgr) handleReorg(height int) {
 func (b *IndexerMgr) updateDB() {
 	b.updateServiceInstance()
 
-	if b.compiling.GetHeight()-b.compiling.GetSyncHeight() < b.compiling.GetBlockHistory() {
-		common.Log.Infof("updateDB do nothing at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+	complingHeight := b.compiling.GetHeight()
+	syncHeight := b.compiling.GetSyncHeight()
+	blocksInHistory := b.compiling.GetBlockHistory()
+
+	if complingHeight-syncHeight < blocksInHistory {
+		common.Log.Infof("updateDB do nothing at height %d-%d", complingHeight, syncHeight)
 		return
 	}
 
-	if b.compiling.GetHeight()-b.compiling.GetSyncHeight() == b.compiling.GetBlockHistory() {
+	if complingHeight-syncHeight == blocksInHistory {
 		// 先备份数据在缓存
 		if b.compilingBackupDB == nil {
 			b.prepareDBBuffer()
-			common.Log.Infof("updateDB clone data at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+			common.Log.Infof("updateDB clone data at height %d-%d", complingHeight, syncHeight)
 		}
 		return
 	}
 
 	// 这个区间不备份数据
-	if b.compiling.GetHeight()-b.compiling.GetSyncHeight() < 2*b.compiling.GetBlockHistory() {
-		common.Log.Infof("updateDB do nothing at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+	if complingHeight-syncHeight < 2*blocksInHistory {
+		common.Log.Infof("updateDB do nothing at height %d-%d", complingHeight, syncHeight)
 		return
 	}
 
 	// b.GetHeight()-b.GetSyncHeight() == 2*b.GetBlockHistory()
 
-	// 到达双倍高度时，将备份的数据写入数据库中。
+	// 到达高度时，将备份的数据写入数据库中。
 	if b.compilingBackupDB != nil {
-		if b.compiling.GetHeight()-b.compilingBackupDB.GetHeight() < b.compiling.GetBlockHistory() {
-			common.Log.Infof("updateDB do nothing at height %d, backup instance %d", b.compiling.GetHeight(), b.compilingBackupDB.GetHeight())
+		if complingHeight-b.compilingBackupDB.GetHeight() < blocksInHistory {
+			common.Log.Infof("updateDB do nothing at height %d, backup instance %d", 
+				complingHeight, b.compilingBackupDB.GetHeight())
 			return
 		}
-		common.Log.Infof("updateDB do backup->forceUpdateDB() at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+		common.Log.Infof("updateDB do backup->forceUpdateDB() at height %d-%d", complingHeight, syncHeight)
 		b.performUpdateDBInBuffer()
 	}
 	b.prepareDBBuffer()
-	common.Log.Infof("updateDB clone data at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+	common.Log.Infof("updateDB clone data at height %d-%d", complingHeight, syncHeight)
 }
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
