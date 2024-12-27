@@ -19,7 +19,7 @@ func NewRuneToIdTable(v *store.Cache[pb.RuneId]) *RuneToIdTable {
 
 func (s *RuneToIdTable) Insert(key *Rune, value *RuneId) (ret *RuneId) {
 	tblKey := []byte(store.RUNE_TO_ID + key.String())
-	pbVal := s.cache.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &RuneId{}
 		ret.FromPb(pbVal)

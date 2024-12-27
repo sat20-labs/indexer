@@ -14,6 +14,7 @@ import (
 type Indexer struct {
 	db                        *badger.DB
 	wb                        *badger.WriteBatch
+	cacheLogs                 map[string]*store.CacheLog
 	chaincfgParam             *chaincfg.Params
 	height                    uint64
 	blockTime                 uint64
@@ -31,8 +32,11 @@ type Indexer struct {
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params) *Indexer {
 	store.SetDB(db)
+	cacheLog := make(map[string]*store.CacheLog)
+	store.SetCacheLogs(cacheLog)
 	return &Indexer{
 		db:                        db,
+		cacheLogs:                 cacheLog,
 		chaincfgParam:             param,
 		runeLedger:                nil,
 		burnedMap:                 nil,
@@ -90,7 +94,24 @@ func (s *Indexer) Init() {
 }
 
 func (s *Indexer) Clone() *Indexer {
-	return s
+	cloneIndex := NewIndexer(s.db, s.chaincfgParam)
+	for key, value := range s.cacheLogs {
+		cacheLog := &store.CacheLog{
+			Type:      value.Type,
+			ExistInDb: value.ExistInDb,
+		}
+		if value.Val != nil {
+			cacheLog.Val = make([]byte, len(value.Val))
+			copy(cacheLog.Val, value.Val)
+		}
+		cloneIndex.cacheLogs[key] = cacheLog
+	}
+	store.SetCacheLogs(cloneIndex.cacheLogs)
+	return cloneIndex
+}
+
+func (b *Indexer) Subtract(backupIndexer *Indexer) {
+	// no need
 }
 
 func (s *Indexer) CheckSelf() bool {

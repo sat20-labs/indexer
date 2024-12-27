@@ -112,7 +112,7 @@ func (s *RuneLedgerTable) GetFromDB(key Address) (ret *RuneLedger) {
 
 func (s *RuneLedgerTable) Insert(key Address, value *RuneLedger) (ret *RuneLedger) {
 	tblKey := []byte(store.RUNE_LEDGER + key)
-	pbVal := s.cache.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &RuneLedger{}
 		ret.FromPb(pbVal)

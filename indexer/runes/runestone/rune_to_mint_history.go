@@ -76,7 +76,7 @@ func (s *RuneMintHistorysTable) GetFromDB(key *Rune) (ret RuneMintHistorys) {
 
 func (s *RuneMintHistorysTable) Insert(key *Rune, value RuneMintHistorys) (ret RuneMintHistorys) {
 	tblKey := []byte(store.RUNE_TO_MINT_HISTORYS + key.String())
-	pbVal := s.cache.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = RuneMintHistorys{}
 		ret.FromPb(pbVal)

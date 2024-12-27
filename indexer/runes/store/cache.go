@@ -11,23 +11,21 @@ import (
 type ActionType int
 
 const (
-	PUT ActionType = 1
-	DEL ActionType = 2
+	INIT ActionType = 0
+	PUT  ActionType = 1
+	DEL  ActionType = 2
 )
 
-type Action struct {
-	Key  []byte
-	Val  []byte
-	Type ActionType
+type CacheLog struct {
+	Val       []byte
+	Type      ActionType
+	ExistInDb bool
 }
 
 var (
-	// db
 	storeDb         *badger.DB
 	storeWriteBatch *badger.WriteBatch
-	// operation
-	actions []Action
-	kvs     map[string][]byte
+	logs            map[string]*CacheLog
 )
 
 type Cache[T any] struct{}
@@ -42,12 +40,40 @@ func SetWriteBatch(v *badger.WriteBatch) {
 	storeWriteBatch = v
 }
 
+func SetCacheLogs(v map[string]*CacheLog) {
+	logs = v
+}
+
 func FlushToDB() {
-	if len(actions) == 0 {
+	if len(logs) == 0 {
 		return
 	}
-	for _, action := range actions {
-		storeWriteBatch.Set(action.Key, action.Val)
+
+	var totalBytes int
+	count := len(logs)
+	for key, action := range logs {
+		totalBytes += len(key)
+		totalBytes += len(action.Val)
+		totalBytes += 4
+		totalBytes += len(key)
+	}
+	common.Log.Infof("Cache::FlushToDB-> actions count: %d, total bytes: %d", count, totalBytes)
+
+	for key, action := range logs {
+		if action.Type == PUT {
+			storeWriteBatch.Set([]byte(key), action.Val)
+		}
+	}
+	for key, action := range logs {
+		if action.Type == DEL && action.ExistInDb {
+			storeDb.Update(func(txn *badger.Txn) error {
+				err := txn.Delete([]byte(key))
+				if err != nil {
+					common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
+				}
+				return nil
+			})
+		}
 	}
 	err := storeWriteBatch.Flush()
 	if err != nil {
@@ -56,16 +82,19 @@ func FlushToDB() {
 }
 
 func ResetCache() {
-	kvs = make(map[string][]byte)
-	actions = make([]Action, 0)
+	logs = make(map[string]*CacheLog)
 }
 
 func (s *Cache[T]) Get(key []byte) (ret *T) {
-	var out T
-	item := kvs[string(key)]
-	if len(item) > 0 {
+	keyStr := string(key)
+	action := logs[keyStr]
+	if action != nil {
+		if action.Type == DEL {
+			return
+		}
+		var out T
 		msg := any(&out).(proto.Message)
-		proto.Unmarshal(item, msg)
+		proto.Unmarshal(action.Val, msg)
 		ret = &out
 		return
 	}
@@ -73,30 +102,35 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 	var raw []byte
 	ret, raw = s.GetFromDB(key)
 	if len(raw) > 0 {
-		kvs[string(key)] = raw
+		logs[keyStr] = &CacheLog{
+			Val:       raw,
+			Type:      INIT,
+			ExistInDb: true,
+		}
 	}
-
 	return
 }
 
-func (s *Cache[T]) Remove(key []byte) (ret *T) {
+func (s *Cache[T]) Delete(key []byte) (ret *T) {
 	ret = s.Get(key)
 	if ret == nil {
 		return
 	}
-	delete(kvs, string(key))
-	actions = append(actions, Action{Key: key, Val: []byte{}})
+	log := logs[string(key)]
+	log.Type = DEL
 	return
 }
 
-func (s *Cache[T]) Insert(key []byte, msg proto.Message) (ret *T) {
-	ret = s.Remove(key)
+func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
+	ret = s.Get(key)
 	val, err := proto.Marshal(msg)
 	if err != nil {
-		common.Log.Panicf("Cache.Insert-> key: %s, proto.Marshal err: %v", string(key), err.Error())
+		common.Log.Panicf("Cache.Set-> key: %s, proto.Marshal err: %v", string(key), err.Error())
 	}
-	kvs[string(key)] = val
-	actions = append(actions, Action{Key: key, Val: val})
+	logs[string(key)] = &CacheLog{
+		Val:  val,
+		Type: PUT,
+	}
 	return
 }
 

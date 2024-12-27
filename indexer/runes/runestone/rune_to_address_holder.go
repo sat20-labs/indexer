@@ -74,7 +74,7 @@ func (s *RuneHoldersTable) GetFromDB(key *Rune) (ret RuneHolders) {
 
 func (s *RuneHoldersTable) Insert(key *Rune, value RuneHolders) (ret RuneHolders) {
 	tblKey := []byte(store.RUNE_TO_ADDRESS_HOLDER + key.String())
-	pbVal := s.cache.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = RuneHolders{}
 		ret.FromPb(pbVal)

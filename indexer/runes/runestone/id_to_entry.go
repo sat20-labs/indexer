@@ -37,7 +37,7 @@ func (s *RuneIdToEntryTable) GetFromDB(key *RuneId) (ret *RuneEntry) {
 
 func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.String())
-	pbVal := s.cache.Insert(tblKey, value.ToPb())
+	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &RuneEntry{}
 		ret.FromPb(pbVal)
