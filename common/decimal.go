@@ -173,23 +173,23 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 
 
 // Mul muls two Decimal instances and returns a new Decimal instance
-func (d *Decimal) Mul(other *Decimal) *Decimal {
+func (d *Decimal) Mul(other *big.Int) *Decimal {
 	if d == nil || other == nil {
 		return nil
 	}
-	value := new(big.Int).Mul(d.Value, other.Value)
+	value := new(big.Int).Mul(d.Value, other)
 	// value := new(big.Int).Div(value0, precisionFactor[other.Precition])
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
 
 // Div divs two Decimal instances and returns a new Decimal instance
-func (d *Decimal) Div(other *Decimal) *Decimal {
+func (d *Decimal) Div(other *big.Int) *Decimal {
 	if d == nil || other == nil {
 		return nil
 	}
 	// value0 := new(big.Int).Mul(d.Value, precisionFactor[other.Precition])
-	value := new(big.Int).Div(d.Value, other.Value)
+	value := new(big.Int).Div(d.Value, other)
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
@@ -283,10 +283,6 @@ func (d *Decimal) IntegerPart() int64 {
 	return quotient.Int64()
 }
 
-func (d *Decimal) Int64() int64 {
-	return d.IntegerPart()
-}
-
 func (d *Decimal) ToInt64WithMax(max int64) (int64) {
 	if d == nil {
 		return 0
@@ -304,11 +300,15 @@ func (d *Decimal) ToInt64WithMax(max int64) (int64) {
 	if scaleIndex < 0 {
 		scaleIndex = 0
 	}
+
+	// d.Value 不会
+	//value := d.Value.Int64() * (precisionFactor[scaleIndex]).Int64()
 	value := new(big.Int).Mul(d.Value, precisionFactor[scaleIndex])
 	
-	result := &Decimal{Precition: d.Precition, Value: value}
-
-	return result.Int64()
+	//result := &Decimal{Precition: d.Precition, Value: value}
+	
+	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
+	return quotient.Int64()
 }
 
 func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal, error) {
@@ -325,7 +325,9 @@ func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal
 
 	// 计算浮点值
 	//floatValue := float64(value) / scaleFactor
-	bigValue := new(big.Int).Div(new(big.Int).SetInt64(value), precisionFactor[scaleIndex])
+	bigValue := new(big.Int).Mul(new(big.Int).SetInt64(value), precisionFactor[precision])
+	bigValue = new(big.Int).Div(bigValue, precisionFactor[scaleIndex])
+	
 	result := &Decimal{Precition: precision, Value: bigValue}
 	return result, nil
 
