@@ -64,21 +64,21 @@ func FlushToDB() {
 			storeWriteBatch.Set([]byte(key), action.Val)
 		}
 	}
-	for key, action := range logs {
-		if action.Type == DEL && action.ExistInDb {
-			storeDb.Update(func(txn *badger.Txn) error {
-				err := txn.Delete([]byte(key))
-				if err != nil {
-					common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
-				}
-				return nil
-			})
-		}
-	}
 	err := storeWriteBatch.Flush()
 	if err != nil {
 		common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
 	}
+	storeDb.Update(func(txn *badger.Txn) error {
+		for key, action := range logs {
+			if action.Type == DEL && action.ExistInDb {
+				err := txn.Delete([]byte(key))
+				if err != nil {
+					common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
+				}
+			}
+		}
+		return nil
+	})
 }
 
 func ResetCache() {
