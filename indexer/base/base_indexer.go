@@ -554,7 +554,8 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			block := <-b.blocksChan
 
 			if block == nil {
-				common.Log.Panicf("BaseIndexer.SyncToBlock-> fetch block failed %d", i)
+				common.Log.Errorf("BaseIndexer.SyncToBlock-> fetch block failed %d", i)
+				return -2
 			}
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> get block: cost: %v", time.Since(startTime))
 
