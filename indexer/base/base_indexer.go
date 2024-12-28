@@ -756,7 +756,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	count, err := getBlockCount()
 	if err != nil {
 		common.Log.Errorf("failed to get block count %v", err)
-		return -1
+		return -2
 	}
 
 	bRunInStepMode := false

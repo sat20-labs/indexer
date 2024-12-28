@@ -204,8 +204,10 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 					// handle reorg
 					b.handleReorg(ret)
 				} else {
-					common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
-					bWantExit = true
+					if ret == -1 {
+						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+						bWantExit = true
+					}
 				}
 
 				isRunning = false
