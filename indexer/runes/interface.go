@@ -20,8 +20,13 @@ import (
 //     判断utxo中是否有runes资产
 
 // 获取所有tickers的名字, (在接口中的方法里面需要得到所有RUNEINFO)
-func (s *Indexer) GetRuneInfoList(start, limit uint64) ([]*runestone.RuneEntry, uint64) {
-	s.idToEntryTbl.GetFromDB(nil)
+func (s *Indexer) GetRuneInfoList(start, limit uint64) (ret []*runestone.RuneEntry, total uint64) {
+	// list := s.idToEntryTbl.GetListFromDB()
+	// for k, v := range list {
+	// 	v.SpacedRune.Spacers
+	// 	ret = append(ret, v)
+	// }
+
 	return nil, 0
 }
 

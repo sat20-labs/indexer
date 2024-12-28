@@ -85,7 +85,7 @@ func (s *Indexer) Init() {
 			Mints:      uint128.Uint128{},
 			Number:     0,
 			Premine:    uint128.Uint128{},
-			SpacedRune: runestone.SpacedRune{Rune: r, Spacers: 128},
+			SpacedRune: *runestone.NewSpacedRune(r, 128),
 			Symbol:     &symbol,
 			Timestamp:  0,
 			Turbo:      true,

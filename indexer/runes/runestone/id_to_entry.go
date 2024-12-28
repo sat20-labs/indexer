@@ -35,7 +35,7 @@ func (s *RuneIdToEntryTable) GetFromDB(key *RuneId) (ret *RuneEntry) {
 	return
 }
 
-func (s *RuneIdToEntryTable) GetListFromDB(key *RuneId) (ret map[string]*RuneEntry) {
+func (s *RuneIdToEntryTable) GetListFromDB() (ret map[string]*RuneEntry) {
 	prefixKey := []byte(store.ID_TO_ENTRY)
 	list := s.cache.GetListFromDB(prefixKey)
 	if len(list) == 0 {

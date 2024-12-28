@@ -478,7 +478,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 			Mints:        uint128.Uint128{},
 			Number:       number,
 			Premine:      uint128.Uint128{},
-			SpacedRune:   runestone.SpacedRune{Rune: *r, Spacers: 0},
+			SpacedRune:   *runestone.NewSpacedRune(*r, 0),
 			Symbol:       nil,
 			Timestamp:    s.blockTime,
 			Turbo:        false,
@@ -492,7 +492,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 			Terms:      artifact.Runestone.Etching.Terms,
 			Mints:      uint128.Uint128{},
 			Number:     number,
-			SpacedRune: runestone.SpacedRune{Rune: *r, Spacers: 0},
+			SpacedRune: *runestone.NewSpacedRune(*r, 0),
 			Symbol:     artifact.Runestone.Etching.Symbol,
 			Timestamp:  s.blockTime,
 			Turbo:      artifact.Runestone.Etching.Turbo,
@@ -505,7 +505,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 			entry.Premine = *artifact.Runestone.Etching.Premine
 		}
 		if artifact.Runestone.Etching.Spacers != nil {
-			entry.SpacedRune = runestone.SpacedRune{Rune: *r, Spacers: *artifact.Runestone.Etching.Spacers}
+			entry.SpacedRune = *runestone.NewSpacedRune(*r, *artifact.Runestone.Etching.Spacers)
 		}
 	}
 	return
