@@ -122,6 +122,22 @@ func (p *TxOutput) Zero() bool {
 	return p.OutValue.Value == 0 && len(p.Assets) == 0
 }
 
+func (p *TxOutput) HasPlainSat() bool {
+	if len(p.Assets) == 0 {
+		return true
+	}
+	assetAmt := p.Assets.GetBindingSatAmout()
+	return p.OutValue.Value > assetAmt
+}
+
+func (p *TxOutput) GetPlainSat() int64 {
+	if len(p.Assets) == 0 {
+		return p.OutValue.Value
+	}
+	assetAmt := p.Assets.GetBindingSatAmout()
+	return p.OutValue.Value - assetAmt
+}
+
 func (p *TxOutput) OutPoint() *wire.OutPoint {
 	outpoint, _ := wire.NewOutPointFromString(p.OutPointStr)
 	return outpoint
@@ -292,7 +308,7 @@ func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, erro
 
 func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
-		return p.Value()
+		return p.GetPlainSat()
 	}
 	asset, err := p.Assets.Find(assetName)
 	if err != nil {
