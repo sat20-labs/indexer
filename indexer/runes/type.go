@@ -24,7 +24,7 @@ type RuneInfo struct {
 	EtchingBlock       uint64 // runestone.RuneId.Block
 	EtchingTransaction uint32 // runestone.RuneId.Tx
 	Supply             uint128.Uint128
-	Premine            uint128.Uint128 // runestone.Etching.Premine
+	Premine            string // runestone.Etching.Premine
 	PreminePercentage  float32
 	Burned             uint128.Uint128 // runestone.RuneEntry.Burned
 	Divisibility       uint8           // runestone.Etching.Divisibility
