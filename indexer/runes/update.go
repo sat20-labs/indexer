@@ -20,6 +20,7 @@ func (s *Indexer) UpdateDB() {
 		return
 	}
 	store.FlushToDB()
+	s.status.Height = s.height
 	s.status.FlushToDB()
 
 	s.wb = nil
@@ -66,7 +67,6 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 			saveCount++
 		}
 	}
-	s.status.Height = uint64(block.Height)
 	sinceTime := time.Since(startTime)
 	txCount := len(block.Transactions)
 	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, saveCount:%d, block took time:%v, tx took avg time:%v",

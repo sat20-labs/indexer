@@ -3,6 +3,7 @@ package runes
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -11,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
+	"lukechampine.com/uint128"
 )
 
 func ParseMintHistoryKey(input string) (string, string, error) {
@@ -158,4 +160,24 @@ func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 		}
 	}
 	return
+}
+
+// getPercentage calculates the percentage of numerator over denominator multiplied by 10000 for higher precision
+func GetPercentage(numerator, denominator *uint128.Uint128) *Decimal {
+	// Convert uint128 to big.Float
+	floatNumerator := new(big.Float).SetInt(numerator.Big())
+	floatDenominator := new(big.Float).SetInt(denominator.Big())
+
+	// Perform division
+	percentage := new(big.Float).Quo(floatNumerator, floatDenominator)
+
+	// Multiply by 10000 to increase the precision
+	percentage.Mul(percentage, big.NewFloat(10000))
+
+	// Convert result to big.Int
+	percentageInt := new(big.Int)
+	percentage.Int(percentageInt)
+
+	value := uint128.FromBig(percentageInt)
+	return NewDecimal(&value, 2)
 }

@@ -1,19 +1,18 @@
 package runes
 
 import (
-	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"lukechampine.com/uint128"
 )
 
-type RuneMint struct {
-	Start     uint64 //
-	End       uint64
-	Amount    uint128.Uint128
+type MintInfo struct {
+	Start     string
+	End       string
+	Amount    string
 	Mints     uint128.Uint128
-	Cap       uint128.Uint128 // runestone.RuneEntry.Terms.Cap
+	Cap       uint128.Uint128
 	Remaining uint128.Uint128
 	Mintable  bool
-	Progress  float32
+	Progress  string
 }
 
 type RuneInfo struct {
@@ -23,15 +22,14 @@ type RuneInfo struct {
 	Id                 string // runestone.RuneId.Block:runestone.RuneId.Tx
 	EtchingBlock       uint64 // runestone.RuneId.Block
 	EtchingTransaction uint32 // runestone.RuneId.Tx
+	MintInfo           *MintInfo
 	Supply             uint128.Uint128
 	Premine            string // runestone.Etching.Premine
-	PreminePercentage  float32
+	PreminePercentage  string
 	Burned             uint128.Uint128 // runestone.RuneEntry.Burned
 	Divisibility       uint8           // runestone.Etching.Divisibility
 	Symbol             string          // runestone.Etching.Symbol
 	Turbo              bool            // runestone.RuneEntry.Turbo
 	Etching            string          // Txid, runestone.RuneEntry.Etching
-	Parent             runestone.InscriptionId
-
-	Terms *runestone.Terms
+	Parent             string
 }
