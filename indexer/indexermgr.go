@@ -53,7 +53,7 @@ type IndexerMgr struct {
 	compilingBackupDB *base_indexer.BaseIndexer
 	exoticBackupDB    *exotic.ExoticIndexer
 	brc20BackupDB     *brc20.BRC20Indexer
-	//runesBackupDB	  *ft.FTIndexer
+	runesBackupDB	  *runes.Indexer
 	ftBackupDB  *ft.FTIndexer
 	nsBackupDB  *ns.NameService
 	nftBackupDB *nft.NftIndexer
@@ -87,12 +87,6 @@ func NewIndexerMgr(
 		chaincfgParam:     chaincfgParam,
 		maxIndexHeight:    maxIndexHeight,
 		periodFlushToDB:   periodFlushToDB,
-		compilingBackupDB: nil,
-		exoticBackupDB:    nil,
-		ftBackupDB:        nil,
-		nsBackupDB:        nil,
-		nftBackupDB:       nil,
-		rpcService:        nil,
 	}
 
 	instance = mgr
@@ -150,6 +144,8 @@ func (b *IndexerMgr) Init() {
 	b.compilingBackupDB = nil
 	b.exoticBackupDB = nil
 	b.ftBackupDB = nil
+	b.brc20BackupDB = nil
+	b.runesBackupDB = nil
 	b.nsBackupDB = nil
 	b.nftBackupDB = nil
 
@@ -208,8 +204,10 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 					// handle reorg
 					b.handleReorg(ret)
 				} else {
-					common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
-					bWantExit = true
+					if ret == -1 {
+						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+						bWantExit = true
+					}
 				}
 
 				isRunning = false
@@ -279,7 +277,7 @@ func (b *IndexerMgr) checkSelf() {
 	b.nft.CheckSelf(b.baseDB)
 	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight())
 	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight())
-	//b.runesIndexer.CheckSelf()
+	b.runesIndexer.CheckSelf()
 	b.ns.CheckSelf(b.baseDB)
 	common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
 }
@@ -309,39 +307,44 @@ func (b *IndexerMgr) handleReorg(height int) {
 func (b *IndexerMgr) updateDB() {
 	b.updateServiceInstance()
 
-	if b.compiling.GetHeight()-b.compiling.GetSyncHeight() < b.compiling.GetBlockHistory() {
-		common.Log.Infof("updateDB do nothing at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+	complingHeight := b.compiling.GetHeight()
+	syncHeight := b.compiling.GetSyncHeight()
+	blocksInHistory := b.compiling.GetBlockHistory()
+
+	if complingHeight-syncHeight < blocksInHistory {
+		common.Log.Infof("updateDB do nothing at height %d-%d", complingHeight, syncHeight)
 		return
 	}
 
-	if b.compiling.GetHeight()-b.compiling.GetSyncHeight() == b.compiling.GetBlockHistory() {
+	if complingHeight-syncHeight == blocksInHistory {
 		// 先备份数据在缓存
 		if b.compilingBackupDB == nil {
 			b.prepareDBBuffer()
-			common.Log.Infof("updateDB clone data at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+			common.Log.Infof("updateDB clone data at height %d-%d", complingHeight, syncHeight)
 		}
 		return
 	}
 
 	// 这个区间不备份数据
-	if b.compiling.GetHeight()-b.compiling.GetSyncHeight() < 2*b.compiling.GetBlockHistory() {
-		common.Log.Infof("updateDB do nothing at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+	if complingHeight-syncHeight < 2*blocksInHistory {
+		common.Log.Infof("updateDB do nothing at height %d-%d", complingHeight, syncHeight)
 		return
 	}
 
 	// b.GetHeight()-b.GetSyncHeight() == 2*b.GetBlockHistory()
 
-	// 到达双倍高度时，将备份的数据写入数据库中。
+	// 到达高度时，将备份的数据写入数据库中。
 	if b.compilingBackupDB != nil {
-		if b.compiling.GetHeight()-b.compilingBackupDB.GetHeight() < b.compiling.GetBlockHistory() {
-			common.Log.Infof("updateDB do nothing at height %d, backup instance %d", b.compiling.GetHeight(), b.compilingBackupDB.GetHeight())
+		if complingHeight-b.compilingBackupDB.GetHeight() < blocksInHistory {
+			common.Log.Infof("updateDB do nothing at height %d, backup instance %d", 
+				complingHeight, b.compilingBackupDB.GetHeight())
 			return
 		}
-		common.Log.Infof("updateDB do backup->forceUpdateDB() at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+		common.Log.Infof("updateDB do backup->forceUpdateDB() at height %d-%d", complingHeight, syncHeight)
 		b.performUpdateDBInBuffer()
 	}
 	b.prepareDBBuffer()
-	common.Log.Infof("updateDB clone data at height %d-%d", b.compiling.GetHeight(), b.compiling.GetSyncHeight())
+	common.Log.Infof("updateDB clone data at height %d-%d", complingHeight, syncHeight)
 }
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
@@ -351,6 +354,8 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.nftBackupDB.UpdateDB()
 	b.nsBackupDB.UpdateDB()
 	b.ftBackupDB.UpdateDB()
+	b.runesBackupDB.UpdateDB()
+	b.brc20BackupDB.UpdateDB()
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
@@ -362,18 +367,18 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.nsBackupDB = b.ns.Clone()
 	b.nftBackupDB = b.nft.Clone()
 	b.brc20BackupDB = b.brc20Indexer.Clone()
-	//b.runesBackupDB = b.runesIndexer.Clone()
+	b.runesBackupDB = b.runesIndexer.Clone()
 	common.Log.Infof("backup instance %d cloned", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
 	b.compiling.Subtract(b.compilingBackupDB)
 	b.exotic.Subtract(b.exoticBackupDB)
+	b.nft.Subtract(b.nftBackupDB)
+	b.ns.Subtract(b.nsBackupDB)
 	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
-	//b.runesIndexer.Subtract(b.runesBackupDB)
-	b.ns.Subtract(b.nsBackupDB)
-	b.nft.Subtract(b.nftBackupDB)
+	b.runesIndexer.Subtract(b.runesBackupDB)
 }
 
 func (b *IndexerMgr) updateServiceInstance() {

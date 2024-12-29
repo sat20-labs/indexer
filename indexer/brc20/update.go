@@ -25,6 +25,8 @@ func (p *BRC20Indexer) UpdateInscribeDeploy(ticker *common.BRC20Ticker) {
 		// 仅更新显示内容
 		p.tickerAdded[name] = org.Ticker
 	}
+
+	common.Log.Infof("UpdateInscribeDeploy %s", ticker.Name)
 }
 
 // mint

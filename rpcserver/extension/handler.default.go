@@ -178,7 +178,7 @@ func (s *Service) feeSummary(c *gin.Context) {
 		},
 	}
 
-	ret, err := bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(1, "ECONOMICAL")
+	ret, err := bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(6, "ECONOMICAL")
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -188,7 +188,7 @@ func (s *Service) feeSummary(c *gin.Context) {
 	// BTC/kb -> sat/vb
 	resp.Data.List[0].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
 
-	ret, err = bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(1, "ECONOMICAL")
+	ret, err = bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(3, "ECONOMICAL")
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

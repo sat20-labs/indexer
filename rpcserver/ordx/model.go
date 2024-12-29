@@ -131,7 +131,9 @@ func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutputInfo, error) {
 func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutputInfo, error) {
 	result := make([]*rpcwire.TxOutputInfo, 0)
 	for _, utxo := range req.Utxos {
-
+		if rpcwire.IsExistUtxoInMemPool(utxo) {
+			continue
+		}
 		txOutput, err := s.GetUtxoInfo(utxo)
 		if err != nil {
 			continue
@@ -151,6 +153,9 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 		return nil, 0, err
 	}
 	for _, txOut := range outputMap {
+		if rpcwire.IsExistUtxoInMemPool(txOut.OutPointStr) {
+			continue
+		}
 		assets := make([]*rpcwire.AssetInfo, 0)
 		for _, asset := range txOut.Assets {
 			offsets := txOut.Offsets[asset.Name]
@@ -170,6 +175,10 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 
 		result = append(result, &output)
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].OutValue.Value > result[j].OutValue.Value
+	})
 
 	return result, len(result), nil
 }

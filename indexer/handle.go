@@ -410,7 +410,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		)
 		return nil
 	}
-	if max.Sign() < 0 || max.IsOverflowUint64() {
+	if max.Sign() < 0 || max.IsOverflowInt64() {
 		common.Log.Warnf("deploy, but max invalid (range)")
 		return nil
 		// return
@@ -418,7 +418,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 
 	if max.Sign() == 0 {
 		if ticker.SelfMint {
-			ticker.Max = *max.GetMaxUint64()
+			ticker.Max = *max.GetMaxInt64()
 		} else {
 			common.Log.Warnf("deploy, but max invalid (0)")
 			return nil
@@ -437,13 +437,13 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		)
 		return nil
 	}
-	if lim.Sign() < 0 || lim.IsOverflowUint64() {
+	if lim.Sign() < 0 || lim.IsOverflowInt64() {
 		common.Log.Warnf("deploy, but lim invalid (range)")
 		return nil
 	}
 	if lim.Sign() == 0 {
 		if ticker.SelfMint {
-			ticker.Limit = *lim.GetMaxUint64()
+			ticker.Limit = *lim.GetMaxInt64()
 		} else {
 			common.Log.Warnf("deploy, but lim invalid (0)")
 			return nil

@@ -68,7 +68,7 @@ func NewBaseIndexer(
 		db:               basicDB,
 		stats:            &SyncStats{},
 		periodFlushToDB:  periodFlushToDB,
-		keepBlockHistory: 6,
+		keepBlockHistory: 10,
 		blocksChan:       make(chan *common.Block, BLOCK_PREFETCH),
 		chaincfgParam:    chaincfgParam,
 		maxIndexHeight:   maxIndexHeight,
@@ -554,7 +554,8 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			block := <-b.blocksChan
 
 			if block == nil {
-				common.Log.Panicf("BaseIndexer.SyncToBlock-> fetch block failed %d", i)
+				common.Log.Errorf("BaseIndexer.SyncToBlock-> fetch block failed %d", i)
+				return -2
 			}
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> get block: cost: %v", time.Since(startTime))
 
@@ -756,7 +757,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	count, err := getBlockCount()
 	if err != nil {
 		common.Log.Errorf("failed to get block count %v", err)
-		return -1
+		return -2
 	}
 
 	bRunInStepMode := false

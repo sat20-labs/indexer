@@ -13,7 +13,7 @@ const DEFAULT_PRECISION = 0
 
 var MAX_PRECISION_STRING = "18"
 
-var precisionFactor [19]*big.Int = [19]*big.Int{
+var precisionFactor [64]*big.Int = [64]*big.Int{
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(0), nil),
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(1), nil),
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(2), nil),
@@ -33,23 +33,68 @@ var precisionFactor [19]*big.Int = [19]*big.Int{
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil),
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(17), nil),
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(19), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(20), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(21), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(22), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(23), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(25), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(26), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(27), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(28), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(29), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(31), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(32), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(33), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(34), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(35), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(36), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(37), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(38), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(39), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(40), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(41), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(42), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(43), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(44), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(45), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(46), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(47), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(48), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(49), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(51), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(52), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(53), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(54), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(55), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(56), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(57), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(58), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(59), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(60), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(61), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(62), nil),
+	new(big.Int).Exp(big.NewInt(10), big.NewInt(63), nil),
 }
 
 // Decimal represents a fixed-point decimal number with 18 decimal places
 type Decimal struct {
-	Precition uint
+	Precition int
 	Value     *big.Int
 }
 
-func NewDefaultDecimal(v uint64) *Decimal {
-	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetUint64(v)}
+func NewDefaultDecimal(v int64) *Decimal {
+	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetInt64(v)}
 }
 
-func NewDecimal(v uint64, p uint) *Decimal {
+func NewDecimal(v int64, p int) *Decimal {
 	if p > MAX_PRECISION {
 		p = MAX_PRECISION
 	}
-	return &Decimal{Precition: p, Value: new(big.Int).SetUint64(v)}
+	return &Decimal{Precition: p, Value: new(big.Int).SetInt64(v)}
 }
 
 func NewDecimalCopy(other *Decimal) *Decimal {
@@ -109,7 +154,7 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 		value = value.Add(value, decimalPart)
 	}
 
-	return &Decimal{Precition: uint(maxPrecision), Value: value}, nil
+	return &Decimal{Precition: int(maxPrecision), Value: value}, nil
 }
 
 // String returns the string representation of a Decimal instance
@@ -171,6 +216,27 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
+
+// Mul muls two Decimal instances and returns a new Decimal instance
+func (d *Decimal) Mul(other *big.Int) *Decimal {
+	if d == nil || other == nil {
+		return nil
+	}
+	value := new(big.Int).Mul(d.Value, other)
+	return &Decimal{Precition: d.Precition, Value: value}
+}
+
+
+// Div divs two Decimal instances and returns a new Decimal instance
+func (d *Decimal) Div(other *big.Int) *Decimal {
+	if d == nil || other == nil {
+		return nil
+	}
+	value := new(big.Int).Div(d.Value, other)
+	return &Decimal{Precition: d.Precition, Value: value}
+}
+
+
 func (d *Decimal) Cmp(other *Decimal) int {
 	if d == nil && other == nil {
 		return 0
@@ -182,7 +248,7 @@ func (d *Decimal) Cmp(other *Decimal) int {
 		return -other.Value.Sign()
 	}
 	if d.Precition != other.Precition {
-		Log.Panicf(fmt.Sprintf("precition not match, (%d != %d)", d.Precition, other.Precition))
+		Log.Panicf("precition not match, (%d != %d)", d.Precition, other.Precition)
 	}
 	return d.Value.Cmp(other.Value)
 }
@@ -207,21 +273,21 @@ func (d *Decimal) Sign() int {
 	return d.Value.Sign()
 }
 
-func (d *Decimal) IsOverflowUint64() bool {
+func (d *Decimal) IsOverflowInt64() bool {
 	if d == nil {
 		return false
 	}
 
-	integerPart := new(big.Int).SetUint64(math.MaxUint64)
+	integerPart := new(big.Int).SetInt64(math.MaxInt64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
 	return d.Value.Cmp(value) > 0
 }
 
-func (d *Decimal) GetMaxUint64() *Decimal {
+func (d *Decimal) GetMaxInt64() *Decimal {
 	if d == nil {
 		return nil
 	}
-	integerPart := new(big.Int).SetUint64(math.MaxUint64)
+	integerPart := new(big.Int).SetInt64(math.MaxInt64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
 	return &Decimal{Precition: d.Precition, Value: value}
 }
@@ -267,12 +333,12 @@ func (d *Decimal) ToInt64WithMax(max int64) (int64) {
 	if scaleIndex < 0 {
 		scaleIndex = 0
 	}
-	scaleFactor := math.Pow10(scaleIndex)
-
-	return int64(d.Float64() * scaleFactor)
+	value := new(big.Int).Mul(d.Value, precisionFactor[scaleIndex])
+	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
+	return quotient.Int64()
 }
 
-func NewDecimalFromInt64WithMax(value int64, max int64, precision uint) (*Decimal, error) {
+func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal, error) {
 	if max <= 0 {
 		return nil, fmt.Errorf("invalid max %d", max)
 	}
@@ -282,26 +348,11 @@ func NewDecimalFromInt64WithMax(value int64, max int64, precision uint) (*Decima
 	if scaleIndex < 0 {
 		scaleIndex = 0
 	}
-	scaleFactor := math.Pow10(scaleIndex)
 
 	// 计算浮点值
-	floatValue := float64(value) / scaleFactor
-
-	// 转换浮点值为 Decimal 的整数表示
-	integerPart := int64(floatValue)
-	fractionPart := floatValue - float64(integerPart)
-
-	valueBigInt := new(big.Int).SetInt64(integerPart)
-	if fractionPart > 0 {
-		fractionBigInt := big.NewInt(int64(fractionPart * math.Pow10(int(precision))))
-		valueBigInt.Mul(valueBigInt, precisionFactor[precision])
-		valueBigInt.Add(valueBigInt, fractionBigInt)
-	} else {
-		valueBigInt.Mul(valueBigInt, precisionFactor[precision])
-	}
-
-	return &Decimal{
-		Value:     valueBigInt,
-		Precition: precision,
-	}, nil
+	bigValue := new(big.Int).Mul(new(big.Int).SetInt64(value), precisionFactor[precision])
+	bigValue = new(big.Int).Div(bigValue, precisionFactor[scaleIndex])
+	
+	result := &Decimal{Precition: precision, Value: bigValue}
+	return result, nil
 }
