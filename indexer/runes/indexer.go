@@ -117,10 +117,6 @@ func (b *Indexer) Subtract(backupIndexer *Indexer) {
 	// no need
 }
 
-func (s *Indexer) Subtract(old *Indexer) {
-	
-}
-
 func (s *Indexer) CheckSelf() bool {
 	return true
 }
