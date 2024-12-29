@@ -1,6 +1,8 @@
 package runes
 
 import (
+	"time"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
@@ -13,6 +15,8 @@ import (
 
 type Indexer struct {
 	db                        *badger.DB
+	cloneTimeStamp            int64
+	isUpdateing               bool
 	wb                        *badger.WriteBatch
 	cacheLogs                 map[string]*store.CacheLog
 	chaincfgParam             *chaincfg.Params
@@ -32,11 +36,10 @@ type Indexer struct {
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params) *Indexer {
 	store.SetDB(db)
-	cacheLog := make(map[string]*store.CacheLog)
-	store.SetCacheLogs(cacheLog)
 	return &Indexer{
 		db:                        db,
-		cacheLogs:                 cacheLog,
+		cloneTimeStamp:            0,
+		cacheLogs:                 nil,
 		chaincfgParam:             param,
 		runeLedger:                nil,
 		burnedMap:                 nil,
@@ -95,26 +98,28 @@ func (s *Indexer) Init() {
 
 func (s *Indexer) Clone() *Indexer {
 	cloneIndex := NewIndexer(s.db, s.chaincfgParam)
-	if len(s.cacheLogs) == 0 {
-		return cloneIndex
-	}
-	for key, value := range s.cacheLogs {
+	for k, v := range s.cacheLogs {
 		cacheLog := &store.CacheLog{
-			Type:      value.Type,
-			ExistInDb: value.ExistInDb,
+			Type:      v.Type,
+			ExistInDb: v.ExistInDb,
+			TimeStamp: v.TimeStamp,
 		}
-		if value.Val != nil {
-			cacheLog.Val = make([]byte, len(value.Val))
-			copy(cacheLog.Val, value.Val)
+		if v.Val != nil {
+			cacheLog.Val = make([]byte, len(v.Val))
+			copy(cacheLog.Val, v.Val)
 		}
-		cloneIndex.cacheLogs[key] = cacheLog
+		cloneIndex.cacheLogs[k] = cacheLog
 	}
-	store.SetCacheLogs(cloneIndex.cacheLogs)
+	cloneIndex.cloneTimeStamp = time.Now().UnixNano()
 	return cloneIndex
 }
 
 func (b *Indexer) Subtract(backupIndexer *Indexer) {
-	// no need
+	for k, v := range backupIndexer.cacheLogs {
+		if v.TimeStamp <= b.cloneTimeStamp {
+			delete(b.cacheLogs, k)
+		}
+	}
 }
 
 func (s *Indexer) CheckSelf() bool {

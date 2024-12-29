@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
@@ -20,6 +21,7 @@ type CacheLog struct {
 	Val       []byte
 	Type      ActionType
 	ExistInDb bool
+	TimeStamp int64
 }
 
 var (
@@ -81,10 +83,6 @@ func FlushToDB() {
 	})
 }
 
-func ResetCache() {
-	logs = make(map[string]*CacheLog)
-}
-
 func (s *Cache[T]) Get(key []byte) (ret *T) {
 	keyStr := string(key)
 	action := logs[keyStr]
@@ -106,6 +104,7 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 			Val:       raw,
 			Type:      INIT,
 			ExistInDb: true,
+			TimeStamp: 0,
 		}
 	}
 	return
@@ -118,6 +117,7 @@ func (s *Cache[T]) Delete(key []byte) (ret *T) {
 	}
 	log := logs[string(key)]
 	log.Type = DEL
+	log.TimeStamp = time.Now().UnixNano()
 	return
 }
 
@@ -134,6 +134,7 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 	}
 	log.Val = val
 	log.Type = PUT
+	log.TimeStamp = time.Now().UnixNano()
 	return
 }
 

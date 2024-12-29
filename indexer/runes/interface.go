@@ -127,7 +127,7 @@ func (s *Indexer) GetHolders(ticker string, start, limit int) ([]*runestone.Rune
 	return holders, 0
 }
 
-func (s *Indexer) GetMintHistory(ticker string, start, limit int) (runestone.RuneMintHistorys, int) {
+func (s *Indexer) GetMintHistory(ticker string, start, limit int) ([]*runestone.RuneMintHistory, int) {
 	r, err := runestone.RuneFromString(ticker)
 	if err != nil {
 		common.Log.Debugf("RuneIndexer.GetMintHistory-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
@@ -137,17 +137,22 @@ func (s *Indexer) GetMintHistory(ticker string, start, limit int) (runestone.Run
 	if mintHistorys == nil {
 		return nil, 0
 	}
-	end := len(mintHistorys)
+	total := len(mintHistorys)
+	var ret []*runestone.RuneMintHistory = make([]*runestone.RuneMintHistory, total)
+	for _, v := range mintHistorys {
+		ret = append(ret, v)
+	}
+	end := total
 	if start >= end {
 		return nil, 0
 	}
 	if start+limit < end {
 		end = start + limit
 	}
-	return mintHistorys[start:end], end
+	return ret[start:end], end
 }
 
-func (s *Indexer) GetAddressMintHistory(address runestone.Address, ticker string, start, limit int) (runestone.RuneMintHistorys, int) {
+func (s *Indexer) GetAddressMintHistory(address runestone.Address, ticker string, start, limit int) ([]*runestone.RuneMintHistory, int) {
 	r, err := runestone.RuneFromString(ticker)
 	if err != nil {
 		common.Log.Debugf("RuneIndexer.GetAddressMintHistory-> runestone.RuneFromString(%s) err:%v", ticker, err.Error())
@@ -158,19 +163,22 @@ func (s *Indexer) GetAddressMintHistory(address runestone.Address, ticker string
 		common.Log.Infof("RuneIndexer.GetAddressMintHistory-> runeLedgerTbl.GetFromDB(%s) rune not found, ticker: %s", address, ticker)
 		return nil, 0
 	}
-
 	mintHistorys := make(runestone.RuneMintHistorys, len(ledger.Assets[*r].Mints))
 	mints := ledger.Assets[*r].Mints
-	for i, mint := range mints {
+	for _, mint := range mints {
 		mintHistory := &runestone.RuneMintHistory{
 			Address: address,
 			Rune:    *r,
 			Utxo:    mint.String(),
 		}
-		mintHistorys[i] = mintHistory
+		key := mintHistory.GetKey()
+		mintHistorys[key] = mintHistory
 	}
-
 	total := len(mintHistorys)
+	var ret []*runestone.RuneMintHistory = make([]*runestone.RuneMintHistory, total)
+	for _, v := range mintHistorys {
+		ret = append(ret, v)
+	}
 	end := total
 	if start >= end {
 		return nil, 0
@@ -178,8 +186,7 @@ func (s *Indexer) GetAddressMintHistory(address runestone.Address, ticker string
 	if start+limit < end {
 		end = start + limit
 	}
-
-	return mintHistorys[start:end], total
+	return ret[start:end], total
 }
 
 func (s *Indexer) GetMintAmount(ticker string) (mint uint64, supply uint64) {

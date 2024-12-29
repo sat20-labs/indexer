@@ -19,33 +19,40 @@ func (s *Indexer) UpdateDB() {
 	if s.wb == nil {
 		return
 	}
+
+	store.SetCacheLogs(s.cacheLogs)
 	store.FlushToDB()
 	s.status.Height = s.height
 	s.status.FlushToDB()
 
 	s.wb = nil
+	s.isUpdateing = false
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d", s.status.Height)
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
-	if block.Height != 0 {
-		if s.status.Height < uint64(block.Height-1) {
-			common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.status.Height, block.Height-1)
-		} else if s.status.Height >= uint64(block.Height) {
-			common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.status.Height, block.Height)
-			return
+	if !s.isUpdateing {
+		if block.Height > 0 {
+			if s.status.Height < uint64(block.Height-1) {
+				common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.status.Height, block.Height-1)
+			} else if s.status.Height >= uint64(block.Height) {
+				common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.status.Height, block.Height)
+				return
+			}
+		} else {
+			if s.status.Height > uint64(block.Height) {
+				common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.status.Height, block.Height)
+				return
+			}
 		}
-	} else {
-		if s.status.Height > uint64(block.Height) {
-			common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.status.Height, block.Height)
-			return
-		}
+		s.isUpdateing = true
 	}
 
 	if s.wb == nil {
 		s.wb = s.db.NewWriteBatch()
 		store.SetWriteBatch(s.wb)
-		store.ResetCache()
+		s.cacheLogs = make(map[string]*store.CacheLog)
+		store.SetCacheLogs(s.cacheLogs)
 	}
 
 	s.height = uint64(block.Height)
@@ -436,11 +443,13 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 						mintHistorys = make(runestone.RuneMintHistorys, 0)
 					}
 					for _, v := range runeAsset.Mints {
-						mintHistorys = append(mintHistorys, &runestone.RuneMintHistory{
+						runeMintHistory := &runestone.RuneMintHistory{
 							Address: *pAddress,
 							Rune:    r,
 							Utxo:    v.String(),
-						})
+						}
+						key := runeMintHistory.GetKey()
+						mintHistorys[key] = runeMintHistory
 					}
 					if len(mintHistorys) > 0 {
 						s.runeMintHistorysTbl.Insert(&r, mintHistorys)

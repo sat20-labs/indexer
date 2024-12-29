@@ -1,6 +1,8 @@
 package runestone
 
 import (
+	"strings"
+
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
@@ -11,38 +13,34 @@ type RuneMintHistory struct {
 	Utxo    string
 }
 
-func (s *RuneMintHistory) ToPb() (ret *pb.RuneMintHistory) {
-	ret = &pb.RuneMintHistory{
-		Address: string(s.Address),
-		Rune:    s.Rune.ToPb(),
-		Utxo:    s.Utxo,
-	}
-	return ret
+func (s *RuneMintHistory) FromPb(key string) {
+	parts := strings.SplitN(key, ":", 3)
+	s.Address = Address(parts[0])
+	s.Rune = *NewRune(Uint128FromString(parts[1]))
+	s.Utxo = parts[2]
 }
 
-func (s *RuneMintHistory) FromPb(pbVal *pb.RuneMintHistory) {
-	s.Address = Address(pbVal.Address)
-	s.Rune.FromPb(pbVal.Rune)
-	s.Utxo = pbVal.Utxo
+func (s *RuneMintHistory) GetKey() string {
+	return string(s.Address) + ":" + s.Rune.String() + ":" + s.Utxo
 }
 
-type RuneMintHistorys []*RuneMintHistory
+type RuneMintHistorys map[string]*RuneMintHistory
 
-func (s *RuneMintHistorys) ToPb() (ret *pb.RuneMintHistorys) {
+func (s RuneMintHistorys) ToPb() (ret *pb.RuneMintHistorys) {
 	ret = &pb.RuneMintHistorys{
-		MintHistorys: make([]*pb.RuneMintHistory, len(*s)),
+		MintHistorys: make(map[string]*pb.RuneMintHistory, len(s)),
 	}
-	for i, v := range *s {
-		ret.MintHistorys[i] = v.ToPb()
+	for k := range s {
+		ret.MintHistorys[k] = &pb.RuneMintHistory{}
 	}
 	return ret
 }
 
-func (s *RuneMintHistorys) FromPb(pbVal *pb.RuneMintHistorys) {
-	for _, v := range pbVal.MintHistorys {
+func (s RuneMintHistorys) FromPb(pbVal *pb.RuneMintHistorys) {
+	for key := range pbVal.MintHistorys {
 		runeMintHistory := &RuneMintHistory{}
-		runeMintHistory.FromPb(v)
-		*s = append(*s, runeMintHistory)
+		runeMintHistory.FromPb(key)
+		s[key] = runeMintHistory
 	}
 }
 
