@@ -168,8 +168,8 @@ func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*Addr
 	ret := make([]*AddressAsset, total)
 	for spacedRune, lot := range spaceRuneLotMap {
 		addressLot := &AddressAsset{
-			SpacedRune: &spacedRune,
-			Balance:    *lot.Value,
+			Rune:    spacedRune.String(),
+			Balance: *lot.Value,
 		}
 		ret = append(ret, addressLot)
 	}
@@ -188,7 +188,7 @@ func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*Addr
 *
 desc: 根据utxo获取ticker名字和资产数量
 */
-func (s *Indexer) GetUtxoAssets(utxo string, start, limit uint64) ([]*UtxoAsset, uint64) {
+func (s *Indexer) GetUtxoAssets(utxo string, start, limit uint64) []*UtxoAsset {
 	outpoint := &runestone.OutPoint{}
 	outpoint.FromString(utxo)
 	balances := s.outpointToRuneBalancesTbl.GetFromDB(outpoint)
@@ -196,20 +196,11 @@ func (s *Indexer) GetUtxoAssets(utxo string, start, limit uint64) ([]*UtxoAsset,
 	for _, balance := range balances {
 		runeEntry := s.idToEntryTbl.GetFromDB(&balance.RuneId)
 		ret = append(ret, &UtxoAsset{
-			SpacedRune: &runeEntry.SpacedRune,
-			Balance:    *balance.Lot.Value,
+			Rune:    runeEntry.SpacedRune.String(),
+			Balance: *balance.Lot.Value,
 		})
 	}
-
-	total := uint64(len(ret))
-	end := total
-	if start >= end {
-		return nil, 0
-	}
-	if start+limit < end {
-		end = start + limit
-	}
-	return ret[start:end], end
+	return ret
 }
 
 /*

@@ -3,6 +3,7 @@ package runes
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/OLProtocol/go-bitcoind"
@@ -136,17 +137,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			allocated[uint32(outputIndex)] = make(runestone.RuneIdLotMap)
 		}
 
-		type RuneTransfer struct {
-			Rune   *runestone.Rune
-			RuneId *runestone.RuneId
-			Amount *runestone.Lot
-			// Output uint32
-		}
-		type RuneTransferMap map[uint32]*RuneTransfer
-		runeTransfers := make(RuneTransferMap)
-
 		var bornedRuneEntry *runestone.RuneEntry
 		var mintAmount *runestone.Lot
+		var mintOutIndex *uint32
 		mintRuneId := artifact.Mint()
 		if mintRuneId != nil {
 			var err error
@@ -198,29 +191,14 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				}
 
 				// transfers
-				var transferRune *runestone.Rune
-				var transferId *runestone.RuneId
 				if edict.ID.Cmp(zeroId) == 0 {
 					if etchedRune == nil {
 						common.Log.Panicf("RuneIndexer.index_runes-> etched rune not found")
 					}
-					transferRune = etchedRune
-					transferId = etchedId
 				} else {
 					runeEntry := s.idToEntryTbl.Get(id)
 					if runeEntry == nil {
 						common.Log.Panicf("RuneIndexer.index_runes-> rune entry not found")
-					}
-					transferRune = &runeEntry.SpacedRune.Rune
-					transferId = id
-				}
-
-				setRuneTransfers := func(amount *runestone.Lot, output uint32) {
-					if amount.Value.Cmp(uint128.Zero) > 0 {
-						if runeTransfers[output] == nil {
-							runeTransfers[output] = &RuneTransfer{transferRune, transferId, runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})}
-						}
-						runeTransfers[output].Amount.AddAssign(amount)
 					}
 				}
 
@@ -250,12 +228,10 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 									amount = amount.AddUint128(&one)
 								}
 								allocate(balance, &amount, output)
-								setRuneTransfers(&amount, output)
 							}
 						} else {
 							for _, output := range destinations {
 								allocate(balance, amount, output)
-								setRuneTransfers(amount, output)
 							}
 						}
 					}
@@ -269,7 +245,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 						}
 					}
 					allocate(balance, amount, output)
-					setRuneTransfers(amount, output)
 				}
 			}
 		}
@@ -290,18 +265,18 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			// assign all un-allocated runes to the default output, or the first non
 			// OP_RETURN output if there is no default
 			find := false
-			var outIndex *uint32
+
 			if pointer == nil {
 				for index, v := range tx.Outputs {
 					if v.Address.PkScript[0] != txscript.OP_RETURN {
 						u32Index := uint32(index)
-						outIndex = &u32Index
+						mintOutIndex = &u32Index
 						find = true
 						break
 					}
 				}
 			} else if (*pointer) < uint32(len(allocated)) {
-				outIndex = pointer
+				mintOutIndex = pointer
 				find = true
 			} else if (*pointer) >= uint32(len(allocated)) {
 				common.Log.Panicf("RuneIndexer.index_runes-> pointer out of range")
@@ -309,7 +284,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			if find {
 				for id, balance := range unallocated {
 					if balance.Value.Cmp(uint128.Zero) > 0 {
-						allocated[*outIndex].GetOrDefault(&id).AddAssign(balance)
+						allocated[*mintOutIndex].GetOrDefault(&id).AddAssign(balance)
 					}
 				}
 			} else {
@@ -381,9 +356,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		// update runeIdToMintHistory
 		if mintAmount != nil {
+			common.Log.Infof("RuneIndexer.index_runes-> mintAmount:%v", mintOutIndex)
+			utxo := fmt.Sprintf("%s:%d", tx.Txid, mintOutIndex)
 			v := &runestone.RuneIdToMintHistory{
 				RuneId: mintRuneId,
-				Txid:   runestone.Txid(tx.Txid),
+				Utxo:   runestone.Utxo(utxo),
 			}
 			s.runeIdToMintHistoryTbl.Insert(v)
 		}

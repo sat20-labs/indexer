@@ -206,40 +206,46 @@ func (s *UtxoBalances) UnmarshalJSON(data []byte) error {
 }
 
 type AddressAsset struct {
-	SpacedRune *runestone.SpacedRune
-	Balance    uint128.Uint128
+	Rune    string
+	Balance uint128.Uint128
 }
 
 func (s AddressAsset) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		SpacedRune string `json:"spacedrune"`
-		Balance    string `json:"balance"`
+		Rune    string `json:"rune"`
+		Balance string `json:"balance"`
 	}{
-		SpacedRune: s.SpacedRune.String(),
-		Balance:    s.Balance.String(),
+		Rune:    s.Rune,
+		Balance: s.Balance.String(),
 	})
 }
 
 func (s *AddressAsset) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		SpacedRune string `json:"spacedrune"`
-		Balance    string `json:"balance"`
+		Rune    string `json:"rune"`
+		Balance string `json:"balance"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	var err error
-	s.SpacedRune, err = runestone.SpacedRuneFromString(aux.SpacedRune)
+	_, err = runestone.SpacedRuneFromString(aux.Rune)
 	if err != nil {
 		return err
 	}
+	s.Rune = aux.Rune
 	s.Balance, err = uint128.FromString(aux.Balance)
 	return err
 }
 
 type UtxoAsset struct {
-	SpacedRune *runestone.SpacedRune
-	Balance    uint128.Uint128
+	Rune    string
+	Balance uint128.Uint128
+}
+
+type MintHistory struct {
+	Utxo   string
+	Amount uint128.Uint128
 }
 
 type Edict struct {

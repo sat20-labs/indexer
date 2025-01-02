@@ -44,16 +44,16 @@ func NewAddressRuneIdToMintHistoryTable(cache *store.Cache[pb.AddressRuneIdToMin
 	return &AddressRuneIdToMintHistoryTable{Table: Table[pb.AddressRuneIdToMintHistory]{cache: cache}}
 }
 
-func (s *AddressRuneIdToMintHistoryTable) GetTxidsFromDB(address Address, runeId *RuneId) (ret []Txid) {
+func (s *AddressRuneIdToMintHistoryTable) GetUtxosFromDB(address Address, runeId *RuneId) (ret []Utxo) {
 	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + string(address) + "-" + runeId.String() + "-")
 	pbVal := s.cache.GetListFromDB(tblKey, false)
 
 	if pbVal != nil {
-		ret = make([]Txid, 0)
+		ret = make([]Utxo, 0)
 		for k := range pbVal {
 			v := &RuneIdToMintHistory{}
 			v.FromString(k)
-			ret = append(ret, v.Txid)
+			ret = append(ret, v.Utxo)
 		}
 	}
 	return

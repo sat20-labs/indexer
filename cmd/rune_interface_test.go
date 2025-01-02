@@ -62,8 +62,8 @@ func TestInterface1(t *testing.T) {
 		t.Logf("GetAddressAssets return addressAssets %d: %+v\n", i, v)
 	}
 	// 7
-	utxoAssets, total := runesIndexer.GetUtxoAssets(firstRuneName, 0, 10)
-	t.Logf("GetUtxoAssets return utxoAssets total count: %d\n", total)
+	utxoAssets := runesIndexer.GetUtxoAssets(firstRuneName, 0, 10)
+	t.Logf("GetUtxoAssets return utxoAssets total count: %d\n", len(utxoAssets))
 	for i, v := range utxoAssets {
 		t.Logf("GetUtxoAssets return utxoAssets %d: %+v\n", i, v)
 	}
