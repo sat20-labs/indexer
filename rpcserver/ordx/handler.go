@@ -104,6 +104,47 @@ func (s *Handle) isDeployAllowed(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func (s *Handle) getMintableTickers(c *gin.Context) {
+	resp := &rpcwire.StatusListResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: &rpcwire.StatusListData{
+			ListResp: rpcwire.ListResp{
+				Total: 0,
+				Start: 0,
+			},
+			Height: uint64(0),
+			Detail: nil,
+		},
+	}
+
+	protocol := c.Param("protocol")
+	if protocol == "" {
+		protocol = "ordx"
+	}
+
+	height := s.model.GetSyncHeight()
+	ticklist, err := s.model.GetMintableTickerList(protocol)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	} else {
+		resp.Data = &rpcwire.StatusListData{
+			ListResp: rpcwire.ListResp{
+				Total: uint64(len(ticklist)),
+				Start: 0,
+			},
+			Height: uint64(height),
+			Detail: ticklist,
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
 // @Summary Get status list for all tickers
 // @Description Get status list for all tickers
 // @Tags ordx

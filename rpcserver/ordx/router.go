@@ -54,6 +54,7 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// inscribe
 	// 检查某个ticker是否可以deploy
 	r.GET(proxy+"/deploy/:ticker/:address", s.handle.isDeployAllowed)
+	r.GET(proxy+"/deploy/mintable/:protocol", s.handle.getMintableTickers)
 	r.POST(proxy+"/collection", s.handle.addCollection)
 
 	// ft

@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/sat20-labs/indexer/common"
-	ordx "github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
@@ -21,10 +20,10 @@ func NewModel(indexer base_indexer.Indexer) *Model {
 	}
 }
 
-func (s *Model) newTickerStatusResp(ticker *ordx.Ticker) *rpcwire.TickerStatus {
-	txid, _, err := ordx.ParseOrdInscriptionID(ticker.Base.InscriptionId)
+func (s *Model) newTickerStatusResp(ticker *common.Ticker) *rpcwire.TickerStatus {
+	txid, _, err := common.ParseOrdInscriptionID(ticker.Base.InscriptionId)
 	if err != nil {
-		ordx.Log.Warnf("ordx.Model.GetTickStatusList-> parse ticker utxo error: %s, ticker: %v", err.Error(), ticker)
+		common.Log.Warnf("ordx.Model.GetTickStatusList-> parse ticker utxo error: %s, ticker: %v", err.Error(), ticker)
 		return nil
 	}
 
@@ -67,6 +66,10 @@ func (s *Model) getTickStatusMap() (map[string]*rpcwire.TickerStatus, error) {
 		ret[tickerName] = tickerStatusResp
 	}
 	return ret, nil
+}
+
+func (s *Model) getMintableTickStatusMap(protocol string) (map[string]*rpcwire.TickerStatus, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (s *Model) getTicker(tickerName string) (*rpcwire.TickerStatus, error) {
