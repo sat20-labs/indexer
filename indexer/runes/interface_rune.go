@@ -15,8 +15,8 @@ import (
 desc: 获取所有ticker
 */
 func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint64) {
-	list := s.idToEntryTbl.GetListFromDB()
-	for _, v := range list {
+	runeEntrys := s.idToEntryTbl.GetListFromDB()
+	for _, v := range runeEntrys {
 		supply := v.Supply()
 		terms := v.Terms
 		percentage := GetPercentage(&v.Premine, &supply)
@@ -71,7 +71,15 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 		ret = append(ret, runeInfo)
 	}
 
-	return nil, 0
+	total = uint64(len(ret))
+	end := total
+	if start >= end {
+		return nil, 0
+	}
+	if start+limit < end {
+		end = start + limit
+	}
+	return ret[start:end], end
 }
 
 /*
@@ -84,8 +92,6 @@ func (s *Indexer) GetRuneInfo(ticker string) (ret *RuneInfo) {
 		common.Log.Infof("RuneIndexer.GetRuneInfo-> runestone.SpacedRuneFromString(%s) err:%s", ticker, err.Error())
 		return nil
 	}
-	name := spaceRune.Rune.String()
-	common.Log.Infof("RuneIndexer.GetRuneInfo-> name:%s", name)
 	runeId := s.runeToIdTbl.GetFromDB(&spaceRune.Rune)
 	if runeId == nil {
 		common.Log.Errorf("RuneIndexer.GetRuneInfo-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
@@ -106,6 +112,36 @@ func (s *Indexer) GetRuneInfo(ticker string) (ret *RuneInfo) {
 		Symbol:             string(*runeEntry.Symbol),
 		Turbo:              runeEntry.Turbo,
 		Etching:            runeEntry.Etching,
+	}
+	terms := runeEntry.Terms
+	if terms != nil {
+		ret.MintInfo = &MintInfo{}
+		if len(terms.Height) > 0 {
+			if terms.Height[0] != nil {
+				ret.MintInfo.Start = strconv.FormatUint(*terms.Height[0], 10)
+			}
+			if terms.Height[1] != nil {
+				ret.MintInfo.End = strconv.FormatUint(*terms.Height[1], 10)
+			}
+		}
+		if terms.Amount != nil {
+			ret.MintInfo.Amount = runeEntry.Pile(*terms.Amount).String()
+		}
+		ret.MintInfo.Mints = runeEntry.Mints
+		if terms.Cap != nil {
+			ret.MintInfo.Cap = *terms.Cap
+		}
+		ret.MintInfo.Remaining = ret.MintInfo.Cap.Sub(ret.MintInfo.Mints)
+
+		_, err := runeEntry.Mintable(s.Status.Height + 1)
+		ret.MintInfo.Mintable = err == nil
+
+		if ret.MintInfo.Mintable {
+			if runeEntry.Terms.Cap.Cmp(uint128.Zero) > 0 {
+				mintProgress := GetPercentage(&ret.MintInfo.Mints, &ret.MintInfo.Cap)
+				ret.MintInfo.Progress = mintProgress.String()
+			}
+		}
 	}
 	if runeEntry.Parent != nil {
 		ret.Parent = string(*runeEntry.Parent)

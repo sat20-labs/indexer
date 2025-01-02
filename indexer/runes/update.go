@@ -41,6 +41,13 @@ func (s *Indexer) UpdateDB() {
 		}
 	}
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count: %d, db del count: %d", s.Status.Height, setCount, delCount)
+
+	// firstRuneName := "BESTINSLOT•XYZ"
+	// spaceRune, _ := runestone.SpacedRuneFromString(firstRuneName)
+	// runeId := s.runeToIdTbl.GetFromDB(&spaceRune.Rune)
+	// if runeId != nil {
+	// 	common.Log.Infof("RuneIndexer.UpdateDB-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", spaceRune.String(), firstRuneName)
+	// }
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
@@ -69,9 +76,6 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	}
 
 	s.height = uint64(block.Height)
-	if s.height == 0 {
-		common.Log.Info("RuneIndexer.UpdateTransfer-> block height is 0")
-	}
 	s.burnedMap = make(runestone.RuneIdLotMap)
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
 	s.minimumRune = &minimum
@@ -356,7 +360,10 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		// update runeIdToMintHistory
 		if mintAmount != nil {
-			common.Log.Infof("RuneIndexer.index_runes-> mintAmount:%v", mintOutIndex)
+			if mintOutIndex == nil {
+				common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
+			}
+			// common.Log.Infof("RuneIndexer.index_runes-> mintAmount:%d", *mintOutIndex)
 			utxo := fmt.Sprintf("%s:%d", tx.Txid, mintOutIndex)
 			v := &runestone.RuneIdToMintHistory{
 				RuneId: mintRuneId,

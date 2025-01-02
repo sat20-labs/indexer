@@ -43,8 +43,9 @@ func (s *RuneIdToEntryTable) GetListFromDB() (ret map[string]*RuneEntry) {
 	}
 	ret = make(map[string]*RuneEntry)
 	for k, v := range list {
-		ret[k] = &RuneEntry{}
-		ret[k].FromPb(v)
+		key := k[len(prefixKey):]
+		ret[key] = &RuneEntry{}
+		ret[key].FromPb(v)
 	}
 	return ret
 }
