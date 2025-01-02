@@ -59,6 +59,24 @@ func (s *Model) GetTickerStatusList() ([]*rpcwire.TickerStatus, error) {
 	return ret, nil
 }
 
+
+func (s *Model) GetMintableTickerList(protocol string) ([]*rpcwire.TickerStatus, error) {
+	tickerStatusRespMap, err := s.getMintableTickStatusMap(protocol)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make([]*rpcwire.TickerStatus, 0)
+	for _, tickerStatusResp := range tickerStatusRespMap {
+		ret = append(ret, tickerStatusResp)
+	}
+
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i].ID < ret[j].ID
+	})
+	return ret, nil
+}
+
 func (s *Model) GetTickerStatus(tickerName string) (*rpcwire.TickerStatus, error) {
 	return s.getTicker(tickerName)
 }
