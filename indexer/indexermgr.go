@@ -53,10 +53,10 @@ type IndexerMgr struct {
 	compilingBackupDB *base_indexer.BaseIndexer
 	exoticBackupDB    *exotic.ExoticIndexer
 	brc20BackupDB     *brc20.BRC20Indexer
-	runesBackupDB	  *runes.Indexer
-	ftBackupDB  *ft.FTIndexer
-	nsBackupDB  *ns.NameService
-	nftBackupDB *nft.NftIndexer
+	runesBackupDB     *runes.Indexer
+	ftBackupDB        *ft.FTIndexer
+	nsBackupDB        *ns.NameService
+	nftBackupDB       *nft.NftIndexer
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
 
@@ -83,10 +83,10 @@ func NewIndexerMgr(
 	}
 
 	mgr := &IndexerMgr{
-		dbDir:             dbDir,
-		chaincfgParam:     chaincfgParam,
-		maxIndexHeight:    maxIndexHeight,
-		periodFlushToDB:   periodFlushToDB,
+		dbDir:           dbDir,
+		chaincfgParam:   chaincfgParam,
+		maxIndexHeight:  maxIndexHeight,
+		periodFlushToDB: periodFlushToDB,
 	}
 
 	instance = mgr
@@ -136,7 +136,7 @@ func (b *IndexerMgr) Init() {
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	b.runesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam)
+	b.runesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.rpcService)
 	b.runesIndexer.Init()
 
 	b.rpcService = base_indexer.NewRpcIndexer(b.compiling)
@@ -336,7 +336,7 @@ func (b *IndexerMgr) updateDB() {
 	// 到达高度时，将备份的数据写入数据库中。
 	if b.compilingBackupDB != nil {
 		if complingHeight-b.compilingBackupDB.GetHeight() < blocksInHistory {
-			common.Log.Infof("updateDB do nothing at height %d, backup instance %d", 
+			common.Log.Infof("updateDB do nothing at height %d, backup instance %d",
 				complingHeight, b.compilingBackupDB.GetHeight())
 			return
 		}

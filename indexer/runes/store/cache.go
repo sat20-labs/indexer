@@ -85,14 +85,14 @@ func FlushToDB() {
 
 func (s *Cache[T]) Get(key []byte) (ret *T) {
 	keyStr := string(key)
-	action := logs[keyStr]
-	if action != nil {
-		if action.Type == DEL {
+	log := logs[keyStr]
+	if log != nil {
+		if log.Type == DEL {
 			return
 		}
 		var out T
 		msg := any(&out).(proto.Message)
-		proto.Unmarshal(action.Val, msg)
+		proto.Unmarshal(log.Val, msg)
 		ret = &out
 		return
 	}
@@ -151,7 +151,7 @@ func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
 	}
 }
 
-func (s *Cache[T]) GetListFromDB(keyPrefix []byte) (ret map[string]*T) {
+func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
 	err := storeDb.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -162,23 +162,26 @@ func (s *Cache[T]) GetListFromDB(keyPrefix []byte) (ret map[string]*T) {
 			}
 
 			key := item.KeyCopy(nil)
-			v, err := item.ValueCopy(nil)
-			if err != nil {
-				return err
+			var out T
+			if isNeedValue {
+				v, err := item.ValueCopy(nil)
+				if err != nil {
+					return err
+				}
+				msg, ok := any(&out).(proto.Message)
+				if !ok {
+					return fmt.Errorf("type %T does not implement proto.Message", out)
+				}
+				err = proto.Unmarshal(v, msg)
+				if err != nil {
+					return err
+				}
 			}
 
-			var out T
-			msg, ok := any(&out).(proto.Message)
-			if !ok {
-				return fmt.Errorf("type %T does not implement proto.Message", out)
-			}
-			err = proto.Unmarshal(v, msg)
-			if err != nil {
-				return err
-			}
 			if ret == nil {
 				ret = make(map[string]*T)
 			}
+
 			ret[string(key)] = &out
 		}
 		return nil

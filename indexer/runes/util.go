@@ -2,9 +2,7 @@ package runes
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -15,19 +13,19 @@ import (
 	"lukechampine.com/uint128"
 )
 
-func ParseMintHistoryKey(input string) (string, string, error) {
-	if !strings.HasPrefix(input, DB_PREFIX_MINT_HISTORY) {
-		return "", "", fmt.Errorf("invalid string format")
-	}
-	str := strings.TrimPrefix(input, DB_PREFIX_MINT_HISTORY)
-	parts := strings.Split(str, "-")
+// func ParseMintHistoryKey(input string) (string, string, error) {
+// 	if !strings.HasPrefix(input, DB_PREFIX_MINT_HISTORY) {
+// 		return "", "", fmt.Errorf("invalid string format")
+// 	}
+// 	str := strings.TrimPrefix(input, DB_PREFIX_MINT_HISTORY)
+// 	parts := strings.Split(str, "-")
 
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid string format")
-	}
+// 	if len(parts) != 2 {
+// 		return "", "", fmt.Errorf("invalid string format")
+// 	}
 
-	return parts[0], parts[1], nil
-}
+// 	return parts[0], parts[1], nil
+// }
 
 /**
  * It must be the first INSCRIPTION encountered in the VOUTS of this transaction,
@@ -66,6 +64,9 @@ func parseTxVoutScriptAddress(transaction *common.Transaction, voutIndex int, pa
 	}
 	if len(addresses) == 0 {
 		return "", errors.New("no address")
+	}
+	if len(addresses) > 1 {
+		return "", errors.New("multiple addresses")
 	}
 	address = runestone.Address(addresses[0].EncodeAddress())
 	return

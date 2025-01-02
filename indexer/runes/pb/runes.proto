@@ -61,17 +61,12 @@ message RuneEntry {
     bool turbo = 14;
 }
 
-// runesStatus
 message RunesStatus {
     string version = 1;
     uint64 height = 2;
     uint64 number = 3;
     uint64 reserved_runes = 4;
 }
-
-
-// OutpointToBalances
-// message OutpointToBalances { map<string, OutpointToRuneBalances> outpoint_to_balance_value_map = 1; }
 
 message Lot {
     Uint128 value = 1;   
@@ -82,45 +77,7 @@ message RuneIdLot {
 }
 
 message OutpointToRuneBalances { repeated RuneIdLot rune_id_lots = 1; }
-
-message OutPoint {
-	string txid = 1;
-	uint32 vout = 2;
-}
-
-message Edict {
-	RuneId id = 1;
-	Uint128 amount = 2;
-    uint32 output = 3;
-}
-
-message Cenotaph {
-    Rune Etching = 1;
-    int32 Flaw = 2;
-    RuneId mint = 3;
-}
-
-message RuneAsset { 
-    Uint128 balance = 1;
-    bool is_etching = 2;
-    repeated OutPoint mints = 3;
-    repeated Edict transfers = 4;
-}
-
-message RuneLedger { 
-    map<string, RuneAsset> assets = 1; 
-}
-
-message RuneHolder { 
-    string address = 1;
-    Uint128 balance = 2;
-}
-message RuneHolders { repeated RuneHolder holders = 1; }
-
-
-
-message RuneMintHistory {}
-
-message RuneMintHistorys { 
-    map<string, RuneMintHistory> mintHistorys = 1; 
-}
+message RuneIdToAddress {}
+message RuneIdToOutpoint {}
+message RuneIdToMintHistory {}
+message AddressRuneIdToMintHistory {}

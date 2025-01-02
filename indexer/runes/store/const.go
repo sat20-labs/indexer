@@ -7,17 +7,34 @@ const (
 )
 
 const (
-	OUTPOINT_TO_BALANCES   = "o2b-"
-	ID_TO_ENTRY            = "i2e-"
-	RUNE_TO_ID             = "r2i-"
-	TRANSACTION_ID_TO_RUNE = "ti2r-"
-	RUNE_LEDGER            = "rl-"
-	RUNE_TO_ADDRESS_HOLDER = "r2a-"
-	RUNE_TO_MINT_HISTORYS  = "r2m-"
-)
+	// 表: runeId映射runeEntry表
+	// 存储: key = i2r-%runeId% value = runeEntry
+	ID_TO_ENTRY = "a-"
 
-const (
-	DB_PREFIX_MINT_HISTORY = "m-"
-	DB_PREFIX_RUNE         = "r-"
-	DB_PREFIX_RUNE_HOLDER  = "h-"
+	// 表: runeEntry映射RuneId表
+	// 存储: key = r2i-%runeEntry% value = runeId
+	RUNE_TO_ID = "b-"
+
+	// 表: utox映射rune资产表
+	// 存储: key = o2b-%outpoint% value = runeIdLot
+	OUTPOINT_TO_BALANCES = "c-"
+
+	// 表: runeid映射拥有rune资产的address (new)
+	// 存储: key = rab-%runeid.string()-%address% value = nil
+	// 存放时机: 当rune资产发生变化时,需要更新这个表
+	RUNEID_TO_ADDRESS = "d-"
+
+	// 表: runeid映射拥有rune资产的utxo (new)
+	// 存储: key = rub-%runeid.string()%-%utxo% value = nil
+	// 存放时机: 当rune资产发生变化时,需要更新这个表
+	RUNEID_TO_UTXO = "e-"
+
+	// 表: runeid映射mint的utxo (new)
+	// 存储: key = rm-%runeid.string()%-%utxo% value = nil
+	// 存放时机:
+	RUNEID_TO_MINT_HISTORYS = "f-"
+
+	// 表: address和runeid映射mint的utxo (new)
+	// 存储: key = arm-%address%-%runeid.string()%-%utxo% value = nil
+	ADDRESS_RUNEID_TO_MINT_HISTORYS = "g-"
 )

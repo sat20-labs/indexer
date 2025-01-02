@@ -12,6 +12,7 @@ type RunesStatus struct {
 	Height        uint64
 	Number        uint64
 	ReservedRunes uint64
+	Desc          string
 }
 
 func NewRunesStatus(s *store.Cache[pb.RunesStatus]) *RunesStatus {

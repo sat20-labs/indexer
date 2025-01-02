@@ -1,6 +1,7 @@
 package runestone
 
 import (
+	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
@@ -18,6 +19,10 @@ func NewRuneToIdTable(v *store.Cache[pb.RuneId]) *RuneToIdTable {
 }
 
 func (s *RuneToIdTable) Insert(key *Rune, value *RuneId) (ret *RuneId) {
+	searchStr := key.String()
+	if searchStr == "BESTINSLOTXYZ" {
+		common.Log.Infof("RuneToIdTable.Insert-> searchStr: %s", searchStr)
+	}
 	tblKey := []byte(store.RUNE_TO_ID + key.String())
 	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {

@@ -21,7 +21,7 @@ func (s *OutPoint) String() string {
 	return fmt.Sprintf("%s:%d", s.Txid, s.Vout)
 }
 
-func (s *OutPoint) From(str string) error {
+func (s *OutPoint) FromString(str string) error {
 	parts := strings.Split(str, ":")
 	if len(parts) != 2 {
 		return errors.New("invalid format: expected 'txid:vout'")
@@ -121,11 +121,21 @@ func NewOutpointToRuneBalancesTable(s *store.Cache[pb.OutpointToRuneBalances]) *
 	return &OutpointToRuneBalancesTable{Table: Table[pb.OutpointToRuneBalances]{cache: s}}
 }
 
-func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret *OutpointToRuneBalances) {
+func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret OutpointToRuneBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
-		ret = &OutpointToRuneBalances{}
+		ret = OutpointToRuneBalances{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
+
+func (s *OutpointToRuneBalancesTable) GetFromDB(key *OutPoint) (ret OutpointToRuneBalances) {
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	pbVal, _ := s.cache.GetFromDB(tblKey)
+	if pbVal != nil {
+		ret = OutpointToRuneBalances{}
 		ret.FromPb(pbVal)
 	}
 	return

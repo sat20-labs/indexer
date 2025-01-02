@@ -3,6 +3,7 @@ package runestone
 import (
 	"errors"
 	"math/big"
+	"sort"
 	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/txscript"
@@ -231,6 +232,120 @@ func (r *Runestone) Decipher(transaction *wire.MsgTx) (*Artifact, error) {
 			Pointer: pointer,
 		},
 	}, nil
+}
+
+func (r *Runestone) Encipher() ([]byte, error) {
+
+	var payload []byte
+	//Etching
+	if r.Etching != nil {
+		flags := uint128.Zero
+		FlagEtching.Set(&flags)
+		if r.Etching.Terms != nil {
+			FlagTerms.Set(&flags)
+		}
+		if r.Etching.Turbo {
+			FlagTurbo.Set(&flags)
+		}
+		payload = append(payload, TagFlags.Byte())
+		payload = append(payload, EncodeUint128(flags)...)
+		if r.Etching.Rune != nil {
+			payload = append(payload, TagRune.Byte())
+			payload = append(payload, EncodeUint128(r.Etching.Rune.Value)...)
+		}
+		if r.Etching.Divisibility != nil {
+			payload = append(payload, TagDivisibility.Byte())
+			payload = append(payload, EncodeUint8(*r.Etching.Divisibility)...)
+		}
+		if r.Etching.Spacers != nil {
+			payload = append(payload, TagSpacers.Byte())
+			payload = append(payload, EncodeUint32(*r.Etching.Spacers)...)
+		}
+		if r.Etching.Symbol != nil {
+			payload = append(payload, TagSymbol.Byte())
+			payload = append(payload, EncodeChar(*r.Etching.Symbol)...)
+		}
+		if r.Etching.Premine != nil {
+			payload = append(payload, TagPremine.Byte())
+			payload = append(payload, EncodeUint128(*r.Etching.Premine)...)
+		}
+		if r.Etching.Terms != nil {
+			payload = append(payload, TagAmount.Byte())
+			payload = append(payload, EncodeUint128(*r.Etching.Terms.Amount)...)
+			payload = append(payload, TagCap.Byte())
+			payload = append(payload, EncodeUint128(*r.Etching.Terms.Cap)...)
+			if r.Etching.Terms.Height[0] != nil {
+				payload = append(payload, TagHeightStart.Byte())
+				payload = append(payload, EncodeUint64(*r.Etching.Terms.Height[0])...)
+			}
+			if r.Etching.Terms.Height[1] != nil {
+				payload = append(payload, TagHeightEnd.Byte())
+				payload = append(payload, EncodeUint64(*r.Etching.Terms.Height[1])...)
+			}
+			if r.Etching.Terms.Offset[0] != nil {
+				payload = append(payload, TagOffsetStart.Byte())
+				payload = append(payload, EncodeUint64(*r.Etching.Terms.Offset[0])...)
+			}
+			if r.Etching.Terms.Offset[1] != nil {
+				payload = append(payload, TagOffsetEnd.Byte())
+				payload = append(payload, EncodeUint64(*r.Etching.Terms.Offset[1])...)
+			}
+		}
+	}
+	//Mint
+	if r.Mint != nil {
+		payload = append(payload, TagMint.Byte())
+		payload = append(payload, EncodeUint64(r.Mint.Block)...)
+		payload = append(payload, TagMint.Byte())
+		payload = append(payload, EncodeUint32(r.Mint.Tx)...)
+	}
+	//Pointer
+	if r.Pointer != nil {
+		payload = append(payload, TagPointer.Byte())
+		payload = append(payload, EncodeUint32(*r.Pointer)...)
+	}
+	//Edicts
+	if len(r.Edicts) != 0 {
+		payload = append(payload, TagBody.Byte())
+		edicts := r.Edicts
+		sort.Slice(edicts, func(i, j int) bool {
+			if edicts[i].ID.Block < (edicts[j].ID.Block) {
+				return true
+			}
+			if edicts[i].ID.Block == edicts[j].ID.Block && edicts[i].ID.Block < edicts[j].ID.Block {
+				return true
+			}
+			return false
+		})
+
+		var previous = RuneId{0, 0}
+		for _, edict := range edicts {
+			temp := RuneId{edict.ID.Block, edict.ID.Tx}
+			block, tx, _ := previous.Delta(edict.ID)
+			payload = append(payload, EncodeUint64(block)...)
+			payload = append(payload, EncodeUint32(tx)...)
+			payload = append(payload, EncodeUint128(edict.Amount)...)
+			payload = append(payload, EncodeUint32(edict.Output)...)
+			previous = temp
+		}
+	}
+
+	//build op_return script
+	builder := txscript.NewScriptBuilder()
+	// Push OP_RETURN
+	builder.AddOp(txscript.OP_RETURN)
+	// Push MAGIC_NUMBER
+	builder.AddOp(MAGIC_NUMBER)
+	for len(payload) > 0 {
+		chunkSize := txscript.MaxScriptElementSize
+		if len(payload) < chunkSize {
+			chunkSize = len(payload)
+		}
+		chunk := payload[:chunkSize]
+		builder.AddData(chunk)
+		payload = payload[chunkSize:]
+	}
+	return builder.Script()
 }
 
 type Payload struct {

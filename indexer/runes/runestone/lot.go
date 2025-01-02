@@ -1,6 +1,8 @@
 package runestone
 
 import (
+	"encoding/json"
+
 	"lukechampine.com/uint128"
 )
 
@@ -58,4 +60,28 @@ func (l Lot) Eq(rhs *uint128.Uint128) bool {
 
 func (l Lot) Cmp(rhs *uint128.Uint128) int {
 	return l.Value.Cmp(*rhs)
+}
+
+func (l Lot) MarshalJSON() ([]byte, error) {
+	if l.Value == nil {
+		return json.Marshal(nil)
+	}
+	return json.Marshal(l.Value.String())
+}
+
+func (l *Lot) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		l.Value = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	value, err := uint128.FromString(s)
+	if err != nil {
+		return err
+	}
+	l.Value = &value
+	return nil
 }
