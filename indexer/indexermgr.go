@@ -38,7 +38,7 @@ type IndexerMgr struct {
 	periodFlushToDB int
 
 	brc20Indexer *brc20.BRC20Indexer
-	runesIndexer *runes.Indexer
+	RunesIndexer *runes.Indexer
 	exotic       *exotic.ExoticIndexer
 	ftIndexer    *ft.FTIndexer
 	ns           *ns.NameService
@@ -121,6 +121,8 @@ func (b *IndexerMgr) Init() {
 		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
 	}
 
+	b.rpcService = base_indexer.NewRpcIndexer(b.compiling)
+
 	if !instance.IsMainnet() {
 		exotic.IsTestNet = true
 		exotic.SatributeList = append(exotic.SatributeList, exotic.Customized)
@@ -136,10 +138,8 @@ func (b *IndexerMgr) Init() {
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	b.runesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.rpcService)
-	b.runesIndexer.Init()
-
-	b.rpcService = base_indexer.NewRpcIndexer(b.compiling)
+	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.rpcService)
+	b.RunesIndexer.Init()
 
 	b.compilingBackupDB = nil
 	b.exoticBackupDB = nil
@@ -277,7 +277,7 @@ func (b *IndexerMgr) checkSelf() {
 	b.nft.CheckSelf(b.baseDB)
 	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight())
 	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight())
-	b.runesIndexer.CheckSelf()
+	b.RunesIndexer.CheckSelf()
 	b.ns.CheckSelf(b.baseDB)
 	common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
 }
@@ -289,7 +289,7 @@ func (b *IndexerMgr) forceUpdateDB() {
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
 	b.brc20Indexer.UpdateDB()
-	b.runesIndexer.UpdateDB()
+	b.RunesIndexer.UpdateDB()
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
 }
@@ -367,7 +367,7 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.nsBackupDB = b.ns.Clone()
 	b.nftBackupDB = b.nft.Clone()
 	b.brc20BackupDB = b.brc20Indexer.Clone()
-	b.runesBackupDB = b.runesIndexer.Clone()
+	b.runesBackupDB = b.RunesIndexer.Clone()
 	common.Log.Infof("backup instance %d cloned", b.compilingBackupDB.GetHeight())
 }
 
@@ -378,7 +378,7 @@ func (b *IndexerMgr) cleanDBBuffer() {
 	b.ns.Subtract(b.nsBackupDB)
 	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
-	b.runesIndexer.Subtract(b.runesBackupDB)
+	b.RunesIndexer.Subtract(b.runesBackupDB)
 }
 
 func (b *IndexerMgr) updateServiceInstance() {

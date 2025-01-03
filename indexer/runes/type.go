@@ -10,18 +10,19 @@ import (
 type MintInfo struct {
 	Start     string `json:"start"`
 	End       string `json:"end"`
-	Amount    string `json:"amount"`
+	Amount    uint128.Uint128
 	Mints     uint128.Uint128
 	Cap       uint128.Uint128
 	Remaining uint128.Uint128
-	Mintable  bool   `json:"mintable"`
-	Progress  string `json:"progress"`
+	Mintable  bool `json:"mintable"`
+	Progress  int  `json:"progress"`
 }
 
 func (s MintInfo) MarshalJSON() ([]byte, error) {
 	type Alias MintInfo
 	return json.Marshal(&struct {
 		Alias
+		Amount    string `json:"amount"`
 		Mints     string `json:"mints"`
 		Cap       string `json:"cap"`
 		Remaining string `json:"remaining"`
@@ -37,6 +38,7 @@ func (s *MintInfo) UnmarshalJSON(data []byte) error {
 	type Alias MintInfo
 	aux := &struct {
 		*Alias
+		Amount    string `json:"amount"`
 		Mints     string `json:"mints"`
 		Cap       string `json:"cap"`
 		Remaining string `json:"remaining"`
@@ -71,8 +73,8 @@ type RuneInfo struct {
 	EtchingTransaction uint32
 	MintInfo           *MintInfo
 	Supply             uint128.Uint128
-	Premine            string
-	PreminePercentage  string
+	Premine            uint128.Uint128
+	PreminePercentage  int
 	Burned             uint128.Uint128
 	Divisibility       uint8
 	Symbol             string
@@ -85,12 +87,14 @@ func (s RuneInfo) MarshalJSON() ([]byte, error) {
 	type Alias RuneInfo
 	return json.Marshal(&struct {
 		Alias
-		Supply string `json:"supply"`
-		Burned string `json:"burned"`
+		Supply  string `json:"supply"`
+		Premine string `json:"premine"`
+		Burned  string `json:"burned"`
 	}{
-		Alias:  Alias(s),
-		Supply: s.Supply.String(),
-		Burned: s.Burned.String(),
+		Alias:   Alias(s),
+		Supply:  s.Supply.String(),
+		Premine: s.Premine.String(),
+		Burned:  s.Burned.String(),
 	})
 }
 
@@ -98,8 +102,9 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 	type Alias RuneInfo
 	aux := &struct {
 		*Alias
-		Supply string `json:"supply"`
-		Burned string `json:"burned"`
+		Supply  string `json:"supply"`
+		Premine string `json:"premine"`
+		Burned  string `json:"burned"`
 	}{
 		Alias: (*Alias)(s),
 	}
@@ -108,6 +113,10 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	s.Supply, err = uint128.FromString(aux.Supply)
+	if err != nil {
+		return err
+	}
+	s.Premine, err = uint128.FromString(aux.Premine)
 	if err != nil {
 		return err
 	}
@@ -121,6 +130,7 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 type AddressBalance struct {
 	Address string
 	Balance uint128.Uint128
+	Pile    *runestone.Pile
 }
 
 func (s AddressBalance) MarshalJSON() ([]byte, error) {

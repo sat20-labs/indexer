@@ -16,13 +16,13 @@ type RuneIdToAddress struct {
 }
 
 func (s *RuneIdToAddress) FromString(key string) {
-	parts := strings.SplitN(key, "-", 2)
+	parts := strings.SplitN(key, "-", 3)
 	var err error
-	s.RuneId, err = RuneIdFromString(parts[0])
+	s.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[0], err)
+		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
 	}
-	s.Address = Address(parts[1])
+	s.Address = Address(parts[2])
 }
 
 func (s *RuneIdToAddress) ToPb() *pb.RuneIdToAddress {
@@ -41,26 +41,28 @@ func NewRuneIdToAddressTable(cache *store.Cache[pb.RuneIdToAddress]) *RuneToAddr
 	return &RuneToAddressTable{Table: Table[pb.RuneIdToAddress]{cache: cache}}
 }
 
-func (s *RuneToAddressTable) GetAddressesFromDB(runeId *RuneId) (ret []Address) {
+func (s *RuneToAddressTable) GetAddresses(runeId *RuneId) (ret []Address) {
 	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.String() + "-")
-	pbVal := s.cache.GetListFromDB(tblKey, false)
+	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
-		ret = make([]Address, 0)
+		ret = make([]Address, len(pbVal))
+		var i = 0
 		for k := range pbVal {
 			v := &RuneIdToAddress{}
 			v.FromString(k)
-			ret = append(ret, v.Address)
+			ret[i] = v.Address
+			i++
 		}
 	}
 	return
 }
 
-func (s *RuneToAddressTable) Insert(key *RuneIdToAddress) (ret RuneIdToAddress) {
-	tblKey := []byte(store.RUNEID_TO_ADDRESS + key.String())
-	pbVal := s.cache.Set(tblKey, key.ToPb())
+func (s *RuneToAddressTable) Insert(v *RuneIdToAddress) (ret RuneIdToAddress) {
+	tblKey := []byte(store.RUNEID_TO_ADDRESS + v.String())
+	pbVal := s.cache.Set(tblKey, v.ToPb())
 	if pbVal != nil {
-		ret = *key
+		ret = *v
 	}
 	return
 }

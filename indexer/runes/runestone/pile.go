@@ -46,6 +46,33 @@ func (p Pile) String() string {
 	return fmt.Sprintf("%s\u00A0%c", result, symbol)
 }
 
+func (p Pile) Uint128() (*uint128.Uint128, error) {
+	cutoff, err := calculateCutoff(p.Divisibility)
+	if err != nil {
+		return nil, fmt.Errorf("Error: %v", err)
+	}
+
+	whole := p.Amount.Div(cutoff)
+	fractional := p.Amount.Mod(cutoff)
+
+	var resultStr string
+	if fractional.IsZero() {
+		resultStr = whole.String()
+	} else {
+		fractionalStr := fmt.Sprintf("%0*s", p.Divisibility, fractional.String())
+		width := int(p.Divisibility)
+		for fractional.Mod(uint128.From64(10)).IsZero() {
+			fractional = fractional.Div(uint128.From64(10))
+			width--
+		}
+		fractionalStr = fractionalStr[:width]
+		resultStr = fmt.Sprintf("%s.%s", whole.String(), fractionalStr)
+	}
+
+	ret, err := uint128.FromString(resultStr)
+	return &ret, err
+}
+
 func calculateCutoff(divisibility uint8) (uint128.Uint128, error) {
 	if divisibility >= 39 {
 		return uint128.Uint128{}, ErrDivisibilityTooLarge

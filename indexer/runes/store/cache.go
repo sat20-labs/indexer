@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
@@ -99,7 +100,7 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 
 	var raw []byte
 	ret, raw = s.GetFromDB(key)
-	if len(raw) > 0 {
+	if logs != nil && len(raw) > 0 {
 		logs[keyStr] = &CacheLog{
 			Val:       raw,
 			Type:      INIT,
@@ -149,6 +150,35 @@ func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
 	if err != nil {
 		common.Log.Panicf("Cache.SetToDB-> err: %v", err.Error())
 	}
+}
+
+func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
+	ret = s.GetListFromDB(keyPrefix, isNeedValue)
+	if len(ret) == 0 {
+		ret = make(map[string]*T)
+	}
+	if logs == nil {
+		return
+	}
+	keyPrefixStr := string(keyPrefix)
+	for k, v := range logs {
+		if strings.HasPrefix(k, keyPrefixStr) {
+			if v.Type == DEL {
+				delete(ret, k)
+			} else if v.Type == PUT {
+				var out T
+				if isNeedValue {
+					msg := any(&out).(proto.Message)
+					proto.Unmarshal(v.Val, msg)
+				}
+				if ret == nil {
+					ret = make(map[string]*T)
+				}
+				ret[k] = &out
+			}
+		}
+	}
+	return
 }
 
 func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
