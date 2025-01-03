@@ -14,15 +14,18 @@ type RuneIdToOutpoint struct {
 }
 
 func (s *RuneIdToOutpoint) FromString(key string) {
-	parts := strings.SplitN(key, "-", 2)
+	parts := strings.SplitN(key, "-", 3)
 	var err error
-	s.RuneId, err = RuneIdFromString(parts[0])
+	s.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[0], err)
+		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
 	}
-	err = s.Outpoint.FromString(parts[1])
+	if s.Outpoint == nil {
+		s.Outpoint = &OutPoint{}
+	}
+	err = s.Outpoint.FromString(parts[2])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> OutPoint.FromString(%s) err:%v", parts[1], err)
+		common.Log.Panicf("RuneIdToAddress.FromString-> OutPoint.FromString(%s) err:%v", parts[2], err)
 	}
 }
 
@@ -46,11 +49,13 @@ func (s *RuneIdToOutpointTable) GetOutpointsFromDB(runeId *RuneId) (ret []*OutPo
 	tblKey := []byte(store.RUNEID_TO_UTXO + runeId.String() + "-")
 	pbVal := s.cache.GetListFromDB(tblKey, false)
 	if pbVal != nil {
-		ret = make([]*OutPoint, 0)
+		ret = make([]*OutPoint, len(pbVal))
+		var i = 0
 		for k := range pbVal {
 			v := &RuneIdToOutpoint{}
 			v.FromString(k)
-			ret = append(ret, v.Outpoint)
+			ret[i] = v.Outpoint
+			i++
 		}
 	}
 	return

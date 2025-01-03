@@ -16,13 +16,13 @@ type RuneIdToMintHistory struct {
 }
 
 func (s *RuneIdToMintHistory) FromString(key string) {
-	parts := strings.SplitN(key, "-", 2)
+	parts := strings.SplitN(key, "-", 3)
 	var err error
-	s.RuneId, err = RuneIdFromString(parts[0])
+	s.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[0], err)
+		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
 	}
-	s.Utxo = Utxo(parts[1])
+	s.Utxo = Utxo(parts[2])
 }
 
 func (s *RuneIdToMintHistory) ToPb() *pb.RuneIdToMintHistory {
@@ -46,11 +46,13 @@ func (s *RuneToMintHistoryTable) GetUtxosFromDB(runeId *RuneId) (ret []Utxo) {
 	pbVal := s.cache.GetListFromDB(tblKey, false)
 
 	if pbVal != nil {
-		ret = make([]Utxo, 0)
+		ret = make([]Utxo, len(pbVal))
+		var i = 0
 		for k := range pbVal {
 			v := &RuneIdToMintHistory{}
 			v.FromString(k)
-			ret = append(ret, v.Utxo)
+			ret[i] = v.Utxo
+			i++
 		}
 	}
 	return

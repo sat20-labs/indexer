@@ -33,12 +33,12 @@ func (s *Indexer) GetMintHistory(ticker string, start, limit uint64) ([]*MintHis
 		return nil, 0
 	}
 
-	ret := make([]*MintHistory, 0)
-	for _, utxo := range utxos {
-		ret = append(ret, &MintHistory{
+	ret := make([]*MintHistory, len(utxos))
+	for i, utxo := range utxos {
+		ret[i] = &MintHistory{
 			Utxo:   string(utxo),
 			Amount: *runeEntry.Terms.Amount,
-		})
+		}
 	}
 
 	total := uint64(len(ret))
@@ -49,7 +49,7 @@ func (s *Indexer) GetMintHistory(ticker string, start, limit uint64) ([]*MintHis
 	if start+limit < end {
 		end = start + limit
 	}
-	return ret[start:end], end
+	return ret[start:end], total
 }
 
 /*
@@ -80,12 +80,12 @@ func (s *Indexer) GetAddressMintHistory(ticker, address string, start, limit uin
 		return nil, 0
 	}
 
-	ret := make([]*MintHistory, 0)
-	for _, utxo := range utxos {
-		ret = append(ret, &MintHistory{
+	ret := make([]*MintHistory, len(utxos))
+	for i, utxo := range utxos {
+		ret[i] = &MintHistory{
 			Utxo:   string(utxo),
 			Amount: *runeEntry.Terms.Amount,
-		})
+		}
 	}
 
 	total := uint64(len(ret))
@@ -96,5 +96,5 @@ func (s *Indexer) GetAddressMintHistory(ticker, address string, start, limit uin
 	if start+limit < end {
 		end = start + limit
 	}
-	return ret[start:end], end
+	return ret[start:end], total
 }

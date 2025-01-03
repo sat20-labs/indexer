@@ -79,7 +79,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 	if start+limit < end {
 		end = start + limit
 	}
-	return ret[start:end], end
+	return ret[start:end], total
 }
 
 /*

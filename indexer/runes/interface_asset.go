@@ -27,6 +27,11 @@ func (s *Indexer) GetAllAddressBalances(ticker string, start, limit uint64) ([]*
 		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", runeSpace.String(), ticker)
 		return nil, 0
 	}
+	r := s.idToEntryTbl.GetFromDB(runeId)
+	if r == nil {
+		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> idToEntryTbl.GetFromDB(%s) rune not found, ticker: %s", runeId.String(), ticker)
+		return nil, 0
+	}
 
 	addresses := s.runeIdToAddressTbl.GetAddressesFromDB(runeId)
 	if len(addresses) == 0 {
@@ -55,12 +60,16 @@ func (s *Indexer) GetAllAddressBalances(ticker string, start, limit uint64) ([]*
 
 	total := uint64(len(addressLotMap))
 	ret := make([]*AddressBalance, total)
+	var i = 0
 	for address, lot := range addressLotMap {
+		pile := r.Pile(*lot.Value)
 		addressLot := &AddressBalance{
 			Address: string(address),
 			Balance: *lot.Value,
+			Pile:    &pile,
 		}
-		ret = append(ret, addressLot)
+		ret[i] = addressLot
+		i++
 	}
 
 	end := total
@@ -70,7 +79,7 @@ func (s *Indexer) GetAllAddressBalances(ticker string, start, limit uint64) ([]*
 	if start+limit < end {
 		end = start + limit
 	}
-	return ret[start:end], end
+	return ret[start:end], total
 }
 
 /*
@@ -120,12 +129,14 @@ func (s *Indexer) GetAllUtxoBalances(ticker string, start, limit uint64) (*UtxoB
 		Total:    *totalAmount.Value,
 		Balances: make([]*UtxoBalance, total),
 	}
+	var i = 0
 	for outpoint, lot := range outpointLotsMap {
 		addressLot := &UtxoBalance{
 			Utxo:    outpoint.String(),
 			Balance: *lot.Value,
 		}
-		ret.Balances = append(ret.Balances, addressLot)
+		ret.Balances[i] = addressLot
+		i++
 	}
 
 	end := total
@@ -166,12 +177,14 @@ func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*Addr
 
 	total := uint64(len(spaceRuneLotMap))
 	ret := make([]*AddressAsset, total)
+	var i = 0
 	for spacedRune, lot := range spaceRuneLotMap {
 		addressLot := &AddressAsset{
 			Rune:    spacedRune.String(),
 			Balance: *lot.Value,
 		}
-		ret = append(ret, addressLot)
+		ret[i] = addressLot
+		i++
 	}
 
 	end := total
@@ -181,7 +194,7 @@ func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*Addr
 	if start+limit < end {
 		end = start + limit
 	}
-	return ret[start:end], end
+	return ret[start:end], total
 }
 
 /*
@@ -192,13 +205,13 @@ func (s *Indexer) GetUtxoAssets(utxo string, start, limit uint64) []*UtxoAsset {
 	outpoint := &runestone.OutPoint{}
 	outpoint.FromString(utxo)
 	balances := s.outpointToRuneBalancesTbl.GetFromDB(outpoint)
-	ret := make([]*UtxoAsset, 0)
-	for _, balance := range balances {
+	ret := make([]*UtxoAsset, len(balances))
+	for i, balance := range balances {
 		runeEntry := s.idToEntryTbl.GetFromDB(&balance.RuneId)
-		ret = append(ret, &UtxoAsset{
+		ret[i] = &UtxoAsset{
 			Rune:    runeEntry.SpacedRune.String(),
 			Balance: *balance.Lot.Value,
-		})
+		}
 	}
 	return ret
 }

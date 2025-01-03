@@ -121,6 +121,7 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 type AddressBalance struct {
 	Address string
 	Balance uint128.Uint128
+	Pile    *runestone.Pile
 }
 
 func (s AddressBalance) MarshalJSON() ([]byte, error) {
