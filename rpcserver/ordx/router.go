@@ -106,4 +106,5 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 
 	// 获取某个UTXO上所有的资产信息
 	r.GET(proxy+"/v2/utxo/assetoffset/:utxo", s.handle.getAssetOffset)
+	r.GET(proxy+"/v2/tick/info/:ticker", s.handle.getTickerInfo)
 }

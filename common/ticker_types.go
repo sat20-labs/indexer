@@ -59,3 +59,13 @@ func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 		InscriptionNum: base.Id,
 		Height: int(base.BlockHeight)}
 }
+
+type TickerInfo struct {
+	Protocol   string
+	Name       string  
+	Type       string 
+	Divisibility int
+	NumLenght  int     // default 64, int64
+	MintedAmt  string
+	MaxSupply  string
+}

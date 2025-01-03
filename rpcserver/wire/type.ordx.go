@@ -7,6 +7,19 @@ import (
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
+type TickerInfo struct {
+	Protocol        string `json:"protocol"`
+	Ticker          string `json:"ticker" example:"BTC"`
+	Divisibility	int    `json:"divisibility" example:"8"`
+	TotalMinted     string `json:"totalMinted" example:"546"`
+	MaxSupply       string `json:"max" example:"10000"`
+}
+
+type TickerInfoResp struct {
+	BaseResp
+	Data *TickerInfo `json:"data"`
+}
+
 type TickerStatus struct {
 	ID              int64  `json:"id" example:"1"`
 	Ticker          string `json:"ticker" example:"BTC"`

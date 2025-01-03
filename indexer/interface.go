@@ -606,3 +606,52 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		Offsets: offsetmap,
 	}
 }
+
+func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo {
+	var result *common.TickerInfo
+	switch tickerName.Protocol {
+	case common.PROTOCOL_NAME_ORDX:
+		ticker := b.ftIndexer.GetTicker(tickerName.Ticker)
+		if ticker != nil {
+			result = &common.TickerInfo{}
+			result.Protocol = common.PROTOCOL_NAME_ORDX
+			result.Type = common.ASSET_TYPE_FT
+			result.Name = ticker.Name
+			result.Divisibility = 0
+			result.NumLenght = 64
+			result.MaxSupply = fmt.Sprintf("%d", ticker.Max)
+			minted, _ := b.ftIndexer.GetMintAmount(tickerName.Ticker)
+			result.MintedAmt = fmt.Sprintf("%d", minted)
+		}
+	case common.PROTOCOL_NAME_BRC20:
+		brc20 := b.brc20Indexer.GetTicker(tickerName.Ticker)
+		if brc20 != nil {
+			result = &common.TickerInfo{}
+			result.Protocol = common.PROTOCOL_NAME_BRC20
+			result.Type = common.ASSET_TYPE_FT
+			result.Name = brc20.Name
+			result.Divisibility = int(brc20.Decimal)
+			result.NumLenght = 128
+			result.MaxSupply = brc20.Max.String()
+			minted, _ := b.brc20Indexer.GetMintAmount(tickerName.Ticker)
+			result.MintedAmt = minted.String()
+		}
+	case common.PROTOCOL_NAME_RUNES:
+		rune := b.RunesIndexer.GetRuneInfo(tickerName.Ticker)
+		if rune != nil {
+			result = &common.TickerInfo{}
+			result.Protocol = common.PROTOCOL_NAME_RUNES
+			result.Type = common.ASSET_TYPE_FT
+			result.Name = rune.Name
+			result.Divisibility = int(rune.Divisibility)
+			result.NumLenght = 128
+			result.MintedAmt = rune.Supply.String()
+			if rune.MintInfo != nil {
+				maxSupply := rune.MintInfo.Amount.Mul(rune.MintInfo.Cap)
+				result.MintedAmt = maxSupply.String()
+			}
+		}
+	}
+
+	return result
+}

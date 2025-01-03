@@ -81,6 +81,10 @@ func (s *Model) GetTickerStatus(tickerName string) (*rpcwire.TickerStatus, error
 	return s.getTicker(tickerName)
 }
 
+func (s *Model) GetTickerInfo(tickerName string) (*rpcwire.TickerInfo, error) {
+	return s.getTickerInfo(tickerName)
+}
+
 func (s *Model) GetAddressMintHistory(tickerName, address string, start, limit int) (*rpcwire.MintHistory, error) {
 
 	var ticker common.TickerName

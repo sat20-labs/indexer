@@ -220,6 +220,27 @@ func (s *Handle) getTickerStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (s *Handle) getTickerInfo(c *gin.Context) {
+	resp := &rpcwire.TickerInfoResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+
+	tickerName := c.Param("ticker")
+	tickerInfo, err := s.model.GetTickerInfo(tickerName)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	resp.Data = tickerInfo
+	c.JSON(http.StatusOK, resp)
+}
+
 // @Summary Get Holder List
 // @Description Get a list of holders for a specific ticker
 // @Tags ordx.tick
