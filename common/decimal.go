@@ -6,6 +6,8 @@ import (
 	"math"
 	"math/big"
 	"strings"
+
+	"lukechampine.com/uint128"
 )
 
 const MAX_PRECISION = 18
@@ -355,4 +357,19 @@ func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal
 	
 	result := &Decimal{Precition: precision, Value: bigValue}
 	return result, nil
+}
+
+func NewDecimalFromUint128(n uint128.Uint128, precision int) *Decimal {
+	value := new(big.Int).SetUint64(n.Lo)
+	value = value.Add(value, new(big.Int).SetUint64(n.Hi).Lsh(new(big.Int).SetUint64(n.Hi), 64))
+	return &Decimal{Precition: precision, Value: value}
+}
+
+func (d *Decimal) ToUint128() uint128.Uint128 {
+	if d == nil {
+		return uint128.Uint128{}
+	}
+	lo := d.Value.Uint64()
+	hi := d.Value.Rsh(d.Value, 64).Uint64()
+	return uint128.Uint128{Lo: lo, Hi: hi}
 }
