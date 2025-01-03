@@ -17,19 +17,19 @@ func (s *Indexer) GetMintHistory(ticker string, start, limit uint64) ([]*MintHis
 		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", ticker, err.Error())
 		return nil, 0
 	}
-	runeId := s.runeToIdTbl.GetFromDB(&spaceRune.Rune)
+	runeId := s.runeToIdTbl.Get(&spaceRune.Rune)
 	if runeId == nil {
-		common.Log.Errorf("RuneIndexer.GetMintHistory-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetMintHistory-> runeToIdTbl.Get(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
 		return nil, 0
 	}
-	utxos := s.runeIdToMintHistoryTbl.GetUtxosFromDB(runeId)
+	utxos := s.runeIdToMintHistoryTbl.GetUtxos(runeId)
 	if len(utxos) == 0 {
 		return nil, 0
 	}
 
-	runeEntry := s.idToEntryTbl.GetFromDB(runeId)
+	runeEntry := s.idToEntryTbl.Get(runeId)
 	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.GetFromDB(%s) rune not found, ticker: %s", runeId.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", runeId.String(), ticker)
 		return nil, 0
 	}
 
@@ -64,19 +64,19 @@ func (s *Indexer) GetAddressMintHistory(ticker, address string, start, limit uin
 		common.Log.Infof("RuneIndexer.GetAddressMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", ticker, err.Error())
 		return nil, 0
 	}
-	runeId := s.runeToIdTbl.GetFromDB(&spaceRune.Rune)
+	runeId := s.runeToIdTbl.Get(&spaceRune.Rune)
 	if runeId == nil {
-		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> runeToIdTbl.Get(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
 		return nil, 0
 	}
-	utxos := s.addressRuneIdToMintHistoryTbl.GetUtxosFromDB(runestone.Address(address), runeId)
+	utxos := s.addressRuneIdToMintHistoryTbl.GetUtxos(runestone.Address(address), runeId)
 	if len(utxos) == 0 {
 		return nil, 0
 	}
 
-	runeEntry := s.idToEntryTbl.GetFromDB(runeId)
+	runeEntry := s.idToEntryTbl.Get(runeId)
 	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.GetFromDB(%s) rune not found, ticker: %s", runeId.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", runeId.String(), ticker)
 		return nil, 0
 	}
 

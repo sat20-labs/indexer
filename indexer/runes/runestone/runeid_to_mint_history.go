@@ -41,9 +41,9 @@ func NewRuneIdToMintHistoryTable(store *store.Cache[pb.RuneIdToMintHistory]) *Ru
 	return &RuneToMintHistoryTable{Table: Table[pb.RuneIdToMintHistory]{cache: store}}
 }
 
-func (s *RuneToMintHistoryTable) GetUtxosFromDB(runeId *RuneId) (ret []Utxo) {
+func (s *RuneToMintHistoryTable) GetUtxos(runeId *RuneId) (ret []Utxo) {
 	tblKey := []byte(store.RUNEID_TO_MINT_HISTORYS + runeId.String() + "-")
-	pbVal := s.cache.GetListFromDB(tblKey, false)
+	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
 		ret = make([]Utxo, len(pbVal))

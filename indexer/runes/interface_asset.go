@@ -22,18 +22,18 @@ func (s *Indexer) GetAllAddressBalances(ticker string, start, limit uint64) ([]*
 		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.SpacedRuneFromString(%s) err:%v", ticker, err.Error())
 		return nil, 0
 	}
-	runeId := s.runeToIdTbl.GetFromDB(&runeSpace.Rune)
+	runeId := s.runeToIdTbl.Get(&runeSpace.Rune)
 	if runeId == nil {
-		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", runeSpace.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> runeToIdTbl.Get(%s) rune not found, ticker: %s", runeSpace.String(), ticker)
 		return nil, 0
 	}
-	r := s.idToEntryTbl.GetFromDB(runeId)
+	r := s.idToEntryTbl.Get(runeId)
 	if r == nil {
-		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> idToEntryTbl.GetFromDB(%s) rune not found, ticker: %s", runeId.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> idToEntryTbl.Get(%s) rune not found, ticker: %s", runeId.String(), ticker)
 		return nil, 0
 	}
 
-	addresses := s.runeIdToAddressTbl.GetAddressesFromDB(runeId)
+	addresses := s.runeIdToAddressTbl.GetAddresses(runeId)
 	if len(addresses) == 0 {
 		return nil, 0
 	}
@@ -45,7 +45,7 @@ func (s *Indexer) GetAllAddressBalances(ticker string, start, limit uint64) ([]*
 		for _, utxo := range utxos {
 			outPoint := &runestone.OutPoint{}
 			outPoint.FromString(utxo)
-			blances := s.outpointToRuneBalancesTbl.GetFromDB(outPoint)
+			blances := s.outpointToRuneBalancesTbl.Get(outPoint)
 			for _, balance := range blances {
 				if balance.RuneId.Block != runeId.Block || balance.RuneId.Tx != runeId.Tx {
 					continue
@@ -96,12 +96,12 @@ func (s *Indexer) GetAllUtxoBalances(ticker string, start, limit uint64) (*UtxoB
 		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", ticker, err.Error())
 		return nil, 0
 	}
-	runeId := s.runeToIdTbl.GetFromDB(&spaceRune.Rune)
+	runeId := s.runeToIdTbl.Get(&spaceRune.Rune)
 	if runeId == nil {
-		common.Log.Errorf("RuneIndexer.GetAllUtxoBalances-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetAllUtxoBalances-> runeToIdTbl.Get(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
 		return nil, 0
 	}
-	outpoints := s.runeIdToOutpointTbl.GetOutpointsFromDB(runeId)
+	outpoints := s.runeIdToOutpointTbl.GetOutpoints(runeId)
 	if len(outpoints) == 0 {
 		return nil, 0
 	}
@@ -110,7 +110,7 @@ func (s *Indexer) GetAllUtxoBalances(ticker string, start, limit uint64) (*UtxoB
 	outpointLotsMap := make(OutpointLotsMap)
 	totalAmount := runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
 	for _, outpoint := range outpoints {
-		blances := s.outpointToRuneBalancesTbl.GetFromDB(outpoint)
+		blances := s.outpointToRuneBalancesTbl.Get(outpoint)
 		for _, balance := range blances {
 			if balance.RuneId.Block != runeId.Block || balance.RuneId.Tx != runeId.Tx {
 				continue
@@ -165,9 +165,9 @@ func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*Addr
 	for _, utxo := range utxos {
 		outpoint := &runestone.OutPoint{}
 		outpoint.FromString(utxo)
-		balances := s.outpointToRuneBalancesTbl.GetFromDB(outpoint)
+		balances := s.outpointToRuneBalancesTbl.Get(outpoint)
 		for _, balance := range balances {
-			runeEntry := s.idToEntryTbl.GetFromDB(&balance.RuneId)
+			runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
 			if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
 				spaceRuneLotMap[runeEntry.SpacedRune] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
 			}
@@ -204,10 +204,10 @@ desc: 根据utxo获取ticker名字和资产数量
 func (s *Indexer) GetUtxoAssets(utxo string, start, limit uint64) []*UtxoAsset {
 	outpoint := &runestone.OutPoint{}
 	outpoint.FromString(utxo)
-	balances := s.outpointToRuneBalancesTbl.GetFromDB(outpoint)
+	balances := s.outpointToRuneBalancesTbl.Get(outpoint)
 	ret := make([]*UtxoAsset, len(balances))
 	for i, balance := range balances {
-		runeEntry := s.idToEntryTbl.GetFromDB(&balance.RuneId)
+		runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
 		ret[i] = &UtxoAsset{
 			Rune:    runeEntry.SpacedRune.String(),
 			Balance: *balance.Lot.Value,

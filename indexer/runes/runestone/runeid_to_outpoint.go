@@ -45,9 +45,9 @@ func NewRuneIdToUtxoTable(store *store.Cache[pb.RuneIdToOutpoint]) *RuneIdToOutp
 	return &RuneIdToOutpointTable{Table: Table[pb.RuneIdToOutpoint]{cache: store}}
 }
 
-func (s *RuneIdToOutpointTable) GetOutpointsFromDB(runeId *RuneId) (ret []*OutPoint) {
+func (s *RuneIdToOutpointTable) GetOutpoints(runeId *RuneId) (ret []*OutPoint) {
 	tblKey := []byte(store.RUNEID_TO_UTXO + runeId.String() + "-")
-	pbVal := s.cache.GetListFromDB(tblKey, false)
+	pbVal := s.cache.GetList(tblKey, false)
 	if pbVal != nil {
 		ret = make([]*OutPoint, len(pbVal))
 		var i = 0

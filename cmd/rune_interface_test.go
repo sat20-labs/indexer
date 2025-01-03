@@ -44,20 +44,18 @@ func TestInterfaceRune(t *testing.T) {
 	}
 }
 
-func TestInterfaceAsset(t *testing.T) {
+func TestGetAllAddressBalances(t *testing.T) {
 	InitRuneTester()
 	// 4
-	// addressBalance, total := runesIndexer.GetAllAddressBalances(firstRuneName, 0, 10)
-	// common.Log.Infof("GetAllAddressBalances return addressBalance total count: %d\n", total)
-	// for i, v := range addressBalance {
-	// 	common.Log.Infof("GetAllAddressBalances return addressBalance %d: address: %s, balance: %s\n", i, v.Address, v.Pile.String())
-	// }
+	addressBalance, total := runesIndexer.GetAllAddressBalances(firstRuneName, 0, 10)
+	t.Logf("GetAllAddressBalances return addressBalance total count: %d\n", total)
+	for i, v := range addressBalance {
+		t.Logf("GetAllAddressBalances return addressBalance %d: address: %s, balance: %s\n", i, v.Address, v.Pile.String())
+	}
+}
 
-	// t.Logf("GetAllAddressBalances return addressBalance total count: %d\n", total)
-	// for i, v := range addressBalance {
-	// 	t.Logf("GetAllAddressBalances return addressBalance %d: address: %s, balance: %s\n", i, v.Address, v.Pile.String())
-	// }
-
+func TestInterfaceAsset(t *testing.T) {
+	InitRuneTester()
 	// 5
 	allUtxoBalances, total := runesIndexer.GetAllUtxoBalances(firstRuneName, 0, 10)
 	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total)
@@ -91,10 +89,13 @@ func TestInterfaceAsset(t *testing.T) {
 	for i, v := range mintHistorys {
 		t.Logf("GetMintHistory return txids %d: %+v\n", i, v)
 	}
+}
 
+func TestGetAddressMintHistory(t *testing.T) {
+	InitRuneTester()
 	// 10
-	firstRuneAddress = "tb1pfu2ff6ycy99t02zteumkm2jtk3uwm4skp50m7tevapcpkm8vaqqq73vxqr"
-	mintHistorys, total = runesIndexer.GetAddressMintHistory(firstRuneName, firstRuneAddress, 0, 10)
+	firstRuneAddress := "tb1pfu2ff6ycy99t02zteumkm2jtk3uwm4skp50m7tevapcpkm8vaqqq73vxqr"
+	mintHistorys, total := runesIndexer.GetAddressMintHistory(firstRuneName, firstRuneAddress, 0, 10)
 	t.Logf("GetAddressMintHistory return txids total count: %d\n", total)
 	for i, v := range mintHistorys {
 		t.Logf("GetAddressMintHistory return txids %d: %+v\n", i, v)
