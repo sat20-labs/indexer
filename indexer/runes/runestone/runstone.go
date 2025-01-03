@@ -2,6 +2,7 @@ package runestone
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"unicode/utf8"
@@ -330,21 +331,18 @@ func (r *Runestone) Encipher() ([]byte, error) {
 		}
 	}
 
+	if len(payload) > txscript.MaxDataCarrierSize {
+		return nil, fmt.Errorf("payload is too large")
+	}
+
 	//build op_return script
 	builder := txscript.NewScriptBuilder()
 	// Push OP_RETURN
 	builder.AddOp(txscript.OP_RETURN)
 	// Push MAGIC_NUMBER
 	builder.AddOp(MAGIC_NUMBER)
-	for len(payload) > 0 {
-		chunkSize := txscript.MaxScriptElementSize
-		if len(payload) < chunkSize {
-			chunkSize = len(payload)
-		}
-		chunk := payload[:chunkSize]
-		builder.AddData(chunk)
-		payload = payload[chunkSize:]
-	}
+	builder.AddData(payload)
+
 	return builder.Script()
 }
 
