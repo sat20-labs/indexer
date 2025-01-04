@@ -7,6 +7,8 @@ import (
 	"lukechampine.com/uint128"
 )
 
+const defaultRuneSymbol = '\u29C9'
+
 type MintInfo struct {
 	Start     string `json:"start"`
 	End       string `json:"end"`
@@ -14,8 +16,8 @@ type MintInfo struct {
 	Mints     uint128.Uint128
 	Cap       uint128.Uint128
 	Remaining uint128.Uint128
-	Mintable  bool `json:"mintable"`
-	Progress  int  `json:"progress"`
+	Mintable  bool    `json:"mintable"`
+	Progress  float64 `json:"progress"`
 }
 
 func (s MintInfo) MarshalJSON() ([]byte, error) {
@@ -74,7 +76,7 @@ type RuneInfo struct {
 	MintInfo           *MintInfo
 	Supply             uint128.Uint128
 	Premine            uint128.Uint128
-	PreminePercentage  int
+	PreminePercentage  float64
 	Burned             uint128.Uint128
 	Divisibility       uint8
 	Symbol             string
@@ -259,7 +261,7 @@ type MintHistory struct {
 }
 
 type Edict struct {
-	RuneName string
-	Amount   uint128.Uint128
-	Output   uint32
+	RuneId string
+	Amount uint128.Uint128
+	Output uint32
 }

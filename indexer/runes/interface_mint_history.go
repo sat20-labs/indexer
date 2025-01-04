@@ -7,29 +7,24 @@ import (
 
 /*
 *
-desc: 根据ticker名字获取铸造历史 (新增数据表)
+desc: 根据runeid获取铸造历史 (新增数据表)
 数据: key = rm-%runeid.string()%-%txid% value = nil
 实现: 通过runeid得到所有mint的txid(一个txid即一个铸造历史)
 */
-func (s *Indexer) GetMintHistory(ticker string, start, limit uint64) ([]*MintHistory, uint64) {
-	spaceRune, err := runestone.SpacedRuneFromString(ticker)
+func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHistory, uint64) {
+	id, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", ticker, err.Error())
+		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 		return nil, 0
 	}
-	runeId := s.runeToIdTbl.Get(&spaceRune.Rune)
-	if runeId == nil {
-		common.Log.Errorf("RuneIndexer.GetMintHistory-> runeToIdTbl.Get(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
-		return nil, 0
-	}
-	utxos := s.runeIdToMintHistoryTbl.GetUtxos(runeId)
+	utxos := s.runeIdToMintHistoryTbl.GetUtxos(id)
 	if len(utxos) == 0 {
 		return nil, 0
 	}
 
-	runeEntry := s.idToEntryTbl.Get(runeId)
+	runeEntry := s.idToEntryTbl.Get(id)
 	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", runeId.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", id.String(), runeId)
 		return nil, 0
 	}
 
@@ -54,29 +49,27 @@ func (s *Indexer) GetMintHistory(ticker string, start, limit uint64) ([]*MintHis
 
 /*
 *
-desc: 根据地址获取指定ticker的铸造历史 (新增数据表)
+desc: 根据地址获取指定nuneid的铸造历史 (新增数据表)
 数据: key = arm-%address%-%runeid.string()%-%utxo% value = nil
 实现: 通过address和runeid得到所有utxo(一个txid(1/n个utxo)即一个铸造历史)
 */
-func (s *Indexer) GetAddressMintHistory(ticker, address string, start, limit uint64) ([]*MintHistory, uint64) {
-	spaceRune, err := runestone.SpacedRuneFromString(ticker)
+func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, limit uint64) ([]*MintHistory, uint64) {
+	id, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetAddressMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", ticker, err.Error())
-		return nil, 0
+		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 	}
-	runeId := s.runeToIdTbl.Get(&spaceRune.Rune)
-	if runeId == nil {
-		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> runeToIdTbl.Get(%s) rune not found, ticker: %s", spaceRune.String(), ticker)
-		return nil, 0
+	address, err := s.RpcService.GetAddressByID(addressId)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> GetAddressByID(%d) err:%v", addressId, err)
 	}
-	utxos := s.addressRuneIdToMintHistoryTbl.GetUtxos(runestone.Address(address), runeId)
+	utxos := s.addressRuneIdToMintHistoryTbl.GetUtxos(runestone.Address(address), id)
 	if len(utxos) == 0 {
 		return nil, 0
 	}
 
-	runeEntry := s.idToEntryTbl.Get(runeId)
+	runeEntry := s.idToEntryTbl.Get(id)
 	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", runeId.String(), ticker)
+		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.Get(%s) rune not found, runeIdStr: %s", id.String(), runeId)
 		return nil, 0
 	}
 

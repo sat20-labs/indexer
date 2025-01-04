@@ -1,7 +1,6 @@
 package runestone
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -13,25 +12,40 @@ import (
 )
 
 type OutPoint struct {
-	Txid string
-	Vout uint32
+	Txid   string
+	Vout   uint32
+	UtxoId uint64
 }
 
 func (s *OutPoint) String() string {
-	return fmt.Sprintf("%s:%d", s.Txid, s.Vout)
+	return fmt.Sprintf("%s:%x:%x", s.Txid, s.Vout, s.UtxoId)
 }
 
-func (s *OutPoint) FromString(str string) error {
-	parts := strings.Split(str, ":")
-	if len(parts) != 2 {
-		return errors.New("invalid format: expected 'txid:vout'")
-	}
+func (s *OutPoint) FromUtxo(utxo string, utxoId uint64) error {
+	parts := strings.Split(utxo, ":")
 	s.Txid = parts[0]
-	vout, err := strconv.ParseUint(parts[1], 10, 32)
+	vout, err := strconv.ParseUint(parts[1], 16, 32)
 	if err != nil {
 		return fmt.Errorf("invalid vout: %v", err)
 	}
 	s.Vout = uint32(vout)
+	s.UtxoId = utxoId
+	return nil
+}
+
+func (s *OutPoint) FromString(str string) error {
+	parts := strings.Split(str, ":")
+	s.Txid = parts[0]
+	vout, err := strconv.ParseUint(parts[1], 16, 32)
+	if err != nil {
+		return fmt.Errorf("invalid vout: %v", err)
+	}
+	s.Vout = uint32(vout)
+	utxoId, err := strconv.ParseUint(parts[2], 16, 64)
+	if err != nil {
+		return fmt.Errorf("invalid utxoId: %v", err)
+	}
+	s.UtxoId = utxoId
 	return nil
 }
 

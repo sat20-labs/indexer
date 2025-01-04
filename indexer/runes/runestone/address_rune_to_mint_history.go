@@ -1,6 +1,7 @@
 package runestone
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -9,13 +10,14 @@ import (
 )
 
 type AddressRuneIdToMintHistory struct {
-	Address  Address
-	RuneId   *RuneId
-	OutPoint *OutPoint
+	Address   Address
+	AddressId uint64
+	RuneId    *RuneId
+	OutPoint  *OutPoint
 }
 
 func (s *AddressRuneIdToMintHistory) FromString(key string) {
-	parts := strings.SplitN(key, "-", 4)
+	parts := strings.SplitN(key, "-", 5)
 	s.Address = Address(parts[1])
 	var err error
 	if s.RuneId == nil {
@@ -32,6 +34,12 @@ func (s *AddressRuneIdToMintHistory) FromString(key string) {
 	if err != nil {
 		common.Log.Panicf("RuneIdToAddress.FromString-> OutPoint.FromString(%s) err:%v", parts[2], err)
 	}
+
+	addressId, err := strconv.ParseUint(parts[4], 16, 64)
+	if err != nil {
+		common.Log.Panicf("RuneIdToAddress.FromString-> strconv.ParseUint(%s) err:%v", parts[4], err)
+	}
+	s.AddressId = addressId
 }
 
 func (s *AddressRuneIdToMintHistory) ToPb() *pb.AddressRuneIdToMintHistory {
@@ -39,7 +47,7 @@ func (s *AddressRuneIdToMintHistory) ToPb() *pb.AddressRuneIdToMintHistory {
 }
 
 func (s *AddressRuneIdToMintHistory) String() string {
-	return string(s.Address) + "-" + s.RuneId.String() + "-" + s.OutPoint.String()
+	return string(s.Address) + "-" + s.RuneId.String() + "-" + s.OutPoint.String() + "-" + strconv.FormatUint(s.AddressId, 16)
 }
 
 type AddressRuneIdToMintHistoryTable struct {

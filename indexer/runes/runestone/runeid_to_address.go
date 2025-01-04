@@ -1,6 +1,7 @@
 package runestone
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -11,18 +12,25 @@ import (
 type Address string
 
 type RuneIdToAddress struct {
-	RuneId  *RuneId
-	Address Address
+	RuneId    *RuneId
+	Address   Address
+	AddressId uint64
 }
 
 func (s *RuneIdToAddress) FromString(key string) {
-	parts := strings.SplitN(key, "-", 3)
+	parts := strings.SplitN(key, "-", 4)
 	var err error
 	s.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
 		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
 	}
 	s.Address = Address(parts[2])
+	addressId, err := strconv.ParseUint(parts[3], 16, 64)
+	if err != nil {
+		common.Log.Panicf("RuneIdToAddress.FromString-> strconv.ParseUint(%s) err:%v", parts[3], err)
+	}
+	s.AddressId = addressId
+
 }
 
 func (s *RuneIdToAddress) ToPb() *pb.RuneIdToAddress {
@@ -30,7 +38,8 @@ func (s *RuneIdToAddress) ToPb() *pb.RuneIdToAddress {
 }
 
 func (s *RuneIdToAddress) String() string {
-	return s.RuneId.String() + "-" + string(s.Address)
+	adressId := strconv.FormatUint(s.AddressId, 16)
+	return s.RuneId.String() + "-" + string(s.Address) + "-" + adressId
 }
 
 type RuneToAddressTable struct {

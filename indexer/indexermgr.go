@@ -138,7 +138,7 @@ func (b *IndexerMgr) Init() {
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.rpcService)
+	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling, b.rpcService)
 	b.RunesIndexer.Init()
 
 	b.compilingBackupDB = nil

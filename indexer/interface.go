@@ -165,7 +165,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 	return result, nil
 }
 
-
 // return: utxoId->asset amount
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *swire.AssetName) (map[uint64]*common.TxOutput, error) {
 	utxos, err := b.rpcService.GetUTXOs(address)
@@ -196,7 +195,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *sw
 			result[utxoId] = info
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -256,7 +255,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	if value != 0 {
 		result[common.ASSET_PLAIN_SAT] = value
 	}
-	
+
 	return result
 }
 
@@ -460,10 +459,10 @@ func (b *IndexerMgr) GetMintHistory(tick string, start, limit int) []*common.Min
 	return b.ftIndexer.GetMintHistory(tick, start, limit)
 }
 
-func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.TickerName, 
+func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.TickerName,
 	start, limit int) ([]*common.MintAbbrInfo, int) {
 	addressId := b.GetAddressId(address)
-	
+
 	switch tick.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
 		switch tick.Type {
@@ -477,15 +476,15 @@ func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.Tick
 			return nil, 0
 		default:
 		}
-		
+
 	case common.PROTOCOL_NAME_BRC20:
 		//return b.brc20Indexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 	case common.PROTOCOL_NAME_RUNES:
 
 	}
-	
+
 	return nil, 0
-	
+
 }
 
 func (b *IndexerMgr) GetMintInfo(inscriptionId string) *common.Mint {
@@ -572,7 +571,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		for _, rngs := range v {
 			for _, rng := range rngs {
 				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
+				offsets = append(offsets, &common.OffsetRange{Start: start, End: start + rng.Size})
 				value += rng.Size
 			}
 		}
@@ -586,7 +585,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			Amount:     value,
 			BindingSat: 1,
 		}
-		
+
 		if assets == nil {
 			assets = swire.TxAssets{asset}
 		} else {
@@ -602,7 +601,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			Value:    common.GetOrdinalsSize(info.Ordinals),
 			PkScript: info.PkScript,
 		},
-		Assets: assets,
+		Assets:  assets,
 		Offsets: offsetmap,
 	}
 }
@@ -637,7 +636,7 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 			result.MintedAmt = minted.String()
 		}
 	case common.PROTOCOL_NAME_RUNES:
-		rune := b.RunesIndexer.GetRuneInfo(tickerName.Ticker)
+		rune := b.RunesIndexer.GetRuneInfoWithName(tickerName.Ticker)
 		if rune != nil {
 			result = &common.TickerInfo{}
 			result.Protocol = common.PROTOCOL_NAME_RUNES

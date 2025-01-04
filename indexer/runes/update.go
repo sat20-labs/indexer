@@ -323,7 +323,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			}
 			// Sort balanceArray by id so tests can assert balanceArray in a fixed order
 			balanceArray := balances.GetSortArray()
-			outpoint := &runestone.OutPoint{Txid: tx.Txid, Vout: vout}
+			utxoId := common.GetUtxoId(tx.Outputs[vout])
+			outpoint := &runestone.OutPoint{Txid: tx.Txid, Vout: vout, UtxoId: utxoId}
 			s.outpointToRuneBalancesTbl.Insert(outpoint, balanceArray)
 
 			// update runeIdToOutputMap and runeIdToAddressMap
@@ -335,7 +336,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			for runeId, balance := range balances {
 				if balance.Value.Cmp(uint128.Zero) > 0 {
 					runeIdToAddressMap[runeId] = address
-					runeIdToAddressRuneIdToMintHistoryMap[runeId] = runestone.AddressRuneIdToMintHistory{Address: address, RuneId: &runeId, OutPoint: outpoint}
+					addressId := s.BaseIndexer.GetAddressId(string(address))
+					runeIdToAddressRuneIdToMintHistoryMap[runeId] = runestone.AddressRuneIdToMintHistory{
+						Address: address, RuneId: &runeId, OutPoint: outpoint,
+						AddressId: addressId,
+					}
 					runeIdToOutputMap[runeId] = outpoint
 				}
 			}
@@ -348,7 +353,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		// update runeIdToAddress
 		for runeId, address := range runeIdToAddressMap {
-			runeIdToAddress := &runestone.RuneIdToAddress{RuneId: &runeId, Address: address}
+			addressId := s.BaseIndexer.GetAddressId(string(address))
+			runeIdToAddress := &runestone.RuneIdToAddress{RuneId: &runeId, Address: address, AddressId: addressId}
 			s.runeIdToAddressTbl.Insert(runeIdToAddress)
 		}
 
@@ -364,17 +370,20 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
 			}
 			// common.Log.Infof("RuneIndexer.index_runes-> mintAmount:%d", *mintOutIndex)
-			utxo := fmt.Sprintf("%s:%d", tx.Txid, mintOutIndex)
+			utxo := fmt.Sprintf("%s:%d", tx.Txid, *mintOutIndex)
+			output := tx.Outputs[*mintOutIndex]
+			utxoId := common.GetUtxoId(output)
 			v := &runestone.RuneIdToMintHistory{
 				RuneId: mintRuneId,
 				Utxo:   runestone.Utxo(utxo),
+				UtxoId: utxoId,
 			}
 			s.runeIdToMintHistoryTbl.Insert(v)
 		}
 
 		// update addressRuneIdToMintHistory
 		for r, h := range runeIdToAddressRuneIdToMintHistoryMap {
-			v := &runestone.AddressRuneIdToMintHistory{RuneId: &r, Address: h.Address, OutPoint: h.OutPoint}
+			v := &runestone.AddressRuneIdToMintHistory{RuneId: &r, Address: h.Address, OutPoint: h.OutPoint, AddressId: h.AddressId}
 			s.addressRuneIdToMintHistoryTbl.Insert(v)
 		}
 	}

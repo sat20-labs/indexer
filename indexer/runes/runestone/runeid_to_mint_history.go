@@ -1,6 +1,7 @@
 package runestone
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -13,16 +14,22 @@ type Utxo string
 type RuneIdToMintHistory struct {
 	RuneId *RuneId
 	Utxo   Utxo
+	UtxoId uint64
 }
 
 func (s *RuneIdToMintHistory) FromString(key string) {
-	parts := strings.SplitN(key, "-", 3)
+	parts := strings.SplitN(key, "-", 4)
 	var err error
 	s.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
 		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
 	}
 	s.Utxo = Utxo(parts[2])
+	utxoId, err := strconv.ParseUint(parts[3], 16, 64)
+	if err != nil {
+		common.Log.Panicf("RuneIdToAddress.FromString-> strconv.ParseUint(%s) err:%v", parts[3], err)
+	}
+	s.UtxoId = utxoId
 }
 
 func (s *RuneIdToMintHistory) ToPb() *pb.RuneIdToMintHistory {
@@ -30,7 +37,7 @@ func (s *RuneIdToMintHistory) ToPb() *pb.RuneIdToMintHistory {
 }
 
 func (s *RuneIdToMintHistory) String() string {
-	return s.RuneId.String() + "-" + string(s.Utxo)
+	return s.RuneId.String() + "-" + string(s.Utxo) + "-" + strconv.FormatUint(s.UtxoId, 16)
 }
 
 type RuneToMintHistoryTable struct {

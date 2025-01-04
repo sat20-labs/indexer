@@ -16,7 +16,8 @@ import (
 
 type Indexer struct {
 	db                            *badger.DB
-	rpcService                    *base.RpcIndexer
+	RpcService                    *base.RpcIndexer
+	BaseIndexer                   *base.BaseIndexer
 	cloneTimeStamp                int64
 	isUpdateing                   bool
 	wb                            *badger.WriteBatch
@@ -36,11 +37,12 @@ type Indexer struct {
 	addressRuneIdToMintHistoryTbl *runestone.AddressRuneIdToMintHistoryTable
 }
 
-func NewIndexer(db *badger.DB, param *chaincfg.Params, rpcService *base.RpcIndexer) *Indexer {
+func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
 	store.SetDB(db)
 	return &Indexer{
 		db:                            db,
-		rpcService:                    rpcService,
+		BaseIndexer:                   baseIndexer,
+		RpcService:                    rpcService,
 		cloneTimeStamp:                0,
 		cacheLogs:                     nil,
 		chaincfgParam:                 param,
@@ -73,7 +75,7 @@ func (s *Indexer) Init() {
 		s.Status.Number = 1
 		s.Status.FlushToDB()
 
-		symbol := '\u29C9'
+		symbol := defaultRuneSymbol
 		startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)
 		endHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 5)
 		s.idToEntryTbl.SetToDB(id, &runestone.RuneEntry{
@@ -100,7 +102,7 @@ func (s *Indexer) Init() {
 }
 
 func (s *Indexer) Clone() *Indexer {
-	cloneIndex := NewIndexer(s.db, s.chaincfgParam, s.rpcService)
+	cloneIndex := NewIndexer(s.db, s.chaincfgParam, s.BaseIndexer, s.RpcService)
 	for k, v := range s.cacheLogs {
 		cacheLog := &store.CacheLog{
 			Type:      v.Type,
