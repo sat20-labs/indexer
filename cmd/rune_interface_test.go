@@ -65,16 +65,14 @@ func TestInterfaceAsset(t *testing.T) {
 
 	// 6
 	firstRuneAddress := "tb1pn9dzakm6egrv90c9gsgs63axvmn6ydwemrpuwljnmz9qdk38ueqsqae936"
-	addressAssets, total := runesIndexer.GetAddressAssets(firstRuneAddress, 0, 10)
-	t.Logf("GetAddressAssets return addressAssets total count: %d\n", total)
+	addressAssets := runesIndexer.GetAddressAssets(firstRuneAddress)
 	for i, v := range addressAssets {
 		t.Logf("GetAddressAssets return addressAssets %d: %+v\n", i, v)
 	}
 
 	// 7
 	utxo := "d2f8fe663c83550fee4039027fc4d5053066c10b638180137f43b997cc427108:0"
-	utxoAssets := runesIndexer.GetUtxoAssets(utxo, 0, 10)
-	t.Logf("GetUtxoAssets return utxoAssets total count: %d\n", len(utxoAssets))
+	utxoAssets := runesIndexer.GetUtxoAssets(utxo)
 	for i, v := range utxoAssets {
 		t.Logf("GetUtxoAssets return utxoAssets %d: %+v\n", i, v)
 	}

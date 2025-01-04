@@ -154,10 +154,10 @@ func (s *Indexer) GetAllUtxoBalances(ticker string, start, limit uint64) (*UtxoB
 *
 desc: 根据地址获取该地址所有ticker和持有的数量
 */
-func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*AddressAsset, uint64) {
+func (s *Indexer) GetAddressAssets(address string) []*AddressAsset {
 	utxos := s.rpcService.GetUTXOs2(address)
 	if len(utxos) == 0 {
-		return nil, 0
+		return nil
 	}
 
 	type SpaceRuneLotMap map[runestone.SpacedRune]*runestone.Lot
@@ -186,22 +186,14 @@ func (s *Indexer) GetAddressAssets(address string, start, limit uint64) ([]*Addr
 		ret[i] = addressLot
 		i++
 	}
-
-	end := total
-	if start >= end {
-		return nil, 0
-	}
-	if start+limit < end {
-		end = start + limit
-	}
-	return ret[start:end], total
+	return ret
 }
 
 /*
 *
 desc: 根据utxo获取ticker名字和资产数量
 */
-func (s *Indexer) GetUtxoAssets(utxo string, start, limit uint64) []*UtxoAsset {
+func (s *Indexer) GetUtxoAssets(utxo string) []*UtxoAsset {
 	outpoint := &runestone.OutPoint{}
 	outpoint.FromString(utxo)
 	balances := s.outpointToRuneBalancesTbl.Get(outpoint)
