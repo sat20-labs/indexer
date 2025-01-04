@@ -143,6 +143,11 @@ func (p *TxOutput) OutPoint() *wire.OutPoint {
 	return outpoint
 }
 
+func (p *TxOutput) OutPoint_SatsNet() *swire.OutPoint {
+	outpoint, _ := swire.NewOutPointFromString(p.OutPointStr)
+	return outpoint
+}
+
 func (p *TxOutput) TxOut() *wire.TxOut {
 	return &wire.TxOut{
 		Value: p.Value(),
@@ -150,7 +155,7 @@ func (p *TxOutput) TxOut() *wire.TxOut {
 	}
 }
 
-func (p *TxOutput) TxOutput_SatsNet() *swire.TxOut {
+func (p *TxOutput) TxOut_SatsNet() *swire.TxOut {
 	return &swire.TxOut{
 		Value: p.Value(),
 		Assets: p.Assets,
@@ -172,6 +177,14 @@ func (p *TxOutput) TxIn() *wire.TxIn {
 		return nil
 	}
 	return wire.NewTxIn(outpoint, nil, nil)
+}
+
+func (p *TxOutput) TxIn_SatsNet() *swire.TxIn {
+	outpoint, err := swire.NewOutPointFromString(p.OutPointStr)
+	if err != nil {
+		return nil
+	}
+	return swire.NewTxIn(outpoint, nil, nil)
 }
 
 func (p *TxOutput) SizeOfBindingSats() int64 {
