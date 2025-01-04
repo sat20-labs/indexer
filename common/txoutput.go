@@ -143,6 +143,21 @@ func (p *TxOutput) OutPoint() *wire.OutPoint {
 	return outpoint
 }
 
+func (p *TxOutput) TxOut() *wire.TxOut {
+	return &wire.TxOut{
+		Value: p.Value(),
+		PkScript: p.OutValue.PkScript,
+	}
+}
+
+func (p *TxOutput) TxOutput_SatsNet() *swire.TxOut {
+	return &swire.TxOut{
+		Value: p.Value(),
+		Assets: p.Assets,
+		PkScript: p.OutValue.PkScript,
+	}
+}
+
 func (p *TxOutput) TxID() string {
 	parts := strings.Split(p.OutPointStr, ":")
 	if len(parts) != 2 {
@@ -237,7 +252,7 @@ func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput
 	asset2.Amount = asset.Amount - amt
 
 	if IsBindingSat(name) == 0 {
-		// no offsets
+		// runes：no offsets
 		part1.OutValue.Value = 330
 		part1.Assets = swire.TxAssets{*asset1}
 		part2.OutValue.Value = p.Value()-330
