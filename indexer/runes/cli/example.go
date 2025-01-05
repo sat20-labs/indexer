@@ -8,11 +8,10 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
-
 	"lukechampine.com/uint128"
 )
 
-func testEtching() {
+func TestEtching() {
 	runeName := "STUDYZY.GMAIL.COM"
 	symbol := '曾'
 	myRune, err := runestone.SpacedRuneFromString(runeName)
@@ -40,7 +39,7 @@ func testEtching() {
 	dataString, _ := txscript.DisasmString(data)
 	fmt.Printf("Etching Script: %s\n", dataString)
 }
-func testMint() {
+func TestMint() {
 	runeIdStr := "2609649:946"
 	runeId, _ := runestone.RuneIdFromString(runeIdStr)
 	r := runestone.Runestone{Mint: runeId}
@@ -52,7 +51,7 @@ func testMint() {
 	dataString, _ := txscript.DisasmString(data)
 	fmt.Printf("Mint Script: %s\n", dataString)
 }
-func testDecode() {
+func TestDecode() {
 	data, _ := hex.DecodeString("140114001600") //Mint UNCOMMON•GOODS
 	var tx wire.MsgTx
 	builder := txscript.NewScriptBuilder()

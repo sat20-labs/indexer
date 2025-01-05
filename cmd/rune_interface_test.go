@@ -103,8 +103,12 @@ func TestGetAddressMintHistory(t *testing.T) {
 	InitRuneTester()
 	// 10
 	firstRuneAddress := "tb1pfu2ff6ycy99t02zteumkm2jtk3uwm4skp50m7tevapcpkm8vaqqq73vxqr"
+	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
+	if err != nil {
+		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
+	}
 	addressId := runesIndexer.RpcService.GetAddressId(firstRuneAddress)
-	mintHistorys, total := runesIndexer.GetAddressMintHistory(firstRuneName, addressId, 0, 10)
+	mintHistorys, total := runesIndexer.GetAddressMintHistory(runeId.String(), addressId, 0, 10)
 	t.Logf("GetAddressMintHistory return txids total count: %d\n", total)
 	for i, v := range mintHistorys {
 		t.Logf("GetAddressMintHistory return txids %d: %+v\n", i, v)

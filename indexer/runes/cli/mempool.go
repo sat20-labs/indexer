@@ -66,6 +66,9 @@ func (m MempoolConnector) GetBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 	hashString := string(res)
 	hash, err := hex.DecodeString(hashString)
+	if err != nil {
+		return nil, err
+	}
 	log.Printf("found block hash %x by height:%d", hash, height)
 	return hash, nil
 }
