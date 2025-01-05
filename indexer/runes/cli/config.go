@@ -65,15 +65,15 @@ func (c Config) GetUtxoAmount() int64 {
 
 func (c Config) GetEtching() (*runestone.Etching, error) {
 	if c.Etching == nil {
-		return nil, errors.New("Etching config is required")
+		return nil, errors.New("etching config is required")
 	}
 	if c.Etching.Rune == "" {
-		return nil, errors.New("Rune is required")
+		return nil, errors.New("rune is required")
 	}
 	if c.Etching.Symbol != nil {
 		runeCount := utf8.RuneCountInString(*c.Etching.Symbol)
 		if runeCount != 1 {
-			return nil, errors.New("Symbol must be a single character")
+			return nil, errors.New("symbol must be a single character")
 		}
 	}
 	etching := &runestone.Etching{}
@@ -139,10 +139,10 @@ func (c Config) GetEtching() (*runestone.Etching, error) {
 }
 func (c Config) GetMint() (*runestone.RuneId, error) {
 	if c.Mint == nil {
-		return nil, errors.New("Mint config is required")
+		return nil, errors.New("mint config is required")
 	}
 	if c.Mint.RuneId == "" {
-		return nil, errors.New("RuneId is required")
+		return nil, errors.New("runeId is required")
 	}
 	runeId, err := runestone.RuneIdFromString(c.Mint.RuneId)
 	if err != nil {
@@ -175,9 +175,6 @@ func (c Config) GetPrivateKeyAddr() (*btcec.PrivateKey, string, error) {
 		return nil, "", err
 	}
 	privKey, pubKey := btcec.PrivKeyFromBytes(pkBytes)
-	if err != nil {
-		return nil, "", err
-	}
 	tapKey := txscript.ComputeTaprootKeyNoScript(pubKey)
 	addr, err := btcutil.NewAddressTaproot(
 		schnorr.SerializePubKey(tapKey), c.GetNetwork(),

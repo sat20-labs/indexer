@@ -8,6 +8,7 @@ import (
 
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/txscript"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
@@ -33,14 +34,15 @@ func (s *Indexer) UpdateDB() {
 	s.isUpdateing = false
 	setCount := 0
 	delCount := 0
-	for _, v := range s.cacheLogs {
-		if v.Type == store.DEL {
+
+	for v := range s.cacheLogs.IterBuffered() {
+		if v.Val.Type == store.DEL {
 			delCount++
-		} else if v.Type == store.PUT {
+		} else if v.Val.Type == store.PUT {
 			setCount++
 		}
 	}
-	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count: %d, db del count: %d", s.Status.Height, setCount, delCount)
+	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count:%d, db del count:%d", s.Status.Height, setCount, delCount)
 
 	// firstRuneName := "BESTINSLOT•XYZ"
 	// spaceRune, _ := runestone.SpacedRuneFromString(firstRuneName)
@@ -71,7 +73,8 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	if s.wb == nil {
 		s.wb = s.db.NewWriteBatch()
 		store.SetWriteBatch(s.wb)
-		s.cacheLogs = make(map[string]*store.CacheLog)
+		cacheLogs := cmap.New[*store.CacheLog]()
+		s.cacheLogs = &cacheLogs
 		store.SetCacheLogs(s.cacheLogs)
 	}
 

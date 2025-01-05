@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
@@ -21,7 +22,7 @@ type Indexer struct {
 	cloneTimeStamp                int64
 	isUpdateing                   bool
 	wb                            *badger.WriteBatch
-	cacheLogs                     map[string]*store.CacheLog
+	cacheLogs                     *cmap.ConcurrentMap[string, *store.CacheLog]
 	chaincfgParam                 *chaincfg.Params
 	height                        uint64
 	blockTime                     uint64
@@ -103,29 +104,30 @@ func (s *Indexer) Init() {
 
 func (s *Indexer) Clone() *Indexer {
 	cloneIndex := NewIndexer(s.db, s.chaincfgParam, s.BaseIndexer, s.RpcService)
-	for k, v := range s.cacheLogs {
+	for log := range s.cacheLogs.IterBuffered() {
 		cacheLog := &store.CacheLog{
-			Type:      v.Type,
-			ExistInDb: v.ExistInDb,
-			TimeStamp: v.TimeStamp,
+			Type:      log.Val.Type,
+			ExistInDb: log.Val.ExistInDb,
+			TimeStamp: log.Val.TimeStamp,
 		}
-		if v.Val != nil {
-			cacheLog.Val = make([]byte, len(v.Val))
-			copy(cacheLog.Val, v.Val)
+		if log.Val.Val != nil {
+			cacheLog.Val = make([]byte, len(log.Val.Val))
+			copy(cacheLog.Val, log.Val.Val)
 		}
 		if cloneIndex.cacheLogs == nil {
-			cloneIndex.cacheLogs = make(map[string]*store.CacheLog)
+			cacheLogs := cmap.New[*store.CacheLog]()
+			cloneIndex.cacheLogs = &cacheLogs
 		}
-		cloneIndex.cacheLogs[k] = cacheLog
+		cloneIndex.cacheLogs.Set(log.Key, cacheLog)
 	}
 	cloneIndex.cloneTimeStamp = time.Now().UnixNano()
 	return cloneIndex
 }
 
-func (b *Indexer) Subtract(backupIndexer *Indexer) {
-	for k, v := range backupIndexer.cacheLogs {
-		if v.TimeStamp <= b.cloneTimeStamp {
-			delete(b.cacheLogs, k)
+func (s *Indexer) Subtract(backupIndexer *Indexer) {
+	for log := range backupIndexer.cacheLogs.IterBuffered() {
+		if log.Val.TimeStamp <= s.cloneTimeStamp {
+			s.cacheLogs.Remove(log.Key)
 		}
 	}
 }

@@ -40,6 +40,9 @@ func GetTapScriptAddress(pk *btcec.PublicKey, revealedScript []byte, net *chainc
 		tapKeyBytes,
 		net,
 	)
+	if err != nil {
+		return nil, err
+	}
 	return addr, nil
 }
 func GetTaprootPubkey(pubkey *btcec.PublicKey, revealedScript []byte) (*btcec.PublicKey, error) {

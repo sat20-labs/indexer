@@ -169,7 +169,7 @@ func VerifyTx(rawTx string, prevTxOutScript []byte, prevTxOutValue int64) error 
 		return err
 	}
 
-	for i, _ := range tx.TxIn {
+	for i := range tx.TxIn {
 
 		outputFetcher := txscript.NewCannedPrevOutputFetcher(prevTxOutScript, prevTxOutValue)
 		sigHashes := txscript.NewTxSigHashes(&tx, outputFetcher)

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/dgraph-io/badger/v4"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"google.golang.org/protobuf/proto"
 )
@@ -28,7 +30,7 @@ type CacheLog struct {
 var (
 	storeDb         *badger.DB
 	storeWriteBatch *badger.WriteBatch
-	logs            map[string]*CacheLog
+	logs            *cmap.ConcurrentMap[string, *CacheLog]
 )
 
 type Cache[T any] struct{}
@@ -43,38 +45,34 @@ func SetWriteBatch(v *badger.WriteBatch) {
 	storeWriteBatch = v
 }
 
-func SetCacheLogs(v map[string]*CacheLog) {
+func SetCacheLogs(v *cmap.ConcurrentMap[string, *CacheLog]) {
 	logs = v
 }
 
 func FlushToDB() {
-	if len(logs) == 0 {
+	count := logs.Count()
+	if count == 0 {
 		return
 	}
 
-	var totalBytes int
-	count := len(logs)
-	for key, action := range logs {
-		totalBytes += len(key)
-		totalBytes += len(action.Val)
-		totalBytes += 4
-		totalBytes += len(key)
-	}
-	common.Log.Infof("Cache::FlushToDB-> logs count: %d, total bytes: %d", count, totalBytes)
-
-	for key, action := range logs {
-		if action.Type == PUT {
-			storeWriteBatch.Set([]byte(key), action.Val)
+	var totalBytes int64
+	for log := range logs.IterBuffered() {
+		totalBytes += int64(len(log.Key))
+		totalBytes += int64(unsafe.Sizeof(log.Val))
+		totalBytes += int64(len(log.Val.Val))
+		if log.Val.Type == PUT {
+			storeWriteBatch.Set([]byte(log.Key), log.Val.Val)
 		}
 	}
+
 	err := storeWriteBatch.Flush()
 	if err != nil {
 		common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
 	}
 	storeDb.Update(func(txn *badger.Txn) error {
-		for key, action := range logs {
-			if action.Type == DEL && action.ExistInDb {
-				err := txn.Delete([]byte(key))
+		for log := range logs.IterBuffered() {
+			if log.Val.Type == DEL && log.Val.ExistInDb {
+				err := txn.Delete([]byte(log.Key))
 				if err != nil {
 					common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
 				}
@@ -82,31 +80,35 @@ func FlushToDB() {
 		}
 		return nil
 	})
+
+	common.Log.Debugf("Cache::FlushToDB-> logs count: %d, total bytes: %d", count, totalBytes)
 }
 
 func (s *Cache[T]) Get(key []byte) (ret *T) {
 	keyStr := string(key)
-	log := logs[keyStr]
-	if log != nil {
-		if log.Type == DEL {
+	if logs != nil {
+		log, ok := logs.Get(keyStr)
+		if ok {
+			if log.Type == DEL {
+				return
+			}
+			var out T
+			msg := any(&out).(proto.Message)
+			proto.Unmarshal(log.Val, msg)
+			ret = &out
 			return
 		}
-		var out T
-		msg := any(&out).(proto.Message)
-		proto.Unmarshal(log.Val, msg)
-		ret = &out
-		return
 	}
 
 	var raw []byte
 	ret, raw = s.GetFromDB(key)
 	if logs != nil && len(raw) > 0 {
-		logs[keyStr] = &CacheLog{
+		logs.Set(keyStr, &CacheLog{
 			Val:       raw,
 			Type:      INIT,
 			ExistInDb: true,
 			TimeStamp: 0,
-		}
+		})
 	}
 	return
 }
@@ -116,9 +118,14 @@ func (s *Cache[T]) Delete(key []byte) (ret *T) {
 	if ret == nil {
 		return
 	}
-	log := logs[string(key)]
-	log.Type = DEL
-	log.TimeStamp = time.Now().UnixNano()
+	log, ok := logs.Get(string(key))
+	if ok {
+		log.Type = DEL
+		log.TimeStamp = time.Now().UnixNano()
+	} else {
+		// must be in cache
+		common.Log.Panicf("Cache.Delete-> key: %s, not found in logs", string(key))
+	}
 	return
 }
 
@@ -128,13 +135,13 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 	if err != nil {
 		common.Log.Panicf("Cache.Set-> key: %s, proto.Marshal err: %v", string(key), err.Error())
 	}
-	log := logs[string(key)]
-	if log == nil {
-		logs[string(key)] = &CacheLog{}
-		log = logs[string(key)]
+	log, ok := logs.Get(string(key))
+	if !ok {
+		log = &CacheLog{}
+		logs.Set(string(key), log)
 	}
-	log.Val = val
 	log.Type = PUT
+	log.Val = val
 	log.TimeStamp = time.Now().UnixNano()
 	return
 }
@@ -161,20 +168,37 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 		return
 	}
 	keyPrefixStr := string(keyPrefix)
-	for k, v := range logs {
-		if strings.HasPrefix(k, keyPrefixStr) {
-			if v.Type == DEL {
-				delete(ret, k)
-			} else if v.Type == PUT {
+	for log := range logs.IterBuffered() {
+		if strings.HasPrefix(log.Key, keyPrefixStr) {
+			if log.Val.Type == DEL {
+				delete(ret, log.Key)
+			} else if log.Val.Type == PUT {
 				var out T
 				if isNeedValue {
 					msg := any(&out).(proto.Message)
-					proto.Unmarshal(v.Val, msg)
+					proto.Unmarshal(log.Val.Val, msg)
 				}
 				if ret == nil {
 					ret = make(map[string]*T)
 				}
-				ret[k] = &out
+				ret[log.Key] = &out
+			}
+		}
+	}
+	for log := range logs.IterBuffered() {
+		if strings.HasPrefix(log.Key, keyPrefixStr) {
+			if log.Val.Type == DEL {
+				delete(ret, log.Key)
+			} else if log.Val.Type == PUT {
+				var out T
+				if isNeedValue {
+					msg := any(&out).(proto.Message)
+					proto.Unmarshal(log.Val.Val, msg)
+				}
+				if ret == nil {
+					ret = make(map[string]*T)
+				}
+				ret[log.Key] = &out
 			}
 		}
 	}
