@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
@@ -16,30 +15,25 @@ type AddressRuneIdToMintHistory struct {
 	OutPoint  *OutPoint
 }
 
-func (s *AddressRuneIdToMintHistory) FromString(key string) {
-	parts := strings.SplitN(key, "-", 5)
-	s.Address = Address(parts[1])
+func AddressRuneIdToMintHistoryFromString(str string) (*AddressRuneIdToMintHistory, error) {
+	ret := &AddressRuneIdToMintHistory{}
+	parts := strings.SplitN(str, "-", 5)
+	ret.Address = Address(parts[1])
 	var err error
-	if s.RuneId == nil {
-		s.RuneId = &RuneId{}
-	}
-	s.RuneId, err = RuneIdFromString(parts[2])
+	ret.RuneId, err = RuneIdFromString(parts[2])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
+		return nil, err
 	}
-	if s.OutPoint == nil {
-		s.OutPoint = &OutPoint{}
-	}
-	err = s.OutPoint.FromString(parts[3])
+	ret.OutPoint, err = OutPointFromString(parts[3])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> OutPoint.FromString(%s) err:%v", parts[2], err)
+		return nil, err
 	}
-
 	addressId, err := strconv.ParseUint(parts[4], 16, 64)
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> strconv.ParseUint(%s) err:%v", parts[4], err)
+		return nil, err
 	}
-	s.AddressId = addressId
+	ret.AddressId = addressId
+	return ret, nil
 }
 
 func (s *AddressRuneIdToMintHistory) ToPb() *pb.AddressRuneIdToMintHistory {
@@ -58,7 +52,7 @@ func NewAddressRuneIdToMintHistoryTable(cache *store.Cache[pb.AddressRuneIdToMin
 	return &AddressRuneIdToMintHistoryTable{Table: Table[pb.AddressRuneIdToMintHistory]{cache: cache}}
 }
 
-func (s *AddressRuneIdToMintHistoryTable) GetUtxos(address Address, runeId *RuneId) (ret []Utxo) {
+func (s *AddressRuneIdToMintHistoryTable) GetUtxos(address Address, runeId *RuneId) (ret []Utxo, err error) {
 	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + string(address) + "-" + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
@@ -66,8 +60,10 @@ func (s *AddressRuneIdToMintHistoryTable) GetUtxos(address Address, runeId *Rune
 		ret = make([]Utxo, len(pbVal))
 		var i = 0
 		for k := range pbVal {
-			v := &AddressRuneIdToMintHistory{}
-			v.FromString(k)
+			v, err := AddressRuneIdToMintHistoryFromString(k)
+			if err != nil {
+				return nil, err
+			}
 			ret[i] = Utxo(v.OutPoint.String())
 			i++
 		}

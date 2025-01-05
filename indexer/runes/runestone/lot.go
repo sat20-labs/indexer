@@ -2,6 +2,8 @@ package runestone
 
 import (
 	"encoding/json"
+	"errors"
+	"math/big"
 
 	"lukechampine.com/uint128"
 )
@@ -10,12 +12,25 @@ type Lot struct {
 	Value *uint128.Uint128
 }
 
+func LotFromString(str string) (*Lot, error) {
+	bigInt, success := new(big.Int).SetString(str, 16)
+	if !success {
+		return nil, errors.New("invalid string")
+	}
+	value := uint128.FromBig(bigInt)
+	return &Lot{Value: &value}, nil
+}
+
 func NewLot(value *uint128.Uint128) *Lot {
 	return &Lot{Value: value}
 }
 
 func (l Lot) N() *uint128.Uint128 {
 	return l.Value
+}
+
+func (l *Lot) String() string {
+	return l.Value.Big().Text(16)
 }
 
 func (l Lot) Add(rhs *Lot) Lot {

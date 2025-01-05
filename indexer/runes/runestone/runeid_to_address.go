@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
@@ -17,20 +16,21 @@ type RuneIdToAddress struct {
 	AddressId uint64
 }
 
-func (s *RuneIdToAddress) FromString(key string) {
-	parts := strings.SplitN(key, "-", 4)
+func RuneIdToAddressFromString(str string) (*RuneIdToAddress, error) {
+	ret := &RuneIdToAddress{}
+	parts := strings.SplitN(str, "-", 4)
 	var err error
-	s.RuneId, err = RuneIdFromString(parts[1])
+	ret.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
+		return nil, err
 	}
-	s.Address = Address(parts[2])
+	ret.Address = Address(parts[2])
 	addressId, err := strconv.ParseUint(parts[3], 16, 64)
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> strconv.ParseUint(%s) err:%v", parts[3], err)
+		return nil, err
 	}
-	s.AddressId = addressId
-
+	ret.AddressId = addressId
+	return ret, nil
 }
 
 func (s *RuneIdToAddress) ToPb() *pb.RuneIdToAddress {
@@ -50,7 +50,7 @@ func NewRuneIdToAddressTable(cache *store.Cache[pb.RuneIdToAddress]) *RuneToAddr
 	return &RuneToAddressTable{Table: Table[pb.RuneIdToAddress]{cache: cache}}
 }
 
-func (s *RuneToAddressTable) GetAddresses(runeId *RuneId) (ret []Address) {
+func (s *RuneToAddressTable) GetAddresses(runeId *RuneId) (ret []Address, err error) {
 	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
@@ -58,8 +58,12 @@ func (s *RuneToAddressTable) GetAddresses(runeId *RuneId) (ret []Address) {
 		ret = make([]Address, len(pbVal))
 		var i = 0
 		for k := range pbVal {
-			v := &RuneIdToAddress{}
-			v.FromString(k)
+			var err error
+			v, err := RuneIdToAddressFromString(k)
+			if err != nil {
+				return nil, err
+			}
+
 			ret[i] = v.Address
 			i++
 		}

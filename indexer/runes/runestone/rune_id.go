@@ -72,7 +72,7 @@ func (r RuneId) Next(block uint128.Uint128, tx uint128.Uint128) (*RuneId, error)
 }
 
 func (r RuneId) String() string {
-	return fmt.Sprintf("%d:%d", r.Block, r.Tx)
+	return fmt.Sprintf("%x:%x", r.Block, r.Tx)
 }
 
 func RuneIdFromString(s string) (*RuneId, error) {
@@ -80,11 +80,11 @@ func RuneIdFromString(s string) (*RuneId, error) {
 	if len(parts) != 2 {
 		return nil, ErrSeparator
 	}
-	block, err := strconv.ParseUint(parts[0], 10, 64)
+	block, err := strconv.ParseUint(parts[0], 16, 64)
 	if err != nil {
 		return nil, ErrBlock(parts[0])
 	}
-	tx, err := strconv.ParseUint(parts[1], 10, 32)
+	tx, err := strconv.ParseUint(parts[1], 16, 32)
 	if err != nil {
 		return nil, ErrTransaction(parts[1])
 	}

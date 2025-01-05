@@ -3,7 +3,6 @@ package runestone
 import (
 	"strings"
 
-	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
@@ -13,20 +12,19 @@ type RuneIdToOutpoint struct {
 	Outpoint *OutPoint
 }
 
-func (s *RuneIdToOutpoint) FromString(key string) {
-	parts := strings.SplitN(key, "-", 3)
+func RuneIdToOutpointFromString(str string) (*RuneIdToOutpoint, error) {
+	runeIdToOutpoint := &RuneIdToOutpoint{}
+	parts := strings.SplitN(str, "-", 3)
 	var err error
-	s.RuneId, err = RuneIdFromString(parts[1])
+	runeIdToOutpoint.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
+		return nil, err
 	}
-	if s.Outpoint == nil {
-		s.Outpoint = &OutPoint{}
-	}
-	err = s.Outpoint.FromString(parts[2])
+	runeIdToOutpoint.Outpoint, err = OutPointFromString(parts[2])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> OutPoint.FromString(%s) err:%v", parts[2], err)
+		return nil, err
 	}
+	return runeIdToOutpoint, nil
 }
 
 func (s *RuneIdToOutpoint) ToPb() *pb.RuneIdToOutpoint {
@@ -45,15 +43,17 @@ func NewRuneIdToUtxoTable(store *store.Cache[pb.RuneIdToOutpoint]) *RuneIdToOutp
 	return &RuneIdToOutpointTable{Table: Table[pb.RuneIdToOutpoint]{cache: store}}
 }
 
-func (s *RuneIdToOutpointTable) GetOutpoints(runeId *RuneId) (ret []*OutPoint) {
+func (s *RuneIdToOutpointTable) GetOutpoints(runeId *RuneId) (ret []*OutPoint, err error) {
 	tblKey := []byte(store.RUNEID_TO_UTXO + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 	if pbVal != nil {
 		ret = make([]*OutPoint, len(pbVal))
 		var i = 0
 		for k := range pbVal {
-			v := &RuneIdToOutpoint{}
-			v.FromString(k)
+			v, err := RuneIdToOutpointFromString(k)
+			if err != nil {
+				return nil, err
+			}
 			ret[i] = v.Outpoint
 			i++
 		}

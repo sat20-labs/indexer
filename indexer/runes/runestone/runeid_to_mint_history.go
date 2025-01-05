@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
@@ -17,19 +16,21 @@ type RuneIdToMintHistory struct {
 	UtxoId uint64
 }
 
-func (s *RuneIdToMintHistory) FromString(key string) {
+func RuneIdToMintHistoryFromString(key string) (*RuneIdToMintHistory, error) {
+	ret := &RuneIdToMintHistory{}
 	parts := strings.SplitN(key, "-", 4)
 	var err error
-	s.RuneId, err = RuneIdFromString(parts[1])
+	ret.RuneId, err = RuneIdFromString(parts[1])
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> RuneIdFromString(%s) err:%v", parts[1], err)
+		return nil, err
 	}
-	s.Utxo = Utxo(parts[2])
+	ret.Utxo = Utxo(parts[2])
 	utxoId, err := strconv.ParseUint(parts[3], 16, 64)
 	if err != nil {
-		common.Log.Panicf("RuneIdToAddress.FromString-> strconv.ParseUint(%s) err:%v", parts[3], err)
+		return nil, err
 	}
-	s.UtxoId = utxoId
+	ret.UtxoId = utxoId
+	return ret, nil
 }
 
 func (s *RuneIdToMintHistory) ToPb() *pb.RuneIdToMintHistory {
@@ -48,7 +49,7 @@ func NewRuneIdToMintHistoryTable(store *store.Cache[pb.RuneIdToMintHistory]) *Ru
 	return &RuneToMintHistoryTable{Table: Table[pb.RuneIdToMintHistory]{cache: store}}
 }
 
-func (s *RuneToMintHistoryTable) GetUtxos(runeId *RuneId) (ret []Utxo) {
+func (s *RuneToMintHistoryTable) GetUtxos(runeId *RuneId) (ret []Utxo, err error) {
 	tblKey := []byte(store.RUNEID_TO_MINT_HISTORYS + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
@@ -56,8 +57,10 @@ func (s *RuneToMintHistoryTable) GetUtxos(runeId *RuneId) (ret []Utxo) {
 		ret = make([]Utxo, len(pbVal))
 		var i = 0
 		for k := range pbVal {
-			v := &RuneIdToMintHistory{}
-			v.FromString(k)
+			v, err := RuneIdToMintHistoryFromString(k)
+			if err != nil {
+				return nil, err
+			}
 			ret[i] = v.Utxo
 			i++
 		}

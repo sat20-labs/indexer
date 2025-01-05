@@ -309,6 +309,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		type RuneIdToOutputMap map[runestone.RuneId]*runestone.OutPoint
 		runeIdToOutputMap := make(RuneIdToOutputMap)
 
+		type RuneIdToOutpointToBalanceMap map[runestone.RuneId]*runestone.RuneIdToOutpointToBalance
+		// runeIdToOutpointToBalance := make(RuneIdToOutpointToBalanceMap)
+
 		type RuneIdToAddressRuneIdToMintHistoryMap map[runestone.RuneId]runestone.AddressRuneIdToMintHistory
 		runeIdToAddressRuneIdToMintHistoryMap := make(RuneIdToAddressRuneIdToMintHistoryMap)
 
@@ -328,7 +331,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			balanceArray := balances.GetSortArray()
 			utxoId := common.GetUtxoId(tx.Outputs[vout])
 			outpoint := &runestone.OutPoint{Txid: tx.Txid, Vout: vout, UtxoId: utxoId}
-			s.outpointToRuneBalancesTbl.Insert(outpoint, balanceArray)
+
+			s.outpointToBalancesTbl.Insert(outpoint, balanceArray)
+			// TODO: GetAllUtxoBalances
 
 			// update runeIdToOutputMap and runeIdToAddressMap
 			address, err := parseTxVoutScriptAddress(tx, int(vout), *s.chaincfgParam)
@@ -457,7 +462,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 			Txid: input.Txid,
 			Vout: uint32(input.Vout),
 		}
-		oldValue := s.outpointToRuneBalancesTbl.Remove(outpoint)
+		oldValue := s.outpointToBalancesTbl.Remove(outpoint)
 		if oldValue == nil {
 			continue
 		}

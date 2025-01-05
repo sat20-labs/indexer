@@ -17,7 +17,10 @@ func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHis
 		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 		return nil, 0
 	}
-	utxos := s.runeIdToMintHistoryTbl.GetUtxos(id)
+	utxos, err := s.runeIdToMintHistoryTbl.GetUtxos(id)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetUtxos(%s) err:%v", id.String(), err)
+	}
 	if len(utxos) == 0 {
 		return nil, 0
 	}
@@ -62,7 +65,10 @@ func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, 
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> GetAddressByID(%d) err:%v", addressId, err)
 	}
-	utxos := s.addressRuneIdToMintHistoryTbl.GetUtxos(runestone.Address(address), id)
+	utxos, err := s.addressRuneIdToMintHistoryTbl.GetUtxos(runestone.Address(address), id)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetUtxos(%s, %s) err:%v", address, id.String(), err)
+	}
 	if len(utxos) == 0 {
 		return nil, 0
 	}

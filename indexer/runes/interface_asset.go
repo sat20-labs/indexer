@@ -23,7 +23,10 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 		return nil, 0
 	}
 
-	addresses := s.runeIdToAddressTbl.GetAddresses(rid)
+	addresses, err := s.runeIdToAddressTbl.GetAddresses(rid)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdToAddressTbl.GetAddresses(%s) err:%v", rid.String(), err.Error())
+	}
 	if len(addresses) == 0 {
 		return nil, 0
 	}
@@ -39,14 +42,16 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 	for _, address := range addresses {
 		utxos := s.RpcService.GetUTXOs2(string(address))
 		for _, utxo := range utxos {
-			outpoint := &runestone.OutPoint{}
 			utxoInfo, err := s.RpcService.GetUtxoInfo(utxo)
 			if err != nil {
 				common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> GetUtxoInfo(%s) err:%v", utxo, err)
 			}
 			utxoId := utxoInfo.UtxoId
-			outpoint.FromUtxo(utxo, utxoId)
-			blances := s.outpointToRuneBalancesTbl.Get(outpoint)
+			outpoint, err := runestone.OutPointFromUtxo(utxo, utxoId)
+			if err != nil {
+				common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runestone.OutPointFromUtxo(%s, %d) err:%v", utxo, utxoId, err)
+			}
+			blances := s.outpointToBalancesTbl.Get(outpoint)
 			for _, balance := range blances {
 				if balance.RuneId.Block != rid.Block || balance.RuneId.Tx != rid.Tx {
 					continue
@@ -97,7 +102,10 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 		return nil, 0
 	}
-	outpoints := s.runeIdToOutpointTbl.GetOutpoints(rid)
+	outpoints, err := s.runeIdToOutpointTbl.GetOutpoints(rid)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.String(), err.Error())
+	}
 	if len(outpoints) == 0 {
 		return nil, 0
 	}
@@ -106,8 +114,8 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	outpointLotsMap := make(OutpointLotsMap)
 	totalAmount := runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
 	for _, outpoint := range outpoints {
-		blances := s.outpointToRuneBalancesTbl.Get(outpoint)
-		for _, balance := range blances {
+		balances := s.outpointToBalancesTbl.Get(outpoint)
+		for _, balance := range balances {
 			if balance.RuneId.Block != rid.Block || balance.RuneId.Tx != rid.Tx {
 				continue
 			}
@@ -117,7 +125,6 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 			outpointLotsMap[*outpoint].AddAssign(&balance.Lot)
 			totalAmount.AddAssign(&balance.Lot)
 		}
-
 	}
 
 	total := uint64(len(outpointLotsMap))
@@ -163,14 +170,16 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 	type SpaceRuneLotMap map[runestone.SpacedRune]*runestone.Lot
 	spaceRuneLotMap := make(SpaceRuneLotMap)
 	for _, utxo := range utxos {
-		outpoint := &runestone.OutPoint{}
 		utxoInfo, err := s.RpcService.GetUtxoInfo(utxo)
 		if err != nil {
-			common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> GetUtxoInfo(%s) err:%v", utxo, err)
+			common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetUtxoInfo(%s) err:%v", utxo, err)
 		}
 		utxoId := utxoInfo.UtxoId
-		outpoint.FromUtxo(utxo, utxoId)
-		balances := s.outpointToRuneBalancesTbl.Get(outpoint)
+		outpoint, err := runestone.OutPointFromUtxo(utxo, utxoId)
+		if err != nil {
+			common.Log.Panicf("RuneIndexer.GetAddressAssets-> runestone.OutPointFromUtxo(%s, %d) err:%v", utxo, utxoId, err)
+		}
+		balances := s.outpointToBalancesTbl.Get(outpoint)
 		for _, balance := range balances {
 			runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
 			if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
@@ -199,13 +208,15 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 desc: 根据utxo获取ticker名字和资产数量
 */
 func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
-	outpoint := &runestone.OutPoint{}
 	utxo, err := s.RpcService.GetUtxoByID(utxoId)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetUtxoAssets-> GetUtxoByID(%d) err:%v", utxoId, err)
 	}
-	outpoint.FromUtxo(utxo, utxoId)
-	balances := s.outpointToRuneBalancesTbl.Get(outpoint)
+	outpoint, err := runestone.OutPointFromUtxo(utxo, utxoId)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetUtxoAssets-> runestone.OutPointFromUtxo(%s, %d) err:%v", utxo, utxoId, err)
+	}
+	balances := s.outpointToBalancesTbl.Get(outpoint)
 	ret := make([]*UtxoAsset, len(balances))
 	for i, balance := range balances {
 		runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
@@ -223,13 +234,15 @@ desc: 判断utxo中是否有runes资产
 实现: balances = get_rune_balances_for_output(utxo); return len(balances) > 0
 */
 func (s *Indexer) IsExistAsset(utxoId uint64) bool {
-	outpoint := &runestone.OutPoint{}
 	utxo, err := s.RpcService.GetUtxoByID(utxoId)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetUtxoAssets-> GetUtxoByID(%d) err:%v", utxoId, err)
+		common.Log.Panicf("RuneIndexer.IsExistAsset-> GetUtxoByID(%d) err:%v", utxoId, err)
 	}
-	outpoint.FromUtxo(utxo, utxoId)
-	balances := s.outpointToRuneBalancesTbl.GetFromDB(outpoint)
+	outpoint, err := runestone.OutPointFromUtxo(utxo, utxoId)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.IsExistAsset-> runestone.OutPointFromUtxo(%s, %d) err:%v", utxo, utxoId, err)
+	}
+	balances := s.outpointToBalancesTbl.Get(outpoint)
 	total := len(balances)
 	return total > 0
 }

@@ -37,4 +37,8 @@ const (
 	// 表: address和runeid映射mint的utxo (new)
 	// 存储: key = arm-%address%-%runeid.string()%-%utxo% value = nil
 	ADDRESS_RUNEID_TO_MINT_HISTORYS = "g-"
+
+	// 表: runeid和outpoint映射balance (new)
+	// 存储: key = rob-%runeid%-%outpoint%-%lot% value = nil
+	RUNEID_TO_OUTPOINT_TO_BALANCE = "h-"
 )

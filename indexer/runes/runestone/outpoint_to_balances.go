@@ -21,32 +21,37 @@ func (s *OutPoint) String() string {
 	return fmt.Sprintf("%s:%x:%x", s.Txid, s.Vout, s.UtxoId)
 }
 
-func (s *OutPoint) FromUtxo(utxo string, utxoId uint64) error {
+func OutPointFromUtxo(utxo string, utxoId uint64) (*OutPoint, error) {
+	outpoint := &OutPoint{}
 	parts := strings.Split(utxo, ":")
-	s.Txid = parts[0]
+	outpoint.Txid = parts[0]
 	vout, err := strconv.ParseUint(parts[1], 16, 32)
 	if err != nil {
-		return fmt.Errorf("invalid vout: %v", err)
+		return nil, fmt.Errorf("invalid vout: %v", err)
 	}
-	s.Vout = uint32(vout)
-	s.UtxoId = utxoId
-	return nil
+	outpoint.Vout = uint32(vout)
+	outpoint.UtxoId = utxoId
+	return outpoint, nil
 }
 
-func (s *OutPoint) FromString(str string) error {
+func OutPointFromString(str string) (*OutPoint, error) {
+	outpoint := &OutPoint{}
 	parts := strings.Split(str, ":")
-	s.Txid = parts[0]
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid outpoint format")
+	}
+	outpoint.Txid = parts[0]
 	vout, err := strconv.ParseUint(parts[1], 16, 32)
 	if err != nil {
-		return fmt.Errorf("invalid vout: %v", err)
+		return nil, err
 	}
-	s.Vout = uint32(vout)
+	outpoint.Vout = uint32(vout)
 	utxoId, err := strconv.ParseUint(parts[2], 16, 64)
 	if err != nil {
-		return fmt.Errorf("invalid utxoId: %v", err)
+		return nil, err
 	}
-	s.UtxoId = utxoId
-	return nil
+	outpoint.UtxoId = utxoId
+	return outpoint, nil
 }
 
 type RuneIdLot struct {
@@ -68,8 +73,8 @@ func (s RuneIdLotMap) GetOrDefault(id *RuneId) *Lot {
 	return s[key]
 }
 
-func (s RuneIdLotMap) GetSortArray() OutpointToRuneBalances {
-	slice := make(OutpointToRuneBalances, len(s))
+func (s RuneIdLotMap) GetSortArray() OutpointToBalances {
+	slice := make(OutpointToBalances, len(s))
 	var i = 0
 	for k, v := range s {
 		slice[i] = RuneIdLot{RuneId: k, Lot: *v}
@@ -83,10 +88,10 @@ func (s RuneIdLotMap) GetSortArray() OutpointToRuneBalances {
 	return slice
 }
 
-type OutpointToRuneBalances []RuneIdLot
+type OutpointToBalances []RuneIdLot
 
-func (s *OutpointToRuneBalances) ToPb() *pb.OutpointToRuneBalances {
-	pbValue := &pb.OutpointToRuneBalances{
+func (s *OutpointToBalances) ToPb() *pb.OutpointToBalances {
+	pbValue := &pb.OutpointToBalances{
 		RuneIdLots: make([]*pb.RuneIdLot, len(*s)),
 	}
 	for i, runeIdLot := range *s {
@@ -108,7 +113,7 @@ func (s *OutpointToRuneBalances) ToPb() *pb.OutpointToRuneBalances {
 	return pbValue
 }
 
-func (s *OutpointToRuneBalances) FromPb(pbValue *pb.OutpointToRuneBalances) {
+func (s *OutpointToBalances) FromPb(pbValue *pb.OutpointToBalances) {
 	for _, pbRuneIdLot := range pbValue.RuneIdLots {
 		runeId := RuneId{
 			Block: pbRuneIdLot.RuneId.Block,
@@ -127,49 +132,39 @@ func (s *OutpointToRuneBalances) FromPb(pbValue *pb.OutpointToRuneBalances) {
 	}
 }
 
-type OutpointToRuneBalancesTable struct {
-	Table[pb.OutpointToRuneBalances]
+type OutpointToBalancesTable struct {
+	Table[pb.OutpointToBalances]
 }
 
-func NewOutpointToRuneBalancesTable(s *store.Cache[pb.OutpointToRuneBalances]) *OutpointToRuneBalancesTable {
-	return &OutpointToRuneBalancesTable{Table: Table[pb.OutpointToRuneBalances]{cache: s}}
+func NewOutpointToBalancesTable(s *store.Cache[pb.OutpointToBalances]) *OutpointToBalancesTable {
+	return &OutpointToBalancesTable{Table: Table[pb.OutpointToBalances]{cache: s}}
 }
 
-func (s *OutpointToRuneBalancesTable) Get(key *OutPoint) (ret OutpointToRuneBalances) {
+func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
-		ret = OutpointToRuneBalances{}
+		ret = OutpointToBalances{}
 		ret.FromPb(pbVal)
 	}
 	return
 }
 
-func (s *OutpointToRuneBalancesTable) GetFromDB(key *OutPoint) (ret OutpointToRuneBalances) {
-	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
-	pbVal, _ := s.cache.GetFromDB(tblKey)
-	if pbVal != nil {
-		ret = OutpointToRuneBalances{}
-		ret.FromPb(pbVal)
-	}
-	return
-}
-
-func (s *OutpointToRuneBalancesTable) Insert(key *OutPoint, value OutpointToRuneBalances) (ret *OutpointToRuneBalances) {
+func (s *OutpointToBalancesTable) Insert(key *OutPoint, value OutpointToBalances) (ret *OutpointToBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
 	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
-		ret = &OutpointToRuneBalances{}
+		ret = &OutpointToBalances{}
 		ret.FromPb(pbVal)
 	}
 	return
 }
 
-func (s *OutpointToRuneBalancesTable) Remove(key *OutPoint) (ret *OutpointToRuneBalances) {
+func (s *OutpointToBalancesTable) Remove(key *OutPoint) (ret *OutpointToBalances) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
 	pbVal := s.cache.Delete(tblKey)
 	if pbVal != nil {
-		ret = &OutpointToRuneBalances{}
+		ret = &OutpointToBalances{}
 		ret.FromPb(pbVal)
 	}
 	return
