@@ -203,37 +203,7 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 	case common.PROTOCOL_NAME_BRC20:
 		return b.GetBRC20TickerV2(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
-		ticker := b.RunesIndexer.GetRuneInfoWithName(tickerName.Ticker)
-		if ticker != nil {
-			result = &common.TickerInfo{}
-			result.Protocol = common.PROTOCOL_NAME_RUNES
-			result.Type = common.ASSET_TYPE_FT
-			result.Ticker = ticker.Id
-			result.DisplayName = ticker.Name
-			result.Id = int64(ticker.Number)
-			result.Divisibility = int(ticker.Divisibility)
-			
-			result.TotalMinted = ticker.Supply.String()
-			result.MaxSupply = ticker.MaxSupply.String()
-			if ticker.MintInfo != nil {
-				result.Limit = ticker.MintInfo.Amount.String()
-			}
-			result.SelfMint = int(ticker.PreminePercentage)
-			
-			
-			result.DeployHeight = ticker.BlockHeight()
-			result.DeployBlocktime = int64(ticker.Timestamp)
-			result.DeployTx = ticker.Etching
-			
-			_, holders := b.RunesIndexer.GetAllAddressBalances(ticker.Id, 0, 1)
-			result.HoldersCount = int(holders)
-			result.InscriptionId = ""
-			result.Description = ""
-			result.Rarity = ""
-			result.DeployAddress = ""
-			result.ContentType = ""
-			result.Delegate = ""
-		}
+		
 	}
 
 	return result

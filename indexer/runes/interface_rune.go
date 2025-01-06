@@ -75,6 +75,15 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 	return
 }
 
+func (s *Indexer) GetAllTickers() []string {
+	runesIds := make([]string, 0)
+	runeEntrys := s.idToEntryTbl.GetList()
+	for _, v := range runeEntrys {
+		runesIds = append(runesIds, v.RuneId.String())
+	}
+	return runesIds
+}
+
 /*
 *
 desc: 获取所有runeInfo
