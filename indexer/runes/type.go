@@ -228,6 +228,7 @@ type AddressAsset struct {
 	Rune         string
 	Balance      uint128.Uint128
 	Divisibility uint8
+	Symbol       rune
 }
 
 func (s AddressAsset) MarshalJSON() ([]byte, error) {
@@ -262,6 +263,7 @@ type UtxoAsset struct {
 	Rune         string
 	Balance      uint128.Uint128
 	Divisibility uint8
+	Symbol       rune
 }
 
 type MintHistory struct {

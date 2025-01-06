@@ -228,7 +228,8 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 
 	type RuneBalance struct {
 		Balance      *runestone.Lot
-		divisibility uint8
+		Divisibility uint8
+		Symbol       rune
 	}
 	type SpaceRuneLotMap map[runestone.SpacedRune]*RuneBalance
 	spaceRuneLotMap := make(SpaceRuneLotMap)
@@ -249,7 +250,8 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 			if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
 				spaceRuneLotMap[runeEntry.SpacedRune] = &RuneBalance{
 					Balance:      runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
-					divisibility: runeEntry.Divisibility,
+					Divisibility: runeEntry.Divisibility,
+					Symbol:       *runeEntry.Symbol,
 				}
 			}
 			spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(&balance.Lot)
@@ -263,7 +265,8 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 		addressLot := &AddressAsset{
 			Rune:         spacedRune.String(),
 			Balance:      *runBalance.Balance.Value,
-			Divisibility: runBalance.divisibility,
+			Divisibility: runBalance.Divisibility,
+			Symbol:       runBalance.Symbol,
 		}
 		ret[i] = addressLot
 		i++
@@ -292,6 +295,7 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 			Rune:         runeEntry.SpacedRune.String(),
 			Balance:      *balance.Lot.Value,
 			Divisibility: runeEntry.Divisibility,
+			Symbol:       *runeEntry.Symbol,
 		}
 	}
 	return ret
