@@ -289,6 +289,23 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxo(utxoId uint64) map[common.Ticker
 	return result
 }
 
+
+// return: ticker -> assets(amt)
+func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
+	result := make(map[common.TickerName]*common.Decimal)
+	
+	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
+	if len(runesAssets) > 0 {
+		for _, v := range runesAssets {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
+			result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
+		}
+	}
+
+	return result
+}
+
+
 // return: ticker -> assets(inscriptionId->Ranges)
 func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[string][]*common.Range {
 	result := make(map[common.TickerName]map[string][]*common.Range)

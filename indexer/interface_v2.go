@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/btcsuite/btcd/wire"
@@ -44,19 +45,19 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *sw
 }
 
 // return: utxoId->asset
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *swire.AssetName) (map[uint64]*common.TxOutput, error) {
+func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *swire.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
 	utxos, err := b.rpcService.GetUTXOs(address)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[uint64]*common.TxOutput)
+	result := make(map[uint64]*common.AssetsInUtxo)
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
 		if err != nil {
 			continue
 		}
-		info := b.GetTxOutputWithUtxo(utxo)
+		info := b.GetTxOutputWithUtxoV2(utxo)
 		if info == nil {
 			continue
 		}
@@ -66,11 +67,11 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *sw
 				result[utxoId] = info
 			}
 		} else {
-			amt := info.GetAsset(ticker)
-			if amt == 0 {
-				continue
+			for _, asset := range info.Assets {
+				if asset.AssetName == *ticker {
+					result[utxoId] = info
+				}
 			}
-			result[utxoId] = info
 		}
 	}
 
@@ -141,6 +142,57 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		Assets: assets,
 		Offsets: offsetmap,
 	}
+}
+
+
+func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string) *common.AssetsInUtxo {
+	info, err := b.rpcService.GetUtxoInfo(utxo)
+	if err != nil {
+		return nil
+	}
+
+	var assetsInUtxo common.AssetsInUtxo
+	assetsInUtxo.OutPoint = utxo
+	assetsInUtxo.Value = info.Value
+
+	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
+	for k, v := range assetmap {
+		value := int64(0)
+		var offsets []*common.OffsetRange
+		for _, rngs := range v {
+			for _, rng := range rngs {
+				start := common.GetSatOffset(info.Ordinals, rng.Start)
+				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
+				value += rng.Size
+			}
+		}
+
+		sort.Slice(offsets, func(i, j int) bool {
+			return offsets[i].Start < offsets[j].Start
+		})
+
+		asset := common.DisplayAsset{
+			AssetName:  k,
+			Amount:     fmt.Sprintf("%d", value),
+			BindingSat: true,
+			Offsets: offsets,
+		}
+
+		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
+	}
+
+	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
+	for k, v := range assetmap2 {
+		asset := common.DisplayAsset{
+			AssetName:  k,
+			Amount:     v.String(),
+			BindingSat: false,
+		}
+
+		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
+	}
+
+	return &assetsInUtxo
 }
 
 func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo {
