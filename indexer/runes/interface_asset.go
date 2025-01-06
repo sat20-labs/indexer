@@ -248,10 +248,14 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 			runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
 
 			if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
+				symbol := defaultRuneSymbol
+				if runeEntry.Symbol != nil {
+					symbol = *runeEntry.Symbol
+				}
 				spaceRuneLotMap[runeEntry.SpacedRune] = &RuneBalance{
 					Balance:      runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
 					Divisibility: runeEntry.Divisibility,
-					Symbol:       *runeEntry.Symbol,
+					Symbol:       symbol,
 				}
 			}
 			spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(&balance.Lot)
@@ -291,11 +295,15 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 	ret := make([]*UtxoAsset, len(balances))
 	for i, balance := range balances {
 		runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
+		symbol := defaultRuneSymbol
+		if runeEntry.Symbol != nil {
+			symbol = *runeEntry.Symbol
+		}
 		ret[i] = &UtxoAsset{
 			Rune:         runeEntry.SpacedRune.String(),
 			Balance:      *balance.Lot.Value,
 			Divisibility: runeEntry.Divisibility,
-			Symbol:       *runeEntry.Symbol,
+			Symbol:       symbol,
 		}
 	}
 	return ret
