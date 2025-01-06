@@ -1,6 +1,8 @@
 package indexer
 
 import (
+	"fmt"
+
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -8,11 +10,64 @@ func (b *IndexerMgr) GetBRC20TickerMap() (map[string]*common.BRC20Ticker, error)
 	return b.brc20Indexer.GetTickerMap()
 }
 
-func (b *IndexerMgr) GetBRC20Ticker(ticker string) *common.BRC20Ticker {
-	return b.brc20Indexer.GetTicker(ticker)
+
+func (b *IndexerMgr) GetBRC20TickerMapV2() (map[string]*common.TickerInfo) {
+	result := make(map[string]*common.TickerInfo)
+	tickers := b.brc20Indexer.GetAllTickers()
+	for _, tickerName := range tickers {
+		t := b.GetBRC20TickerV2(tickerName)
+		if t != nil {
+			result[tickerName] = t
+		}
+	}
+	return result
 }
 
-func (b *IndexerMgr) GetBRC20MintAmount(tickerName string) (common.Decimal, int64) {
+
+func (p *IndexerMgr) GetBRC20TickerV2(tickerName string) *common.TickerInfo {
+	ticker := p.brc20Indexer.GetTicker(tickerName)
+	if ticker == nil {
+		return nil
+	}
+	result := &common.TickerInfo{}
+	result.Protocol = common.PROTOCOL_NAME_BRC20
+	result.Type = common.ASSET_TYPE_FT
+	result.Ticker = ticker.Name
+	result.DisplayName = ticker.Name
+	result.Id = ticker.Id
+	result.Divisibility = int(ticker.Decimal)
+	
+	result.MaxSupply = ticker.Max.String()
+	minted, ms := p.brc20Indexer.GetMintAmount(tickerName)
+	result.TotalMinted = fmt.Sprintf("%d", minted)
+	result.MintTimes = ms
+
+	result.Limit = fmt.Sprintf("%d", ticker.Limit)
+	result.MaxSupply = fmt.Sprintf("%d", ticker.Max)
+	if ticker.SelfMint {
+		result.SelfMint = 100
+	} else {
+		result.SelfMint = 0
+	}
+	
+	result.DeployHeight = int(ticker.Nft.Base.BlockHeight)
+	result.DeployBlocktime = ticker.Nft.Base.BlockTime
+	result.DeployTx = ""
+	
+	holders := p.brc20Indexer.GetHoldersWithTick(ticker.Name)
+	result.HoldersCount = len(holders)
+	result.InscriptionId = ticker.Nft.Base.InscriptionId
+	result.InscriptionNum = ticker.Nft.Base.Id
+	result.Description = ""
+	result.Rarity = ""
+	result.DeployAddress = p.GetAddressById(ticker.Nft.Base.InscriptionAddress)
+	result.Content = ticker.Nft.Base.Content
+	result.ContentType = string(ticker.Nft.Base.ContentType)
+	result.Delegate = ""
+	return result
+}
+
+func (b *IndexerMgr) GetBRC20MintAmount(tickerName string) (*common.Decimal, int64) {
 	return b.brc20Indexer.GetMintAmount(tickerName)
 }
 

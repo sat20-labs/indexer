@@ -195,11 +195,11 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		holdermap := s.GetHoldersWithTick(name)
 		var holderAmount common.Decimal
 		for _, amt := range holdermap {
-			holderAmount.Add(&amt)
+			holderAmount.Add(amt)
 		}
 
 		mintAmount, _ := s.GetMintAmount(name)
-		if holderAmount != mintAmount {
+		if holderAmount != *mintAmount {
 			common.Log.Panicf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
 		}
 	}
@@ -216,11 +216,11 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		holdermap := s.GetHoldersWithTick(name)
 		var holderAmount common.Decimal
 		for _, amt := range holdermap {
-			holderAmount.Add(&amt)
+			holderAmount.Add(amt)
 		}
 
 		mintAmount, _ := s.GetMintAmount(name)
-		if holderAmount != mintAmount {
+		if holderAmount != *mintAmount {
 			common.Log.Panicf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
 		}
 

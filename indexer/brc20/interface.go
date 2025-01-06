@@ -13,6 +13,19 @@ func (p *BRC20Indexer) TickExisted(ticker string) bool {
 	return p.tickerMap[strings.ToLower(ticker)] != nil
 }
 
+
+func (p *BRC20Indexer) GetAllTickers() ([]string) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	ret := make([]string, 0)
+
+	for name, _ := range p.tickerMap {
+		ret = append(ret, name)
+	}
+
+	return ret
+}
+
 func (p *BRC20Indexer) GetTickerMap() (map[string]*common.BRC20Ticker, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -49,11 +62,11 @@ func (p *BRC20Indexer) GetTicker(tickerName string) *common.BRC20Ticker {
 
 // 获取该ticker的holder和持有的utxo
 // return: key, address; value, amt
-func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]common.Decimal {
+func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]*common.Decimal {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	tickerName = strings.ToLower(tickerName)
-	mp := make(map[uint64]common.Decimal, 0)
+	mp := make(map[uint64]*common.Decimal, 0)
 
 	holders, ok := p.tickerToHolderMap[tickerName]
 	if !ok {
@@ -68,7 +81,7 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]common.D
 		}
 		info, ok := holderinfo.Tickers[tickerName]
 		if ok {
-			mp[holderinfo.AddressId] = info.AvailableBalance
+			mp[holderinfo.AddressId] = &info.AvailableBalance
 		}
 	}
 
@@ -128,7 +141,7 @@ func (p *BRC20Indexer) GetMintHistory(tick string, start, limit int) []*common.B
 }
 
 // return: 按铸造时间排序的铸造历史
-func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start, limit int) ([]*common.BRC20MintAbbrInfo, int) {
+func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start, limit int) ([]*common.MintInfo, int) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -137,10 +150,10 @@ func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, 
 		return nil, 0
 	}
 
-	result := make([]*common.BRC20MintAbbrInfo, 0)
+	result := make([]*common.MintInfo, 0)
 	for _, info := range tickinfo.InscriptionMap {
 		if info.Address == addressId {
-			result = append(result, info)
+			result = append(result, info.ToMintInfo())
 		}
 	}
 
@@ -161,21 +174,21 @@ func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, 
 }
 
 // return: mint的总量和次数
-func (p *BRC20Indexer) GetMintAmount(tick string) (common.Decimal, int64) {
+func (p *BRC20Indexer) GetMintAmount(tick string) (*common.Decimal, int64) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
 	var amount common.Decimal
 	tickinfo, ok := p.tickerMap[strings.ToLower(tick)]
 	if !ok {
-		return amount, 0
+		return &amount, 0
 	}
 
 	for _, info := range tickinfo.InscriptionMap {
 		amount.Add(&info.Amount)
 	}
 
-	return amount, int64(len(tickinfo.InscriptionMap))
+	return &amount, int64(len(tickinfo.InscriptionMap))
 }
 
 func (p *BRC20Indexer) GetMint(tickerName, inscriptionId string) *common.BRC20Mint {

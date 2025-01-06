@@ -135,6 +135,14 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (s *RuneInfo) BlockHeight() int {
+	runeId, err := runestone.RuneIdFromString(s.Id)
+	if err != nil {
+		return -1
+	}
+	return int(runeId.Block)
+}
+
 type AddressBalance struct {
 	Address string
 	Balance uint128.Uint128

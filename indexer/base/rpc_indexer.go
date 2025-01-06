@@ -24,6 +24,7 @@ type RpcIndexer struct {
 	// 接收前端api访问的实例，隔离内存访问
 	mutex              sync.RWMutex
 	addressValueMap    map[string]*common.AddressValueInDB
+	addressIdMap       map[uint64]string
 	bSearching         bool
 	satSearchingStatus map[int64]*SatSearchingStatus
 }
@@ -41,6 +42,10 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 // 仅用于前端RPC数据查询时，更新地址数据
 func (b *RpcIndexer) UpdateServiceInstance() {
 	b.addressValueMap = b.prefechAddress()
+	b.addressIdMap = make(map[uint64]string)
+	for k, v := range b.addressValueMap {
+		b.addressIdMap[v.AddressId] = k
+	}
 }
 
 // sync
@@ -229,15 +234,24 @@ func (b *RpcIndexer) GetUtxoByID(id uint64) (string, error) {
 
 // only for RPC interface
 func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
+
+	b.mutex.RLock()
+	addrStr, ok := b.addressIdMap[id]
+	b.mutex.RUnlock()
+	if ok {
+		return addrStr, nil
+	}
+
 	address, err := common.GetAddressByID(b.db, id)
 	if err != nil {
-		for key, value := range b.addressValueMap {
-			if value.AddressId == id {
-				return key, nil
-			}
-		}
 		common.Log.Errorf("RpcIndexer->GetAddressByID %d failed, err: %v", id, err)
+		return "", err
 	}
+
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.addressIdMap[id] = address
+
 
 	return address, err
 }
