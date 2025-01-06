@@ -246,9 +246,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 		tickInfo := b.RunesIndexer.GetRuneInfoWithId(v.Rune)
 		if tickInfo != nil {
 			// TODO 搞不清铸造的量到底是哪个值，让runes索引器自己提供准确的值
-			maxMinted := common.NewDecimalFromUint128(tickInfo.Supply, int(tickInfo.Divisibility))
+			maxSupply := common.NewDecimalFromUint128(tickInfo.Supply, int(tickInfo.Divisibility))
 			amt := common.NewDecimalFromUint128(v.Balance, int(tickInfo.Divisibility))
-			result[tickName] = amt.ToInt64WithMax(maxMinted)
+			result[tickName] = amt.ToInt64WithMax(maxSupply)
 		}
 	}
 
@@ -334,7 +334,7 @@ func (b *IndexerMgr) U128ToInt64(runeId string, amt uint128.Uint128) int64 {
 
 
 // return: ticker -> assets(amt)
-func (b *IndexerMgr) GetUnbindAssetsWithUtxo(utxoId uint64) map[common.TickerName]int64 {
+func (b *IndexerMgr) GetUnbindingAssetsWithUtxo(utxoId uint64) map[common.TickerName]int64 {
 	result := make(map[common.TickerName]int64)
 	
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
@@ -644,7 +644,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		offsetmap[k] = offsets
 	}
 
-	assetmap2 := b.GetUnbindAssetsWithUtxo(info.UtxoId)
+	assetmap2 := b.GetUnbindingAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap2 {
 		asset := swire.AssetInfo{
 			Name:       k,
