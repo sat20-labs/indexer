@@ -43,13 +43,6 @@ func (s *Indexer) UpdateDB() {
 		}
 	}
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count:%d, db del count:%d", s.Status.Height, setCount, delCount)
-
-	// firstRuneName := "BESTINSLOT•XYZ"
-	// spaceRune, _ := runestone.SpacedRuneFromString(firstRuneName)
-	// runeId := s.runeToIdTbl.GetFromDB(&spaceRune.Rune)
-	// if runeId != nil {
-	// 	common.Log.Infof("RuneIndexer.UpdateDB-> runeToIdTbl.GetFromDB(%s) rune not found, ticker: %s", spaceRune.String(), firstRuneName)
-	// }
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
@@ -408,7 +401,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			if mintOutIndex == nil {
 				common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
 			}
-			// common.Log.Infof("RuneIndexer.index_runes-> mintAmount:%d", *mintOutIndex)
 			utxo := fmt.Sprintf("%s:%d", tx.Txid, *mintOutIndex)
 			output := tx.Outputs[*mintOutIndex]
 			utxoId := common.GetUtxoId(output)

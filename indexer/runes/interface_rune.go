@@ -17,20 +17,18 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
 	}
 	ret = &RuneInfo{
-		Name:               runeEntry.SpacedRune.String(),
-		Number:             runeEntry.Number,
-		Timestamp:          runeEntry.Timestamp,
-		Id:                 runeEntry.RuneId.String(),
-		EtchingBlock:       runeEntry.RuneId.Block,
-		EtchingTransaction: runeEntry.RuneId.Tx,
-		Supply:             runeEntry.Supply(),
-		MaxSupply:          runeEntry.MaxSupply(),
-		Premine:            *premine,
-		Burned:             runeEntry.Burned,
-		Divisibility:       runeEntry.Divisibility,
-		Symbol:             string(*runeEntry.Symbol),
-		Turbo:              runeEntry.Turbo,
-		Etching:            runeEntry.Etching,
+		Name:         runeEntry.SpacedRune.String(),
+		Number:       runeEntry.Number,
+		Timestamp:    runeEntry.Timestamp,
+		Id:           runeEntry.RuneId.String(),
+		Supply:       runeEntry.Supply(),
+		MaxSupply:    runeEntry.MaxSupply(),
+		Premine:      *premine,
+		Burned:       runeEntry.Burned,
+		Divisibility: runeEntry.Divisibility,
+		Symbol:       string(*runeEntry.Symbol),
+		Turbo:        runeEntry.Turbo,
+		Etching:      runeEntry.Etching,
 	}
 	terms := runeEntry.Terms
 	if terms != nil {
@@ -99,20 +97,18 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 		}
 		v.MaxSupply()
 		runeInfo := &RuneInfo{
-			Name:               v.SpacedRune.String(),
-			Number:             v.Number,
-			Timestamp:          v.Timestamp,
-			Id:                 v.RuneId.String(),
-			EtchingBlock:       v.RuneId.Block,
-			EtchingTransaction: v.RuneId.Tx,
-			Supply:             v.Supply(),
-			MaxSupply:          v.MaxSupply(),
-			Premine:            *premine,
-			PreminePercentage:  percentageNum,
-			Burned:             v.Burned,
-			Divisibility:       v.Divisibility,
-			Turbo:              v.Turbo,
-			Etching:            v.Etching,
+			Name:              v.SpacedRune.String(),
+			Number:            v.Number,
+			Timestamp:         v.Timestamp,
+			Id:                v.RuneId.String(),
+			Supply:            v.Supply(),
+			MaxSupply:         v.MaxSupply(),
+			Premine:           *premine,
+			PreminePercentage: percentageNum,
+			Burned:            v.Burned,
+			Divisibility:      v.Divisibility,
+			Turbo:             v.Turbo,
+			Etching:           v.Etching,
 		}
 		if v.Symbol != nil {
 			runeInfo.Symbol = string(*v.Symbol)
