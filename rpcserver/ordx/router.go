@@ -103,8 +103,6 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/v2/utxo/info/:utxo", s.handle.getUtxoInfo)
 	r.POST(proxy+"/v2/utxos/info", s.handle.getUtxoInfoList)
 	r.POST(proxy+"/v2/utxos/existing", s.handle.getExistingUtxos)
-
-	// 获取某个UTXO上所有的资产信息
-	r.GET(proxy+"/v2/utxo/assetoffset/:utxo", s.handle.getAssetOffset)
+	
 	r.GET(proxy+"/v2/tick/info/:ticker", s.handle.getTickerInfo)
 }

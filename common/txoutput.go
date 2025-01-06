@@ -237,13 +237,21 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	return nil
 }
 
+// 非绑定资产，第一个输出的value为0，所有聪放在第二个返回值
 func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput, error) {
 
 	if p.Value() < 660 {
 		return nil, nil, fmt.Errorf("output value too small")
 	}
-	part1 := NewTxOutput(amt)
-	part2 := NewTxOutput(p.Value() - amt)
+	
+	bIsBindingSat := IsBindingSat(name) > 0
+	var value1, value2 int64
+	if bIsBindingSat {
+		value1 = amt
+	}
+	value2 = p.Value() - value1
+	part1 := NewTxOutput(value1)
+	part2 := NewTxOutput(value2)
 	if name == nil || *name == ASSET_PLAIN_SAT {
 		if p.Value() < amt {
 			return nil, nil, fmt.Errorf("amount too large")
@@ -264,12 +272,11 @@ func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput
 	asset2 := asset.Clone()
 	asset2.Amount = asset.Amount - amt
 
+	part1.Assets = swire.TxAssets{*asset1}
+	part2.Assets = swire.TxAssets{*asset2}
+
 	if IsBindingSat(name) == 0 {
 		// runes：no offsets
-		part1.OutValue.Value = 330
-		part1.Assets = swire.TxAssets{*asset1}
-		part2.OutValue.Value = p.Value()-330
-		part2.Assets = swire.TxAssets{*asset2}
 		return part1, part2, nil
 	}
 
@@ -277,19 +284,12 @@ func (p *TxOutput) Split(name *swire.AssetName, amt int64) (*TxOutput, *TxOutput
 	if !ok {
 		return nil, nil, fmt.Errorf("can't find asset offset")
 	}
-
 	if asset.Amount == amt {
-		part1.Assets = swire.TxAssets{*asset1}
 		part1.Offsets[*name] = offsets.Clone()
 		return part1, nil, nil
 	}
-
 	offset1, offset2 := offsets.Split(amt)
-
-	part1.Assets = swire.TxAssets{*asset1}
 	part1.Offsets[*name] = offset1
-
-	part2.Assets = swire.TxAssets{*asset2}
 	part2.Offsets[*name] = offset2
 
 	return part1, part2, nil
