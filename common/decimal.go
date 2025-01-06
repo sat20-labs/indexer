@@ -137,7 +137,7 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 
 		currPrecision = len(decimalPartStr)
 		if currPrecision > maxPrecision {
-			return nil, fmt.Errorf("decimal exceeds maximum precision: %s", s)
+			return nil, fmt.Errorf("decimal exceeds maximum precition: %s", s)
 		}
 		n := maxPrecision - currPrecision
 		for i := 0; i < n; i++ {
@@ -314,51 +314,41 @@ func (d *Decimal) IntegerPart() int64 {
 	return quotient.Int64()
 }
 
-func (d *Decimal) ToInt64WithMax(max int64) int64 {
+func (d *Decimal) ToInt64WithMax(max *Decimal) int64 {
 	if d == nil {
 		return 0
 	}
 
-	if max <= 0 {
-		Log.Panicf("invalid max %d", max)
+	if d.Cmp(max) > 0 {
+		Log.Panic("ToInt64WithMax overflow")
 	}
 
-	if d.IntegerPart() > max {
-		Log.Panicf("invalid max %d", max)
+	if !max.IsOverflowInt64() {
+		return d.Value.Int64()
 	}
 
-	scaleIndex := int(math.Log10(float64(math.MaxInt64) / float64(max)))
-	if scaleIndex < 0 {
-		scaleIndex = 0
-	}
-	value := new(big.Int).Mul(d.Value, precisionFactor[scaleIndex])
-	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
-	return quotient.Int64()
+	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
+	scaleIndex := decimalDigits(quotient.Uint64())
+	return d.Div(big.NewInt(int64(scaleIndex))).Value.Int64()
 }
 
-func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal, error) {
-	if max <= 0 {
-		return nil, fmt.Errorf("invalid max %d", max)
+func NewDecimalFromInt64WithMax(value int64, max *Decimal) (*Decimal) {
+
+	if !max.IsOverflowInt64() {
+		return NewDecimal(value, max.Precition)
 	}
 
-	// 根据 max 和 math.MaxInt64 计算放大系数的指数
-	scaleIndex := int(math.Log10(float64(math.MaxInt64) / float64(max)))
-	if scaleIndex < 0 {
-		scaleIndex = 0
-	}
+	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
+	scaleIndex := decimalDigits(quotient.Uint64())
 
-	// 计算浮点值
-	bigValue := new(big.Int).Mul(new(big.Int).SetInt64(value), precisionFactor[precision])
-	bigValue = new(big.Int).Div(bigValue, precisionFactor[scaleIndex])
-
-	result := &Decimal{Precition: precision, Value: bigValue}
-	return result, nil
+	result := NewDecimal(value, max.Precition)
+	return result.Mul(big.NewInt(int64(scaleIndex)))
 }
 
-func NewDecimalFromUint128(n uint128.Uint128, precision int) *Decimal {
+func NewDecimalFromUint128(n uint128.Uint128, precition int) *Decimal {
 	value := new(big.Int).SetUint64(n.Lo)
 	value = value.Add(value, new(big.Int).SetUint64(n.Hi).Lsh(new(big.Int).SetUint64(n.Hi), 64))
-	return &Decimal{Precition: precision, Value: value}
+	return &Decimal{Precition: precition, Value: value}
 }
 
 func (d *Decimal) ToUint128() uint128.Uint128 {
@@ -370,20 +360,56 @@ func (d *Decimal) ToUint128() uint128.Uint128 {
 	return uint128.Uint128{Lo: lo, Hi: hi}
 }
 
-func Uint128ToInt64(supply, amt uint128.Uint128, divisibility int) int64 {
-	decimal := NewDecimalFromUint128(amt, int(divisibility))
-	exp := precisionFactor[divisibility]
-	maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
-	return decimal.ToInt64WithMax(maxSupply)
+func decimalDigits(n uint64) int {
+	return int(math.Floor(math.Log10(float64(n))) + 1)
 }
 
-func Int64ToUint128(amt int64, supply uint128.Uint128, divisibility int) uint128.Uint128 {
-	exp := precisionFactor[divisibility]
-	maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
-	decimal, err := NewDecimalFromInt64WithMax(amt, maxSupply, int(divisibility))
-	if err != nil {
-		Log.Panicf("invalid amt %d", amt)
-	}
+func Uint128ToInt64(supply, amt uint128.Uint128) int64 {
+	if supply.Hi == 0 {
+		return amt.Big().Int64()
+	} 
+
+	// n := supply.LeadingZeros()
+	// n = 64 - n
+	// return amt.Rsh(uint(n)).Big().Int64()
+
+	q, _ := supply.QuoRem64(math.MaxInt64)
+	scaleIndex := decimalDigits(q.Lo)
+
+	return int64(amt.Div64(precisionFactor[scaleIndex].Uint64()).Lo)
+
+	// decimal := NewDecimalFromUint128(amt, int(divisibility))
+	// exp := precisionFactor[divisibility]
+	// var maxSupply int64
+	// scaleIndex := int(math.Log10(float64(math.MaxInt64) / float64(max)))
+	// if scaleIndex < 0 {
+	// 	scaleIndex = 0
+	// }
 	
-	return decimal.ToUint128()
+	// else {
+	// 	maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
+	// }
+	
+	// return decimal.ToInt64WithMax(maxSupply)
+}
+
+func Int64ToUint128(supply uint128.Uint128, amt int64) uint128.Uint128 {
+	// exp := precisionFactor[divisibility]
+	// maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
+	// decimal := NewDecimalFromInt64WithMax(amt, maxSupply, int(divisibility))
+	
+	// return decimal.ToUint128()
+	if supply.Hi == 0 {
+		return uint128.From64(uint64(amt))
+	} 
+
+	// n := supply.LeadingZeros()
+	// n = 64 - n
+	// result := uint128.From64(uint64(amt))
+	// return result.Lsh(uint(n))
+
+	q, _ := supply.QuoRem64(math.MaxInt64)
+	scaleIndex := decimalDigits(q.Lo)
+	result := uint128.From64(uint64(amt))
+	return result.Mul64(precisionFactor[scaleIndex].Uint64())
 }

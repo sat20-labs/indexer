@@ -236,7 +236,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
 		tickInfo := b.brc20Indexer.GetTicker(k)
 		if tickInfo != nil {
-			result[tickName] = v.ToInt64WithMax(tickInfo.Max.IntegerPart())
+			result[tickName] = v.ToInt64WithMax(&tickInfo.Max)
 		}
 	}
 
@@ -248,7 +248,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 			// TODO 搞不清铸造的量到底是哪个值，让runes索引器自己提供准确的值
 			maxMinted := common.NewDecimalFromUint128(tickInfo.Supply, int(tickInfo.Divisibility))
 			amt := common.NewDecimalFromUint128(v.Balance, int(tickInfo.Divisibility))
-			result[tickName] = amt.ToInt64WithMax(maxMinted.IntegerPart())
+			result[tickName] = amt.ToInt64WithMax(maxMinted)
 		}
 	}
 
@@ -329,7 +329,7 @@ func (b *IndexerMgr) U128ToInt64(runeId string, amt uint128.Uint128) int64 {
 		return amt.Big().Int64()
 	}
 	
-	return common.Uint128ToInt64(info.Supply, amt, int(info.Divisibility))
+	return common.Uint128ToInt64(info.Supply, amt)
 }
 
 
