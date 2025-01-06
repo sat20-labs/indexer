@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"lukechampine.com/uint128"
 
 	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
@@ -51,6 +52,11 @@ func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
 	}
 
 	result := b.ftIndexer.HasAssetInUtxo(utxoId)
+	if result {
+		return true
+	}
+
+	result = b.RunesIndexer.IsExistAsset(utxoId)
 	if result {
 		return true
 	}
@@ -228,12 +234,30 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
 	for k, v := range brc20Asset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
-		result[tickName] = int64(v.Float64())
+		tickInfo := b.brc20Indexer.GetTicker(k)
+		if tickInfo != nil {
+			result[tickName] = v.ToInt64WithMax(tickInfo.Max.IntegerPart())
+		}
+	}
+
+	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address))
+	for _, v := range runesAsset {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
+		tickInfo := b.RunesIndexer.GetRuneInfoWithId(v.Rune)
+		if tickInfo != nil {
+			// TODO 搞不清铸造的量到底是哪个值，让runes索引器自己提供准确的值
+			maxMinted := common.NewDecimalFromUint128(tickInfo.Supply, int(tickInfo.Divisibility))
+			amt := common.NewDecimalFromUint128(v.Balance, int(tickInfo.Divisibility))
+			result[tickName] = amt.ToInt64WithMax(maxMinted.IntegerPart())
+		}
 	}
 
 	plainUtxoMap := make(map[uint64]int64)
 	for utxoId, v := range utxos {
 		if b.ftIndexer.HasAssetInUtxo(utxoId) {
+			continue
+		}
+		if b.RunesIndexer.IsExistAsset(utxoId) {
 			continue
 		}
 		if b.nft.HasNftInUtxo(utxoId) {
@@ -294,6 +318,31 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 	for k, v := range ret {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
+	}
+
+	return result
+}
+
+func (b *IndexerMgr) U128ToInt64(runeId string, amt uint128.Uint128) int64 {
+	info := b.RunesIndexer.GetRuneInfoWithId(runeId)
+	if info == nil {
+		return amt.Big().Int64()
+	}
+	
+	return common.Uint128ToInt64(info.Supply, amt, int(info.Divisibility))
+}
+
+
+// return: ticker -> assets(amt)
+func (b *IndexerMgr) GetUnbindAssetsWithUtxo(utxoId uint64) map[common.TickerName]int64 {
+	result := make(map[common.TickerName]int64)
+	
+	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
+	if len(runesAssets) > 0 {
+		for _, v := range runesAssets {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
+			result[tickName] = b.U128ToInt64(v.Rune, v.Balance)
+		}
 	}
 
 	return result
@@ -561,17 +610,17 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		return nil
 	}
 
-	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
-
 	var assets common.TxAssets
 	offsetmap := make(map[swire.AssetName]common.AssetOffsets)
+
+	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
 		value := int64(0)
 		var offsets []*common.OffsetRange
 		for _, rngs := range v {
 			for _, rng := range rngs {
 				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start + rng.Size})
+				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
 				value += rng.Size
 			}
 		}
@@ -595,13 +644,28 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		offsetmap[k] = offsets
 	}
 
+	assetmap2 := b.GetUnbindAssetsWithUtxo(info.UtxoId)
+	for k, v := range assetmap2 {
+		asset := swire.AssetInfo{
+			Name:       k,
+			Amount:     v,
+			BindingSat: 0,
+		}
+		
+		if assets == nil {
+			assets = swire.TxAssets{asset}
+		} else {
+			assets.Add(&asset)
+		}
+	}
+
 	return &common.TxOutput{
 		OutPointStr: utxo,
 		OutValue: wire.TxOut{
 			Value:    common.GetOrdinalsSize(info.Ordinals),
 			PkScript: info.PkScript,
 		},
-		Assets:  assets,
+		Assets: assets,
 		Offsets: offsetmap,
 	}
 }

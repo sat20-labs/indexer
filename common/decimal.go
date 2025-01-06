@@ -218,7 +218,6 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
-
 // Mul muls two Decimal instances and returns a new Decimal instance
 func (d *Decimal) Mul(other *big.Int) *Decimal {
 	if d == nil || other == nil {
@@ -228,7 +227,6 @@ func (d *Decimal) Mul(other *big.Int) *Decimal {
 	return &Decimal{Precition: d.Precition, Value: value}
 }
 
-
 // Div divs two Decimal instances and returns a new Decimal instance
 func (d *Decimal) Div(other *big.Int) *Decimal {
 	if d == nil || other == nil {
@@ -237,7 +235,6 @@ func (d *Decimal) Div(other *big.Int) *Decimal {
 	value := new(big.Int).Div(d.Value, other)
 	return &Decimal{Precition: d.Precition, Value: value}
 }
-
 
 func (d *Decimal) Cmp(other *Decimal) int {
 	if d == nil && other == nil {
@@ -308,7 +305,6 @@ func (d *Decimal) Float64() float64 {
 	return result
 }
 
-
 func (d *Decimal) IntegerPart() int64 {
 	if d == nil {
 		return 0
@@ -318,7 +314,7 @@ func (d *Decimal) IntegerPart() int64 {
 	return quotient.Int64()
 }
 
-func (d *Decimal) ToInt64WithMax(max int64) (int64) {
+func (d *Decimal) ToInt64WithMax(max int64) int64 {
 	if d == nil {
 		return 0
 	}
@@ -354,7 +350,7 @@ func NewDecimalFromInt64WithMax(value int64, max int64, precision int) (*Decimal
 	// 计算浮点值
 	bigValue := new(big.Int).Mul(new(big.Int).SetInt64(value), precisionFactor[precision])
 	bigValue = new(big.Int).Div(bigValue, precisionFactor[scaleIndex])
-	
+
 	result := &Decimal{Precition: precision, Value: bigValue}
 	return result, nil
 }
@@ -372,4 +368,22 @@ func (d *Decimal) ToUint128() uint128.Uint128 {
 	lo := d.Value.Uint64()
 	hi := d.Value.Rsh(d.Value, 64).Uint64()
 	return uint128.Uint128{Lo: lo, Hi: hi}
+}
+
+func Uint128ToInt64(supply, amt uint128.Uint128, divisibility int) int64 {
+	decimal := NewDecimalFromUint128(amt, int(divisibility))
+	exp := precisionFactor[divisibility]
+	maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
+	return decimal.ToInt64WithMax(maxSupply)
+}
+
+func Int64ToUint128(amt int64, supply uint128.Uint128, divisibility int) uint128.Uint128 {
+	exp := precisionFactor[divisibility]
+	maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
+	decimal, err := NewDecimalFromInt64WithMax(amt, maxSupply, int(divisibility))
+	if err != nil {
+		Log.Panicf("invalid amt %d", amt)
+	}
+	
+	return decimal.ToUint128()
 }

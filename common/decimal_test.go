@@ -3,6 +3,8 @@ package common
 import (
 	"fmt"
 	"testing"
+
+	"lukechampine.com/uint128"
 )
 
 func TestDecimal(t *testing.T) {
@@ -10,9 +12,9 @@ func TestDecimal(t *testing.T) {
 	max := int64(21000000)
 	precision := int(3)
 	d0 := NewDecimal(12345, precision)
-	fmt.Printf("Decimal 1 string: %s\n", d0.String()) // 12.345
+	fmt.Printf("Decimal 1 string: %s\n", d0.String())     // 12.345
 	fmt.Printf("Decimal 1 Int64: %d\n", d0.IntegerPart()) // 12345
-	fmt.Printf("Decimal 1 Float64: %f\n", d0.Float64()) // 12.345
+	fmt.Printf("Decimal 1 Float64: %f\n", d0.Float64())   // 12.345
 	value := d0.ToInt64WithMax(max)
 	fmt.Printf("Decimal 1 ToInt64WithMax: %d\n", value) // 1234500000000
 	d00, _ := NewDecimalFromInt64WithMax(value, max, precision)
@@ -52,36 +54,34 @@ func TestDecimalPrecision(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create decimal from string: %v", err)
 		}
-		fmt.Printf("Decimal 1: %s\n", d0.String()) // 12.345
+		fmt.Printf("Decimal 1: %s\n", d0.String())       // 12.345
 		fmt.Printf("Decimal 1: %d\n", d0.Value.Uint64()) // 12345
-		fmt.Printf("Decimal 1: %f\n", d0.Float64()) // 12.345
+		fmt.Printf("Decimal 1: %f\n", d0.Float64())      // 12.345
 	}
 
 	// 测试通过整数创建 ordi
 	d0 := NewDecimal(1234567890123456789, 18)
-	fmt.Printf("Decimal 1: %s\n", d0.String()) // 12.345
+	fmt.Printf("Decimal 1: %s\n", d0.String())       // 12.345
 	fmt.Printf("Decimal 1: %d\n", d0.Value.Uint64()) // 12345
-	fmt.Printf("Decimal 1: %f\n", d0.Float64()) // 12.345
+	fmt.Printf("Decimal 1: %f\n", d0.Float64())      // 12.345
 	fmt.Printf("%s\n", d0.GetMaxInt64().String())
 
 	d1 := NewDecimal(1234567890, 8)
-	fmt.Printf("Decimal 1: %s\n", d1.String()) // 12.345
+	fmt.Printf("Decimal 1: %s\n", d1.String())       // 12.345
 	fmt.Printf("Decimal 1: %d\n", d1.Value.Uint64()) // 12345
-	fmt.Printf("Decimal 1: %f\n", d1.Float64()) // 12.345
+	fmt.Printf("Decimal 1: %f\n", d1.Float64())      // 12.345
 	fmt.Printf("%s\n", d1.GetMaxInt64().String())
-
 
 	{
 		// 测试通过整数创建 runes
 		d0 := NewDecimal(1234567890123456789, 0)
-		fmt.Printf("Decimal 1: %s\n", d0.String()) // 12.345
+		fmt.Printf("Decimal 1: %s\n", d0.String())       // 12.345
 		fmt.Printf("Decimal 1: %d\n", d0.Value.Uint64()) // 12345
-		fmt.Printf("Decimal 1: %f\n", d0.Float64()) // 12.345
+		fmt.Printf("Decimal 1: %f\n", d0.Float64())      // 12.345
 		fmt.Printf("%s\n", d0.GetMaxInt64().String())
 	}
-	
-}
 
+}
 
 func TestDecimal_Runes1(t *testing.T) {
 
@@ -99,7 +99,7 @@ func TestDecimal_Runes1(t *testing.T) {
 		for d0.IsOverflowInt64() {
 			shift++
 			d0 = d0.Div(d.Value)
-			fmt.Printf("Decimal 0: %s\n", d0.String()) 
+			fmt.Printf("Decimal 0: %s\n", d0.String())
 		}
 		fmt.Printf("shift %d\n", shift)
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
@@ -131,7 +131,7 @@ func TestDecimal_Runes2(t *testing.T) {
 		for d0.IsOverflowInt64() {
 			shift++
 			d0 = d0.Div(d.Value)
-			fmt.Printf("Decimal 0: %s\n", d0.String()) 
+			fmt.Printf("Decimal 0: %s\n", d0.String())
 		}
 		if shift > 0 {
 			t.Fatalf("shift must be zero")
@@ -154,7 +154,7 @@ func TestDecimal_Runes2(t *testing.T) {
 			t.Fatalf("Failed to create decimal from string: %v", err)
 		}
 		fmt.Printf("Decimal 2: %s\n", d2.String())
-		
+
 		// 不需要再shift
 		// bigValue := new(big.Int).Mul(d2.Value, precisionFactor[shift])
 		// //quotient, _ := new(big.Int).QuoRem(bigValue, precisionFactor[d.Precition], new(big.Int))
@@ -165,6 +165,35 @@ func TestDecimal_Runes2(t *testing.T) {
 		d4 := d0.Sub(d2)
 		fmt.Printf("Decimal 4: %s\n", d4.String())
 	}
-	
+
 	// 对符文来说，如果max超出int64，就先移位，最终将资产数量表示为int64
+}
+
+func convertTest(t *testing.T, supply, amt uint128.Uint128, divisibility int) {
+	amtInt64 := Uint128ToInt64(supply, amt, divisibility)
+	fmt.Printf("amtInt64 %d\n", amtInt64)
+	amt2 := Int64ToUint128(amtInt64, supply, divisibility)
+	fmt.Printf("amt2 %s\n", amt2.String())
+	if amt.Cmp(amt2) != 0 {
+		t.Fatalf("amt different %s %s", amt.String(), amt2.String())
+	}
+}
+
+func TestDecimal_Runes3(t *testing.T) {
+
+	supply, _ := uint128.FromString("21000000")
+	amt, _ := uint128.FromString("1000")
+	divisibility := 0
+	convertTest(t, supply, amt, divisibility)
+	
+
+	supply, _ = uint128.FromString("21000000")
+	amt, _ = uint128.FromString("1000")
+	divisibility = 1
+	convertTest(t, supply, amt, divisibility)
+
+	supply, _ = uint128.FromString("21000000")
+	amt, _ = uint128.FromString("1000")
+	divisibility = 5
+	convertTest(t, supply, amt, divisibility)
 }
