@@ -82,7 +82,8 @@ func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 		Height: int(base.BlockHeight)}
 }
 
-///////////////////////////////////////////////
+///////////////////////////////////////////////////
+// 用于展示统一的数据信息
 
 type TickerInfo struct {
 	swire.AssetName        `json:"name"`
@@ -126,4 +127,17 @@ type MintHistory struct {
 	Start    int           `json:"start,omitempty"`
 	Limit    int           `json:"limit,omitempty"`
 	Items    []*MintInfo   `json:"items,omitempty"`
+}
+
+type DisplayAsset struct {
+	swire.AssetName        `json:"name"`
+	Amount  string         `json:"amount"`
+	BindingSat bool        `json:"bindingsat"`
+	Offsets []*OffsetRange `json:"offsets"`
+}
+
+type AssetsInUtxo struct {
+	OutPoint    string     `json:"outpoint"`
+	Value       int64      `json:"value"`
+	Assets  	[]*DisplayAsset `json:"assets"`
 }

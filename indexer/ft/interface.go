@@ -14,6 +14,18 @@ func (p *FTIndexer) TickExisted(ticker string) bool {
 	return p.tickerMap[strings.ToLower(ticker)] != nil
 }
 
+func (p *FTIndexer) GetAllTickers() ([]string) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	ret := make([]string, 0)
+
+	for name, _ := range p.tickerMap {
+		ret = append(ret, name)
+	}
+
+	return ret
+}
+
 func (p *FTIndexer) GetTickerMap() (map[string]*common.Ticker, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -377,6 +389,40 @@ func (p *FTIndexer) GetMintHistoryWithAddress(addressId uint64, tick string, sta
 	for _, info := range tickinfo.InscriptionMap {
 		if info.Address == addressId {
 			result = append(result, info)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].InscriptionNum < result[j].InscriptionNum
+	})
+
+	total := len(result)
+	end := total
+	if start >= end {
+		return nil, 0
+	}
+	if start+limit < end {
+		end = start + limit
+	}
+
+	return result[start:end], total
+}
+
+
+// return: 按铸造时间排序的铸造历史
+func (p *FTIndexer) GetMintHistoryWithAddressV2(addressId uint64, tick string, start, limit int) ([]*common.MintInfo, int) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	tickinfo, ok := p.tickerMap[strings.ToLower(tick)]
+	if !ok {
+		return nil, 0
+	}
+
+	result := make([]*common.MintInfo, 0)
+	for _, info := range tickinfo.InscriptionMap {
+		if info.Address == addressId {
+			result = append(result, info.ToMintInfo())
 		}
 	}
 

@@ -2,15 +2,11 @@ package indexer
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"lukechampine.com/uint128"
-
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 // interface for RPC
@@ -171,40 +167,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 	return result, nil
 }
 
-// return: utxoId->asset amount
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *swire.AssetName) (map[uint64]*common.TxOutput, error) {
-	utxos, err := b.rpcService.GetUTXOs(address)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[uint64]*common.TxOutput)
-	for utxoId := range utxos {
-		utxo, err := b.rpcService.GetUtxoByID(utxoId)
-		if err != nil {
-			continue
-		}
-		info := b.GetTxOutputWithUtxo(utxo)
-		if info == nil {
-			continue
-		}
-
-		if ticker == nil || common.IsPlainAsset(ticker) {
-			if len(info.Assets) == 0 {
-				result[utxoId] = info
-			}
-		} else {
-			amt := info.GetAsset(ticker)
-			if amt == 0 {
-				continue
-			}
-			result[utxoId] = info
-		}
-	}
-
-	return result, nil
-}
-
 // return: ticker -> amount
 func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerName]int64 {
 	utxos, err := b.rpcService.GetUTXOs(address)
@@ -229,27 +191,6 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	for k, v := range ftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
-	}
-
-	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
-	for k, v := range brc20Asset {
-		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
-		tickInfo := b.brc20Indexer.GetTicker(k)
-		if tickInfo != nil {
-			result[tickName] = v.ToInt64WithMax(&tickInfo.Max)
-		}
-	}
-
-	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address))
-	for _, v := range runesAsset {
-		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-		tickInfo := b.RunesIndexer.GetRuneInfoWithId(v.Rune)
-		if tickInfo != nil {
-			// TODO 搞不清铸造的量到底是哪个值，让runes索引器自己提供准确的值
-			maxSupply := common.NewDecimalFromUint128(tickInfo.Supply, int(tickInfo.Divisibility))
-			amt := common.NewDecimalFromUint128(v.Balance, int(tickInfo.Divisibility))
-			result[tickName] = amt.ToInt64WithMax(maxSupply)
-		}
 	}
 
 	plainUtxoMap := make(map[uint64]int64)
@@ -602,119 +543,4 @@ func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string
 	}
 
 	return nil, fmt.Errorf("not support asset type %s", ntype)
-}
-
-func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
-	info, err := b.rpcService.GetUtxoInfo(utxo)
-	if err != nil {
-		return nil
-	}
-
-	var assets common.TxAssets
-	offsetmap := make(map[swire.AssetName]common.AssetOffsets)
-
-	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
-	for k, v := range assetmap {
-		value := int64(0)
-		var offsets []*common.OffsetRange
-		for _, rngs := range v {
-			for _, rng := range rngs {
-				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
-				value += rng.Size
-			}
-		}
-
-		sort.Slice(offsets, func(i, j int) bool {
-			return offsets[i].Start < offsets[j].Start
-		})
-
-		asset := swire.AssetInfo{
-			Name:       k,
-			Amount:     value,
-			BindingSat: 1,
-		}
-
-		if assets == nil {
-			assets = swire.TxAssets{asset}
-		} else {
-			assets.Add(&asset)
-		}
-
-		offsetmap[k] = offsets
-	}
-
-	assetmap2 := b.GetUnbindingAssetsWithUtxo(info.UtxoId)
-	for k, v := range assetmap2 {
-		asset := swire.AssetInfo{
-			Name:       k,
-			Amount:     v,
-			BindingSat: 0,
-		}
-		
-		if assets == nil {
-			assets = swire.TxAssets{asset}
-		} else {
-			assets.Add(&asset)
-		}
-	}
-
-	return &common.TxOutput{
-		OutPointStr: utxo,
-		OutValue: wire.TxOut{
-			Value:    common.GetOrdinalsSize(info.Ordinals),
-			PkScript: info.PkScript,
-		},
-		Assets: assets,
-		Offsets: offsetmap,
-	}
-}
-
-func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo {
-	var result *common.TickerInfo
-	switch tickerName.Protocol {
-	case common.PROTOCOL_NAME_ORDX:
-		ticker := b.ftIndexer.GetTicker(tickerName.Ticker)
-		if ticker != nil {
-			result = &common.TickerInfo{}
-			result.Protocol = common.PROTOCOL_NAME_ORDX
-			result.Type = common.ASSET_TYPE_FT
-			result.Name = ticker.Name
-			result.Divisibility = 0
-			result.NumLenght = 64
-			result.MaxSupply = fmt.Sprintf("%d", ticker.Max)
-			minted, _ := b.ftIndexer.GetMintAmount(tickerName.Ticker)
-			result.MintedAmt = fmt.Sprintf("%d", minted)
-		}
-	case common.PROTOCOL_NAME_BRC20:
-		brc20 := b.brc20Indexer.GetTicker(tickerName.Ticker)
-		if brc20 != nil {
-			result = &common.TickerInfo{}
-			result.Protocol = common.PROTOCOL_NAME_BRC20
-			result.Type = common.ASSET_TYPE_FT
-			result.Name = brc20.Name
-			result.Divisibility = int(brc20.Decimal)
-			result.NumLenght = 128
-			result.MaxSupply = brc20.Max.String()
-			minted, _ := b.brc20Indexer.GetMintAmount(tickerName.Ticker)
-			result.MintedAmt = minted.String()
-		}
-	case common.PROTOCOL_NAME_RUNES:
-		rune := b.RunesIndexer.GetRuneInfoWithName(tickerName.Ticker)
-		if rune != nil {
-			result = &common.TickerInfo{}
-			result.Protocol = common.PROTOCOL_NAME_RUNES
-			result.Type = common.ASSET_TYPE_FT
-			result.Name = rune.Name
-			result.Divisibility = int(rune.Divisibility)
-			result.NumLenght = 128
-			result.MintedAmt = rune.Supply.String()
-			if rune.MintInfo != nil {
-				maxSupply := rune.MintInfo.Amount.Mul(rune.MintInfo.Cap)
-				result.MintedAmt = maxSupply.String()
-			}
-		}
-	}
-
-	return result
 }

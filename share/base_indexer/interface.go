@@ -71,6 +71,7 @@ type Indexer interface {
 	GetMintHistory(tickerName string, start, limit int) []*common.MintAbbrInfo
 	// return: inscriptionIds that are splitted.
 	GetSplittedInscriptionsWithTick(tickerName string) []string
+	
 
 	// NameService
 	GetNSStatus() *common.NameServiceStatus
@@ -97,10 +98,26 @@ type Indexer interface {
 	GetNftHistory(start int, limit int) ([]*common.MintAbbrInfo, int)
 	GetNftHistoryWithAddress(addressId uint64, start int, limit int) ([]*common.MintAbbrInfo, int)
 
+	//////////////////////////////////////////////////////////////////////////
 	// new interface
 	GetTxOutputWithUtxo(utxo string) *common.TxOutput
 	// return: utxo->asset amount
 	GetAssetUTXOsInAddressWithTickV2(address string, tickerName *common.TickerName) (map[uint64]*common.TxOutput, error)
-
 	GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo
+
+	GetAssetSummaryInAddressV2(address string) map[common.TickerName]*common.Decimal
+	// return: mint info sorted by inscribed time
+	GetMintHistoryWithAddressV2(address string, tickerName *common.TickerName, start, limit int) ([]*common.MintInfo, int)
+	// return: ticker -> asset info (inscriptinId -> asset ranges)
+	GetAssetsWithUtxoV2(utxo uint64) map[common.TickerName]*common.Decimal
+
+	// FT
+	// return: ticker's name -> ticker info
+	GetTickerMapV2(protcol string) (map[string]*common.TickerInfo)
+	// return: addressId -> asset amount
+	GetHoldersWithTickV2(tickerName *common.TickerName) map[uint64]*common.Decimal
+	// return: asset amount, mint times
+	GetMintAmountV2(tickerName *common.TickerName) (*common.Decimal, int64)
+	// return:  mint info sorted by inscribed time
+	GetMintHistoryV2(tickerName *common.TickerName, start, limit int) []*common.MintInfo
 }

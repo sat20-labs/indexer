@@ -91,9 +91,9 @@ func (s *Model) getTickerInfo(tickerName string) (*rpcwire.TickerInfo, error) {
 
 	return &rpcwire.TickerInfo{
 		Protocol: ticker.Protocol,
-		Ticker: ticker.Name,
+		Ticker: ticker.Ticker,
 		Divisibility: ticker.Divisibility,
-		TotalMinted: ticker.MintedAmt,
+		TotalMinted: ticker.TotalMinted,
 		MaxSupply: ticker.MaxSupply,
 	}, nil
 }
