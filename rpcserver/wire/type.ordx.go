@@ -477,3 +477,26 @@ type TxOutputListResp struct {
 	BaseResp
 	Data []*TxOutputInfo `json:"data"`
 }
+
+
+type TxOutputRespV3 struct {
+	BaseResp
+	Data *common.AssetsInUtxo `json:"data"`
+}
+
+type AssetSummaryRespV3 struct {
+	BaseResp
+	Data []*common.DisplayAsset `json:"data"`
+}
+
+type UtxosWithAssetRespV3 struct {
+	BaseResp
+	Name swire.AssetName
+	ListResp
+	Data []*common.AssetsInUtxo `json:"data"`
+}
+
+type TxOutputListRespV3 struct {
+	BaseResp
+	Data []*common.AssetsInUtxo `json:"data"`
+}

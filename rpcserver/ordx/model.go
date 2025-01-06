@@ -194,3 +194,62 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 
 	return result, len(result), nil
 }
+
+
+func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*common.DisplayAsset, error) {
+	tickerMap := s.indexer.GetAssetSummaryInAddressV2(address)
+
+	result := make([]*common.DisplayAsset, 0)
+	for tickName, balance := range tickerMap {
+		resp := &common.DisplayAsset{}
+		resp.AssetName = tickName
+		resp.Amount = balance.String()
+		resp.BindingSat = common.IsBindingSat(&tickName) > 0
+		result = append(result, resp)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Amount > result[j].Amount
+	})
+
+	return result, nil
+}
+
+func (s *Model) GetUtxoInfoV3(utxo string) (*common.AssetsInUtxo, error) {
+	return s.indexer.GetTxOutputWithUtxoV2(utxo), nil
+}
+
+func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo, error) {
+	result := make([]*common.AssetsInUtxo, 0)
+	for _, utxo := range req.Utxos {
+		if rpcwire.IsExistUtxoInMemPool(utxo) {
+			continue
+		}
+		txOutput, err := s.GetUtxoInfoV3(utxo)
+		if err != nil {
+			continue
+		}
+
+		result = append(result, txOutput)
+	}
+
+	return result, nil
+}
+
+func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
+	result := make([]*common.AssetsInUtxo, 0)
+	assetName := swire.NewAssetNameFromString(name)
+	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV3(address, assetName)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, txOut := range outputMap {
+		result = append(result, txOut)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Value > result[j].Value
+	})
+
+	return result, len(result), nil
+}
