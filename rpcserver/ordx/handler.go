@@ -220,6 +220,22 @@ func (s *Handle) getTickerStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func (s *Handle) getTickerList(c *gin.Context) {
+	resp := &rpcwire.TickersResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: nil,
+	}
+
+	protocol := c.Param("protocol")
+	resp.Data = s.model.GetTickerList(protocol)
+
+	c.JSON(http.StatusOK, resp)
+}
+
 func (s *Handle) getTickerInfo(c *gin.Context) {
 	resp := &rpcwire.TickerInfoResp{
 		BaseResp: rpcwire.BaseResp{

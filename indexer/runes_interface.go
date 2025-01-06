@@ -88,3 +88,21 @@ func (p *IndexerMgr) GetRunesMintHistoryWithAddress(addressId uint64,
 	}
 	return result, int(total)
 }
+
+
+func (p *IndexerMgr) GetRunesMintHistory( 
+	ticker string, start int, limit int) ([]*common.MintInfo, int) {
+	result := make([]*common.MintInfo, 0)
+	infos, total := p.RunesIndexer.GetMintHistory(ticker, uint64(start), uint64(limit))
+	for _, info := range infos {
+		result = append(result, &common.MintInfo{
+			Id: int64(info.Number),
+			Address: p.GetAddressById(info.AddressId),
+			Amount: info.Amount.String(),
+			Height: int(info.Height),
+			InscriptionId: info.Utxo,
+		})
+	}
+	return result, int(total)
+}
+

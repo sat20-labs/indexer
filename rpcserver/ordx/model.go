@@ -83,19 +83,13 @@ func (s *Model) getTicker(tickerName string) (*rpcwire.TickerStatus, error) {
 	return tickerStatusResp, nil
 }
 
-func (s *Model) getTickerInfo(tickerName string) (*rpcwire.TickerInfo, error) {
+func (s *Model) getTickerInfo(tickerName string) (*common.TickerInfo, error) {
 	ticker := s.indexer.GetTickerInfo(swire.NewAssetNameFromString(tickerName))
 	if ticker == nil {
 		return nil, fmt.Errorf("can't find ticker %s", tickerName)
 	}
 
-	return &rpcwire.TickerInfo{
-		Protocol: ticker.Protocol,
-		Ticker: ticker.Ticker,
-		Divisibility: ticker.Divisibility,
-		TotalMinted: ticker.TotalMinted,
-		MaxSupply: ticker.MaxSupply,
-	}, nil
+	return ticker, nil
 }
 
 func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.AssetSummary, error) {

@@ -81,7 +81,16 @@ func (s *Model) GetTickerStatus(tickerName string) (*rpcwire.TickerStatus, error
 	return s.getTicker(tickerName)
 }
 
-func (s *Model) GetTickerInfo(tickerName string) (*rpcwire.TickerInfo, error) {
+func (s *Model) GetTickerList(protocol string) ([]string) {
+	result := make([]string, 0)
+	tickmap := s.indexer.GetTickerMapV2(protocol)
+	for k, _ := range tickmap {
+		result = append(result, k)
+	}
+	return result
+}
+
+func (s *Model) GetTickerInfo(tickerName string) (*common.TickerInfo, error) {
 	return s.getTickerInfo(tickerName)
 }
 

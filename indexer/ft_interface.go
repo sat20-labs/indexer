@@ -27,7 +27,12 @@ func (b *IndexerMgr) GetOrdxTickerMapV2() (map[string]*common.TickerInfo) {
 	for _, tickerName := range tickers {
 		t := b.GetTickerV2(tickerName)
 		if t != nil {
-			result[tickerName] = t
+			assetName := common.TickerName{
+				Protocol: common.PROTOCOL_NAME_ORDX,
+				Type: common.ASSET_TYPE_FT,
+				Ticker: tickerName,
+			}
+			result[assetName.String()] = t
 		}
 	}
 	return result

@@ -203,7 +203,7 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 	case common.PROTOCOL_NAME_BRC20:
 		return b.GetBRC20TickerV2(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
-		
+		return b.GetRunesTickerV2(tickerName.Ticker)
 	}
 
 	return result
@@ -278,7 +278,8 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV2(address string) map[common.Ticke
 }
 
 // return: mint info sorted by inscribed time
-func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string, tick *common.TickerName, start, limit int) ([]*common.MintInfo, int) {
+func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string, 
+	tick *common.TickerName, start, limit int) ([]*common.MintInfo, int) {
 	
 	addressId := b.GetAddressId(address)
 
@@ -299,7 +300,7 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string, tick *common.Ti
 	case common.PROTOCOL_NAME_BRC20:
 		return b.brc20Indexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 	case common.PROTOCOL_NAME_RUNES:
-		//return b.RunesIndexer.GetAddressMintHistory(tick.Ticker, addressId, start, limit)
+		return b.GetRunesMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 	}
 
 	return nil, 0
@@ -372,7 +373,7 @@ func (b *IndexerMgr) GetTickerMapV2(protocol string) (map[string]*common.TickerI
 	case common.PROTOCOL_NAME_BRC20:
 		return b.GetBRC20TickerMapV2()
 	case common.PROTOCOL_NAME_RUNES:
-		return nil
+		return b.GetRunesTickerMapV2()
 	}
 	return nil
 }
@@ -389,7 +390,7 @@ func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName) map[uin
 	case common.PROTOCOL_NAME_BRC20:
 		result = b.brc20Indexer.GetHoldersWithTick(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
-		return nil
+		result = b.RunesIndexer.GetHoldersWithTick(tickerName.Ticker)
 	}
 
 	return result
@@ -404,13 +405,14 @@ func (b *IndexerMgr) GetMintAmountV2(tickerName *common.TickerName) (*common.Dec
 	case common.PROTOCOL_NAME_BRC20:
 		return b.brc20Indexer.GetMintAmount(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
-		return nil, 0
+		return b.GetRunesMintAmount(tickerName.Ticker)
 	}
 	return nil, 0
 }
 
 // return:  mint info sorted by inscribed time
-func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start, limit int) []*common.MintInfo {
+func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start, 
+	limit int) []*common.MintInfo {
 	result := make([]*common.MintInfo, 0)
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
@@ -438,7 +440,7 @@ func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start, limi
 			result = append(result, m)
 		}
 	case common.PROTOCOL_NAME_RUNES:
-		
+		result, _ = b.GetRunesMintHistory(tickerName.Ticker, start, limit)
 	}
 	return result
 }

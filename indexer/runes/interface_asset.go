@@ -8,6 +8,13 @@ import (
 	"lukechampine.com/uint128"
 )
 
+// key: addressId, value: amount
+func (s *Indexer) GetHoldersWithTick(runeId string) map[uint64]*common.Decimal {
+	// TODO
+	return nil
+}
+
+
 /*
 *
 desc: 根据runeid获取所有持有者地址和持有数量 (新增数据表)
