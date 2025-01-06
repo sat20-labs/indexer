@@ -289,8 +289,9 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 	for i, balance := range balances {
 		runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
 		ret[i] = &UtxoAsset{
-			Rune:    runeEntry.SpacedRune.String(),
-			Balance: *balance.Lot.Value,
+			Rune:         runeEntry.SpacedRune.String(),
+			Balance:      *balance.Lot.Value,
+			Divisibility: runeEntry.Divisibility,
 		}
 	}
 	return ret
