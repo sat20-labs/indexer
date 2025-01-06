@@ -1,5 +1,11 @@
 package common
 
+import (
+	"fmt"
+
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
+)
+
 const TickerSeparatedFromName = true
 
 type Mint struct {
@@ -33,8 +39,10 @@ type RBTreeValue_Mint struct {
 
 // 仅用于TickInfo内部
 type MintAbbrInfo struct {
+	Id            int64
 	Address       uint64
 	Amount        int64
+	Ordinals      []*Range
 	InscriptionId string
 	InscriptionNum int64
 	Height        int
@@ -47,8 +55,22 @@ type TickAbbrInfo struct {
 
 func NewMintAbbrInfo(mint *Mint) *MintAbbrInfo {
 	info := NewMintAbbrInfo2(mint.Base)
+	info.Id = mint.Id
 	info.Amount = mint.Amt
+	info.Ordinals = mint.Ordinals
 	return info
+}
+
+func (p *MintAbbrInfo) ToMintInfo() *MintInfo {
+	return &MintInfo{
+		Id: p.Id,
+		//Address: p.Address,
+		Amount: fmt.Sprintf("%d", p.Amount),
+		Ordinals: p.Ordinals,
+		Height: p.Height,
+		InscriptionId: p.InscriptionId,
+		InscriptionNum: p.InscriptionNum,
+	}
 }
 
 func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
@@ -60,12 +82,48 @@ func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 		Height: int(base.BlockHeight)}
 }
 
+///////////////////////////////////////////////
+
 type TickerInfo struct {
-	Protocol   string
-	Name       string  
-	Type       string 
-	Divisibility int
-	NumLenght  int     // default 64, int64
-	MintedAmt  string
-	MaxSupply  string
+	swire.AssetName        `json:"name"`
+	DisplayName     string `json:"displayname"`
+	Id 				int64  `json:"id"`
+	Divisibility 	int	   `json:"divisibility,omitempty"`
+	StartBlock      int    `json:"startBlock,omitempty"`
+	EndBlock        int    `json:"endBlock,omitempty"`
+	SelfMint        int    `json:"selfmint,omitempty"`
+	DeployHeight    int    `json:"deployHeight"`
+	DeployBlocktime int64  `json:"deployBlockTime"`
+	DeployTx        string `json:"deployTx"`
+	Limit           string `json:"limit"`
+	TotalMinted     string `json:"totalMinted"`
+	MintTimes       int64  `json:"mintTimes"`
+	MaxSupply       string `json:"maxSupply,omitempty"`
+	HoldersCount    int    `json:"holdersCount"`
+	InscriptionId   string `json:"inscriptionId,omitempty"`
+	InscriptionNum  int64  `json:"inscriptionNum,omitempty"`
+	Description     string `json:"description,omitempty"`
+	Rarity          string `json:"rarity,omitempty"`
+	DeployAddress   string `json:"deployAddress,omitempty"`
+	Content         []byte `json:"content,omitempty"`
+	ContentType     string `json:"contenttype,omitempty"`
+	Delegate        string `json:"delegate,omitempty"`
+}
+
+type MintInfo struct {
+	Id             int64  `json:"id"`  // ticker内的铸造序号，非全局
+	Address        string `json:"mintaddress"`
+	Amount         string `json:"amount"`
+	Ordinals       []*Range `json:"ordinals,omitempty"`
+	Height         int    `json:"height"`
+	InscriptionId  string `json:"inscriptionId,omitempty"`  // 铭文id，或者符文的铸造输出utxo
+	InscriptionNum int64  `json:"inscriptionNumber,omitempty"`
+}
+
+type MintHistory struct {
+	swire.AssetName        `json:"name"`
+	Total    int           `json:"total,omitempty"`
+	Start    int           `json:"start,omitempty"`
+	Limit    int           `json:"limit,omitempty"`
+	Items    []*MintInfo   `json:"items,omitempty"`
 }

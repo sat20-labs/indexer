@@ -1,5 +1,7 @@
 package common
 
+import "fmt"
+
 type BRC20Mint struct {
 	Nft  *Nft
 	Id   int64
@@ -67,6 +69,7 @@ type BRC20TransferHistory struct {
 }
 
 type BRC20MintAbbrInfo struct {
+	Id             int64
 	Address        uint64
 	Amount         Decimal
 	InscriptionId  string
@@ -97,6 +100,7 @@ func NewBRC20TickAbbrInfo(amt Decimal) *BRC20TickAbbrInfo {
 
 func NewBRC20MintAbbrInfo(mint *BRC20Mint) *BRC20MintAbbrInfo {
 	info := NewBRC20MintAbbrInfo2(mint.Nft.Base)
+	info.Id = mint.Id
 	info.Amount = mint.Amt
 	return info
 }
@@ -108,4 +112,17 @@ func NewBRC20MintAbbrInfo2(base *InscribeBaseContent) *BRC20MintAbbrInfo {
 		InscriptionId:  base.InscriptionId,
 		InscriptionNum: base.Id,
 		Height:         int(base.BlockHeight)}
+}
+
+
+func (p *BRC20MintAbbrInfo) ToMintInfo() *MintInfo {
+	return &MintInfo{
+		Id: p.Id,
+		//Address: p.Address,
+		Amount: fmt.Sprintf("%d", p.Amount),
+		Ordinals: nil,
+		Height: p.Height,
+		InscriptionId: p.InscriptionId,
+		InscriptionNum: p.InscriptionNum,
+	}
 }
