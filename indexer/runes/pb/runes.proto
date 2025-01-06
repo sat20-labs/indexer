@@ -81,5 +81,7 @@ message RuneIdToAddress {}
 message RuneIdToOutpoint {}
 message RuneIdToMintHistory {}
 message AddressRuneIdToMintHistory {}
-message RuneIdToOutpointToBalance {}
+message RuneIdToOutpointToBalance {
+    Lot Balance = 1;
+}
 

@@ -309,8 +309,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		type RuneIdToOutputMap map[runestone.RuneId]*runestone.OutPoint
 		runeIdToOutputMap := make(RuneIdToOutputMap)
 
-		type RuneIdToOutpointToBalanceMap map[runestone.RuneId]*runestone.RuneIdToOutpointToBalance
-		// runeIdToOutpointToBalance := make(RuneIdToOutpointToBalanceMap)
+		type RuneIdToOutpointToBalanceMap map[runestone.RuneId]*runestone.RuneIdOutpointToBalance
+		runeIdToOutpointToBalanceMap := make(RuneIdToOutpointToBalanceMap)
 
 		type RuneIdToAddressRuneIdToMintHistoryMap map[runestone.RuneId]runestone.AddressRuneIdToMintHistory
 		runeIdToAddressRuneIdToMintHistoryMap := make(RuneIdToAddressRuneIdToMintHistoryMap)
@@ -333,7 +333,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			outpoint := &runestone.OutPoint{Txid: tx.Txid, Vout: vout, UtxoId: utxoId}
 
 			s.outpointToBalancesTbl.Insert(outpoint, balanceArray)
-			// TODO: GetAllUtxoBalances
 
 			// update runeIdToOutputMap and runeIdToAddressMap
 			address, err := parseTxVoutScriptAddress(tx, int(vout), *s.chaincfgParam)
@@ -350,6 +349,12 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 						AddressId: addressId,
 					}
 					runeIdToOutputMap[runeId] = outpoint
+					// TODO: GetAllUtxoBalances
+					runeIdToOutpointToBalanceMap[runeId] = &runestone.RuneIdOutpointToBalance{
+						RuneId:   &runeId,
+						OutPoint: outpoint,
+						Balance:  balance,
+					}
 				}
 			}
 		}
@@ -370,6 +375,32 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		for runeId, outpoint := range runeIdToOutputMap {
 			runeIdToOutput := &runestone.RuneIdToOutpoint{RuneId: &runeId, Outpoint: outpoint}
 			s.runeIdToOutpointTbl.Insert(runeIdToOutput)
+		}
+
+		// update runeIdToOutpointToBalance
+		for runeId, outpointToBalance := range runeIdToOutpointToBalanceMap {
+			runeIdToOutpointToBalance := &runestone.RuneIdOutpointToBalance{
+				RuneId:   &runeId,
+				OutPoint: outpointToBalance.OutPoint,
+				Balance:  outpointToBalance.Balance,
+			}
+			oldRuneIdToOutpointToBalance := s.runeIdOutpointToBalanceTbl.Get(runeIdToOutpointToBalance)
+			if oldRuneIdToOutpointToBalance != nil {
+				if oldRuneIdToOutpointToBalance.RuneId.Cmp(runeId) != 0 {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdToOutpointToBalance runeId mismatch")
+				}
+				if oldRuneIdToOutpointToBalance.OutPoint.UtxoId != outpointToBalance.OutPoint.UtxoId {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdToOutpointToBalance outpoint mismatch")
+				}
+				if oldRuneIdToOutpointToBalance.OutPoint.Txid != outpointToBalance.OutPoint.Txid {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdToOutpointToBalance txid mismatch")
+				}
+				if oldRuneIdToOutpointToBalance.OutPoint.Vout != outpointToBalance.OutPoint.Vout {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdToOutpointToBalance vout mismatch")
+				}
+				runeIdToOutpointToBalance.Balance.AddAssign(oldRuneIdToOutpointToBalance.Balance)
+			}
+			s.runeIdOutpointToBalanceTbl.Insert(runeIdToOutpointToBalance)
 		}
 
 		// update runeIdToMintHistory
@@ -468,6 +499,11 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 		}
 		for _, val := range *oldValue {
 			ret[val.RuneId] = &val.Lot
+			key := &runestone.RuneIdOutpointToBalance{
+				RuneId:   &val.RuneId,
+				OutPoint: outpoint,
+			}
+			s.runeIdOutpointToBalanceTbl.Remove(key)
 		}
 	}
 	return
@@ -510,16 +546,6 @@ func (s *Indexer) etched(txIndex uint32, tx *common.Transaction, artifact *runes
 		s.Status.ReservedRunes = reserved_runes + 1
 		r = runestone.Reserved(s.height, txIndex)
 	} else {
-		// test := r.String()
-		// common.Log.Debugf("etched rune: %s", test)
-		// a := r.Value.Cmp(s.minimumRune.Value) < 0
-		// b := r.IsReserved()
-		// c := s.runeToIdTbl.Get(r) != nil
-		// d := !s.txCommitsToRune(tx, *r)
-		// if a || b || c || d {
-		// 	r = nil
-		// 	return
-		// }
 		if r.Value.Cmp(s.minimumRune.Value) < 0 ||
 			r.IsReserved() ||
 			s.runeToIdTbl.Get(r) != nil ||

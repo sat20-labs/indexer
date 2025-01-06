@@ -24,6 +24,7 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		EtchingBlock:       runeEntry.RuneId.Block,
 		EtchingTransaction: runeEntry.RuneId.Tx,
 		Supply:             runeEntry.Supply(),
+		MaxSupply:          runeEntry.MaxSupply(),
 		Premine:            *premine,
 		Burned:             runeEntry.Burned,
 		Divisibility:       runeEntry.Divisibility,
@@ -96,6 +97,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.GetRuneInfos-> strconv.Atoi(%s) err:%s", percentage.String(), err.Error())
 		}
+		v.MaxSupply()
 		runeInfo := &RuneInfo{
 			Name:               v.SpacedRune.String(),
 			Number:             v.Number,
@@ -104,6 +106,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 			EtchingBlock:       v.RuneId.Block,
 			EtchingTransaction: v.RuneId.Tx,
 			Supply:             v.Supply(),
+			MaxSupply:          v.MaxSupply(),
 			Premine:            *premine,
 			PreminePercentage:  percentageNum,
 			Burned:             v.Burned,

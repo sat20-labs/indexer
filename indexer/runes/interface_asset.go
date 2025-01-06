@@ -1,6 +1,8 @@
 package runes
 
 import (
+	"sort"
+
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"lukechampine.com/uint128"
@@ -135,12 +137,69 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	var i = 0
 	for outpoint, lot := range outpointLotsMap {
 		addressLot := &UtxoBalance{
-			Utxo:    outpoint.String(),
-			Balance: *lot.Value,
+			Utxo:     outpoint.String(),
+			Outpoint: &outpoint,
+			Balance:  *lot.Value,
 		}
 		ret.Balances[i] = addressLot
 		i++
 	}
+
+	sort.Slice(ret.Balances, func(i, j int) bool {
+		return ret.Balances[i].Outpoint.UtxoId < ret.Balances[j].Outpoint.UtxoId
+	})
+
+	end := total
+	if start >= end {
+		return nil, 0
+	}
+	if start+limit < end {
+		end = start + limit
+	}
+	ret.Balances = ret.Balances[start:end]
+	return ret, total
+}
+
+func (s *Indexer) QGetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
+	rid, err := runestone.RuneIdFromString(runeId)
+	if err != nil {
+		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
+		return nil, 0
+	}
+
+	balances, err := s.runeIdOutpointToBalanceTbl.GetBalances(rid)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.String(), err.Error())
+	}
+
+	if len(balances) == 0 {
+		return nil, 0
+	}
+
+	sort.Slice(balances, func(i, j int) bool {
+		return balances[i].OutPoint.UtxoId < balances[j].OutPoint.UtxoId
+	})
+
+	total := uint64(len(balances))
+
+	ret := &UtxoBalances{
+		Total:    uint128.Zero,
+		Balances: make([]*UtxoBalance, len(balances)),
+	}
+
+	totalAmount := runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
+	var i = 0
+	for _, balance := range balances {
+		totalAmount.AddAssign(balance.Balance)
+		addressLot := &UtxoBalance{
+			Utxo:     balance.OutPoint.String(),
+			Outpoint: balance.OutPoint,
+			Balance:  *balance.Balance.Value,
+		}
+		ret.Balances[i] = addressLot
+		i++
+	}
+	ret.Total = *totalAmount.Value
 
 	end := total
 	if start >= end {

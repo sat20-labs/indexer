@@ -75,6 +75,7 @@ type RuneInfo struct {
 	EtchingTransaction uint32
 	MintInfo           *MintInfo
 	Supply             uint128.Uint128
+	MaxSupply          uint128.Uint128
 	Premine            uint128.Uint128
 	PreminePercentage  float64
 	Burned             uint128.Uint128
@@ -89,14 +90,16 @@ func (s RuneInfo) MarshalJSON() ([]byte, error) {
 	type Alias RuneInfo
 	return json.Marshal(&struct {
 		Alias
-		Supply  string `json:"supply"`
-		Premine string `json:"premine"`
-		Burned  string `json:"burned"`
+		Supply    string `json:"supply"`
+		MaxSupply string `json:"maxSupply"`
+		Premine   string `json:"premine"`
+		Burned    string `json:"burned"`
 	}{
-		Alias:   Alias(s),
-		Supply:  s.Supply.String(),
-		Premine: s.Premine.String(),
-		Burned:  s.Burned.String(),
+		Alias:     Alias(s),
+		Supply:    s.Supply.String(),
+		MaxSupply: s.MaxSupply.String(),
+		Premine:   s.Premine.String(),
+		Burned:    s.Burned.String(),
 	})
 }
 
@@ -104,9 +107,10 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 	type Alias RuneInfo
 	aux := &struct {
 		*Alias
-		Supply  string `json:"supply"`
-		Premine string `json:"premine"`
-		Burned  string `json:"burned"`
+		Supply    string `json:"supply"`
+		MaxSupply string `json:"maxSupply"`
+		Premine   string `json:"premine"`
+		Burned    string `json:"burned"`
 	}{
 		Alias: (*Alias)(s),
 	}
@@ -115,6 +119,10 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	s.Supply, err = uint128.FromString(aux.Supply)
+	if err != nil {
+		return err
+	}
+	s.MaxSupply, err = uint128.FromString(aux.MaxSupply)
 	if err != nil {
 		return err
 	}
@@ -160,8 +168,9 @@ func (s *AddressBalance) UnmarshalJSON(data []byte) error {
 }
 
 type UtxoBalance struct {
-	Utxo    string
-	Balance uint128.Uint128
+	Utxo     string
+	Outpoint *runestone.OutPoint
+	Balance  uint128.Uint128
 }
 
 func (s UtxoBalance) MarshalJSON() ([]byte, error) {

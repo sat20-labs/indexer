@@ -40,5 +40,9 @@ const (
 
 	// 表: runeid和outpoint映射balance (new)
 	// 存储: key = rob-%runeid%-%outpoint%-%lot% value = nil
-	RUNEID_TO_OUTPOINT_TO_BALANCE = "h-"
+	RUNEID_OUTPOINT_TO_BALANCE = "h-"
+
+	// 表: runeid和address和outpoint映射balance (new)
+	// 存储: key = rob-%runeid%-%outpoint%-%lot% value = nil
+	RUNEID_ADDRESS_OUTPOINT_TO_BALANCE = "i-"
 )

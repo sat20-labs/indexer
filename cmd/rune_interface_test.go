@@ -55,19 +55,32 @@ func TestGetAllAddressBalances(t *testing.T) {
 	}
 }
 
-func TestInterfaceAsset(t *testing.T) {
+func TestGetAllUtxoBalances(t *testing.T) {
 	InitRuneTester()
-	// 5
 	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
 	if err != nil {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
-	allUtxoBalances, total := runesIndexer.GetAllUtxoBalances(runeId.String(), 0, 10)
-	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total)
-	for i, v := range allUtxoBalances.Balances {
+	// 5
+	// allUtxoBalances0, total0 := runesIndexer.GetAllUtxoBalances(runeId.String(), 0, 10)
+	// t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total0)
+	// for i, v := range allUtxoBalances0.Balances {
+	// 	t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
+	// }
+
+	allUtxoBalances1, total1 := runesIndexer.QGetAllUtxoBalances(runeId.String(), 0, 10)
+	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total1)
+	for i, v := range allUtxoBalances1.Balances {
 		t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
 	}
+}
 
+func TestInterfaceAsset(t *testing.T) {
+	InitRuneTester()
+	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
+	if err != nil {
+		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
+	}
 	// 6
 	firstRuneAddress := "tb1pn9dzakm6egrv90c9gsgs63axvmn6ydwemrpuwljnmz9qdk38ueqsqae936"
 	addressId := runesIndexer.RpcService.GetAddressId(firstRuneAddress)

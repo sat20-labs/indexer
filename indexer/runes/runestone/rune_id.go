@@ -72,11 +72,11 @@ func (r RuneId) Next(block uint128.Uint128, tx uint128.Uint128) (*RuneId, error)
 }
 
 func (r RuneId) String() string {
-	return fmt.Sprintf("%x:%x", r.Block, r.Tx)
+	return fmt.Sprintf("%x_%x", r.Block, r.Tx)
 }
 
 func RuneIdFromString(s string) (*RuneId, error) {
-	parts := strings.Split(s, ":")
+	parts := strings.Split(s, "_")
 	if len(parts) != 2 {
 		return nil, ErrSeparator
 	}

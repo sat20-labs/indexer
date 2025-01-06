@@ -32,6 +32,7 @@ type Indexer struct {
 	idToEntryTbl                  *runestone.RuneIdToEntryTable
 	runeToIdTbl                   *runestone.RuneToIdTable
 	outpointToBalancesTbl         *runestone.OutpointToBalancesTable
+	runeIdOutpointToBalanceTbl    *runestone.RuneIdOutpointToBalanceTable
 	runeIdToAddressTbl            *runestone.RuneToAddressTable
 	runeIdToOutpointTbl           *runestone.RuneIdToOutpointTable
 	runeIdToMintHistoryTbl        *runestone.RuneToMintHistoryTable
@@ -52,6 +53,7 @@ func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseInd
 		idToEntryTbl:                  runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry]()),
 		runeToIdTbl:                   runestone.NewRuneToIdTable(store.NewCache[pb.RuneId]()),
 		outpointToBalancesTbl:         runestone.NewOutpointToBalancesTable(store.NewCache[pb.OutpointToBalances]()),
+		runeIdOutpointToBalanceTbl:    runestone.NewRuneIdOutpointToBalancesTable(store.NewCache[pb.RuneIdToOutpointToBalance]()),
 		runeIdToAddressTbl:            runestone.NewRuneIdToAddressTable(store.NewCache[pb.RuneIdToAddress]()),
 		runeIdToOutpointTbl:           runestone.NewRuneIdToUtxoTable(store.NewCache[pb.RuneIdToOutpoint]()),
 		runeIdToMintHistoryTbl:        runestone.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory]()),
