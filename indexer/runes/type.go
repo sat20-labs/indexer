@@ -67,23 +67,21 @@ func (s *MintInfo) UnmarshalJSON(data []byte) error {
 }
 
 type RuneInfo struct {
-	Name               string
-	Number             uint64
-	Timestamp          uint64
-	Id                 string
-	EtchingBlock       uint64
-	EtchingTransaction uint32
-	MintInfo           *MintInfo
-	Supply             uint128.Uint128
-	MaxSupply          uint128.Uint128
-	Premine            uint128.Uint128
-	PreminePercentage  float64
-	Burned             uint128.Uint128
-	Divisibility       uint8
-	Symbol             string
-	Turbo              bool
-	Etching            string
-	Parent             string
+	Name              string
+	Number            uint64
+	Timestamp         uint64
+	Id                string
+	MintInfo          *MintInfo
+	Supply            uint128.Uint128
+	MaxSupply         uint128.Uint128
+	Premine           uint128.Uint128
+	PreminePercentage float64
+	Burned            uint128.Uint128
+	Divisibility      uint8
+	Symbol            string
+	Turbo             bool
+	Etching           string
+	Parent            string
 }
 
 func (s RuneInfo) MarshalJSON() ([]byte, error) {
@@ -227,8 +225,9 @@ func (s *UtxoBalances) UnmarshalJSON(data []byte) error {
 }
 
 type AddressAsset struct {
-	Rune    string
-	Balance uint128.Uint128
+	Rune         string
+	Balance      uint128.Uint128
+	Divisibility uint8
 }
 
 func (s AddressAsset) MarshalJSON() ([]byte, error) {
@@ -260,8 +259,9 @@ func (s *AddressAsset) UnmarshalJSON(data []byte) error {
 }
 
 type UtxoAsset struct {
-	Rune    string
-	Balance uint128.Uint128
+	Rune         string
+	Balance      uint128.Uint128
+	Divisibility uint8
 }
 
 type MintHistory struct {

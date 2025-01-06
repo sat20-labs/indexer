@@ -226,7 +226,11 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 		return nil
 	}
 
-	type SpaceRuneLotMap map[runestone.SpacedRune]*runestone.Lot
+	type RuneBalance struct {
+		Balance      *runestone.Lot
+		divisibility uint8
+	}
+	type SpaceRuneLotMap map[runestone.SpacedRune]*RuneBalance
 	spaceRuneLotMap := make(SpaceRuneLotMap)
 	for _, utxo := range utxos {
 		utxoInfo, err := s.RpcService.GetUtxoInfo(utxo)
@@ -241,20 +245,25 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 		balances := s.outpointToBalancesTbl.Get(outpoint)
 		for _, balance := range balances {
 			runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
+
 			if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
-				spaceRuneLotMap[runeEntry.SpacedRune] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
+				spaceRuneLotMap[runeEntry.SpacedRune] = &RuneBalance{
+					Balance:      runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
+					divisibility: runeEntry.Divisibility,
+				}
 			}
-			spaceRuneLotMap[runeEntry.SpacedRune].AddAssign(&balance.Lot)
+			spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(&balance.Lot)
 		}
 	}
 
 	total := uint64(len(spaceRuneLotMap))
 	ret := make([]*AddressAsset, total)
 	var i = 0
-	for spacedRune, lot := range spaceRuneLotMap {
+	for spacedRune, runBalance := range spaceRuneLotMap {
 		addressLot := &AddressAsset{
-			Rune:    spacedRune.String(),
-			Balance: *lot.Value,
+			Rune:         spacedRune.String(),
+			Balance:      *runBalance.Balance.Value,
+			Divisibility: runBalance.divisibility,
 		}
 		ret[i] = addressLot
 		i++
@@ -280,8 +289,9 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 	for i, balance := range balances {
 		runeEntry := s.idToEntryTbl.Get(&balance.RuneId)
 		ret[i] = &UtxoAsset{
-			Rune:    runeEntry.SpacedRune.String(),
-			Balance: *balance.Lot.Value,
+			Rune:         runeEntry.SpacedRune.String(),
+			Balance:      *balance.Lot.Value,
+			Divisibility: runeEntry.Divisibility,
 		}
 	}
 	return ret
