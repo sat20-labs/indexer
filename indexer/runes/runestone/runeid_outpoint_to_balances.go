@@ -35,8 +35,8 @@ func (s *RuneIdOutpointToBalance) String() string {
 	return s.RuneId.String() + "-" + s.OutPoint.String()
 }
 
-func (s *RuneIdOutpointToBalance) ToPb() *pb.RuneIdToOutpointToBalance {
-	pbValue := &pb.RuneIdToOutpointToBalance{
+func (s *RuneIdOutpointToBalance) ToPb() *pb.RuneBalance {
+	pbValue := &pb.RuneBalance{
 		Balance: &pb.Lot{
 			Value: &pb.Uint128{
 				Hi: s.Balance.Value.Hi,
@@ -48,11 +48,11 @@ func (s *RuneIdOutpointToBalance) ToPb() *pb.RuneIdToOutpointToBalance {
 }
 
 type RuneIdOutpointToBalanceTable struct {
-	Table[pb.RuneIdToOutpointToBalance]
+	Table[pb.RuneBalance]
 }
 
-func NewRuneIdOutpointToBalancesTable(v *store.Cache[pb.RuneIdToOutpointToBalance]) *RuneIdOutpointToBalanceTable {
-	return &RuneIdOutpointToBalanceTable{Table: Table[pb.RuneIdToOutpointToBalance]{cache: v}}
+func NewRuneIdOutpointToBalancesTable(v *store.Cache[pb.RuneBalance]) *RuneIdOutpointToBalanceTable {
+	return &RuneIdOutpointToBalanceTable{Table: Table[pb.RuneBalance]{cache: v}}
 }
 
 func (s *RuneIdOutpointToBalanceTable) Get(v *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {

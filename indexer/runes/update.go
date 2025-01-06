@@ -302,8 +302,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		type RuneIdToOutputMap map[runestone.RuneId]*runestone.OutPoint
 		runeIdToOutputMap := make(RuneIdToOutputMap)
 
-		type RuneIdToOutpointToBalanceMap map[runestone.RuneId]*runestone.RuneIdOutpointToBalance
-		runeIdToOutpointToBalanceMap := make(RuneIdToOutpointToBalanceMap)
+		type RuneBalanceMap map[runestone.RuneId]*runestone.RuneIdOutpointAddressToBalance
+		runeBalanceMap := make(RuneBalanceMap)
 
 		type RuneIdToAddressRuneIdToMintHistoryMap map[runestone.RuneId]runestone.AddressRuneIdToMintHistory
 		runeIdToAddressRuneIdToMintHistoryMap := make(RuneIdToAddressRuneIdToMintHistoryMap)
@@ -342,11 +342,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 						AddressId: addressId,
 					}
 					runeIdToOutputMap[runeId] = outpoint
-					// TODO: GetAllUtxoBalances
-					runeIdToOutpointToBalanceMap[runeId] = &runestone.RuneIdOutpointToBalance{
+					runeBalanceMap[runeId] = &runestone.RuneIdOutpointAddressToBalance{
 						RuneId:   &runeId,
 						OutPoint: outpoint,
 						Balance:  balance,
+						Address:  address,
 					}
 				}
 			}
@@ -370,8 +370,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			s.runeIdToOutpointTbl.Insert(runeIdToOutput)
 		}
 
-		// update runeIdToOutpointToBalance
-		for runeId, outpointToBalance := range runeIdToOutpointToBalanceMap {
+		// update runeIdToOutpointToBalance and runeIdAddressOutpoint
+		for runeId, outpointToBalance := range runeBalanceMap {
+			// update runeIdToOutpointToBalance
 			runeIdToOutpointToBalance := &runestone.RuneIdOutpointToBalance{
 				RuneId:   &runeId,
 				OutPoint: outpointToBalance.OutPoint,
@@ -394,6 +395,34 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				runeIdToOutpointToBalance.Balance.AddAssign(oldRuneIdToOutpointToBalance.Balance)
 			}
 			s.runeIdOutpointToBalanceTbl.Insert(runeIdToOutpointToBalance)
+
+			// update runeIdAddressOutpoint
+			runeIdOutpointAddressToBalance := &runestone.RuneIdOutpointAddressToBalance{
+				RuneId:   &runeId,
+				Address:  outpointToBalance.Address,
+				OutPoint: outpointToBalance.OutPoint,
+				Balance:  outpointToBalance.Balance,
+			}
+			oldRuneIdOutpointAddressToBalance := s.runeIdAddressOutpointToBalanceTbl.Get(runeIdOutpointAddressToBalance)
+			if oldRuneIdOutpointAddressToBalance != nil {
+				if oldRuneIdOutpointAddressToBalance.RuneId.Cmp(runeId) != 0 {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdOutpointAddressToBalance runeId mismatch")
+				}
+				if oldRuneIdOutpointAddressToBalance.OutPoint.UtxoId != outpointToBalance.OutPoint.UtxoId {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdOutpointAddressToBalance outpoint mismatch")
+				}
+				if oldRuneIdOutpointAddressToBalance.OutPoint.Txid != outpointToBalance.OutPoint.Txid {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdOutpointAddressToBalance txid mismatch")
+				}
+				if oldRuneIdOutpointAddressToBalance.OutPoint.Vout != outpointToBalance.OutPoint.Vout {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdOutpointAddressToBalance vout mismatch")
+				}
+				if oldRuneIdOutpointAddressToBalance.Address != outpointToBalance.Address {
+					common.Log.Panicf("RuneIndexer.index_runes-> runeIdOutpointAddressToBalance address mismatch")
+				}
+				runeIdOutpointAddressToBalance.Balance.AddAssign(oldRuneIdOutpointAddressToBalance.Balance)
+			}
+			s.runeIdAddressOutpointToBalanceTbl.Insert(runeIdOutpointAddressToBalance)
 		}
 
 		// update runeIdToMintHistory
@@ -491,11 +520,17 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 		}
 		for _, val := range *oldValue {
 			ret[val.RuneId] = &val.Lot
-			key := &runestone.RuneIdOutpointToBalance{
+			runeIdOutpointToBalance := &runestone.RuneIdOutpointToBalance{
 				RuneId:   &val.RuneId,
 				OutPoint: outpoint,
 			}
-			s.runeIdOutpointToBalanceTbl.Remove(key)
+			s.runeIdOutpointToBalanceTbl.Remove(runeIdOutpointToBalance)
+
+			runeIdOutpointAddressToBalance := &runestone.RuneIdOutpointAddressToBalance{
+				RuneId:   &val.RuneId,
+				OutPoint: outpoint,
+			}
+			s.runeIdAddressOutpointToBalanceTbl.Remove(runeIdOutpointAddressToBalance)
 		}
 	}
 	return

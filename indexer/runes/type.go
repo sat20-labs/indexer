@@ -267,8 +267,11 @@ type UtxoAsset struct {
 }
 
 type MintHistory struct {
-	Utxo   string
-	Amount uint128.Uint128
+	Utxo      string
+	Amount    uint128.Uint128
+	AddressId string
+	Height    uint64
+	Number    uint64
 }
 
 type Edict struct {
