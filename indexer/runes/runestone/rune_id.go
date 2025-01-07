@@ -95,6 +95,22 @@ func RuneIdFromString(s string) (*RuneId, error) {
 	return NewRuneId(block, uint32(tx))
 }
 
+func RuneIdFromHex(s string) (*RuneId, error) {
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 {
+		return nil, ErrSeparator
+	}
+	block, err := strconv.ParseUint(parts[0], 16, 64)
+	if err != nil {
+		return nil, ErrBlock(parts[0])
+	}
+	tx, err := strconv.ParseUint(parts[1], 16, 32)
+	if err != nil {
+		return nil, ErrTransaction(parts[1])
+	}
+	return NewRuneId(block, uint32(tx))
+}
+
 var (
 	ErrSeparator   = errors.New("missing separator")
 	ErrBlock       = func(err string) error { return fmt.Errorf("invalid Block height:%s", err) }
