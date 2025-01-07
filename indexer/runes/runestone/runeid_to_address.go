@@ -37,9 +37,8 @@ func (s *RuneIdToAddress) ToPb() *pb.RuneIdToAddress {
 	return &pb.RuneIdToAddress{}
 }
 
-func (s *RuneIdToAddress) String() string {
-	adressId := strconv.FormatUint(s.AddressId, 16)
-	return s.RuneId.HexStr() + "-" + string(s.Address) + "-" + adressId
+func (s *RuneIdToAddress) Key() string {
+	return s.RuneId.Hex() + "-" + strconv.FormatUint(s.AddressId, 16) + "-" + string(s.Address)
 }
 
 type RuneToAddressTable struct {
@@ -51,7 +50,7 @@ func NewRuneIdToAddressTable(cache *store.Cache[pb.RuneIdToAddress]) *RuneToAddr
 }
 
 func (s *RuneToAddressTable) GetList(runeId *RuneId) (ret []*RuneIdToAddress, err error) {
-	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.HexStr() + "-")
+	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.Hex() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
@@ -72,7 +71,7 @@ func (s *RuneToAddressTable) GetList(runeId *RuneId) (ret []*RuneIdToAddress, er
 }
 
 func (s *RuneToAddressTable) Insert(v *RuneIdToAddress) (ret RuneIdToAddress) {
-	tblKey := []byte(store.RUNEID_TO_ADDRESS + v.String())
+	tblKey := []byte(store.RUNEID_TO_ADDRESS + v.Key())
 	pbVal := s.cache.Set(tblKey, v.ToPb())
 	if pbVal != nil {
 		ret = *v

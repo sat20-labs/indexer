@@ -52,7 +52,7 @@ func TestGetHoldersWithTicks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
-	holders := runesIndexer.GetHoldersWithTick(runeId.DecStr())
+	holders := runesIndexer.GetHoldersWithTick(runeId.String())
 	t.Logf("GetHoldersWithTicks return holders total count: %d\n", len(holders))
 	for i, v := range holders {
 		t.Logf("GetHoldersWithTicks return holders, addressId: %d, value: %s\n", i, v.String())
@@ -67,7 +67,7 @@ func TestGetAllAddressBalances(t *testing.T) {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
 	// TODO optimize
-	addressBalance, total := runesIndexer.GetAllAddressBalances(runeId.HexStr(), 0, 10)
+	addressBalance, total := runesIndexer.GetAllAddressBalances(runeId.Hex(), 0, 10)
 	t.Logf("GetAllAddressBalances return addressBalance total count: %d\n", total)
 	for i, v := range addressBalance {
 		t.Logf("GetAllAddressBalances return addressBalance %d: addressId: %d, balance: %s\n", i, v.AddressId, v.Pile.String())
@@ -87,7 +87,7 @@ func TestGetAllUtxoBalances(t *testing.T) {
 	// 	t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
 	// }
 
-	allUtxoBalances1, total1 := runesIndexer.GetAllUtxoBalances(runeId.HexStr(), 0, 10)
+	allUtxoBalances1, total1 := runesIndexer.GetAllUtxoBalances(runeId.Hex(), 0, 10)
 	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total1)
 	for i, v := range allUtxoBalances1.Balances {
 		t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
@@ -124,7 +124,7 @@ func TestInterfaceAsset(t *testing.T) {
 	t.Logf("IsExistAsset return: %+v\n", isExistAsset)
 
 	// 9
-	mintHistorys, total := runesIndexer.GetMintHistory(runeId.HexStr(), 0, 10)
+	mintHistorys, total := runesIndexer.GetMintHistory(runeId.Hex(), 0, 10)
 	t.Logf("GetMintHistory return txids total count: %d\n", total)
 	for i, v := range mintHistorys {
 		t.Logf("GetMintHistory return txids %d: %+v\n", i, v)
@@ -140,7 +140,7 @@ func TestGetAddressMintHistory(t *testing.T) {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
 	addressId := runesIndexer.RpcService.GetAddressId(firstRuneAddress)
-	mintHistorys, total := runesIndexer.GetAddressMintHistory(runeId.HexStr(), addressId, 0, 10)
+	mintHistorys, total := runesIndexer.GetAddressMintHistory(runeId.Hex(), addressId, 0, 10)
 	t.Logf("GetAddressMintHistory return txids total count: %d\n", total)
 	for i, v := range mintHistorys {
 		t.Logf("GetAddressMintHistory return txids %d: %+v\n", i, v)
