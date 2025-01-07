@@ -186,7 +186,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 desc: 根据runeId获取rune信息
 */
 func (s *Indexer) GetRuneInfoWithId(runeid string) *RuneInfo {
-	runeId, err := runestone.RuneIdFromHex(runeid)
+	runeId, err := runestone.RuneIdFromString(runeid)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetRuneInfoWithId-> runestone.RuneIdFromString(%s) err:%s", runeid, err.Error())
 		return nil
