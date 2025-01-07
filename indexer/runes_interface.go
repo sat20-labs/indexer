@@ -1,7 +1,10 @@
 package indexer
 
 import (
+	"strings"
+
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/runes"
 )
 
 func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
@@ -22,7 +25,13 @@ func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 }
 
 func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {
-	ticker := p.RunesIndexer.GetRuneInfoWithId(tickerName)
+
+	var ticker *runes.RuneInfo
+	if strings.Contains(tickerName, "_") {
+		ticker = p.RunesIndexer.GetRuneInfoWithId(tickerName)
+	} else {
+		ticker = p.RunesIndexer.GetRuneInfoWithName(tickerName)
+	}
 	if ticker == nil {
 		return nil
 	}
