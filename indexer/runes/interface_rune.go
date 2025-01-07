@@ -20,7 +20,7 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		Name:         runeEntry.SpacedRune.String(),
 		Number:       runeEntry.Number,
 		Timestamp:    runeEntry.Timestamp,
-		Id:           runeEntry.RuneId.Hex(),
+		Id:           runeEntry.RuneId.String(),
 		Supply:       runeEntry.Supply(),
 		MaxSupply:    runeEntry.MaxSupply(),
 		Premine:      *premine,
@@ -186,9 +186,9 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 desc: 根据runeId获取rune信息
 */
 func (s *Indexer) GetRuneInfoWithId(runeid string) *RuneInfo {
-	runeId, err := runestone.RuneIdFromString(runeid)
+	runeId, err := runestone.RuneIdFromDec(runeid)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetRuneInfoWithId-> runestone.RuneIdFromString(%s) err:%s", runeid, err.Error())
+		common.Log.Infof("RuneIndexer.GetRuneInfoWithId-> runestone.RuneIdFromDec(%s) err:%s", runeid, err.Error())
 		return nil
 	}
 	return s.getRuneInfoWithId(runeId)

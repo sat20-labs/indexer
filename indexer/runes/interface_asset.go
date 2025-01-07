@@ -87,7 +87,8 @@ desc: 根据runeid获取所有持有者地址和持有数量 (新增数据表)
 4 对于相同的资产需要进行合并和汇总同一rune数量
 */
 func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*AddressBalance, uint64) {
-	rid, err := runestone.RuneIdFromString(runeId)
+	return nil, 0
+	rid, err := runestone.RuneIdFromDec(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.SpacedRuneFromString(%s) err:%v", runeId, err.Error())
 		return nil, 0
