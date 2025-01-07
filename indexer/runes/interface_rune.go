@@ -20,7 +20,7 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		Name:         runeEntry.SpacedRune.String(),
 		Number:       runeEntry.Number,
 		Timestamp:    runeEntry.Timestamp,
-		Id:           runeEntry.RuneId.String(),
+		Id:           runeEntry.RuneId.Hex(),
 		Supply:       runeEntry.Supply(),
 		MaxSupply:    runeEntry.MaxSupply(),
 		Premine:      *premine,
@@ -79,7 +79,7 @@ func (s *Indexer) GetAllTickers() []string {
 	runesIds := make([]string, 0)
 	runeEntrys := s.idToEntryTbl.GetList()
 	for _, v := range runeEntrys {
-		runesIds = append(runesIds, v.RuneId.String())
+		runesIds = append(runesIds, v.RuneId.Hex())
 	}
 	return runesIds
 }
@@ -90,7 +90,9 @@ desc: 获取所有runeInfo
 */
 func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint64) {
 	runeEntrys := s.idToEntryTbl.GetList()
+	var i = 0
 	for _, v := range runeEntrys {
+		common.Log.Infof("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
 		premine, err := v.Pile(v.Premine).Uint128()
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(v.Premine).Uint128() err:%s", err.Error())
@@ -104,7 +106,6 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.GetRuneInfos-> strconv.Atoi(%s) err:%s", percentage.String(), err.Error())
 		}
-		v.MaxSupply()
 		runeInfo := &RuneInfo{
 			Name:              v.SpacedRune.String(),
 			Number:            v.Number,
@@ -166,6 +167,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 			runeInfo.Parent = string(*v.Parent)
 		}
 		ret = append(ret, runeInfo)
+		i++
 	}
 
 	total = uint64(len(ret))

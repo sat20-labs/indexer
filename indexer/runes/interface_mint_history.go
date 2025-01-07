@@ -19,7 +19,7 @@ func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHis
 	}
 	mintHistorys, err := s.runeIdToMintHistoryTbl.GetList(id)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetList(%s) err:%v", id.String(), err)
+		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetList(%s) err:%v", id.Hex(), err)
 	}
 	if len(mintHistorys) == 0 {
 		return nil, 0
@@ -27,7 +27,7 @@ func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHis
 
 	runeEntry := s.idToEntryTbl.Get(id)
 	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", id.String(), runeId)
+		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", id.Hex(), runeId)
 		return nil, 0
 	}
 
@@ -70,7 +70,7 @@ func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, 
 	}
 	mintHistorys, err := s.addressRuneIdToMintHistoryTbl.GetList(runestone.Address(address), id)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetList(%s, %s) err:%v", address, id.String(), err)
+		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetList(%s, %s) err:%v", address, id.Hex(), err)
 	}
 	if len(mintHistorys) == 0 {
 		return nil, 0
@@ -78,7 +78,7 @@ func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, 
 
 	runeEntry := s.idToEntryTbl.Get(id)
 	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.Get(%s) rune not found, runeIdStr: %s", id.String(), runeId)
+		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.Get(%s) rune not found, runeIdStr: %s", id.Hex(), runeId)
 		return nil, 0
 	}
 

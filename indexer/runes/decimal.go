@@ -38,25 +38,50 @@ func (d *Decimal) ToInteger(divisibility uint8) (uint64, error) {
 }
 
 func (d Decimal) String() string {
+	if d.Value.IsZero() {
+		return "0"
+	}
+
+	// Convert Uint128 to big.Int for easier manipulation
+	valueBig := new(big.Int).SetBytes(d.Value.Big().Bytes())
+
 	magnitude := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(d.Scale)), nil)
-	integer := new(big.Int).Div(d.Value.Big(), magnitude)
-	fraction := new(big.Int).Mod(d.Value.Big(), magnitude)
+	integer := new(big.Int).Div(valueBig, magnitude)
+	fraction := new(big.Int).Mod(valueBig, magnitude)
 
-	var result string
-	result += integer.String()
+	result := integer.String()
 
-	if fraction.Cmp(big.NewInt(0)) > 0 {
-		fractionStr := fraction.String()
-		width := int(d.Scale)
-		for fraction.Mod(fraction, big.NewInt(10)).Cmp(big.NewInt(0)) == 0 {
-			fraction.Div(fraction, big.NewInt(10))
-			width--
+	if fraction.Sign() > 0 {
+		fractionStr := fmt.Sprintf("%0*s", d.Scale, fraction.String())
+		fractionStr = strings.TrimRight(fractionStr, "0")
+		if fractionStr != "" {
+			result += "." + fractionStr
 		}
-		result += "." + fmt.Sprintf("%0*s", width, fractionStr)
 	}
 
 	return result
 }
+
+// func (d Decimal) String() string {
+// 	magnitude := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(d.Scale)), nil)
+// 	integer := new(big.Int).Div(d.Value.Big(), magnitude)
+// 	fraction := new(big.Int).Mod(d.Value.Big(), magnitude)
+
+// 	var result string
+// 	result += integer.String()
+
+// 	if fraction.Cmp(big.NewInt(0)) > 0 {
+// 		fractionStr := fraction.String()
+// 		width := int(d.Scale)
+// 		for fraction.Mod(fraction, big.NewInt(10)).Cmp(big.NewInt(0)) == 0 {
+// 			fraction.Div(fraction, big.NewInt(10))
+// 			width--
+// 		}
+// 		result += "." + fmt.Sprintf("%0*s", width, fractionStr)
+// 	}
+
+// 	return result
+// }
 
 func NewDecimalFromString(s string) (*Decimal, error) {
 	var ret Decimal
