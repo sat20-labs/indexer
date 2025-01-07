@@ -115,7 +115,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 			Number:            v.Number,
 			Timestamp:         v.Timestamp,
 			Id:                v.RuneId.String(),
-			Supply:            v.Supply(),
+			Supply:            supply,
 			MaxSupply:         v.MaxSupply(),
 			Premine:           *premine,
 			PreminePercentage: percentageNum,
