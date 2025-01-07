@@ -52,19 +52,19 @@ func NewAddressRuneIdToMintHistoryTable(cache *store.Cache[pb.AddressRuneIdToMin
 	return &AddressRuneIdToMintHistoryTable{Table: Table[pb.AddressRuneIdToMintHistory]{cache: cache}}
 }
 
-func (s *AddressRuneIdToMintHistoryTable) GetUtxos(address Address, runeId *RuneId) (ret []Utxo, err error) {
+func (s *AddressRuneIdToMintHistoryTable) GetList(address Address, runeId *RuneId) (ret []*AddressRuneIdToMintHistory, err error) {
 	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + string(address) + "-" + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
-		ret = make([]Utxo, len(pbVal))
+		ret = make([]*AddressRuneIdToMintHistory, len(pbVal))
 		var i = 0
 		for k := range pbVal {
 			v, err := AddressRuneIdToMintHistoryFromString(k)
 			if err != nil {
 				return nil, err
 			}
-			ret[i] = Utxo(v.OutPoint.String())
+			ret[i] = v
 			i++
 		}
 	}

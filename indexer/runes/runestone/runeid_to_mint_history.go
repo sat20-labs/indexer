@@ -11,9 +11,11 @@ import (
 type Utxo string
 
 type RuneIdToMintHistory struct {
-	RuneId *RuneId
-	Utxo   Utxo
-	UtxoId uint64
+	RuneId    *RuneId
+	Utxo      Utxo
+	UtxoId    uint64
+	Address   string
+	AddressId uint64
 }
 
 func RuneIdToMintHistoryFromString(key string) (*RuneIdToMintHistory, error) {
@@ -34,7 +36,10 @@ func RuneIdToMintHistoryFromString(key string) (*RuneIdToMintHistory, error) {
 }
 
 func (s *RuneIdToMintHistory) ToPb() *pb.RuneIdToMintHistory {
-	return &pb.RuneIdToMintHistory{}
+	return &pb.RuneIdToMintHistory{
+		Address:   s.Address,
+		AddressId: s.AddressId,
+	}
 }
 
 func (s *RuneIdToMintHistory) String() string {
@@ -49,19 +54,21 @@ func NewRuneIdToMintHistoryTable(store *store.Cache[pb.RuneIdToMintHistory]) *Ru
 	return &RuneToMintHistoryTable{Table: Table[pb.RuneIdToMintHistory]{cache: store}}
 }
 
-func (s *RuneToMintHistoryTable) GetUtxos(runeId *RuneId) (ret []Utxo, err error) {
+func (s *RuneToMintHistoryTable) GetList(runeId *RuneId) (ret []*RuneIdToMintHistory, err error) {
 	tblKey := []byte(store.RUNEID_TO_MINT_HISTORYS + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
-		ret = make([]Utxo, len(pbVal))
+		ret = make([]*RuneIdToMintHistory, len(pbVal))
 		var i = 0
-		for k := range pbVal {
-			v, err := RuneIdToMintHistoryFromString(k)
+		for k, v := range pbVal {
+			runeIdToMintHistory, err := RuneIdToMintHistoryFromString(k)
 			if err != nil {
 				return nil, err
 			}
-			ret[i] = v.Utxo
+			runeIdToMintHistory.Address = v.Address
+			runeIdToMintHistory.AddressId = v.AddressId
+			ret[i] = runeIdToMintHistory
 			i++
 		}
 	}
