@@ -438,17 +438,16 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				// TODO
 				common.Log.Errorf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
 					tx.Txid, mintOutIndex, s.chaincfgParam.Net, err)
-			} else {
-				addressId := s.BaseIndexer.GetAddressId(string(address))
-				v := &runestone.RuneIdToMintHistory{
-					RuneId:    mintRuneId,
-					Utxo:      runestone.Utxo(utxo),
-					UtxoId:    utxoId,
-					Address:   string(address),
-					AddressId: addressId,
-				}
-				s.runeIdToMintHistoryTbl.Insert(v)
 			}
+			addressId := s.BaseIndexer.GetAddressId(string(address))
+			v := &runestone.RuneIdToMintHistory{
+				RuneId:    mintRuneId,
+				Utxo:      runestone.Utxo(utxo),
+				UtxoId:    utxoId,
+				Address:   string(address),
+				AddressId: addressId,
+			}
+			s.runeIdToMintHistoryTbl.Insert(v)
 		}
 
 		// update addressRuneIdToMintHistory
