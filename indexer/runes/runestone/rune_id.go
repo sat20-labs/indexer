@@ -79,38 +79,6 @@ func (r RuneId) String() string {
 	return fmt.Sprintf("%d_%d", r.Block, r.Tx)
 }
 
-func RuneIdFromString(s string) (*RuneId, error) {
-	parts := strings.Split(s, "_")
-	if len(parts) != 2 {
-		return nil, ErrSeparator
-	}
-	block, err := strconv.ParseUint(parts[0], 16, 64)
-	if err != nil {
-		return nil, ErrBlock(parts[0])
-	}
-	tx, err := strconv.ParseUint(parts[1], 16, 32)
-	if err != nil {
-		return nil, ErrTransaction(parts[1])
-	}
-	return NewRuneId(block, uint32(tx))
-}
-
-func RuneIdFromDec(s string) (*RuneId, error) {
-	parts := strings.Split(s, "_")
-	if len(parts) != 2 {
-		return nil, ErrSeparator
-	}
-	block, err := strconv.ParseUint(parts[0], 10, 64)
-	if err != nil {
-		return nil, ErrBlock(parts[0])
-	}
-	tx, err := strconv.ParseUint(parts[1], 10, 32)
-	if err != nil {
-		return nil, ErrTransaction(parts[1])
-	}
-	return NewRuneId(block, uint32(tx))
-}
-
 func RuneIdFromHex(s string) (*RuneId, error) {
 	parts := strings.Split(s, "_")
 	if len(parts) != 2 {
@@ -121,6 +89,22 @@ func RuneIdFromHex(s string) (*RuneId, error) {
 		return nil, ErrBlock(parts[0])
 	}
 	tx, err := strconv.ParseUint(parts[1], 16, 32)
+	if err != nil {
+		return nil, ErrTransaction(parts[1])
+	}
+	return NewRuneId(block, uint32(tx))
+}
+
+func RuneIdFromString(s string) (*RuneId, error) {
+	parts := strings.Split(s, "_")
+	if len(parts) != 2 {
+		return nil, ErrSeparator
+	}
+	block, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return nil, ErrBlock(parts[0])
+	}
+	tx, err := strconv.ParseUint(parts[1], 10, 32)
 	if err != nil {
 		return nil, ErrTransaction(parts[1])
 	}

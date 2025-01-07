@@ -16,7 +16,7 @@ func NewRuneIdToEntryTable(store *store.Cache[pb.RuneEntry]) *RuneIdToEntryTable
 }
 
 func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
-	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
+	tblKey := []byte(store.ID_TO_ENTRY + key.HexStr())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = &RuneEntry{}
@@ -26,7 +26,7 @@ func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
 }
 
 func (s *RuneIdToEntryTable) GetFromDB(key *RuneId) (ret *RuneEntry) {
-	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
+	tblKey := []byte(store.ID_TO_ENTRY + key.HexStr())
 	pbVal, _ := s.cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = &RuneEntry{}
@@ -51,7 +51,7 @@ func (s *RuneIdToEntryTable) GetList() (ret map[string]*RuneEntry) {
 }
 
 func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEntry) {
-	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
+	tblKey := []byte(store.ID_TO_ENTRY + key.HexStr())
 	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &RuneEntry{}
@@ -61,6 +61,6 @@ func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEnt
 }
 
 func (s *RuneIdToEntryTable) SetToDB(key *RuneId, value *RuneEntry) {
-	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
+	tblKey := []byte(store.ID_TO_ENTRY + key.HexStr())
 	s.cache.SetToDB(tblKey, value.ToPb())
 }

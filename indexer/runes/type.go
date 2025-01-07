@@ -136,7 +136,7 @@ func (s *RuneInfo) UnmarshalJSON(data []byte) error {
 }
 
 func (s *RuneInfo) BlockHeight() int {
-	runeId, err := runestone.RuneIdFromString(s.Id)
+	runeId, err := runestone.RuneIdFromHex(s.Id)
 	if err != nil {
 		return -1
 	}

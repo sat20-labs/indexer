@@ -144,7 +144,7 @@ func (c Config) GetMint() (*runestone.RuneId, error) {
 	if c.Mint.RuneId == "" {
 		return nil, errors.New("runeId is required")
 	}
-	runeId, err := runestone.RuneIdFromString(c.Mint.RuneId)
+	runeId, err := runestone.RuneIdFromHex(c.Mint.RuneId)
 	if err != nil {
 		return nil, err
 	}

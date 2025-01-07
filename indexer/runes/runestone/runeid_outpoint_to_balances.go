@@ -19,11 +19,11 @@ func GenRuneIdOutpointToBalance(str string, balance *Lot) (*RuneIdOutpointToBala
 	ret := &RuneIdOutpointToBalance{}
 	parts := strings.SplitN(str, "-", 4)
 	var err error
-	ret.RuneId, err = RuneIdFromString(parts[1])
+	ret.RuneId, err = RuneIdFromHex(parts[1])
 	if err != nil {
 		return nil, err
 	}
-	ret.OutPoint, err = OutPointFromString(parts[2])
+	ret.OutPoint, err = OutPointFromHex(parts[2])
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func GenRuneIdOutpointToBalance(str string, balance *Lot) (*RuneIdOutpointToBala
 }
 
 func (s *RuneIdOutpointToBalance) String() string {
-	return s.RuneId.Hex() + "-" + s.OutPoint.String()
+	return s.RuneId.Hex() + "-" + s.OutPoint.Hex()
 }
 
 func (s *RuneIdOutpointToBalance) ToPb() *pb.RuneBalance {

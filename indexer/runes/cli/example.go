@@ -41,7 +41,7 @@ func TestEtching() {
 }
 func TestMint() {
 	runeIdStr := "2609649:946"
-	runeId, _ := runestone.RuneIdFromString(runeIdStr)
+	runeId, _ := runestone.RuneIdFromHex(runeIdStr)
 	r := runestone.Runestone{Mint: runeId}
 	data, err := r.Encipher()
 	if err != nil {
