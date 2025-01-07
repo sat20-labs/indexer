@@ -115,7 +115,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 			Number:            v.Number,
 			Timestamp:         v.Timestamp,
 			Id:                v.RuneId.String(),
-			Supply:            v.Supply(),
+			Supply:            supply,
 			MaxSupply:         v.MaxSupply(),
 			Premine:           *premine,
 			PreminePercentage: percentageNum,
@@ -190,7 +190,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 desc: 根据runeId获取rune信息
 */
 func (s *Indexer) GetRuneInfoWithId(runeid string) *RuneInfo {
-	runeId, err := runestone.RuneIdFromDec(runeid)
+	runeId, err := runestone.RuneIdFromString(runeid)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetRuneInfoWithId-> runestone.RuneIdFromDec(%s) err:%s", runeid, err.Error())
 		return nil
@@ -254,7 +254,7 @@ desc: 根据edict列表构造edict数据
 func (s *Indexer) BuildEdictsData(list []*Edict) (ret []byte, err error) {
 	r := runestone.Runestone{Edicts: []runestone.Edict{}}
 	for _, edict := range list {
-		runeId, err := runestone.RuneIdFromString(edict.RuneId)
+		runeId, err := runestone.RuneIdFromHex(edict.RuneId)
 		if err != nil {
 			return nil, err
 		}

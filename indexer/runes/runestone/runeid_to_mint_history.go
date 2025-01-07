@@ -22,7 +22,7 @@ func RuneIdToMintHistoryFromString(key string) (*RuneIdToMintHistory, error) {
 	ret := &RuneIdToMintHistory{}
 	parts := strings.SplitN(key, "-", 4)
 	var err error
-	ret.RuneId, err = RuneIdFromString(parts[1])
+	ret.RuneId, err = RuneIdFromHex(parts[1])
 	if err != nil {
 		return nil, err
 	}

@@ -16,11 +16,11 @@ func RuneIdToOutpointFromString(str string) (*RuneIdToOutpoint, error) {
 	runeIdToOutpoint := &RuneIdToOutpoint{}
 	parts := strings.SplitN(str, "-", 3)
 	var err error
-	runeIdToOutpoint.RuneId, err = RuneIdFromString(parts[1])
+	runeIdToOutpoint.RuneId, err = RuneIdFromHex(parts[1])
 	if err != nil {
 		return nil, err
 	}
-	runeIdToOutpoint.Outpoint, err = OutPointFromString(parts[2])
+	runeIdToOutpoint.Outpoint, err = OutPointFromHex(parts[2])
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (s *RuneIdToOutpoint) ToPb() *pb.RuneIdToOutpoint {
 }
 
 func (s *RuneIdToOutpoint) String() string {
-	return s.RuneId.Hex() + "-" + s.Outpoint.String()
+	return s.RuneId.Hex() + "-" + s.Outpoint.Hex()
 }
 
 type RuneIdToOutpointTable struct {

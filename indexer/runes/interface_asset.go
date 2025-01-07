@@ -10,7 +10,7 @@ import (
 
 // key: addressId, value: amount
 func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
-	rid, err := runestone.RuneIdFromString(runeId)
+	rid, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil
@@ -88,7 +88,7 @@ desc: 根据runeid获取所有持有者地址和持有数量 (新增数据表)
 */
 func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*AddressBalance, uint64) {
 	return nil, 0
-	rid, err := runestone.RuneIdFromDec(runeId)
+	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.SpacedRuneFromString(%s) err:%v", runeId, err.Error())
 		return nil, 0
@@ -177,7 +177,7 @@ desc: 根据runeId获取所有带有该rune的utxo和该utxo中的资产数量 (
 2 根据utxo获取资产和持有数量 get_rune_balances_for_output(utxo)
 */
 func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
-	rid, err := runestone.RuneIdFromString(runeId)
+	rid, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 		return nil, 0
@@ -208,7 +208,7 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	for _, balance := range balances {
 		totalAmount.AddAssign(balance.Balance)
 		addressLot := &UtxoBalance{
-			Utxo:     balance.OutPoint.String(),
+			Utxo:     balance.OutPoint.Hex(),
 			Outpoint: balance.OutPoint,
 			Balance:  *balance.Balance.Value,
 		}
@@ -229,7 +229,7 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 }
 
 func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
-	rid, err := runestone.RuneIdFromString(runeId)
+	rid, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 		return nil, 0
@@ -267,7 +267,7 @@ func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*U
 	var i = 0
 	for outpoint, lot := range outpointLotsMap {
 		addressLot := &UtxoBalance{
-			Utxo:     outpoint.String(),
+			Utxo:     outpoint.Hex(),
 			Outpoint: &outpoint,
 			Balance:  *lot.Value,
 		}

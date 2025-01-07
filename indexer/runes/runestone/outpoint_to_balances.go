@@ -17,7 +17,7 @@ type OutPoint struct {
 	UtxoId uint64
 }
 
-func (s *OutPoint) String() string {
+func (s *OutPoint) Hex() string {
 	return fmt.Sprintf("%s:%x:%x", s.Txid, s.Vout, s.UtxoId)
 }
 
@@ -34,7 +34,7 @@ func OutPointFromUtxo(utxo string, utxoId uint64) (*OutPoint, error) {
 	return outpoint, nil
 }
 
-func OutPointFromString(str string) (*OutPoint, error) {
+func OutPointFromHex(str string) (*OutPoint, error) {
 	outpoint := &OutPoint{}
 	parts := strings.Split(str, ":")
 	if len(parts) != 3 {
@@ -141,7 +141,7 @@ func NewOutpointToBalancesTable(s *store.Cache[pb.OutpointToBalances]) *Outpoint
 }
 
 func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalances) {
-	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Hex())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		ret = OutpointToBalances{}
@@ -151,7 +151,7 @@ func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalances) {
 }
 
 func (s *OutpointToBalancesTable) Insert(key *OutPoint, value OutpointToBalances) (ret *OutpointToBalances) {
-	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Hex())
 	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &OutpointToBalances{}
@@ -161,7 +161,7 @@ func (s *OutpointToBalancesTable) Insert(key *OutPoint, value OutpointToBalances
 }
 
 func (s *OutpointToBalancesTable) Remove(key *OutPoint) (ret *OutpointToBalances) {
-	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.String())
+	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Hex())
 	pbVal := s.cache.Delete(tblKey)
 	if pbVal != nil {
 		ret = &OutpointToBalances{}
