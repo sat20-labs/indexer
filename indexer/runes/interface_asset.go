@@ -9,20 +9,71 @@ import (
 )
 
 // key: addressId, value: amount
-func (s *Indexer) GetHoldersWithTick(runeId string) map[uint64]*common.Decimal {
+func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
 	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.SpacedRuneFromString(%s) err:%v", runeId, err.Error())
+		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil
 	}
 	runeIdToAddresses, err := s.runeIdToAddressTbl.GetList(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdToAddressTbl.GetList(%s) err:%v", rid.String(), err.Error())
+		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdToAddressTbl.GetList(%s) err:%v", rid.String(), err.Error())
 	}
 	if len(runeIdToAddresses) == 0 {
 		return nil
 	}
-	return nil
+
+	r := s.idToEntryTbl.Get(rid)
+	if r == nil {
+		common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.String(), runeId)
+		return nil
+	}
+
+	type AddressLot struct {
+		Address string
+		Amount  *runestone.Lot
+	}
+	type AddressIdToAddressLotMap map[uint64]*AddressLot
+	addressIdToAddressLotMap := make(AddressIdToAddressLotMap)
+	for _, address := range runeIdToAddresses {
+		utxos := s.RpcService.GetUTXOs2(string(address.Address))
+		for _, utxo := range utxos {
+			utxoInfo, err := s.RpcService.GetUtxoInfo(utxo)
+			if err != nil {
+				common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> GetUtxoInfo(%s) err:%v", utxo, err)
+			}
+			utxoId := utxoInfo.UtxoId
+			outpoint, err := runestone.OutPointFromUtxo(utxo, utxoId)
+			if err != nil {
+				common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runestone.OutPointFromUtxo(%s, %d) err:%v", utxo, utxoId, err)
+			}
+			blances := s.outpointToBalancesTbl.Get(outpoint)
+			for _, balance := range blances {
+				if balance.RuneId.Block != rid.Block || balance.RuneId.Tx != rid.Tx {
+					continue
+				}
+
+				if addressIdToAddressLotMap[address.AddressId] == nil {
+					addressIdToAddressLotMap[address.AddressId] = &AddressLot{
+						Address: string(address.Address),
+						Amount:  runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
+					}
+				}
+				addressIdToAddressLotMap[address.AddressId].Amount.AddAssign(&balance.Lot)
+			}
+		}
+	}
+
+	total := uint64(len(addressIdToAddressLotMap))
+	ret = make(map[uint64]*common.Decimal, total)
+	var i = 0
+
+	for addressId, addressLot := range addressIdToAddressLotMap {
+		decimal := common.NewDecimalFromUint128(*addressLot.Amount.Value, int(r.Divisibility))
+		ret[addressId] = decimal
+		i++
+	}
+	return
 }
 
 /*
