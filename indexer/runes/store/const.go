@@ -38,11 +38,15 @@ const (
 	// 存储: key = arm-%address%-%runeid.string()%-%utxo% value = nil
 	ADDRESS_RUNEID_TO_MINT_HISTORYS = "g-"
 
-	// 表: runeid和outpoint映射balance (new)
+	// 表: runeid和outpoint映射balance
 	// 存储: key = rob-%runeid%-%outpoint%-%lot% value = nil
 	RUNEID_OUTPOINT_TO_BALANCE = "h-"
 
-	// 表: runeid和address和outpoint映射balance (new)
+	// 表: runeid和address和outpoint映射balance
 	// 存储: key = roab-%runeid%-%outpoint%-%lot% value = address & lot
 	RUNEID_OUTPOINT_TO_ADDRESS_BALANCE = "i-"
+
+	// 表: runeid和address和outpoint映射balance
+	// 存储: key = roab-%runeid%-%addressid%-%lot% value = address & addressid & lot
+	RUNEID_ADDRESS_BALANCE = "j-"
 )

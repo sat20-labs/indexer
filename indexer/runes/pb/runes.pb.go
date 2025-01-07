@@ -777,18 +777,73 @@ func (x *RuneIdLot) GetLot() *Lot {
 	return nil
 }
 
+type OutpointToBalancesValue struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Utxo       string       `protobuf:"bytes,1,opt,name=utxo,proto3" json:"utxo,omitempty"`
+	RuneIdLots []*RuneIdLot `protobuf:"bytes,2,rep,name=rune_id_lots,json=runeIdLots,proto3" json:"rune_id_lots,omitempty"`
+}
+
+func (x *OutpointToBalancesValue) Reset() {
+	*x = OutpointToBalancesValue{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OutpointToBalancesValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutpointToBalancesValue) ProtoMessage() {}
+
+func (x *OutpointToBalancesValue) ProtoReflect() protoreflect.Message {
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutpointToBalancesValue.ProtoReflect.Descriptor instead.
+func (*OutpointToBalancesValue) Descriptor() ([]byte, []int) {
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *OutpointToBalancesValue) GetUtxo() string {
+	if x != nil {
+		return x.Utxo
+	}
+	return ""
+}
+
+func (x *OutpointToBalancesValue) GetRuneIdLots() []*RuneIdLot {
+	if x != nil {
+		return x.RuneIdLots
+	}
+	return nil
+}
+
 type OutpointToBalances struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	RuneIdLots []*RuneIdLot `protobuf:"bytes,1,rep,name=rune_id_lots,json=runeIdLots,proto3" json:"rune_id_lots,omitempty"`
+	Value *OutpointToBalancesValue `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
 }
 
 func (x *OutpointToBalances) Reset() {
 	*x = OutpointToBalances{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[12]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -801,7 +856,7 @@ func (x *OutpointToBalances) String() string {
 func (*OutpointToBalances) ProtoMessage() {}
 
 func (x *OutpointToBalances) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[12]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -814,12 +869,12 @@ func (x *OutpointToBalances) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutpointToBalances.ProtoReflect.Descriptor instead.
 func (*OutpointToBalances) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{12}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *OutpointToBalances) GetRuneIdLots() []*RuneIdLot {
+func (x *OutpointToBalances) GetValue() *OutpointToBalancesValue {
 	if x != nil {
-		return x.RuneIdLots
+		return x.Value
 	}
 	return nil
 }
@@ -833,7 +888,7 @@ type RuneIdToAddress struct {
 func (x *RuneIdToAddress) Reset() {
 	*x = RuneIdToAddress{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[13]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -846,7 +901,7 @@ func (x *RuneIdToAddress) String() string {
 func (*RuneIdToAddress) ProtoMessage() {}
 
 func (x *RuneIdToAddress) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[13]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -859,7 +914,7 @@ func (x *RuneIdToAddress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuneIdToAddress.ProtoReflect.Descriptor instead.
 func (*RuneIdToAddress) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{13}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{14}
 }
 
 type RuneIdToOutpoint struct {
@@ -871,7 +926,7 @@ type RuneIdToOutpoint struct {
 func (x *RuneIdToOutpoint) Reset() {
 	*x = RuneIdToOutpoint{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[14]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -884,7 +939,7 @@ func (x *RuneIdToOutpoint) String() string {
 func (*RuneIdToOutpoint) ProtoMessage() {}
 
 func (x *RuneIdToOutpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[14]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +952,7 @@ func (x *RuneIdToOutpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuneIdToOutpoint.ProtoReflect.Descriptor instead.
 func (*RuneIdToOutpoint) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{14}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{15}
 }
 
 type RuneIdToMintHistory struct {
@@ -912,7 +967,7 @@ type RuneIdToMintHistory struct {
 func (x *RuneIdToMintHistory) Reset() {
 	*x = RuneIdToMintHistory{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[15]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -925,7 +980,7 @@ func (x *RuneIdToMintHistory) String() string {
 func (*RuneIdToMintHistory) ProtoMessage() {}
 
 func (x *RuneIdToMintHistory) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[15]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -938,7 +993,7 @@ func (x *RuneIdToMintHistory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuneIdToMintHistory.ProtoReflect.Descriptor instead.
 func (*RuneIdToMintHistory) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{15}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RuneIdToMintHistory) GetAddress() string {
@@ -964,7 +1019,7 @@ type AddressRuneIdToMintHistory struct {
 func (x *AddressRuneIdToMintHistory) Reset() {
 	*x = AddressRuneIdToMintHistory{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[16]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -977,7 +1032,7 @@ func (x *AddressRuneIdToMintHistory) String() string {
 func (*AddressRuneIdToMintHistory) ProtoMessage() {}
 
 func (x *AddressRuneIdToMintHistory) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[16]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -990,7 +1045,7 @@ func (x *AddressRuneIdToMintHistory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddressRuneIdToMintHistory.ProtoReflect.Descriptor instead.
 func (*AddressRuneIdToMintHistory) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{16}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{17}
 }
 
 type RuneBalance struct {
@@ -1004,7 +1059,7 @@ type RuneBalance struct {
 func (x *RuneBalance) Reset() {
 	*x = RuneBalance{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[17]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1017,7 +1072,7 @@ func (x *RuneBalance) String() string {
 func (*RuneBalance) ProtoMessage() {}
 
 func (x *RuneBalance) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[17]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1030,7 +1085,7 @@ func (x *RuneBalance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuneBalance.ProtoReflect.Descriptor instead.
 func (*RuneBalance) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{17}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RuneBalance) GetBalance() *Lot {
@@ -1052,7 +1107,7 @@ type RuneAddressBalance struct {
 func (x *RuneAddressBalance) Reset() {
 	*x = RuneAddressBalance{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_indexer_runes_pb_runes_proto_msgTypes[18]
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[19]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1065,7 +1120,7 @@ func (x *RuneAddressBalance) String() string {
 func (*RuneAddressBalance) ProtoMessage() {}
 
 func (x *RuneAddressBalance) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_runes_pb_runes_proto_msgTypes[18]
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[19]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1078,7 +1133,7 @@ func (x *RuneAddressBalance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RuneAddressBalance.ProtoReflect.Descriptor instead.
 func (*RuneAddressBalance) Descriptor() ([]byte, []int) {
-	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{18}
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RuneAddressBalance) GetAddress() string {
@@ -1089,6 +1144,69 @@ func (x *RuneAddressBalance) GetAddress() string {
 }
 
 func (x *RuneAddressBalance) GetBalance() *Lot {
+	if x != nil {
+		return x.Balance
+	}
+	return nil
+}
+
+type RuneIdAddressToBalance struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Address string `protobuf:"bytes,1,opt,name=Address,proto3" json:"Address,omitempty"`
+	Utxo    string `protobuf:"bytes,2,opt,name=Utxo,proto3" json:"Utxo,omitempty"`
+	Balance *Lot   `protobuf:"bytes,3,opt,name=Balance,proto3" json:"Balance,omitempty"`
+}
+
+func (x *RuneIdAddressToBalance) Reset() {
+	*x = RuneIdAddressToBalance{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[20]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RuneIdAddressToBalance) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuneIdAddressToBalance) ProtoMessage() {}
+
+func (x *RuneIdAddressToBalance) ProtoReflect() protoreflect.Message {
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[20]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuneIdAddressToBalance.ProtoReflect.Descriptor instead.
+func (*RuneIdAddressToBalance) Descriptor() ([]byte, []int) {
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RuneIdAddressToBalance) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *RuneIdAddressToBalance) GetUtxo() string {
+	if x != nil {
+		return x.Utxo
+	}
+	return ""
+}
+
+func (x *RuneIdAddressToBalance) GetBalance() *Lot {
 	if x != nil {
 		return x.Balance
 	}
@@ -1183,31 +1301,45 @@ var file_indexer_runes_pb_runes_proto_rawDesc = []byte{
 	0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64,
 	0x52, 0x06, 0x72, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x12, 0x1f, 0x0a, 0x03, 0x6c, 0x6f, 0x74, 0x18,
 	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73,
-	0x2e, 0x4c, 0x6f, 0x74, 0x52, 0x03, 0x6c, 0x6f, 0x74, 0x22, 0x4b, 0x0a, 0x12, 0x4f, 0x75, 0x74,
-	0x70, 0x6f, 0x69, 0x6e, 0x74, 0x54, 0x6f, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x12,
-	0x35, 0x0a, 0x0c, 0x72, 0x75, 0x6e, 0x65, 0x5f, 0x69, 0x64, 0x5f, 0x6c, 0x6f, 0x74, 0x73, 0x18,
-	0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73,
-	0x2e, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x4c, 0x6f, 0x74, 0x52, 0x0a, 0x72, 0x75, 0x6e, 0x65,
-	0x49, 0x64, 0x4c, 0x6f, 0x74, 0x73, 0x22, 0x11, 0x0a, 0x0f, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64,
-	0x54, 0x6f, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x22, 0x12, 0x0a, 0x10, 0x52, 0x75, 0x6e,
-	0x65, 0x49, 0x64, 0x54, 0x6f, 0x4f, 0x75, 0x74, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x4d, 0x0a,
-	0x13, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x54, 0x6f, 0x4d, 0x69, 0x6e, 0x74, 0x48, 0x69, 0x73,
-	0x74, 0x6f, 0x72, 0x79, 0x12, 0x18, 0x0a, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x1c,
-	0x0a, 0x09, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x09, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x22, 0x1c, 0x0a, 0x1a,
-	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x54, 0x6f, 0x4d,
-	0x69, 0x6e, 0x74, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x36, 0x0a, 0x0b, 0x52, 0x75,
-	0x6e, 0x65, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x12, 0x27, 0x0a, 0x07, 0x42, 0x61, 0x6c,
-	0x61, 0x6e, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x62, 0x2e,
-	0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x4c, 0x6f, 0x74, 0x52, 0x07, 0x42, 0x61, 0x6c, 0x61, 0x6e,
-	0x63, 0x65, 0x22, 0x57, 0x0a, 0x12, 0x52, 0x75, 0x6e, 0x65, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73,
-	0x73, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x41, 0x64, 0x64, 0x72,
-	0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65,
-	0x73, 0x73, 0x12, 0x27, 0x0a, 0x07, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x4c,
-	0x6f, 0x74, 0x52, 0x07, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x42, 0x0b, 0x5a, 0x09, 0x2f,
-	0x72, 0x75, 0x6e, 0x65, 0x73, 0x2f, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x2e, 0x4c, 0x6f, 0x74, 0x52, 0x03, 0x6c, 0x6f, 0x74, 0x22, 0x64, 0x0a, 0x17, 0x4f, 0x75, 0x74,
+	0x70, 0x6f, 0x69, 0x6e, 0x74, 0x54, 0x6f, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x56,
+	0x61, 0x6c, 0x75, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x75, 0x74, 0x78, 0x6f, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x04, 0x75, 0x74, 0x78, 0x6f, 0x12, 0x35, 0x0a, 0x0c, 0x72, 0x75, 0x6e, 0x65,
+	0x5f, 0x69, 0x64, 0x5f, 0x6c, 0x6f, 0x74, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x13,
+	0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64,
+	0x4c, 0x6f, 0x74, 0x52, 0x0a, 0x72, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x4c, 0x6f, 0x74, 0x73, 0x22,
+	0x4d, 0x0a, 0x12, 0x4f, 0x75, 0x74, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x54, 0x6f, 0x42, 0x61, 0x6c,
+	0x61, 0x6e, 0x63, 0x65, 0x73, 0x12, 0x37, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x21, 0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e,
+	0x4f, 0x75, 0x74, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x54, 0x6f, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63,
+	0x65, 0x73, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x11,
+	0x0a, 0x0f, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x54, 0x6f, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73,
+	0x73, 0x22, 0x12, 0x0a, 0x10, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x54, 0x6f, 0x4f, 0x75, 0x74,
+	0x70, 0x6f, 0x69, 0x6e, 0x74, 0x22, 0x4d, 0x0a, 0x13, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x54,
+	0x6f, 0x4d, 0x69, 0x6e, 0x74, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x18, 0x0a, 0x07,
+	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x41,
+	0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73,
+	0x73, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x41, 0x64, 0x64, 0x72, 0x65,
+	0x73, 0x73, 0x49, 0x64, 0x22, 0x1c, 0x0a, 0x1a, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x52,
+	0x75, 0x6e, 0x65, 0x49, 0x64, 0x54, 0x6f, 0x4d, 0x69, 0x6e, 0x74, 0x48, 0x69, 0x73, 0x74, 0x6f,
+	0x72, 0x79, 0x22, 0x36, 0x0a, 0x0b, 0x52, 0x75, 0x6e, 0x65, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63,
+	0x65, 0x12, 0x27, 0x0a, 0x07, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x4c, 0x6f,
+	0x74, 0x52, 0x07, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x22, 0x57, 0x0a, 0x12, 0x52, 0x75,
+	0x6e, 0x65, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65,
+	0x12, 0x18, 0x0a, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x27, 0x0a, 0x07, 0x42, 0x61,
+	0x6c, 0x61, 0x6e, 0x63, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x62,
+	0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x4c, 0x6f, 0x74, 0x52, 0x07, 0x42, 0x61, 0x6c, 0x61,
+	0x6e, 0x63, 0x65, 0x22, 0x6f, 0x0a, 0x16, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x41, 0x64, 0x64,
+	0x72, 0x65, 0x73, 0x73, 0x54, 0x6f, 0x42, 0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x12, 0x18, 0x0a,
+	0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
+	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x55, 0x74, 0x78, 0x6f, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x55, 0x74, 0x78, 0x6f, 0x12, 0x27, 0x0a, 0x07, 0x42,
+	0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70,
+	0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x4c, 0x6f, 0x74, 0x52, 0x07, 0x42, 0x61, 0x6c,
+	0x61, 0x6e, 0x63, 0x65, 0x42, 0x0b, 0x5a, 0x09, 0x2f, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2f, 0x70,
+	0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1222,7 +1354,7 @@ func file_indexer_runes_pb_runes_proto_rawDescGZIP() []byte {
 	return file_indexer_runes_pb_runes_proto_rawDescData
 }
 
-var file_indexer_runes_pb_runes_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_indexer_runes_pb_runes_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_indexer_runes_pb_runes_proto_goTypes = []interface{}{
 	(*Uint128)(nil),                    // 0: pb.runes.Uint128
 	(*Uint8)(nil),                      // 1: pb.runes.Uint8
@@ -1236,13 +1368,15 @@ var file_indexer_runes_pb_runes_proto_goTypes = []interface{}{
 	(*RunesStatus)(nil),                // 9: pb.runes.RunesStatus
 	(*Lot)(nil),                        // 10: pb.runes.Lot
 	(*RuneIdLot)(nil),                  // 11: pb.runes.RuneIdLot
-	(*OutpointToBalances)(nil),         // 12: pb.runes.OutpointToBalances
-	(*RuneIdToAddress)(nil),            // 13: pb.runes.RuneIdToAddress
-	(*RuneIdToOutpoint)(nil),           // 14: pb.runes.RuneIdToOutpoint
-	(*RuneIdToMintHistory)(nil),        // 15: pb.runes.RuneIdToMintHistory
-	(*AddressRuneIdToMintHistory)(nil), // 16: pb.runes.AddressRuneIdToMintHistory
-	(*RuneBalance)(nil),                // 17: pb.runes.RuneBalance
-	(*RuneAddressBalance)(nil),         // 18: pb.runes.RuneAddressBalance
+	(*OutpointToBalancesValue)(nil),    // 12: pb.runes.OutpointToBalancesValue
+	(*OutpointToBalances)(nil),         // 13: pb.runes.OutpointToBalances
+	(*RuneIdToAddress)(nil),            // 14: pb.runes.RuneIdToAddress
+	(*RuneIdToOutpoint)(nil),           // 15: pb.runes.RuneIdToOutpoint
+	(*RuneIdToMintHistory)(nil),        // 16: pb.runes.RuneIdToMintHistory
+	(*AddressRuneIdToMintHistory)(nil), // 17: pb.runes.AddressRuneIdToMintHistory
+	(*RuneBalance)(nil),                // 18: pb.runes.RuneBalance
+	(*RuneAddressBalance)(nil),         // 19: pb.runes.RuneAddressBalance
+	(*RuneIdAddressToBalance)(nil),     // 20: pb.runes.RuneIdAddressToBalance
 }
 var file_indexer_runes_pb_runes_proto_depIdxs = []int32{
 	0,  // 0: pb.runes.Rune.value:type_name -> pb.runes.Uint128
@@ -1261,14 +1395,16 @@ var file_indexer_runes_pb_runes_proto_depIdxs = []int32{
 	0,  // 13: pb.runes.Lot.value:type_name -> pb.runes.Uint128
 	2,  // 14: pb.runes.RuneIdLot.runeId:type_name -> pb.runes.RuneId
 	10, // 15: pb.runes.RuneIdLot.lot:type_name -> pb.runes.Lot
-	11, // 16: pb.runes.OutpointToBalances.rune_id_lots:type_name -> pb.runes.RuneIdLot
-	10, // 17: pb.runes.RuneBalance.Balance:type_name -> pb.runes.Lot
-	10, // 18: pb.runes.RuneAddressBalance.Balance:type_name -> pb.runes.Lot
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	11, // 16: pb.runes.OutpointToBalancesValue.rune_id_lots:type_name -> pb.runes.RuneIdLot
+	12, // 17: pb.runes.OutpointToBalances.value:type_name -> pb.runes.OutpointToBalancesValue
+	10, // 18: pb.runes.RuneBalance.Balance:type_name -> pb.runes.Lot
+	10, // 19: pb.runes.RuneAddressBalance.Balance:type_name -> pb.runes.Lot
+	10, // 20: pb.runes.RuneIdAddressToBalance.Balance:type_name -> pb.runes.Lot
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_indexer_runes_pb_runes_proto_init() }
@@ -1422,7 +1558,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*OutpointToBalances); i {
+			switch v := v.(*OutpointToBalancesValue); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1434,7 +1570,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RuneIdToAddress); i {
+			switch v := v.(*OutpointToBalances); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1446,7 +1582,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RuneIdToOutpoint); i {
+			switch v := v.(*RuneIdToAddress); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1458,7 +1594,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RuneIdToMintHistory); i {
+			switch v := v.(*RuneIdToOutpoint); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1470,7 +1606,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*AddressRuneIdToMintHistory); i {
+			switch v := v.(*RuneIdToMintHistory); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1482,7 +1618,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RuneBalance); i {
+			switch v := v.(*AddressRuneIdToMintHistory); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1494,7 +1630,31 @@ func file_indexer_runes_pb_runes_proto_init() {
 			}
 		}
 		file_indexer_runes_pb_runes_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RuneBalance); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_indexer_runes_pb_runes_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RuneAddressBalance); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_indexer_runes_pb_runes_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RuneIdAddressToBalance); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1512,7 +1672,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_indexer_runes_pb_runes_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

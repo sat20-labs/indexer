@@ -12,18 +12,19 @@ import (
 
 func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 	runeEntry := s.idToEntryTbl.Get(runeId)
-	premine, err := runeEntry.Pile(runeEntry.Premine).Uint128()
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
-	}
+	// premine, err := runeEntry.Pile(runeEntry.Premine).Uint128()
+	// if err != nil {
+	// 	common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
+	// }
 	ret = &RuneInfo{
-		Name:         runeEntry.SpacedRune.String(),
-		Number:       runeEntry.Number,
-		Timestamp:    runeEntry.Timestamp,
-		Id:           runeEntry.RuneId.String(),
-		Supply:       runeEntry.Supply(),
-		MaxSupply:    runeEntry.MaxSupply(),
-		Premine:      *premine,
+		Name:      runeEntry.SpacedRune.String(),
+		Number:    runeEntry.Number,
+		Timestamp: runeEntry.Timestamp,
+		Id:        runeEntry.RuneId.String(),
+		Supply:    runeEntry.Supply(),
+		MaxSupply: runeEntry.MaxSupply(),
+		// Premine:      *premine,
+		Premine:      runeEntry.Premine,
 		Burned:       runeEntry.Burned,
 		Divisibility: runeEntry.Divisibility,
 		Turbo:        runeEntry.Turbo,
@@ -46,11 +47,12 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 			}
 		}
 		if terms.Amount != nil {
-			amount, err := runeEntry.Pile(*terms.Amount).Uint128()
-			if err != nil {
-				common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(*terms.Amount).Uint128() err:%s", err.Error())
-			}
-			ret.MintInfo.Amount = *amount
+			// amount, err := runeEntry.Pile(*terms.Amount).Uint128()
+			// if err != nil {
+			// 	common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(*terms.Amount).Uint128() err:%s", err.Error())
+			// }
+			// ret.MintInfo.Amount = *amount
+			ret.MintInfo.Amount = *terms.Amount
 		}
 		ret.MintInfo.Mints = runeEntry.Mints
 		if terms.Cap != nil {
@@ -97,10 +99,10 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 	var i = 0
 	for _, v := range runeEntrys {
 		common.Log.Infof("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
-		premine, err := v.Pile(v.Premine).Uint128()
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(v.Premine).Uint128() err:%s", err.Error())
-		}
+		// premine, err := v.Pile(v.Premine).Uint128()
+		// if err != nil {
+		// 	common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(v.Premine).Uint128() err:%s", err.Error())
+		// }
 		supply := v.Supply()
 		percentage := NewDecimal(&uint128.Zero, 2)
 		if supply.Cmp(uint128.Zero) != 0 {
@@ -111,13 +113,14 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 			common.Log.Panicf("RuneIndexer.GetRuneInfos-> strconv.Atoi(%s) err:%s", percentage.String(), err.Error())
 		}
 		runeInfo := &RuneInfo{
-			Name:              v.SpacedRune.String(),
-			Number:            v.Number,
-			Timestamp:         v.Timestamp,
-			Id:                v.RuneId.String(),
-			Supply:            supply,
-			MaxSupply:         v.MaxSupply(),
-			Premine:           *premine,
+			Name:      v.SpacedRune.String(),
+			Number:    v.Number,
+			Timestamp: v.Timestamp,
+			Id:        v.RuneId.String(),
+			Supply:    supply,
+			MaxSupply: v.MaxSupply(),
+			// Premine:           *premine,
+			Premine:           v.Premine,
 			PreminePercentage: percentageNum,
 			Burned:            v.Burned,
 			Divisibility:      v.Divisibility,
@@ -141,11 +144,12 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 				}
 			}
 			if terms.Amount != nil {
-				amount, err := v.Pile(*terms.Amount).Uint128()
-				if err != nil {
-					common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(*terms.Amount).Uint128() err:%s", err.Error())
-				}
-				runeInfo.MintInfo.Amount = *amount
+				// amount, err := v.Pile(*terms.Amount).Uint128()
+				// if err != nil {
+				// 	common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(*terms.Amount).Uint128() err:%s", err.Error())
+				// }
+				// runeInfo.MintInfo.Amount = *amount
+				runeInfo.MintInfo.Amount = *terms.Amount
 			}
 			runeInfo.MintInfo.Mints = v.Mints
 			if terms.Cap != nil {

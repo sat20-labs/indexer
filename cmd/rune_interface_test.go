@@ -70,7 +70,7 @@ func TestGetAllAddressBalances(t *testing.T) {
 	addressBalance, total := runesIndexer.GetAllAddressBalances(runeId.Hex(), 0, 10)
 	t.Logf("GetAllAddressBalances return addressBalance total count: %d\n", total)
 	for i, v := range addressBalance {
-		t.Logf("GetAllAddressBalances return addressBalance %d: addressId: %d, balance: %s\n", i, v.AddressId, v.Pile.String())
+		t.Logf("GetAllAddressBalances return addressBalance %d: addressId: %d, balance: %s\n", i, v.AddressId, v.Balance.String())
 	}
 }
 

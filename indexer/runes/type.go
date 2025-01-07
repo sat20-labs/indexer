@@ -147,7 +147,7 @@ type AddressBalance struct {
 	AddressId uint64
 	Address   string
 	Balance   uint128.Uint128
-	Pile      *runestone.Pile
+	// Pile      *runestone.Pile
 }
 
 func (s AddressBalance) MarshalJSON() ([]byte, error) {

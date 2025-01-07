@@ -10,13 +10,14 @@ import (
 )
 
 type RuneIdOutpointAddressToBalance struct {
-	RuneId   *RuneId
-	Address  Address
-	OutPoint *OutPoint
-	Balance  *Lot
+	RuneId    *RuneId
+	AddressId uint64
+	Address   Address
+	OutPoint  *OutPoint
+	Balance   *Lot
 }
 
-func GenRuneIdOutpointAddressToBalance(str string, address string, balance *Lot) (*RuneIdOutpointAddressToBalance, error) {
+func RuneIdOutpointAddressToBalanceFromString(str string) (*RuneIdOutpointAddressToBalance, error) {
 	ret := &RuneIdOutpointAddressToBalance{}
 	parts := strings.SplitN(str, "-", 3)
 	var err error
@@ -29,12 +30,10 @@ func GenRuneIdOutpointAddressToBalance(str string, address string, balance *Lot)
 	if err != nil {
 		return nil, err
 	}
-	ret.Address = Address(address)
-	ret.Balance = balance
 	return ret, nil
 }
 
-func (s *RuneIdOutpointAddressToBalance) String() string {
+func (s *RuneIdOutpointAddressToBalance) Key() string {
 	return s.RuneId.Hex() + "-" + s.OutPoint.Hex()
 }
 
@@ -60,14 +59,16 @@ func NewRuneIdAddressOutpointToBalancesTable(v *store.Cache[pb.RuneAddressBalanc
 }
 
 func (s *RuneIdAddressOutpointToBalanceTable) Get(v *RuneIdOutpointAddressToBalance) (ret *RuneIdOutpointAddressToBalance) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.Key())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
-		ret, err = GenRuneIdOutpointAddressToBalance(string(tblKey), string(v.Address), v.Balance)
+		ret, err = RuneIdOutpointAddressToBalanceFromString(string(tblKey))
 		if err != nil {
 			common.Log.Panicf("RuneIdAddressOutpointToBalanceTable.Get-> GenRuneIdAddressOutpointToBalance(%s) err:%v", string(tblKey), err)
 		}
+		ret.Address = Address(v.Address)
+		ret.Balance = v.Balance
 	}
 	return
 }
@@ -80,17 +81,16 @@ func (s *RuneIdAddressOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret [
 		var i = 0
 		for k, v := range pbVal {
 			var err error
-			balance := &Lot{
-				Value: &uint128.Uint128{
-					Hi: v.Balance.Value.Hi,
-					Lo: v.Balance.Value.Lo,
-				},
+			lot := &Lot{
+				Value: &uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo},
 			}
-			RuneIdAddressOutpointToBalance, err := GenRuneIdOutpointAddressToBalance(string(k), v.Address, balance)
+			runeIdAddressOutpointToBalance, err := RuneIdOutpointAddressToBalanceFromString(k)
 			if err != nil {
-				common.Log.Panicf("RuneIdAddressOutpointToBalanceTable.Get-> GenRuneIdAddressOutpointToBalance(%s) err:%v", string(k), err)
+				return nil, err
 			}
-			ret[i] = RuneIdAddressOutpointToBalance
+			runeIdAddressOutpointToBalance.Address = Address(v.Address)
+			runeIdAddressOutpointToBalance.Balance = lot
+			ret[i] = runeIdAddressOutpointToBalance
 			i++
 		}
 	}
@@ -98,11 +98,11 @@ func (s *RuneIdAddressOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret [
 }
 
 func (s *RuneIdAddressOutpointToBalanceTable) Insert(v *RuneIdOutpointAddressToBalance) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.Key())
 	s.cache.Set(tblKey, v.ToPb())
 }
 
-func (s *RuneIdAddressOutpointToBalanceTable) Remove(key *RuneIdOutpointAddressToBalance) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + key.String())
+func (s *RuneIdAddressOutpointToBalanceTable) Remove(v *RuneIdOutpointAddressToBalance) {
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.Key())
 	s.cache.Delete(tblKey)
 }
