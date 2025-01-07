@@ -81,12 +81,6 @@ func TestGetAllUtxoBalances(t *testing.T) {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
 	// 5
-	// allUtxoBalances0, total0 := runesIndexer.GetAllUtxoBalances(runeId.String(), 0, 10)
-	// t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total0)
-	// for i, v := range allUtxoBalances0.Balances {
-	// 	t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
-	// }
-
 	allUtxoBalances1, total1 := runesIndexer.GetAllUtxoBalances(runeId.Hex(), 0, 10)
 	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total1)
 	for i, v := range allUtxoBalances1.Balances {
