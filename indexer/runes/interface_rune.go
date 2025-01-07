@@ -30,6 +30,11 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		Turbo:        runeEntry.Turbo,
 		Etching:      runeEntry.Etching,
 	}
+	symbol := defaultRuneSymbol
+	if runeEntry.Symbol != nil {
+		symbol = *runeEntry.Symbol
+	}
+	ret.Symbol = string(symbol)
 	terms := runeEntry.Terms
 	if terms != nil {
 		ret.MintInfo = &MintInfo{}
