@@ -17,11 +17,11 @@ func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHis
 		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 		return nil, 0
 	}
-	utxos, err := s.runeIdToMintHistoryTbl.GetUtxos(id)
+	mintHistorys, err := s.runeIdToMintHistoryTbl.GetList(id)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetUtxos(%s) err:%v", id.String(), err)
+		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetList(%s) err:%v", id.String(), err)
 	}
-	if len(utxos) == 0 {
+	if len(mintHistorys) == 0 {
 		return nil, 0
 	}
 
@@ -31,11 +31,14 @@ func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHis
 		return nil, 0
 	}
 
-	ret := make([]*MintHistory, len(utxos))
-	for i, utxo := range utxos {
+	ret := make([]*MintHistory, len(mintHistorys))
+	for i, runeIdToMintHistory := range mintHistorys {
 		ret[i] = &MintHistory{
-			Utxo:   string(utxo),
-			Amount: *runeEntry.Terms.Amount,
+			Utxo:      string(runeIdToMintHistory.Utxo),
+			Amount:    *runeEntry.Terms.Amount,
+			AddressId: runeIdToMintHistory.AddressId,
+			Height:    runeEntry.RuneId.Block,
+			Number:    runeEntry.Number,
 		}
 	}
 
@@ -65,11 +68,11 @@ func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, 
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> GetAddressByID(%d) err:%v", addressId, err)
 	}
-	utxos, err := s.addressRuneIdToMintHistoryTbl.GetUtxos(runestone.Address(address), id)
+	mintHistorys, err := s.addressRuneIdToMintHistoryTbl.GetList(runestone.Address(address), id)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetUtxos(%s, %s) err:%v", address, id.String(), err)
+		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetList(%s, %s) err:%v", address, id.String(), err)
 	}
-	if len(utxos) == 0 {
+	if len(mintHistorys) == 0 {
 		return nil, 0
 	}
 
@@ -79,11 +82,14 @@ func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, 
 		return nil, 0
 	}
 
-	ret := make([]*MintHistory, len(utxos))
-	for i, utxo := range utxos {
+	ret := make([]*MintHistory, len(mintHistorys))
+	for i, mintHistory := range mintHistorys {
 		ret[i] = &MintHistory{
-			Utxo:   string(utxo),
-			Amount: *runeEntry.Terms.Amount,
+			Utxo:      mintHistory.OutPoint.String(),
+			Amount:    *runeEntry.Terms.Amount,
+			AddressId: mintHistory.AddressId,
+			Height:    runeEntry.RuneId.Block,
+			Number:    runeEntry.Number,
 		}
 	}
 

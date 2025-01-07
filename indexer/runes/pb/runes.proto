@@ -79,7 +79,10 @@ message RuneIdLot {
 message OutpointToBalances { repeated RuneIdLot rune_id_lots = 1; }
 message RuneIdToAddress {}
 message RuneIdToOutpoint {}
-message RuneIdToMintHistory {}
+message RuneIdToMintHistory {
+    string Address = 1;
+    uint64 AddressId = 2;
+}
 message AddressRuneIdToMintHistory {}
 message RuneBalance {
     Lot Balance = 1;

@@ -277,7 +277,7 @@ type UtxoAsset struct {
 type MintHistory struct {
 	Utxo      string
 	Amount    uint128.Uint128
-	AddressId string
+	AddressId uint64
 	Height    uint64
 	Number    uint64
 }
