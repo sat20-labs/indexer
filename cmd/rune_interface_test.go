@@ -51,7 +51,7 @@ func TestGetAllAddressBalances(t *testing.T) {
 	addressBalance, total := runesIndexer.GetAllAddressBalances(runeId.String(), 0, 10)
 	t.Logf("GetAllAddressBalances return addressBalance total count: %d\n", total)
 	for i, v := range addressBalance {
-		t.Logf("GetAllAddressBalances return addressBalance %d: address: %s, balance: %s\n", i, v.Address, v.Pile.String())
+		t.Logf("GetAllAddressBalances return addressBalance %d: addressId: %d, balance: %s\n", i, v.AddressId, v.Pile.String())
 	}
 }
 
@@ -68,7 +68,7 @@ func TestGetAllUtxoBalances(t *testing.T) {
 	// 	t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
 	// }
 
-	allUtxoBalances1, total1 := runesIndexer.QGetAllUtxoBalances(runeId.String(), 0, 10)
+	allUtxoBalances1, total1 := runesIndexer.GetAllUtxoBalances(runeId.String(), 0, 10)
 	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total1)
 	for i, v := range allUtxoBalances1.Balances {
 		t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)

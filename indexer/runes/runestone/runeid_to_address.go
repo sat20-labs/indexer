@@ -50,12 +50,12 @@ func NewRuneIdToAddressTable(cache *store.Cache[pb.RuneIdToAddress]) *RuneToAddr
 	return &RuneToAddressTable{Table: Table[pb.RuneIdToAddress]{cache: cache}}
 }
 
-func (s *RuneToAddressTable) GetAddresses(runeId *RuneId) (ret []Address, err error) {
+func (s *RuneToAddressTable) GetList(runeId *RuneId) (ret []*RuneIdToAddress, err error) {
 	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
-		ret = make([]Address, len(pbVal))
+		ret = make([]*RuneIdToAddress, len(pbVal))
 		var i = 0
 		for k := range pbVal {
 			var err error
@@ -64,7 +64,7 @@ func (s *RuneToAddressTable) GetAddresses(runeId *RuneId) (ret []Address, err er
 				return nil, err
 			}
 
-			ret[i] = v.Address
+			ret[i] = v
 			i++
 		}
 	}

@@ -60,7 +60,7 @@ func NewRuneIdAddressOutpointToBalancesTable(v *store.Cache[pb.RuneAddressBalanc
 }
 
 func (s *RuneIdAddressOutpointToBalanceTable) Get(v *RuneIdOutpointAddressToBalance) (ret *RuneIdOutpointAddressToBalance) {
-	tblKey := []byte(store.RUNEID_ADDRESS_OUTPOINT_TO_BALANCE + v.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.String())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
@@ -73,7 +73,7 @@ func (s *RuneIdAddressOutpointToBalanceTable) Get(v *RuneIdOutpointAddressToBala
 }
 
 func (s *RuneIdAddressOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneIdOutpointAddressToBalance, err error) {
-	tblKey := []byte(store.RUNEID_ADDRESS_OUTPOINT_TO_BALANCE + runeId.String() + "-")
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + runeId.String() + "-")
 	pbVal := s.cache.GetList(tblKey, true)
 	if pbVal != nil {
 		ret = make([]*RuneIdOutpointAddressToBalance, len(pbVal))
@@ -98,11 +98,11 @@ func (s *RuneIdAddressOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret [
 }
 
 func (s *RuneIdAddressOutpointToBalanceTable) Insert(v *RuneIdOutpointAddressToBalance) {
-	tblKey := []byte(store.RUNEID_ADDRESS_OUTPOINT_TO_BALANCE + v.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + v.String())
 	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *RuneIdAddressOutpointToBalanceTable) Remove(key *RuneIdOutpointAddressToBalance) {
-	tblKey := []byte(store.RUNEID_ADDRESS_OUTPOINT_TO_BALANCE + key.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_ADDRESS_BALANCE + key.String())
 	s.cache.Delete(tblKey)
 }

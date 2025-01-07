@@ -144,30 +144,31 @@ func (s *RuneInfo) BlockHeight() int {
 }
 
 type AddressBalance struct {
-	Address string
-	Balance uint128.Uint128
-	Pile    *runestone.Pile
+	AddressId uint64
+	Address   string
+	Balance   uint128.Uint128
+	Pile      *runestone.Pile
 }
 
 func (s AddressBalance) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Address string `json:"address"`
-		Balance string `json:"balance"`
+		AddressId uint64 `json:"addressid"`
+		Balance   string `json:"balance"`
 	}{
-		Address: s.Address,
-		Balance: s.Balance.String(),
+		AddressId: s.AddressId,
+		Balance:   s.Balance.String(),
 	})
 }
 
 func (s *AddressBalance) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		Address string `json:"address"`
-		Balance string `json:"balance"`
+		AddressId uint64 `json:"addressid"`
+		Balance   string `json:"balance"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	s.Address = aux.Address
+	s.AddressId = aux.AddressId
 	var err error
 	s.Balance, err = uint128.FromString(aux.Balance)
 	return err
