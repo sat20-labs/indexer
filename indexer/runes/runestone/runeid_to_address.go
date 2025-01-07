@@ -39,7 +39,7 @@ func (s *RuneIdToAddress) ToPb() *pb.RuneIdToAddress {
 
 func (s *RuneIdToAddress) String() string {
 	adressId := strconv.FormatUint(s.AddressId, 16)
-	return s.RuneId.String() + "-" + string(s.Address) + "-" + adressId
+	return s.RuneId.Hex() + "-" + string(s.Address) + "-" + adressId
 }
 
 type RuneToAddressTable struct {
@@ -51,7 +51,7 @@ func NewRuneIdToAddressTable(cache *store.Cache[pb.RuneIdToAddress]) *RuneToAddr
 }
 
 func (s *RuneToAddressTable) GetList(runeId *RuneId) (ret []*RuneIdToAddress, err error) {
-	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.String() + "-")
+	tblKey := []byte(store.RUNEID_TO_ADDRESS + runeId.Hex() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {

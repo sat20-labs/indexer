@@ -32,7 +32,7 @@ func (s *RuneIdToOutpoint) ToPb() *pb.RuneIdToOutpoint {
 }
 
 func (s *RuneIdToOutpoint) String() string {
-	return s.RuneId.String() + "-" + s.Outpoint.String()
+	return s.RuneId.Hex() + "-" + s.Outpoint.String()
 }
 
 type RuneIdToOutpointTable struct {
@@ -44,7 +44,7 @@ func NewRuneIdToUtxoTable(store *store.Cache[pb.RuneIdToOutpoint]) *RuneIdToOutp
 }
 
 func (s *RuneIdToOutpointTable) GetOutpoints(runeId *RuneId) (ret []*OutPoint, err error) {
-	tblKey := []byte(store.RUNEID_TO_UTXO + runeId.String() + "-")
+	tblKey := []byte(store.RUNEID_TO_UTXO + runeId.Hex() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 	if pbVal != nil {
 		ret = make([]*OutPoint, len(pbVal))

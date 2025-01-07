@@ -17,7 +17,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 	}
 	runeIdToAddresses, err := s.runeIdToAddressTbl.GetList(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdToAddressTbl.GetList(%s) err:%v", rid.String(), err.Error())
+		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdToAddressTbl.GetList(%s) err:%v", rid.Hex(), err.Error())
 	}
 	if len(runeIdToAddresses) == 0 {
 		return nil
@@ -25,7 +25,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 
 	r := s.idToEntryTbl.Get(rid)
 	if r == nil {
-		common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.String(), runeId)
+		common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
 		return nil
 	}
 
@@ -95,7 +95,7 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 
 	runeIdToAddresses, err := s.runeIdToAddressTbl.GetList(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdToAddressTbl.GetList(%s) err:%v", rid.String(), err.Error())
+		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdToAddressTbl.GetList(%s) err:%v", rid.Hex(), err.Error())
 	}
 	if len(runeIdToAddresses) == 0 {
 		return nil, 0
@@ -103,7 +103,7 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 
 	r := s.idToEntryTbl.Get(rid)
 	if r == nil {
-		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.String(), runeId)
+		common.Log.Errorf("RuneIndexer.GetAllAddressBalances-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
 		return nil, 0
 	}
 
@@ -184,7 +184,7 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 
 	balances, err := s.runeIdOutpointToBalanceTbl.GetBalances(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.String(), err.Error())
+		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.Hex(), err.Error())
 	}
 
 	if len(balances) == 0 {
@@ -235,7 +235,7 @@ func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*U
 	}
 	outpoints, err := s.runeIdToOutpointTbl.GetOutpoints(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.String(), err.Error())
+		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.Hex(), err.Error())
 	}
 	if len(outpoints) == 0 {
 		return nil, 0

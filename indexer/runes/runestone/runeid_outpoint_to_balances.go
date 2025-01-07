@@ -32,7 +32,7 @@ func GenRuneIdOutpointToBalance(str string, balance *Lot) (*RuneIdOutpointToBala
 }
 
 func (s *RuneIdOutpointToBalance) String() string {
-	return s.RuneId.String() + "-" + s.OutPoint.String()
+	return s.RuneId.Hex() + "-" + s.OutPoint.String()
 }
 
 func (s *RuneIdOutpointToBalance) ToPb() *pb.RuneBalance {
@@ -69,7 +69,7 @@ func (s *RuneIdOutpointToBalanceTable) Get(v *RuneIdOutpointToBalance) (ret *Run
 }
 
 func (s *RuneIdOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneIdOutpointToBalance, err error) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + runeId.String() + "-")
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + runeId.Hex() + "-")
 	pbVal := s.cache.GetList(tblKey, true)
 	if pbVal != nil {
 		ret = make([]*RuneIdOutpointToBalance, len(pbVal))

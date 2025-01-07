@@ -41,7 +41,7 @@ func (s *AddressRuneIdToMintHistory) ToPb() *pb.AddressRuneIdToMintHistory {
 }
 
 func (s *AddressRuneIdToMintHistory) String() string {
-	return string(s.Address) + "-" + s.RuneId.String() + "-" + s.OutPoint.String() + "-" + strconv.FormatUint(s.AddressId, 16)
+	return string(s.Address) + "-" + s.RuneId.Hex() + "-" + s.OutPoint.String() + "-" + strconv.FormatUint(s.AddressId, 16)
 }
 
 type AddressRuneIdToMintHistoryTable struct {
@@ -53,7 +53,7 @@ func NewAddressRuneIdToMintHistoryTable(cache *store.Cache[pb.AddressRuneIdToMin
 }
 
 func (s *AddressRuneIdToMintHistoryTable) GetList(address Address, runeId *RuneId) (ret []*AddressRuneIdToMintHistory, err error) {
-	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + string(address) + "-" + runeId.String() + "-")
+	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + string(address) + "-" + runeId.Hex() + "-")
 	pbVal := s.cache.GetList(tblKey, false)
 
 	if pbVal != nil {
