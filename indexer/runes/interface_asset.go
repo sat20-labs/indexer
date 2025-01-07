@@ -295,6 +295,7 @@ func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*U
 desc: 根据地址获取该地址所有ticker和持有的数量
 */
 func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
+	return nil
 	address, err := s.RpcService.GetAddressByID(addressId)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetAddressByID(%d) err:%v", addressId, err)
