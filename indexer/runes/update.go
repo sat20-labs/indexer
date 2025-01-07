@@ -125,7 +125,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.Txid, err.Error())
 		}
 	} else {
-		common.Log.Debugf("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
+		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
 	}
 
 	if artifact != nil {

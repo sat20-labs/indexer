@@ -40,6 +40,20 @@ func TestInterfaceRune(t *testing.T) {
 	}
 }
 
+func TestGetHoldersWithTicks(t *testing.T) {
+	InitRuneTester()
+	// 11
+	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
+	if err != nil {
+		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
+	}
+	holders := runesIndexer.GetHoldersWithTick(runeId.String())
+	t.Logf("GetHoldersWithTicks return holders total count: %d\n", len(holders))
+	for i, v := range holders {
+		t.Logf("GetHoldersWithTicks return holders, addressId: %d, value: %s\n", i, v.String())
+	}
+}
+
 func TestGetAllAddressBalances(t *testing.T) {
 	InitRuneTester()
 	// 4
