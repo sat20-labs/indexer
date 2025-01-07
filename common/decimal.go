@@ -369,44 +369,16 @@ func Uint128ToInt64(supply, amt uint128.Uint128) int64 {
 		return amt.Big().Int64()
 	} 
 
-	// n := supply.LeadingZeros()
-	// n = 64 - n
-	// return amt.Rsh(uint(n)).Big().Int64()
-
 	q, _ := supply.QuoRem64(math.MaxInt64)
 	scaleIndex := decimalDigits(q.Lo)
 
 	return int64(amt.Div64(precisionFactor[scaleIndex].Uint64()).Lo)
-
-	// decimal := NewDecimalFromUint128(amt, int(divisibility))
-	// exp := precisionFactor[divisibility]
-	// var maxSupply int64
-	// scaleIndex := int(math.Log10(float64(math.MaxInt64) / float64(max)))
-	// if scaleIndex < 0 {
-	// 	scaleIndex = 0
-	// }
-	
-	// else {
-	// 	maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
-	// }
-	
-	// return decimal.ToInt64WithMax(maxSupply)
 }
 
 func Int64ToUint128(supply uint128.Uint128, amt int64) uint128.Uint128 {
-	// exp := precisionFactor[divisibility]
-	// maxSupply := supply.Div64(exp.Uint64()).Big().Int64()
-	// decimal := NewDecimalFromInt64WithMax(amt, maxSupply, int(divisibility))
-	
-	// return decimal.ToUint128()
 	if supply.Hi == 0 {
 		return uint128.From64(uint64(amt))
 	} 
-
-	// n := supply.LeadingZeros()
-	// n = 64 - n
-	// result := uint128.From64(uint64(amt))
-	// return result.Lsh(uint(n))
 
 	q, _ := supply.QuoRem64(math.MaxInt64)
 	scaleIndex := decimalDigits(q.Lo)

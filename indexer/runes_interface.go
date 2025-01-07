@@ -10,7 +10,12 @@ func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 	for _, tickerName := range tickers {
 		t := b.GetRunesTickerV2(tickerName)
 		if t != nil {
-			result[tickerName] = t
+			assetName := common.TickerName{
+				Protocol: common.PROTOCOL_NAME_RUNES,
+				Type: common.ASSET_TYPE_FT,
+				Ticker: tickerName,
+			}
+			result[assetName.String()] = t
 		}
 	}
 	return result

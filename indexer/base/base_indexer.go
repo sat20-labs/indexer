@@ -321,6 +321,7 @@ func (b *BaseIndexer) UpdateDB() {
 				common.Log.Infof("the OP_RETURN has %d sats in %s", v.Value, k)
 			}
 		}
+		// 9173744691ac25f3cd94f35d4fc0e0a2b9d1ab17b4fe562acc07660552f95518 输出大量0sats的utxo
 		key := common.GetUTXODBKey(k)
 		utxoId := common.GetUtxoId(v)
 

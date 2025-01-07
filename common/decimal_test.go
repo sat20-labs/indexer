@@ -183,8 +183,8 @@ func TestDecimal_Runes3(t *testing.T) {
 	convertTest(t, supply, amt)
 	
 
-	supply, _ = uint128.FromString("21000000")
-	amt, _ = uint128.FromString("1000")
+	supply, _ = uint128.FromString("21000000000000000000000000")
+	amt, _ = uint128.FromString("1000000000000000000000")
 	convertTest(t, supply, amt)
 
 	supply, _ = uint128.FromString("21000000")
