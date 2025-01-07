@@ -85,14 +85,7 @@ func (s *Handle) isDeployAllowed(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	address := c.Param("address")
-	if ticker == "" {
-		resp.Code = -1
-		resp.Msg = "no address"
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	_, err := s.model.IsDeployAllowed(address, ticker)
+	_, err := s.model.IsDeployAllowed(ticker)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

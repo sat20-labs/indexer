@@ -8,6 +8,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
+	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 func (s *Model) GetSyncHeight() int {
@@ -18,25 +19,16 @@ func (s *Model) GetBlockInfo(height int) (*common.BlockInfo, error) {
 	return s.indexer.GetBlockInfo(height)
 }
 
-func (s *Model) IsDeployAllowed(address, ticker string) (bool, error) {
+func (s *Model) IsDeployAllowed(ticker string) (bool, error) {
 	
-	if !common.TickerSeparatedFromName {
-		info := s.indexer.GetNameInfo(ticker)
-		if info != nil {
-			tickerInfo := s.indexer.GetTicker(ticker)
-			if tickerInfo != nil {
-				return false, fmt.Errorf("ticker %s exists", ticker)
-			}
-			if info.OwnerAddress != address {
-				return false, fmt.Errorf("ticker name %s has been registered", ticker)
-			}
-		}
-	} else {
-		// 不将名字和ticker挂钩！
-		tickerInfo := s.indexer.GetTicker(ticker)
-		if tickerInfo != nil {
-			return false, fmt.Errorf("ticker %s exists", ticker)
-		}
+	name := swire.NewAssetNameFromString(ticker)
+	if name == nil {
+		return false, fmt.Errorf("invalid ticker name")
+	}
+	
+	tickerInfo := s.indexer.GetTickerInfo(name)
+	if tickerInfo != nil {
+		return false, fmt.Errorf("ticker %s exists", ticker)
 	}
 	
 	return true, nil
