@@ -79,7 +79,7 @@ func (s *Indexer) GetAllTickers() []string {
 	runesIds := make([]string, 0)
 	runeEntrys := s.idToEntryTbl.GetList()
 	for _, v := range runeEntrys {
-		runesIds = append(runesIds, v.RuneId.Hex())
+		runesIds = append(runesIds, v.RuneId.String())
 	}
 	return runesIds
 }
