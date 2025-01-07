@@ -26,7 +26,6 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		Premine:      *premine,
 		Burned:       runeEntry.Burned,
 		Divisibility: runeEntry.Divisibility,
-		Symbol:       string(*runeEntry.Symbol),
 		Turbo:        runeEntry.Turbo,
 		Etching:      runeEntry.Etching,
 	}
