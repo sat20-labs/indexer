@@ -46,6 +46,7 @@ func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {
 	result.TotalMinted = ticker.Supply.String()
 	result.MaxSupply = ticker.MaxSupply.String()
 	if ticker.MintInfo != nil {
+		result.MintTimes = ticker.MintInfo.Mints.Big().Int64()
 		result.Limit = ticker.MintInfo.Amount.String()
 	}
 	result.SelfMint = int(ticker.PreminePercentage)
