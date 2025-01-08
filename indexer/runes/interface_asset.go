@@ -77,7 +77,7 @@ desc: 根据runeid获取所有持有者地址和持有数量 (新增数据表)
 func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*AddressBalance, uint64) {
 	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.SpacedRuneFromString(%s) err:%v", runeId, err.Error())
+		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil, 0
 	}
 
@@ -154,13 +154,13 @@ desc: 根据runeId获取所有带有该rune的utxo和该utxo中的资产数量 (
 func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
 	rid, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
+		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.RuneIdFromHex(%s) err:%s", runeId, err.Error())
 		return nil, 0
 	}
 
 	balances, err := s.runeIdOutpointToBalanceTbl.GetBalances(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.Hex(), err.Error())
+		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdOutpointToBalanceTbl.GetBalances(%s) err:%s", rid.Hex(), err.Error())
 	}
 
 	if len(balances) == 0 {
@@ -206,12 +206,12 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
 	rid, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
+		common.Log.Infof("RuneIndexer.SlowGetAllUtxoBalances-> runestone.RuneIdFromHex(%s) err:%s", runeId, err.Error())
 		return nil, 0
 	}
 	outpoints, err := s.runeIdToOutpointTbl.GetOutpoints(rid)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.Hex(), err.Error())
+		common.Log.Panicf("RuneIndexer.SlowGetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.Hex(), err.Error())
 	}
 	if len(outpoints) == 0 {
 		return nil, 0
@@ -270,15 +270,6 @@ func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*U
 desc: 根据地址获取该地址所有ticker和持有的数量
 */
 func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
-	// address, err := s.RpcService.GetAddressByID(addressId)
-	// if err != nil {
-	// 	common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetAddressByID(%d) err:%v", addressId, err)
-	// }
-	// utxos := s.RpcService.GetUTXOs2(address)
-	// if len(utxos) == 0 {
-	// 	return nil
-	// }
-
 	type RuneBalance struct {
 		Balance      *runestone.Lot
 		Divisibility uint8

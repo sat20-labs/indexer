@@ -400,10 +400,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 			// update runeIdAddressOutpointBalance
 			runeIdOutpointAddressToBalance := &runestone.RuneIdOutpointAddressToBalance{
-				RuneId:   &runeId,
-				Address:  outpointToBalance.Address,
-				OutPoint: outpointToBalance.OutPoint,
-				Balance:  outpointToBalance.Balance,
+				RuneId:    &runeId,
+				Address:   outpointToBalance.Address,
+				AddressId: outpointToBalance.AddressId,
+				OutPoint:  outpointToBalance.OutPoint,
+				Balance:   outpointToBalance.Balance,
 			}
 			oldRuneIdOutpointAddressToBalance := s.runeIdAddressOutpointToBalanceTbl.Get(runeIdOutpointAddressToBalance)
 			if oldRuneIdOutpointAddressToBalance != nil {

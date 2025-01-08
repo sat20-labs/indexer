@@ -11,9 +11,9 @@ import (
 
 type RuneIdOutpointAddressToBalance struct {
 	RuneId    *RuneId
+	OutPoint  *OutPoint
 	AddressId uint64
 	Address   Address
-	OutPoint  *OutPoint
 	Balance   *Lot
 }
 
@@ -45,7 +45,8 @@ func (s *RuneIdOutpointAddressToBalance) ToPb() *pb.RuneAddressBalance {
 				Lo: s.Balance.Value.Lo,
 			},
 		},
-		Address: string(s.Address),
+		Address:   string(s.Address),
+		AddressId: s.AddressId,
 	}
 	return pbValue
 }
