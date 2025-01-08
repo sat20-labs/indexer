@@ -126,7 +126,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 	runeEntrys := s.idToEntryTbl.GetList()
 	var i = 0
 	for _, runeEntry := range runeEntrys {
-		common.Log.Infof("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
+		common.Log.Tracef("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
 		runeInfo := s.genRuneInfo(runeEntry)
 		ret = append(ret, runeInfo)
 		i++
