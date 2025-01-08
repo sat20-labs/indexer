@@ -66,7 +66,7 @@ func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, 
 	}
 	mintHistorys, err := s.addressRuneIdToMintHistoryTbl.GetList(addressId, id)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetList(%s, %s) err:%v", addressId, id.Hex(), err)
+		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetList(%d, %s) err:%v", addressId, id.Hex(), err)
 	}
 	if len(mintHistorys) == 0 {
 		return nil, 0
