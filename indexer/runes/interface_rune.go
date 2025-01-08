@@ -11,6 +11,9 @@ import (
 )
 
 func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
+	if runeEntry == nil {
+		return nil
+	}
 	premine, err := runeEntry.Pile(runeEntry.Premine).Uint128()
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
