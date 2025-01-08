@@ -48,5 +48,9 @@ const (
 
 	// 表: runeid和address和outpoint映射balance
 	// 存储: key = roab-%runeid%-%addressid%-%lot% value = address & addressid & lot
-	RUNEID_ADDRESS_BALANCE = "j-"
+	RUNEID_ADDRESS_TO_BALANCE = "j-"
+
+	// 表: address和outpoint映射balance
+	// 存储: key = roab-%addressid%-%outpoint%-%lot% value = address & runeid & lot
+	ADDRESS_OUTPOINT_TO_BALANCE = "k-"
 )

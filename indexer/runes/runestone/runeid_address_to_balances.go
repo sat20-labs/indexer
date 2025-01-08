@@ -15,7 +15,6 @@ type RuneIdAddressToBalance struct {
 	RuneId    *RuneId
 	AddressId uint64
 	Address   Address
-	OutPoint  *OutPoint
 	Balance   *Lot
 }
 
@@ -48,7 +47,6 @@ func (s *RuneIdAddressToBalance) ToPb() *pb.RuneIdAddressToBalance {
 			},
 		},
 		Address: string(s.Address),
-		Utxo:    s.OutPoint.Hex(),
 	}
 	return pbValue
 }
@@ -62,7 +60,7 @@ func NewRuneIdAddressToBalanceTable(v *store.Cache[pb.RuneIdAddressToBalance]) *
 }
 
 func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneIdAddressToBalance) {
-	tblKey := []byte(store.RUNEID_ADDRESS_BALANCE + v.Key())
+	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
@@ -78,17 +76,12 @@ func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneI
 				Lo: pbVal.Balance.Value.Lo,
 			},
 		}
-		ret.OutPoint, err = OutPointFromHex(pbVal.Utxo)
-		if err != nil {
-			common.Log.Panicf("RuneIdAddressToBalanceTable.Get-> OutPointFromHex(%s) err:%v", pbVal.Utxo, err)
-			return nil
-		}
 	}
 	return
 }
 
 func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneIdAddressToBalance, err error) {
-	tblKey := []byte(store.RUNEID_ADDRESS_BALANCE + runeId.Hex() + "-")
+	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + runeId.Hex() + "-")
 	pbVal := s.cache.GetList(tblKey, true)
 	if pbVal != nil {
 		ret = make([]*RuneIdAddressToBalance, len(pbVal))
@@ -102,10 +95,6 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneId
 			ret[i].Address = Address(v.Address)
 			ret[i].Balance = &Lot{
 				Value: &uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}}
-			ret[i].OutPoint, err = OutPointFromHex(v.Utxo)
-			if err != nil {
-				return nil, err
-			}
 			ret[i] = runeIdAddressOutpointToBalance
 			i++
 		}
@@ -114,11 +103,11 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneId
 }
 
 func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {
-	tblKey := []byte(store.RUNEID_ADDRESS_BALANCE + v.Key())
+	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
 	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *RuneIdAddressToBalanceTable) Remove(v *RuneIdAddressToBalance) {
-	tblKey := []byte(store.RUNEID_ADDRESS_BALANCE + v.Key())
+	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
 	s.cache.Delete(tblKey)
 }

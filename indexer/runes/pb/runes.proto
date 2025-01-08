@@ -95,9 +95,12 @@ message RuneAddressBalance {
     string Address = 1;
     Lot Balance = 2; 
 }
-
 message RuneIdAddressToBalance {
     string Address = 1;
-    string Utxo = 2;
     Lot Balance = 3; 
+}
+message AddressOutpointToBalance {
+    string Address = 1;
+    RuneId runeId = 2;
+    Lot Balance = 3;
 }

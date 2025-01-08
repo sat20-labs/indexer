@@ -270,14 +270,14 @@ func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*U
 desc: 根据地址获取该地址所有ticker和持有的数量
 */
 func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
-	address, err := s.RpcService.GetAddressByID(addressId)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetAddressByID(%d) err:%v", addressId, err)
-	}
-	utxos := s.RpcService.GetUTXOs2(address)
-	if len(utxos) == 0 {
-		return nil
-	}
+	// address, err := s.RpcService.GetAddressByID(addressId)
+	// if err != nil {
+	// 	common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetAddressByID(%d) err:%v", addressId, err)
+	// }
+	// utxos := s.RpcService.GetUTXOs2(address)
+	// if len(utxos) == 0 {
+	// 	return nil
+	// }
 
 	type RuneBalance struct {
 		Balance      *runestone.Lot
@@ -286,30 +286,26 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 	}
 	type SpaceRuneLotMap map[runestone.SpacedRune]*RuneBalance
 	spaceRuneLotMap := make(SpaceRuneLotMap)
-	for _, utxo := range utxos {
-		utxoInfo, err := s.RpcService.GetUtxoInfo(utxo)
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetUtxoInfo(%s) err:%v", utxo, err)
-		}
-		utxoId := utxoInfo.UtxoId
-		outpoint := runestone.OutPointFromUtxoId(utxoId)
-		outpointToBalancesValue := s.outpointToBalancesTbl.Get(outpoint)
-		for _, runeIdLot := range outpointToBalancesValue.RuneIdLots {
-			runeEntry := s.idToEntryTbl.Get(&runeIdLot.RuneId)
 
-			if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
-				symbol := defaultRuneSymbol
-				if runeEntry.Symbol != nil {
-					symbol = *runeEntry.Symbol
-				}
-				spaceRuneLotMap[runeEntry.SpacedRune] = &RuneBalance{
-					Balance:      runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
-					Divisibility: runeEntry.Divisibility,
-					Symbol:       symbol,
-				}
+	balances, err := s.addressOutpointToBalancesTbl.GetBalances(addressId)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetBalances(%d) err:%v", addressId, err)
+	}
+
+	for _, balance := range balances {
+		runeEntry := s.idToEntryTbl.Get(balance.RuneId)
+		if spaceRuneLotMap[runeEntry.SpacedRune] == nil {
+			symbol := defaultRuneSymbol
+			if runeEntry.Symbol != nil {
+				symbol = *runeEntry.Symbol
 			}
-			spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(&runeIdLot.Lot)
+			spaceRuneLotMap[runeEntry.SpacedRune] = &RuneBalance{
+				Balance:      runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
+				Divisibility: runeEntry.Divisibility,
+				Symbol:       symbol,
+			}
 		}
+		spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(balance.Balance)
 	}
 
 	total := uint64(len(spaceRuneLotMap))
