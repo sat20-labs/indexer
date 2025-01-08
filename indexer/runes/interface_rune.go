@@ -10,25 +10,47 @@ import (
 	"lukechampine.com/uint128"
 )
 
-func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
-	runeEntry := s.idToEntryTbl.Get(runeId)
-	// premine, err := runeEntry.Pile(runeEntry.Premine).Uint128()
-	// if err != nil {
-	// 	common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
-	// }
+func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
+	premine, err := runeEntry.Pile(runeEntry.Premine).Uint128()
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
+	}
+	supply, err := runeEntry.Pile(runeEntry.Supply()).Uint128()
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Supply()).Uint128() err:%s", err.Error())
+	}
+	maxSupply, err := runeEntry.Pile(runeEntry.MaxSupply()).Uint128()
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.MaxSupply()).Uint128() err:%s", err.Error())
+	}
+	burned, err := runeEntry.Pile(runeEntry.Burned).Uint128()
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Burned).Uint128() err:%s", err.Error())
+	}
+
+	percentage := NewDecimal(&uint128.Zero, 2)
+	if runeEntry.Supply().Cmp(uint128.Zero) != 0 {
+		supply := runeEntry.Supply()
+		percentage = GetPercentage(&runeEntry.Premine, &supply)
+	}
+	percentageNum, err := strconv.ParseFloat(percentage.String(), 64)
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.genRuneInfo-> ParseFloat(%s) err:%s", percentage.String(), err.Error())
+	}
+
 	ret = &RuneInfo{
-		Name:      runeEntry.SpacedRune.String(),
-		Number:    runeEntry.Number,
-		Timestamp: runeEntry.Timestamp,
-		Id:        runeEntry.RuneId.String(),
-		Supply:    runeEntry.Supply(),
-		MaxSupply: runeEntry.MaxSupply(),
-		// Premine:      *premine,
-		Premine:      runeEntry.Premine,
-		Burned:       runeEntry.Burned,
-		Divisibility: runeEntry.Divisibility,
-		Turbo:        runeEntry.Turbo,
-		Etching:      runeEntry.Etching,
+		Name:              runeEntry.SpacedRune.String(),
+		Number:            runeEntry.Number,
+		Timestamp:         runeEntry.Timestamp,
+		Id:                runeEntry.RuneId.String(),
+		Supply:            *supply,
+		MaxSupply:         *maxSupply,
+		Premine:           *premine,
+		PreminePercentage: percentageNum,
+		Burned:            *burned,
+		Divisibility:      runeEntry.Divisibility,
+		Turbo:             runeEntry.Turbo,
+		Etching:           runeEntry.Etching,
 	}
 	symbol := defaultRuneSymbol
 	if runeEntry.Symbol != nil {
@@ -47,12 +69,11 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 			}
 		}
 		if terms.Amount != nil {
-			// amount, err := runeEntry.Pile(*terms.Amount).Uint128()
-			// if err != nil {
-			// 	common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(*terms.Amount).Uint128() err:%s", err.Error())
-			// }
-			// ret.MintInfo.Amount = *amount
-			ret.MintInfo.Amount = *terms.Amount
+			amount, err := runeEntry.Pile(*terms.Amount).Uint128()
+			if err != nil {
+				common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(*terms.Amount).Uint128() err:%s", err.Error())
+			}
+			ret.MintInfo.Amount = *amount
 		}
 		ret.MintInfo.Mints = runeEntry.Mints
 		if terms.Cap != nil {
@@ -66,7 +87,6 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		if ret.MintInfo.Mintable {
 			if runeEntry.Terms.Cap.Cmp(uint128.Zero) > 0 {
 				mintProgress := GetPercentage(&ret.MintInfo.Mints, &ret.MintInfo.Cap)
-
 				progress, err := strconv.ParseFloat(mintProgress.String(), 64)
 				if err != nil {
 					common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> strconv.Atoi(%s) err:%s", mintProgress.String(), err.Error())
@@ -79,6 +99,11 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 		ret.Parent = string(*runeEntry.Parent)
 	}
 	return
+}
+
+func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
+	runeEntry := s.idToEntryTbl.Get(runeId)
+	return s.genRuneInfo(runeEntry)
 }
 
 func (s *Indexer) GetAllTickers() []string {
@@ -97,83 +122,9 @@ desc: 获取所有runeInfo
 func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint64) {
 	runeEntrys := s.idToEntryTbl.GetList()
 	var i = 0
-	for _, v := range runeEntrys {
+	for _, runeEntry := range runeEntrys {
 		common.Log.Infof("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
-		// premine, err := v.Pile(v.Premine).Uint128()
-		// if err != nil {
-		// 	common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(v.Premine).Uint128() err:%s", err.Error())
-		// }
-		supply := v.Supply()
-		percentage := NewDecimal(&uint128.Zero, 2)
-		if supply.Cmp(uint128.Zero) != 0 {
-			percentage = GetPercentage(&v.Premine, &supply)
-		}
-		percentageNum, err := strconv.ParseFloat(percentage.String(), 64)
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.GetRuneInfos-> strconv.Atoi(%s) err:%s", percentage.String(), err.Error())
-		}
-		runeInfo := &RuneInfo{
-			Name:      v.SpacedRune.String(),
-			Number:    v.Number,
-			Timestamp: v.Timestamp,
-			Id:        v.RuneId.String(),
-			Supply:    supply,
-			MaxSupply: v.MaxSupply(),
-			// Premine:           *premine,
-			Premine:           v.Premine,
-			PreminePercentage: percentageNum,
-			Burned:            v.Burned,
-			Divisibility:      v.Divisibility,
-			Turbo:             v.Turbo,
-			Etching:           v.Etching,
-		}
-		if v.Symbol != nil {
-			runeInfo.Symbol = string(*v.Symbol)
-		} else {
-			runeInfo.Symbol = string(defaultRuneSymbol)
-		}
-		terms := v.Terms
-		if terms != nil {
-			runeInfo.MintInfo = &MintInfo{}
-			if len(terms.Height) > 0 {
-				if terms.Height[0] != nil {
-					runeInfo.MintInfo.Start = strconv.FormatUint(*terms.Height[0], 10)
-				}
-				if terms.Height[1] != nil {
-					runeInfo.MintInfo.End = strconv.FormatUint(*terms.Height[1], 10)
-				}
-			}
-			if terms.Amount != nil {
-				// amount, err := v.Pile(*terms.Amount).Uint128()
-				// if err != nil {
-				// 	common.Log.Panicf("RuneIndexer.GetRuneInfos-> v.Pile(*terms.Amount).Uint128() err:%s", err.Error())
-				// }
-				// runeInfo.MintInfo.Amount = *amount
-				runeInfo.MintInfo.Amount = *terms.Amount
-			}
-			runeInfo.MintInfo.Mints = v.Mints
-			if terms.Cap != nil {
-				runeInfo.MintInfo.Cap = *terms.Cap
-			}
-			runeInfo.MintInfo.Remaining = runeInfo.MintInfo.Cap.Sub(runeInfo.MintInfo.Mints)
-
-			_, err := v.Mintable(s.Status.Height + 1)
-			runeInfo.MintInfo.Mintable = err == nil
-
-			if runeInfo.MintInfo.Mintable {
-				if v.Terms.Cap.Cmp(uint128.Zero) > 0 {
-					mintProgress := GetPercentage(&runeInfo.MintInfo.Mints, &runeInfo.MintInfo.Cap)
-					progress, err := strconv.ParseFloat(mintProgress.String(), 64)
-					if err != nil {
-						common.Log.Panicf("RuneIndexer.GetRuneInfos-> strconv.Atoi(%s) err:%s", mintProgress.String(), err.Error())
-					}
-					runeInfo.MintInfo.Progress = progress
-				}
-			}
-		}
-		if v.Parent != nil {
-			runeInfo.Parent = string(*v.Parent)
-		}
+		runeInfo := s.genRuneInfo(runeEntry)
 		ret = append(ret, runeInfo)
 		i++
 	}
