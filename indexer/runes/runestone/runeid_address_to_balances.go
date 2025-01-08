@@ -92,10 +92,10 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneId
 			if err != nil {
 				return nil, err
 			}
+			ret[i] = runeIdAddressOutpointToBalance
 			ret[i].Address = Address(v.Address)
 			ret[i].Balance = &Lot{
 				Value: &uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}}
-			ret[i] = runeIdAddressOutpointToBalance
 			i++
 		}
 	}

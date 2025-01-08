@@ -12,8 +12,8 @@ type Address string
 
 type RuneIdToAddress struct {
 	RuneId    *RuneId
-	Address   Address
 	AddressId uint64
+	Address   Address
 }
 
 func RuneIdToAddressFromString(str string) (*RuneIdToAddress, error) {
@@ -24,12 +24,13 @@ func RuneIdToAddressFromString(str string) (*RuneIdToAddress, error) {
 	if err != nil {
 		return nil, err
 	}
-	ret.Address = Address(parts[2])
-	addressId, err := strconv.ParseUint(parts[3], 16, 64)
+
+	addressId, err := strconv.ParseUint(parts[2], 16, 64)
 	if err != nil {
 		return nil, err
 	}
 	ret.AddressId = addressId
+	ret.Address = Address(parts[3])
 	return ret, nil
 }
 
