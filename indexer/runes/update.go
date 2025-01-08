@@ -12,7 +12,6 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
-	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"lukechampine.com/uint128"
 )
@@ -91,30 +90,6 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, block took time:%v, tx took avg time:%v",
 		block.Height, txCount, sinceTime, sinceTime/time.Duration(txCount))
 	s.update()
-}
-
-func (s *Indexer) GetOutPoints(address string) (ret []*runestone.OutPoint) {
-	utxoid_to_value_map, err := base_indexer.ShareBaseIndexer.GetUTXOsWithAddress(address)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetOutPoints-> GetUTXOsWithAddress(%s) err:%v", address, err)
-	}
-	for id := range utxoid_to_value_map {
-		utxo, _, err := base_indexer.ShareBaseIndexer.GetOrdinalsWithUtxoId(id)
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.GetOutPoints-> GetOrdinalsWithUtxoId(%d) err:%v", id, err)
-		}
-		txid, vout, err := common.ParseUtxo(utxo)
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.GetOutPoints-> ParseUtxo(%s) err:%v", utxo, err)
-		}
-
-		outpoint := &runestone.OutPoint{
-			Txid: txid,
-			Vout: uint32(vout),
-		}
-		ret = append(ret, outpoint)
-	}
-	return
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
