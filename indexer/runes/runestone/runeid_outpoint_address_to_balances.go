@@ -68,8 +68,14 @@ func (s *RuneIdAddressOutpointToBalanceTable) Get(v *RuneIdOutpointAddressToBala
 		if err != nil {
 			common.Log.Panicf("RuneIdAddressOutpointToBalanceTable.Get-> GenRuneIdAddressOutpointToBalance(%s) err:%v", string(tblKey), err)
 		}
-		ret.Address = Address(v.Address)
-		ret.Balance = v.Balance
+		ret.Address = Address(pbVal.Address)
+		ret.Balance = &Lot{
+			Value: &uint128.Uint128{
+				Hi: pbVal.Balance.Value.Hi,
+				Lo: pbVal.Balance.Value.Lo,
+			},
+		}
+		ret.AddressId = pbVal.AddressId
 	}
 	return
 }
