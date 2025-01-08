@@ -458,10 +458,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		}
 
 		// update runeIdToMintHistory
-		if mintAmount != nil {
-			if mintOutIndex == nil {
-				common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
-			}
+		// if mintAmount != nil {
+		if mintAmount != nil && mintOutIndex != nil {
+			// if mintOutIndex == nil {
+			// 	// common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
+			// }
 			utxo := fmt.Sprintf("%s:%d", tx.Txid, *mintOutIndex)
 			output := tx.Outputs[*mintOutIndex]
 			utxoId := common.GetUtxoId(output)
