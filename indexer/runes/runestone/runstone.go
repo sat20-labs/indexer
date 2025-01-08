@@ -331,7 +331,7 @@ func (r *Runestone) Encipher() ([]byte, error) {
 		}
 	}
 
-	if len(payload) > txscript.MaxDataCarrierSize {
+	if len(payload) > txscript.MaxDataCarrierSize - 1 {
 		return nil, fmt.Errorf("payload is too large")
 	}
 
