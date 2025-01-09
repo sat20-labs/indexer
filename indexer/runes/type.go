@@ -235,6 +235,7 @@ func (s *UtxoBalances) UnmarshalJSON(data []byte) error {
 
 type AddressAsset struct {
 	Rune         string
+	RuneId       string
 	Balance      uint128.Uint128
 	Divisibility uint8
 	Symbol       rune
@@ -243,9 +244,11 @@ type AddressAsset struct {
 func (s AddressAsset) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Rune    string `json:"rune"`
+		RuneId  string `json:"runeid"`
 		Balance string `json:"balance"`
 	}{
 		Rune:    s.Rune,
+		RuneId:  s.RuneId,
 		Balance: s.Balance.String(),
 	})
 }
@@ -253,6 +256,7 @@ func (s AddressAsset) MarshalJSON() ([]byte, error) {
 func (s *AddressAsset) UnmarshalJSON(data []byte) error {
 	aux := struct {
 		Rune    string `json:"rune"`
+		RuneId  string `json:"runeid"`
 		Balance string `json:"balance"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -264,6 +268,7 @@ func (s *AddressAsset) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	s.Rune = aux.Rune
+	s.RuneId = aux.RuneId
 	s.Balance, err = uint128.FromString(aux.Balance)
 	return err
 }

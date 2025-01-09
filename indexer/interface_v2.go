@@ -246,7 +246,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV2(address string) map[common.Ticke
 
 	runesAsset := b.RunesIndexer.GetAddressAssets(addressId)
 	for _, v := range runesAsset {
-		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.RuneId}
 		ticker := b.RunesIndexer.GetRuneInfoWithName(v.Rune)
 		if ticker != nil {
 			result[tickName] = common.Uint128ToInt64(ticker.MaxSupply, v.Balance)
