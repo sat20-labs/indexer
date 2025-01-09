@@ -448,6 +448,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
 		}
 
+		if artifact.Runestone == nil {
+			return
+		}
 		// update runeIdToMintHistory
 		if mintAmount != nil {
 			if mintOutIndex == nil {
