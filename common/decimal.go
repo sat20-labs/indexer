@@ -314,6 +314,7 @@ func (d *Decimal) IntegerPart() int64 {
 	return quotient.Int64()
 }
 
+// 不考虑精度
 func (d *Decimal) ToInt64WithMax(max *Decimal) int64 {
 	if d == nil {
 		return 0
@@ -327,6 +328,7 @@ func (d *Decimal) ToInt64WithMax(max *Decimal) int64 {
 		return d.Value.Int64()
 	}
 
+	// 十进制移位
 	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
 	scaleIndex := decimalDigits(quotient.Uint64())
 	return d.Div(big.NewInt(int64(scaleIndex))).Value.Int64()

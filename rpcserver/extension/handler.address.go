@@ -45,7 +45,7 @@ func getAssetSummary(address string) (*AssetSummary, error) {
 	ret.InscriptionCount = uint64(inscriptionCount)
 	ret.OrdinalsSummary.Count = uint64(inscriptionCount)
 
-	assetsList := base_indexer.ShareBaseIndexer.GetAssetSummaryInAddress(address)
+	assetsList := base_indexer.ShareBaseIndexer.GetAssetSummaryInAddressV2(address)
 	for ticker, balance := range assetsList {
 		switch ticker.Type {
 		case common.ASSET_TYPE_NS:
