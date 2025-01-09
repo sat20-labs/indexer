@@ -93,7 +93,7 @@ func (s *Model) getTickerInfo(tickerName string) (*common.TickerInfo, error) {
 }
 
 func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.AssetSummary, error) {
-	tickerMap := s.indexer.GetAssetSummaryInAddress(address)
+	tickerMap := s.indexer.GetAssetSummaryInAddressV2(address)
 
 	result := rpcwire.AssetSummary{}
 	for tickName, balance := range tickerMap {
@@ -195,9 +195,8 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 	return result, len(result), nil
 }
 
-
 func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*common.DisplayAsset, error) {
-	tickerMap := s.indexer.GetAssetSummaryInAddressV2(address)
+	tickerMap := s.indexer.GetAssetSummaryInAddressV3(address)
 
 	result := make([]*common.DisplayAsset, 0)
 	for tickName, balance := range tickerMap {
