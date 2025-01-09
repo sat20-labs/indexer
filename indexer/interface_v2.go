@@ -94,7 +94,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		for _, rngs := range v {
 			for _, rng := range rngs {
 				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
+				offsets = append(offsets, &common.OffsetRange{Start: start, End: start + rng.Size})
 				value += rng.Size
 			}
 		}
@@ -125,7 +125,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			Amount:     v,
 			BindingSat: 0,
 		}
-		
+
 		if assets == nil {
 			assets = swire.TxAssets{asset}
 		} else {
@@ -139,11 +139,10 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			Value:    common.GetOrdinalsSize(info.Ordinals),
 			PkScript: info.PkScript,
 		},
-		Assets: assets,
+		Assets:  assets,
 		Offsets: offsetmap,
 	}
 }
-
 
 func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string) *common.AssetsInUtxo {
 	info, err := b.rpcService.GetUtxoInfo(utxo)
@@ -162,7 +161,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string) *common.AssetsInUtxo {
 		for _, rngs := range v {
 			for _, rng := range rngs {
 				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start+rng.Size})
+				offsets = append(offsets, &common.OffsetRange{Start: start, End: start + rng.Size})
 				value += rng.Size
 			}
 		}
@@ -175,7 +174,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string) *common.AssetsInUtxo {
 			AssetName:  k,
 			Amount:     fmt.Sprintf("%d", value),
 			BindingSat: true,
-			Offsets: offsets,
+			Offsets:    offsets,
 		}
 
 		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
@@ -208,7 +207,6 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 
 	return result
 }
-
 
 // return: ticker -> amount
 func (b *IndexerMgr) GetAssetSummaryInAddressV2(address string) map[common.TickerName]int64 {
@@ -249,7 +247,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV2(address string) map[common.Ticke
 	runesAsset := b.RunesIndexer.GetAddressAssets(addressId)
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-		ticker := b.RunesIndexer.GetRuneInfoWithId(v.Rune)
+		ticker := b.RunesIndexer.GetRuneInfoWithName(v.Rune)
 		if ticker != nil {
 			result[tickName] = common.Uint128ToInt64(ticker.MaxSupply, v.Balance)
 		}
@@ -355,9 +353,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 }
 
 // return: mint info sorted by inscribed time
-func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string, 
+func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 	tick *common.TickerName, start, limit int) ([]*common.MintInfo, int) {
-	
+
 	addressId := b.GetAddressId(address)
 
 	switch tick.Protocol {
@@ -366,9 +364,9 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 		case common.ASSET_TYPE_FT:
 			return b.ftIndexer.GetMintHistoryWithAddressV2(addressId, tick.Ticker, start, limit)
 		case common.ASSET_TYPE_NFT:
-			
+
 		case common.ASSET_TYPE_NS:
-			
+
 		case common.ASSET_TYPE_EXOTIC:
 			return nil, 0
 		default:
@@ -382,6 +380,7 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 
 	return nil, 0
 }
+
 // return: ticker -> asset info (inscriptinId -> asset ranges)
 func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
 	result := make(map[common.TickerName]*common.Decimal)
@@ -443,7 +442,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 
 // FT
 // return: ticker's name -> ticker info
-func (b *IndexerMgr) GetTickerMapV2(protocol string) (map[string]*common.TickerInfo) {
+func (b *IndexerMgr) GetTickerMapV2(protocol string) map[string]*common.TickerInfo {
 	switch protocol {
 	case common.PROTOCOL_NAME_ORDX:
 		return b.GetOrdxTickerMapV2()
@@ -488,7 +487,7 @@ func (b *IndexerMgr) GetMintAmountV2(tickerName *common.TickerName) (*common.Dec
 }
 
 // return:  mint info sorted by inscribed time
-func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start, 
+func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 	limit int) []*common.MintInfo {
 	result := make([]*common.MintInfo, 0)
 	switch tickerName.Protocol {
@@ -503,7 +502,7 @@ func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 		default:
 			ordxMintInfo = b.ftIndexer.GetMintHistory(tickerName.Ticker, start, limit)
 		}
-		
+
 		for _, info := range ordxMintInfo {
 			m := info.ToMintInfo()
 			m.Address = b.GetAddressById(info.Address)
