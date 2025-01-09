@@ -111,11 +111,17 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 }
 
 func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
+	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
+		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> address is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
+	}
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
 	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) {
+	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
+		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> address is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
+	}
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
 	s.cache.Delete(tblKey)
 }

@@ -148,15 +148,15 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			}
 
 			zeroId := runestone.RuneId{Block: uint64(0), Tx: uint32(0)}
-			for i, edict := range artifact.Runestone.Edicts {
+			for _, edict := range artifact.Runestone.Edicts {
 				amount := runestone.NewLot(&edict.Amount)
-				if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
-					if i == 1 {
-						en1 := s.idToEntryTbl.Get(&edict.ID)
-						p := en1.Pile(edict.Amount).String()
-						common.Log.Debugf("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, p)
-					}
-				}
+				// if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
+				// 	if i == 1 {
+				// 		en1 := s.idToEntryTbl.Get(&edict.ID)
+				// 		p := en1.Pile(edict.Amount).String()
+				// 		common.Log.Debugf("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, p)
+				// 	}
+				// }
 				// edicts with output values greater than the number of outputs
 				// should never be produced by the edict parser
 				output := edict.Output
