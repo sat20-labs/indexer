@@ -103,7 +103,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
 	}
 
-	if tx.Txid == "37f7198e52c4dae76731eadb598fffa1fe8fe94432a8d96f2632e5bb2227bac6" {
+	// if s.height == 30562 && tx_index == 50 {
+	// 	common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
+	// }
+
+	if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
 		common.Log.Infof("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
 	}
 
@@ -144,9 +148,15 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			}
 
 			zeroId := runestone.RuneId{Block: uint64(0), Tx: uint32(0)}
-			for _, edict := range artifact.Runestone.Edicts {
+			for i, edict := range artifact.Runestone.Edicts {
 				amount := runestone.NewLot(&edict.Amount)
-
+				if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
+					if i == 1 {
+						en1 := s.idToEntryTbl.Get(&edict.ID)
+						p := en1.Pile(edict.Amount).String()
+						common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, p)
+					}
+				}
 				// edicts with output values greater than the number of outputs
 				// should never be produced by the edict parser
 				output := edict.Output
@@ -565,7 +575,10 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 			continue
 		}
 		for _, val := range oldValue.RuneIdLots {
-			ret[val.RuneId] = &val.Lot
+			if ret[val.RuneId] == nil {
+				ret[val.RuneId] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
+			}
+			ret[val.RuneId].AddAssign(&val.Lot)
 			runeIdOutpointToBalance := &runestone.RuneIdOutpointToBalance{
 				RuneId:   &val.RuneId,
 				OutPoint: outpoint,
