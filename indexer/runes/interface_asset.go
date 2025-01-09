@@ -325,6 +325,7 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 		}
 		ret[i] = &UtxoAsset{
 			Rune:         runeEntry.SpacedRune.String(),
+			RuneId:       runeEntry.RuneId.String(),
 			Balance:      *runeIdLot.Lot.Value,
 			Divisibility: runeEntry.Divisibility,
 			Symbol:       symbol,

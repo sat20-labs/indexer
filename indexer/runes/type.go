@@ -275,6 +275,7 @@ func (s *AddressAsset) UnmarshalJSON(data []byte) error {
 
 type UtxoAsset struct {
 	Rune         string
+	RuneId       string
 	Balance      uint128.Uint128
 	Divisibility uint8
 	Symbol       rune
