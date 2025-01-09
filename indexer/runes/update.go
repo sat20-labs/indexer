@@ -108,7 +108,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	// }
 
 	if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
-		common.Log.Infof("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
+		common.Log.Debugf("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
 	}
 
 	if artifact != nil {
@@ -154,7 +154,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					if i == 1 {
 						en1 := s.idToEntryTbl.Get(&edict.ID)
 						p := en1.Pile(edict.Amount).String()
-						common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, p)
+						common.Log.Debugf("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, p)
 					}
 				}
 				// edicts with output values greater than the number of outputs

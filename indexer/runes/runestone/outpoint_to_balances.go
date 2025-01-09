@@ -202,7 +202,7 @@ func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalancesValu
 
 func (s *OutpointToBalancesTable) Insert(key *OutPoint, value *OutpointToBalancesValue) (ret *OutpointToBalancesValue) {
 	if key.Txid == "27d547acffd10a4a47f18f5f97aaa71e276e826e7fb076003a14404d060295c0" {
-		common.Log.Infof("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
+		common.Log.Debugf("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
 	}
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Key())
 	pbVal := s.cache.Set(tblKey, value.ToPb())
@@ -215,7 +215,7 @@ func (s *OutpointToBalancesTable) Insert(key *OutPoint, value *OutpointToBalance
 
 func (s *OutpointToBalancesTable) Remove(key *OutPoint) (ret *OutpointToBalancesValue) {
 	if key.Txid == "27d547acffd10a4a47f18f5f97aaa71e276e826e7fb076003a14404d060295c0" {
-		common.Log.Infof("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
+		common.Log.Debugf("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
 	}
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Key())
 	pbVal := s.cache.Delete(tblKey)
