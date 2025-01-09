@@ -265,7 +265,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 }
 
 func (b *IndexerMgr) U128ToInt64(runeId string, amt uint128.Uint128) int64 {
-	info := b.RunesIndexer.GetRuneInfoWithId(runeId)
+	info := b.RunesIndexer.GetRuneInfoWithName(runeId)
 	if info == nil {
 		return amt.Big().Int64()
 	}
@@ -298,7 +298,7 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.Tick
 	if len(runesAssets) > 0 {
 		for _, v := range runesAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-			result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
+			result[tickName] = common.NewDecimalFromUint128(v.Balance, 0)
 		}
 	}
 

@@ -76,7 +76,7 @@ func (b *IndexerMgr) GetRunesMintAmount(tickerName string) (*common.Decimal, int
 	if info.MintInfo != nil {
 		times = info.MintInfo.Mints.Big().Int64()
 	}
-	return common.NewDecimalFromUint128(info.Supply, int(info.Divisibility)), times
+	return common.NewDecimalFromUint128(info.Supply, 0), times
 }
 
 func (b *IndexerMgr) GetRunesDBVer() string {

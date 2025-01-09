@@ -48,7 +48,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 	var i = 0
 
 	for addressId, addressLot := range addressIdToAddressLotMap {
-		decimal := common.NewDecimalFromUint128(*addressLot.Amount.Value, int(r.Divisibility))
+		decimal := common.NewDecimalFromUint128(*addressLot.Amount.Value, 0)
 		ret[addressId] = decimal
 		i++
 	}
