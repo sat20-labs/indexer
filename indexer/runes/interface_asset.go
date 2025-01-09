@@ -289,7 +289,11 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 				RuneId:       runeEntry.RuneId.String(),
 			}
 		}
-		spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(balance.Balance)
+		amount, err := runeEntry.Pile(*balance.Balance.Value).Uint128()
+		if err != nil {
+			common.Log.Panicf("RuneIndexer.GetAddressAssets-> runeEntry.Pile(%s).Uint128() err:%s", balance.Balance.Value.String(), err.Error())
+		}
+		spaceRuneLotMap[runeEntry.SpacedRune].Balance.AddAssign(runestone.NewLot(amount))
 	}
 
 	total := uint64(len(spaceRuneLotMap))
