@@ -318,7 +318,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address))
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
+		result[tickName] = common.NewDecimalFromUint128(v.Balance, 0)
 	}
 
 	plainUtxoMap := make(map[uint64]int64)
@@ -399,7 +399,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	if len(runesAssets) > 0 {
 		for _, v := range runesAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-			result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
+			result[tickName] = common.NewDecimalFromUint128(v.Balance, 0)
 		}
 	}
 	nfts := b.getNftsWithUtxo(utxoId)
