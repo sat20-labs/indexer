@@ -40,9 +40,6 @@ func (s *AddressOutpointToBalance) Key() string {
 }
 
 func (s *AddressOutpointToBalance) ToPb() *pb.AddressOutpointToBalance {
-	if s.Address == "" {
-		common.Log.Info("test")
-	}
 	pbValue := &pb.AddressOutpointToBalance{
 		Balance: &pb.Lot{
 			Value: &pb.Uint128{
