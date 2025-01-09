@@ -103,7 +103,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
 	}
 
-	if tx.Txid == "27d547acffd10a4a47f18f5f97aaa71e276e826e7fb076003a14404d060295c0" {
+	if tx.Txid == "37f7198e52c4dae76731eadb598fffa1fe8fe94432a8d96f2632e5bb2227bac6" {
 		common.Log.Infof("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
 	}
 
@@ -457,12 +457,14 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
 		}
 
+		if artifact.Runestone == nil {
+			return
+		}
 		// update runeIdToMintHistory
-		// if mintAmount != nil {
-		if mintAmount != nil && mintOutIndex != nil {
-			// if mintOutIndex == nil {
-			// 	// common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
-			// }
+		if mintAmount != nil {
+			if mintOutIndex == nil {
+				common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
+			}
 			utxo := fmt.Sprintf("%s:%d", tx.Txid, *mintOutIndex)
 			output := tx.Outputs[*mintOutIndex]
 			utxoId := common.GetUtxoId(output)
