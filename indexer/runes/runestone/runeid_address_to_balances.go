@@ -102,12 +102,27 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneId
 	return
 }
 
-func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {
+func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance, runeentry1 *RuneEntry) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
+	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
+		if runeentry1 != nil {
+			pile := runeentry1.Pile(*v.Balance.Value)
+			pilestr := pile.String()
+			common.Log.Infof("RuneIdAddressToBalanceTable.Insert-> runeId:%s, address:%s, pile:%s ",
+				v.RuneId.String(), v.Address, pilestr)
+		}
+
+	}
 	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *RuneIdAddressToBalanceTable) Remove(v *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
+	if v.RuneId == nil {
+		common.Log.Infof("RuneIdAddressToBalanceTable.Insert-> runeId is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
+	}
+	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
+		common.Log.Infof("RuneIdAddressToBalanceTable.Insert-> address is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
+	}
 	s.cache.Delete(tblKey)
 }

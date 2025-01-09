@@ -26,8 +26,7 @@ func InitRuneTester() {
 func TestInterfaceRune(t *testing.T) {
 	InitRuneTester()
 	// 0
-	// runeIdStr := "61721_61"
-	runeIdStr := "7762_32"
+	runeIdStr := "61721_61"
 	runeInfo := runesIndexer.GetRuneInfoWithId(runeIdStr)
 	t.Logf("GetRuneInfoWithId return: %+v\n", runeInfo)
 	// 1

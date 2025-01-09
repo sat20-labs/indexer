@@ -10,25 +10,16 @@ import (
 
 // key: addressId, value: amount
 func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
-	rid, err := runestone.RuneIdFromHex(runeId)
+	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil
 	}
-	runeIdToAddresses, err := s.runeIdToAddressTbl.GetList(rid)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdToAddressTbl.GetList(%s) err:%v", rid.Hex(), err.Error())
-	}
-	if len(runeIdToAddresses) == 0 {
-		return nil
-	}
-
 	r := s.idToEntryTbl.Get(rid)
 	if r == nil {
 		common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
 		return nil
 	}
-
 	balances, err := s.runeIdAddressToBalanceTbl.GetBalances(rid)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())

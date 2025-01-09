@@ -103,6 +103,14 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
 	}
 
+	// if s.height == 30562 && tx_index == 50 {
+	// 	common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
+	// }
+
+	if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
+		common.Log.Infof("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
+	}
+
 	if artifact != nil {
 		isParseOk = true
 		unallocated := s.unallocated(tx)
@@ -140,9 +148,15 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			}
 
 			zeroId := runestone.RuneId{Block: uint64(0), Tx: uint32(0)}
-			for _, edict := range artifact.Runestone.Edicts {
+			for i, edict := range artifact.Runestone.Edicts {
 				amount := runestone.NewLot(&edict.Amount)
-
+				if tx.Txid == "5d9b56b676bde024207454fd027bc5eaa9ebac8c05abe5fb473b7a0fb54dcea2" {
+					if i == 1 {
+						en1 := s.idToEntryTbl.Get(&edict.ID)
+						p := en1.Pile(edict.Amount).String()
+						common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, p)
+					}
+				}
 				// edicts with output values greater than the number of outputs
 				// should never be produced by the edict parser
 				output := edict.Output
@@ -420,7 +434,12 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				}
 				runeIdAddressToBalance.Balance.AddAssign(oldRuneIdAddressToBalance.Balance)
 			}
-			s.runeIdAddressToBalanceTbl.Insert(runeIdAddressToBalance)
+			if runeIdAddressToBalance.Address == "tb1p9mxraz4rqlfk88qunvpts0ug5f8f8q8wjvzptayq6wuyw02rn64qsymn6a" {
+				common.Log.Info("test")
+			}
+			rid1 := runeIdAddressToBalance.RuneId
+			runeentry1 := s.idToEntryTbl.Get(rid1)
+			s.runeIdAddressToBalanceTbl.Insert(runeIdAddressToBalance, runeentry1)
 
 			// update addressOutpointToBalances
 			addressOutpointToBalance := &runestone.AddressOutpointToBalance{
@@ -556,7 +575,10 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 			continue
 		}
 		for _, val := range oldValue.RuneIdLots {
-			ret[val.RuneId] = &val.Lot
+			if ret[val.RuneId] == nil {
+				ret[val.RuneId] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
+			}
+			ret[val.RuneId].AddAssign(&val.Lot)
 			runeIdOutpointToBalance := &runestone.RuneIdOutpointToBalance{
 				RuneId:   &val.RuneId,
 				OutPoint: outpoint,
@@ -582,12 +604,20 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 			if oldRuneIdAddressToBalance == nil {
 				continue
 			}
+			if oldRuneIdAddressToBalance.Address == "tb1p9mxraz4rqlfk88qunvpts0ug5f8f8q8wjvzptayq6wuyw02rn64qsymn6a" {
+				common.Log.Info("test")
+			}
+			if oldRuneIdAddressToBalance.Balance.Value.Cmp(*val.Lot.Value) < 0 {
+				continue
+			}
 			newRuneIdAddressToBalanceValue := oldRuneIdAddressToBalance.Balance.Value.Sub(*val.Lot.Value)
 			if newRuneIdAddressToBalanceValue.Cmp(uint128.Zero) != 0 {
 				oldRuneIdAddressToBalance.Balance.Value = &newRuneIdAddressToBalanceValue
-				s.runeIdAddressToBalanceTbl.Insert(runeIdAddressToBalance)
+				rid1 := runeIdAddressToBalance.RuneId
+				runeentry1 := s.idToEntryTbl.Get(rid1)
+				s.runeIdAddressToBalanceTbl.Insert(oldRuneIdAddressToBalance, runeentry1)
 			} else {
-				s.runeIdAddressToBalanceTbl.Remove(runeIdAddressToBalance)
+				s.runeIdAddressToBalanceTbl.Remove(oldRuneIdAddressToBalance)
 			}
 
 			addressOutpointToBalance := &runestone.AddressOutpointToBalance{
@@ -602,12 +632,15 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret runestone.RuneIdLotMa
 				oldAddressOutpointToBalance.RuneId.Tx != val.RuneId.Tx {
 				continue
 			}
+			if oldAddressOutpointToBalance.Balance.Value.Cmp(*val.Lot.Value) < 0 {
+				continue
+			}
 			newRuneIdAddressToBalanceValue = oldAddressOutpointToBalance.Balance.Value.Sub(*val.Lot.Value)
 			if newRuneIdAddressToBalanceValue.Cmp(uint128.Zero) != 0 {
 				oldAddressOutpointToBalance.Balance.Value = &newRuneIdAddressToBalanceValue
-				s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
+				s.addressOutpointToBalancesTbl.Insert(oldAddressOutpointToBalance)
 			} else {
-				s.addressOutpointToBalancesTbl.Remove(addressOutpointToBalance)
+				s.addressOutpointToBalancesTbl.Remove(oldAddressOutpointToBalance)
 			}
 		}
 	}

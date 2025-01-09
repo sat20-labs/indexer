@@ -40,6 +40,9 @@ func (s *AddressOutpointToBalance) Key() string {
 }
 
 func (s *AddressOutpointToBalance) ToPb() *pb.AddressOutpointToBalance {
+	if s.Address == "" {
+		common.Log.Info("test")
+	}
 	pbValue := &pb.AddressOutpointToBalance{
 		Balance: &pb.Lot{
 			Value: &pb.Uint128{
@@ -70,8 +73,14 @@ func (s *AddressOutpointToBalancesTable) Get(v *AddressOutpointToBalance) (ret *
 		if err != nil {
 			common.Log.Panicf("AddressOutpointToBalanceTable.Get-> AddressOutpointToBalanceFromString(%s) err:%v", string(tblKey), err)
 		}
-		ret.Address = Address(v.Address)
-		ret.Balance = v.Balance
+		ret.RuneId = &RuneId{Block: pbVal.RuneId.Block, Tx: pbVal.RuneId.Tx}
+		ret.Address = Address(pbVal.Address)
+		ret.Balance = &Lot{
+			Value: &uint128.Uint128{
+				Hi: pbVal.Balance.Value.Hi,
+				Lo: pbVal.Balance.Value.Lo,
+			},
+		}
 	}
 	return
 }
@@ -92,6 +101,7 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 				return nil, err
 			}
 			addressOutpointToBalance.Address = Address(v.Address)
+			addressOutpointToBalance.RuneId = &RuneId{Block: v.RuneId.Block, Tx: v.RuneId.Tx}
 			addressOutpointToBalance.Balance = lot
 			ret[i] = addressOutpointToBalance
 			i++
