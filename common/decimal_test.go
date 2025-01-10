@@ -178,13 +178,13 @@ func convertTest(t *testing.T, supply, amt uint128.Uint128) {
 
 func TestDecimal_Runes3(t *testing.T) {
 
-	supply, _ := uint128.FromString("1234567890123456789012")
-	amt, _ := uint128.FromString("1234567890123")
+	supply, _ := uint128.FromString("100000000000000100000000000000")
+	amt, _ := uint128.FromString("1100000000000000")
 	convertTest(t, supply, amt)
 	
 
-	supply, _ = uint128.FromString("21000000000000000000000000")
-	amt, _ = uint128.FromString("1000000000000000000000")
+	supply, _ = uint128.FromString("2000000")
+	amt, _ = uint128.FromString("11")
 	convertTest(t, supply, amt)
 
 	supply, _ = uint128.FromString("21000000")
