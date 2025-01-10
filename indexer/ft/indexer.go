@@ -209,13 +209,15 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 		mintAmount, _ := s.GetMintAmount(name)
 		if holderAmount != mintAmount {
-			common.Log.Panicf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			common.Log.Errorf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			return false
 		}
 
 		utxos, ok := s.utxoMap[name]
 		if !ok {
 			if holderAmount != 0 {
-				common.Log.Panicf("ticker %s has no asset utxos", name)
+				common.Log.Errorf("ticker %s has no asset utxos", name)
+				return false
 			}
 		} else {
 			amontInUtxos := int64(0)
@@ -224,18 +226,21 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 				holderInfo, ok := s.holderInfo[utxo]
 				if !ok {
-					common.Log.Panicf("ticker %s's utxo %d not in holdermap", name, utxo)
+					common.Log.Errorf("ticker %s's utxo %d not in holdermap", name, utxo)
+					return false
 				}
 				tickinfo, ok := holderInfo.Tickers[name]
 				if !ok {
-					common.Log.Panicf("ticker %s's utxo %d not in holders", name, utxo)
+					common.Log.Errorf("ticker %s's utxo %d not in holders", name, utxo)
+					return false
 				}
 				amountInHolder := int64(0)
 				for _, rngs := range tickinfo.MintInfo {
 					amountInHolder += common.GetOrdinalsSize(rngs)
 				}
 				if amountInHolder != amoutInUtxo {
-					common.Log.Panicf("ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
+					common.Log.Errorf("ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
+					return false
 				}
 			}
 		}
@@ -247,7 +252,8 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 		name := "pearl"
 		ticker := s.GetTicker(name)
 		if ticker == nil {
-			common.Log.Panicf("can't find %s in db", name)
+			common.Log.Errorf("can't find %s in db", name)
+			return false
 		}
 
 		holdermap := s.GetHolderAndAmountWithTick(name)
@@ -258,7 +264,8 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 		mintAmount, _ := s.GetMintAmount(name)
 		if holderAmount != mintAmount {
-			common.Log.Panicf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
+			common.Log.Errorf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
+			return false
 		}
 
 		// 1.2.0 版本升级后，pearl的数量增加了105张。原因是之前铸造时，部分输出少于amt的铸造，被错误的识别为无效的铸造。
@@ -266,10 +273,12 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 		// 比如： 5647d570edcbe45d4953915f7b9063e9b39b83432ae2ae13fdbd5283abb83367i0 等
 		if ticker.BlockStart == 828200 {
 			if holderAmount != 156271012 {
-				common.Log.Panicf("%s amount incorrect. %d", name, holderAmount)
+				common.Log.Errorf("%s amount incorrect. %d", name, holderAmount)
+				return false
 			}
 		} else {
-			common.Log.Panicf("Incorrect %s", name)
+			common.Log.Errorf("Incorrect %s", name)
+			return false
 		}
 	}
 

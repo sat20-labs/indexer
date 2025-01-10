@@ -631,47 +631,56 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		common.Log.Infof("wrong utxo2 %d: %d", i, value)
 	}
 
+	result := true
 	if len(wrongAddress) != 0 || len(wrongIds) != 0 || len(wrongSats) != 0 || len(wrongUtxo1) != 0 {
-		common.Log.Panic("data wrong")
+		common.Log.Error("data wrong")
+		result = false
 	}
 
 	count := p.status.Count - uint64(len(p.nftAdded))
 	if count != uint64(len(nftsInT1)) || count != uint64(lastkey+1) {
-		common.Log.Panicf("name count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
+		common.Log.Errorf("name count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
+		result = false
 	}
 
 	common.Log.Infof("utxos not in table %s", DB_PREFIX_NFT)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
 		p.printfUtxos(utxos1, baseDB)
-		common.Log.Panicf("utxo1 wrong %d", len(utxos1))
+		common.Log.Errorf("utxo1 wrong %d", len(utxos1))
+		result = false
 	}
 
 	common.Log.Infof("utxos not in table %s", DB_PREFIX_UTXO)
 	utxos2 := findDifferentItems(utxosInT2, utxosInT1)
 	if len(utxos2) > 0 {
 		p.printfUtxos(utxos2, baseDB)
-		common.Log.Panicf("utxo2 wrong %d", len(utxos2))
+		common.Log.Errorf("utxo2 wrong %d", len(utxos2))
+		result = false
 	}
 
 	common.Log.Infof("sats not in table %s", DB_PREFIX_NFT)
 	sats1 := findDifferentItems(satsInT1, satsInT2)
 	if len(sats1) > 0 {
-		common.Log.Panicf("sat1 wrong %d", len(sats1))
+		common.Log.Errorf("sat1 wrong %d", len(sats1))
+		result = false
 	}
 
 	common.Log.Infof("sats not in table %s", DB_PREFIX_UTXO)
 	sats2 := findDifferentItems(satsInT2, satsInT1)
 	if len(sats2) > 0 {
-		common.Log.Panicf("sats2 wrong %d", len(sats2))
+		common.Log.Errorf("sats2 wrong %d", len(sats2))
+		result = false
 	}
 
 	// 1. 每个utxoId都存在baseDB中
 	// 2. 两个表格中的数据相互对应: name，sat
 	// 3. name的总数跟stats中一致
+	if result {
+		common.Log.Infof("nft DB checked successfully, %v", time.Since(startTime))
+	}
 
-	common.Log.Infof("nft DB checked successfully, %v", time.Since(startTime))
-	return true
+	return result
 }
 
 func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {

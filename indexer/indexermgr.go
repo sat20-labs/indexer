@@ -272,14 +272,16 @@ func (b *IndexerMgr) closeDB() {
 
 func (b *IndexerMgr) checkSelf() {
 	start := time.Now()
-	b.compiling.CheckSelf()
-	b.exotic.CheckSelf()
-	b.nft.CheckSelf(b.baseDB)
-	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight())
-	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight())
-	b.RunesIndexer.CheckSelf()
-	b.ns.CheckSelf(b.baseDB)
-	common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
+	if b.compiling.CheckSelf() &&
+	b.exotic.CheckSelf() &&
+	b.nft.CheckSelf(b.baseDB) &&
+	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
+	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) &&
+	b.RunesIndexer.CheckSelf() &&
+	b.ns.CheckSelf(b.baseDB) {
+		common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
+	}
+	
 }
 
 func (b *IndexerMgr) forceUpdateDB() {

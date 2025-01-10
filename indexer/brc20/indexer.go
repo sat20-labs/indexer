@@ -200,7 +200,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 
 		mintAmount, _ := s.GetMintAmount(name)
 		if holderAmount != *mintAmount {
-			common.Log.Panicf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			common.Log.Errorf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			return false
 		}
 	}
 
@@ -210,7 +211,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		name := "ordi"
 		ticker := s.GetTicker(name)
 		if ticker == nil {
-			common.Log.Panicf("can't find %s in db", name)
+			common.Log.Errorf("can't find %s in db", name)
+			return false
 		}
 
 		holdermap := s.GetHoldersWithTick(name)
@@ -221,7 +223,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 
 		mintAmount, _ := s.GetMintAmount(name)
 		if holderAmount != *mintAmount {
-			common.Log.Panicf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
+			common.Log.Errorf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
+			return false
 		}
 
 		// if holderAmount != 156271012 {

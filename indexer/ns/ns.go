@@ -254,12 +254,14 @@ func (p *NameService) CheckSelf(baseDB *badger.DB) bool {
 		common.Log.Infof("wrong sat %d: %v", i, value)
 	}
 	if len(wrongName) != 0 || len(wrongSats) != 0 {
-		common.Log.Panic("data wrong")
+		common.Log.Errorf("data wrong")
+		return false
 	}
 
 	count := p.status.NameCount - uint64(len(p.nameAdded))
 	if count != uint64(len(namesInT1)) || count != uint64(lastkey+1) {
-		common.Log.Panicf("name count different %d %d %d", count, len(namesInT1), uint64(lastkey+1))
+		common.Log.Errorf("name count different %d %d %d", count, len(namesInT1), uint64(lastkey+1))
+		return false
 	}
 
 	// 1. 每个utxoId都存在baseDB中

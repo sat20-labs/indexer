@@ -1068,55 +1068,72 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_ADDRESSVALUE)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
-		b.printfUtxos(utxos1)
+		ids := b.printfUtxos(utxos1)
+		b.deleteUtxos(ids)
+		// 因为badger数据库的bug，在DB_KEY_UTXO中删除的数据可能还会出现，在检查后需要重新删除，再次检查，但只重新检查一次
+		if !b.reCheck {
+			b.reCheck = true
+			return b.CheckSelf()
+		}
 	}
 
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_UTXO)
 	utxos2 := findDifferentItems(utxosInT2, utxosInT1)
 	if len(utxos2) > 0 {
-		b.printfUtxos(utxos2)
+		ids := b.printfUtxos(utxos2)
+		b.deleteUtxos(ids)
 	}
 
 	common.Log.Infof("address not in table %s", common.DB_KEY_ADDRESSVALUE)
-	utxos3 := findDifferentItems(addressesInT1, addressesInT2)
-	for uid := range utxos3 {
+	addresses1 := findDifferentItems(addressesInT1, addressesInT2)
+	for uid := range addresses1 {
 		str, _ := common.GetAddressByID(b.db, uid)
 		common.Log.Infof("%s", str)
 	}
 
 	common.Log.Infof("address not in table %s", common.DB_KEY_UTXO)
-	utxos4 := findDifferentItems(addressesInT2, addressesInT1)
-	for uid := range utxos4 {
+	addresses2 := findDifferentItems(addressesInT2, addressesInT1)
+	for uid := range addresses2 {
 		str, _ := common.GetAddressByID(b.db, uid)
 		common.Log.Infof("%s", str)
 	}
 
-	if len(utxos1) > 0 || len(utxos2) > 0 || len(utxos3) > 0 || len(utxos4) > 0 {
-		common.Log.Panic("utxos or address differents")
+	result := true
+	if len(utxos1) > 0 || len(utxos2) > 0 || len(addresses1) > 0 || len(addresses2) > 0 {
+		common.Log.Errorf("utxos or address differents")
+		result = false
 	}
 
 	if addressInUtxo != allAddressCount {
-		common.Log.Panicf("address count different %d %d", addressInUtxo, allAddressCount)
+		common.Log.Errorf("address count different %d %d", addressInUtxo, allAddressCount)
+		result = false
 	}
 
 	if satsInUtxo != satsInAddress {
-		common.Log.Panicf("sats different %d %d", satsInAddress, satsInUtxo)
+		common.Log.Errorf("sats different %d %d", satsInAddress, satsInUtxo)
+		result = false
 	}
 
 	if nonZeroUtxo != nonZeroUtxoInAddress {
-		common.Log.Panicf("utxo different %d %d", nonZeroUtxo, nonZeroUtxoInAddress)
+		common.Log.Errorf("utxo different %d %d", nonZeroUtxo, nonZeroUtxoInAddress)
+		result = false
 	}
 
 	// testnet: block 26432 多奖励了0.001btc，2642多奖励了0.0015，所以测试网络对比数据会有异常，只在主网上验证
 	// mainnet: 早期软件原因有些块没有拿到足够的奖励，比如124724
 	if b.stats.TotalSats != satsInAddress {
-		common.Log.Panicf("sats wrong %d %d", satsInAddress, b.stats.TotalSats)
+		common.Log.Errorf("sats wrong %d %d", satsInAddress, b.stats.TotalSats)
+		result = false
 	}
 
-	b.setDBVersion()
-
-	common.Log.Infof("DB checked successfully, %v", time.Since(startTime))
-	return true
+	if result {
+		common.Log.Infof("DB checked successfully, %v", time.Since(startTime))
+		b.setDBVersion()
+	} else {
+		common.Log.Infof("DB checked failed, %v", time.Since(startTime))
+	}
+	
+	return result
 }
 
 // 耗时很长。仅用于在数据编译完成时验证数据
@@ -1209,6 +1226,34 @@ func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 	})
 
 	return result
+}
+
+// only for test
+func (b *BaseIndexer) deleteUtxos(utxos map[uint64]string) {
+	wb := b.db.NewWriteBatch()
+	defer wb.Cancel()
+
+	for utxoId, utxo := range utxos {
+		key := common.GetUTXODBKey(utxo)
+		err := wb.Delete([]byte(key))
+		if err != nil {
+			common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+		} else {
+			common.Log.Infof("utxo deled: %s", utxo)
+		}
+
+		err = common.UnBindUtxoId(utxoId, wb)
+		if err != nil {
+			common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+		} else {
+			common.Log.Infof("utxo unbind: %d", utxoId)
+		}
+	}
+
+	err := wb.Flush()
+	if err != nil {
+		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
+	}
 }
 
 func (b *BaseIndexer) setDBVersion() {
