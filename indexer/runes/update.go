@@ -96,15 +96,12 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	var artifact *runestone.Artifact
 	artifact, err = parseArtifact(tx)
 	if err != nil {
+		s.unallocated(tx)
 		if err != runestone.ErrNoOpReturn {
-			common.Log.Infof("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.Txid, err.Error())
+			common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.Txid, err.Error())
 		}
 	} else {
 		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
-	}
-
-	if tx.Txid == "795f145c211e04c2e5e46b464a0d2e0f00081398f2181d6057032563fad31b31" {
-		common.Log.Debugf("RuneIndexer.InsertOutpointToBalances-> key.Txid is empty")
 	}
 
 	if artifact != nil {
@@ -550,7 +547,6 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 					OutPoint:  outpoint,
 				}
 				s.addressOutpointToBalancesTbl.Remove(addressOutpointToBalance)
-
 				ret2 = append(ret2, &RuneIdOutPointAddressId{
 					RuneId:    &val.RuneId,
 					OutPoint:  outpoint,
