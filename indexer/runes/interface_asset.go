@@ -39,7 +39,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 				Amount:  runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
 			}
 		}
-		lot := addressIdToAddressLotMap[balance.AddressId].Amount.Add(runestone.NewLot(balance.Balance.Value))
+		lot := addressIdToAddressLotMap[balance.AddressId].Amount.Add(runestone.NewLot(&balance.Balance.Value))
 		addressIdToAddressLotMap[balance.AddressId].Amount = &lot
 	}
 
@@ -48,7 +48,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 	var i = 0
 
 	for addressId, addressLot := range addressIdToAddressLotMap {
-		decimal := common.NewDecimalFromUint128(*addressLot.Amount.Value, 0)
+		decimal := common.NewDecimalFromUint128(addressLot.Amount.Value, 0)
 		ret[addressId] = decimal
 		i++
 	}
@@ -69,14 +69,6 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
-		return nil, 0
-	}
-
-	runeIdToAddresses, err := s.runeIdToAddressTbl.GetList(rid)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdToAddressTbl.GetList(%s) err:%v", rid.Hex(), err.Error())
-	}
-	if len(runeIdToAddresses) == 0 {
 		return nil, 0
 	}
 
@@ -105,7 +97,7 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 				Amount:  runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0}),
 			}
 		}
-		lot := addressIdToAddressLotMap[balance.AddressId].Amount.Add(runestone.NewLot(balance.Balance.Value))
+		lot := addressIdToAddressLotMap[balance.AddressId].Amount.Add(runestone.NewLot(&balance.Balance.Value))
 		addressIdToAddressLotMap[balance.AddressId].Amount = &lot
 	}
 
@@ -113,12 +105,10 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 	ret := make([]*AddressBalance, total)
 	var i = 0
 	for addressId, addressLot := range addressIdToAddressLotMap {
-		// pile := r.Pile(*addressLot.Amount.Value)
 		addressLot := &AddressBalance{
 			AddressId: addressId,
 			Address:   addressLot.Address,
-			Balance:   *addressLot.Amount.Value,
-			// Pile:      &pile,
+			Balance:   addressLot.Amount.Value,
 		}
 		ret[i] = addressLot
 		i++
@@ -172,78 +162,16 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	totalAmount := runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
 	var i = 0
 	for _, balance := range balances {
-		totalAmount.AddAssign(balance.Balance)
+		totalAmount.AddAssign(&balance.Balance)
 		addressLot := &UtxoBalance{
 			Utxo:     balance.OutPoint.Hex(),
 			Outpoint: balance.OutPoint,
-			Balance:  *balance.Balance.Value,
+			Balance:  balance.Balance.Value,
 		}
 		ret.Balances[i] = addressLot
 		i++
 	}
-	ret.Total = *totalAmount.Value
-
-	end := total
-	if start >= end {
-		return nil, 0
-	}
-	if start+limit < end {
-		end = start + limit
-	}
-	ret.Balances = ret.Balances[start:end]
-	return ret, total
-}
-
-func (s *Indexer) SlowGetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
-	rid, err := runestone.RuneIdFromHex(runeId)
-	if err != nil {
-		common.Log.Infof("RuneIndexer.SlowGetAllUtxoBalances-> runestone.RuneIdFromHex(%s) err:%s", runeId, err.Error())
-		return nil, 0
-	}
-	outpoints, err := s.runeIdToOutpointTbl.GetOutpoints(rid)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.SlowGetAllUtxoBalances-> runeIdToOutpointTbl.GetOutpoints(%s) err:%s", rid.Hex(), err.Error())
-	}
-	if len(outpoints) == 0 {
-		return nil, 0
-	}
-
-	type OutpointLotsMap map[runestone.OutPoint]*runestone.Lot
-	outpointLotsMap := make(OutpointLotsMap)
-	totalAmount := runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
-	for _, outpoint := range outpoints {
-		outpointToBalancesValue := s.outpointToBalancesTbl.Get(outpoint)
-		for _, balance := range outpointToBalancesValue.RuneIdLots {
-			if balance.RuneId.Block != rid.Block || balance.RuneId.Tx != rid.Tx {
-				continue
-			}
-			if outpointLotsMap[*outpoint] == nil {
-				outpointLotsMap[*outpoint] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
-			}
-			outpointLotsMap[*outpoint].AddAssign(&balance.Lot)
-			totalAmount.AddAssign(&balance.Lot)
-		}
-	}
-
-	total := uint64(len(outpointLotsMap))
-	ret := &UtxoBalances{
-		Total:    *totalAmount.Value,
-		Balances: make([]*UtxoBalance, total),
-	}
-	var i = 0
-	for outpoint, lot := range outpointLotsMap {
-		addressLot := &UtxoBalance{
-			Utxo:     outpoint.Hex(),
-			Outpoint: &outpoint,
-			Balance:  *lot.Value,
-		}
-		ret.Balances[i] = addressLot
-		i++
-	}
-
-	sort.Slice(ret.Balances, func(i, j int) bool {
-		return ret.Balances[i].Outpoint.UtxoId < ret.Balances[j].Outpoint.UtxoId
-	})
+	ret.Total = totalAmount.Value
 
 	end := total
 	if start >= end {
@@ -289,7 +217,7 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 				RuneId:       runeEntry.RuneId.String(),
 			}
 		}
-		amount, err := runeEntry.Pile(*balance.Balance.Value).Uint128()
+		amount, err := runeEntry.Pile(balance.Balance.Value).Uint128()
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.GetAddressAssets-> runeEntry.Pile(%s).Uint128() err:%s", balance.Balance.Value.String(), err.Error())
 		}
@@ -303,7 +231,7 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 		addressLot := &AddressAsset{
 			Rune:         spacedRune.String(),
 			RuneId:       runBalance.RuneId,
-			Balance:      *runBalance.Balance.Value,
+			Balance:      runBalance.Balance.Value,
 			Divisibility: runBalance.Divisibility,
 			Symbol:       runBalance.Symbol,
 		}
@@ -330,7 +258,7 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 		ret[i] = &UtxoAsset{
 			Rune:         runeEntry.SpacedRune.String(),
 			RuneId:       runeEntry.RuneId.String(),
-			Balance:      *runeIdLot.Lot.Value,
+			Balance:      runeIdLot.Lot.Value,
 			Divisibility: runeEntry.Divisibility,
 			Symbol:       symbol,
 		}

@@ -15,7 +15,7 @@ type RuneIdAddressToBalance struct {
 	RuneId    *RuneId
 	AddressId uint64
 	Address   Address
-	Balance   *Lot
+	Balance   Lot
 }
 
 func RuneIdAddressToBalanceFromString(str string) (*RuneIdAddressToBalance, error) {
@@ -70,8 +70,8 @@ func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneI
 			return nil
 		}
 		ret.Address = Address(pbVal.Address)
-		ret.Balance = &Lot{
-			Value: &uint128.Uint128{
+		ret.Balance = Lot{
+			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
 				Lo: pbVal.Balance.Value.Lo,
 			},
@@ -94,23 +94,18 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneId
 			}
 			ret[i] = runeIdAddressOutpointToBalance
 			ret[i].Address = Address(v.Address)
-			ret[i].Balance = &Lot{
-				Value: &uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}}
+			ret[i].Balance = Lot{
+				Value: uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}}
 			i++
 		}
 	}
 	return
 }
 
-func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance, runeentry1 *RuneEntry) {
+func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
 	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
-		if runeentry1 != nil {
-			pile := runeentry1.Pile(*v.Balance.Value)
-			pilestr := pile.String()
-			common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> runeId:%s, address:%s, pile:%s ",
-				v.RuneId.String(), v.Address, pilestr)
-		}
+		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> runeId:%s, address:%s ", v.RuneId.String(), v.Address)
 	}
 	s.cache.Set(tblKey, v.ToPb())
 }

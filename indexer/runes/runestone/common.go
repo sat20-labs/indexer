@@ -21,6 +21,8 @@ import (
 	"lukechampine.com/uint128"
 )
 
+type Address string
+
 var ErrNone = errors.New("none")
 
 func Encode(n *big.Int) []byte {
