@@ -12,7 +12,7 @@ import (
 type RuneIdOutpointToBalance struct {
 	RuneId   *RuneId
 	OutPoint *OutPoint
-	Balance  *Lot
+	Balance  Lot
 }
 
 func RuneIdOutpointToBalanceFromString(str string) (*RuneIdOutpointToBalance, error) {
@@ -30,7 +30,7 @@ func RuneIdOutpointToBalanceFromString(str string) (*RuneIdOutpointToBalance, er
 	return ret, nil
 }
 
-func (s *RuneIdOutpointToBalance) String() string {
+func (s *RuneIdOutpointToBalance) Key() string {
 	return s.RuneId.Hex() + "-" + s.OutPoint.Hex()
 }
 
@@ -55,7 +55,7 @@ func NewRuneIdOutpointToBalancesTable(v *store.Cache[pb.RuneBalance]) *RuneIdOut
 }
 
 func (s *RuneIdOutpointToBalanceTable) Get(v *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + v.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + v.Key())
 	pbVal := s.cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
@@ -63,8 +63,8 @@ func (s *RuneIdOutpointToBalanceTable) Get(v *RuneIdOutpointToBalance) (ret *Run
 		if err != nil {
 			common.Log.Panicf("RuneIdOutpointToBalanceTable.Get-> GenRuneIdOutpointToBalance(%s) err:%v", string(tblKey), err)
 		}
-		ret.Balance = &Lot{
-			Value: &uint128.Uint128{
+		ret.Balance = Lot{
+			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
 				Lo: pbVal.Balance.Value.Lo,
 			},
@@ -82,7 +82,7 @@ func (s *RuneIdOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneI
 		for k, v := range pbVal {
 			var err error
 			balance := &Lot{
-				Value: &uint128.Uint128{
+				Value: uint128.Uint128{
 					Hi: v.Balance.Value.Hi,
 					Lo: v.Balance.Value.Lo,
 				},
@@ -91,7 +91,7 @@ func (s *RuneIdOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneI
 			if err != nil {
 				common.Log.Panicf("RuneIdOutpointToBalanceTable.Get-> GenRuneIdOutpointToBalance(%s) err:%v", string(k), err)
 			}
-			runeIdOutpointToBalance.Balance = balance
+			runeIdOutpointToBalance.Balance = *balance
 			ret[i] = runeIdOutpointToBalance
 			i++
 		}
@@ -100,11 +100,11 @@ func (s *RuneIdOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneI
 }
 
 func (s *RuneIdOutpointToBalanceTable) Insert(v *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + v.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + v.Key())
 	pbVal := s.cache.Set(tblKey, v.ToPb())
 	if pbVal != nil {
 		balance := &Lot{
-			Value: &uint128.Uint128{
+			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
 				Lo: pbVal.Balance.Value.Lo,
 			},
@@ -114,17 +114,17 @@ func (s *RuneIdOutpointToBalanceTable) Insert(v *RuneIdOutpointToBalance) (ret *
 		if err != nil {
 			common.Log.Panicf("RuneIdOutpointToBalanceTable.Insert-> GenRuneIdOutpointToBalance(%s) err:%v", string(tblKey), err)
 		}
-		ret.Balance = balance
+		ret.Balance = *balance
 	}
 	return
 }
 
 func (s *RuneIdOutpointToBalanceTable) Remove(key *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {
-	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + key.String())
+	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + key.Key())
 	pbVal := s.cache.Delete(tblKey)
 	if pbVal != nil {
 		balance := &Lot{
-			Value: &uint128.Uint128{
+			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
 				Lo: pbVal.Balance.Value.Lo,
 			},
@@ -134,7 +134,7 @@ func (s *RuneIdOutpointToBalanceTable) Remove(key *RuneIdOutpointToBalance) (ret
 		if err != nil {
 			common.Log.Panicf("RuneIdOutpointToBalanceTable.Insert-> GenRuneIdOutpointToBalance(%s) err:%v", string(tblKey), err)
 		}
-		ret.Balance = balance
+		ret.Balance = *balance
 	}
 	return
 }

@@ -105,7 +105,7 @@ func (s RuneIdLotMap) Get(id *RuneId) *Lot {
 func (s RuneIdLotMap) GetOrDefault(id *RuneId) *Lot {
 	key := *id
 	if s[key] == nil {
-		s[key] = &Lot{Value: &uint128.Uint128{}}
+		s[key] = &Lot{Value: uint128.Uint128{}}
 	}
 	return s[key]
 }
@@ -124,13 +124,15 @@ func (s RuneIdLotMap) GetSortArray() (ret []*RuneIdLot) {
 	sort.Slice(slice, func(i, j int) bool {
 		return slice[i].RuneId.Block < slice[j].RuneId.Block ||
 			(slice[i].RuneId.Block == slice[j].RuneId.Block && slice[i].RuneId.Tx < slice[j].RuneId.Tx) ||
-			(slice[i].RuneId.Block == slice[j].RuneId.Block && slice[i].RuneId.Tx == slice[j].RuneId.Tx && slice[i].Lot.Cmp(slice[j].Lot.Value) < 0)
+			(slice[i].RuneId.Block == slice[j].RuneId.Block && slice[i].RuneId.Tx == slice[j].RuneId.Tx && slice[i].Lot.Cmp(&slice[j].Lot.Value) < 0)
 	})
 	return slice
 }
 
 type OutpointToBalancesValue struct {
 	Utxo       string
+	Address    string
+	AddressId  uint64
 	RuneIdLots []*RuneIdLot
 }
 
@@ -140,6 +142,8 @@ func (s *OutpointToBalancesValue) ToPb() *pb.OutpointToBalances {
 	pbValue := &pb.OutpointToBalances{
 		Value: &pb.OutpointToBalancesValue{
 			Utxo:       s.Utxo,
+			Address:    s.Address,
+			AddressId:  s.AddressId,
 			RuneIdLots: make([]*pb.RuneIdLot, len(s.RuneIdLots)),
 		},
 	}
@@ -164,13 +168,15 @@ func (s *OutpointToBalancesValue) ToPb() *pb.OutpointToBalances {
 
 func (s *OutpointToBalancesValue) FromPb(pbValue *pb.OutpointToBalances) {
 	s.Utxo = pbValue.Value.Utxo
+	s.Address = pbValue.Value.Address
+	s.AddressId = pbValue.Value.AddressId
 	for _, pbRuneIdLot := range pbValue.Value.RuneIdLots {
 		runeId := RuneId{
 			Block: pbRuneIdLot.RuneId.Block,
 			Tx:    pbRuneIdLot.RuneId.Tx,
 		}
 		lot := Lot{
-			Value: &uint128.Uint128{
+			Value: uint128.Uint128{
 				Hi: pbRuneIdLot.Lot.Value.Hi,
 				Lo: pbRuneIdLot.Lot.Value.Lo,
 			},

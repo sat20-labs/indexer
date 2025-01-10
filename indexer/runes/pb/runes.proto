@@ -78,7 +78,9 @@ message RuneIdLot {
 
 message OutpointToBalancesValue {
     string utxo = 1;
-    repeated RuneIdLot rune_id_lots = 2;
+    string Address = 2;
+	uint64 AddressId = 3;
+    repeated RuneIdLot rune_id_lots = 4;
 }
 message OutpointToBalances { OutpointToBalancesValue value = 1; }
 message RuneIdToAddress {}

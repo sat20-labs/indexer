@@ -16,7 +16,7 @@ type AddressOutpointToBalance struct {
 	OutPoint  *OutPoint
 	Address   Address
 	RuneId    *RuneId
-	Balance   *Lot
+	Balance   Lot
 }
 
 func AddressOutpointToBalanceFromString(str string) (*AddressOutpointToBalance, error) {
@@ -72,8 +72,8 @@ func (s *AddressOutpointToBalancesTable) Get(v *AddressOutpointToBalance) (ret *
 		}
 		ret.RuneId = &RuneId{Block: pbVal.RuneId.Block, Tx: pbVal.RuneId.Tx}
 		ret.Address = Address(pbVal.Address)
-		ret.Balance = &Lot{
-			Value: &uint128.Uint128{
+		ret.Balance = Lot{
+			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
 				Lo: pbVal.Balance.Value.Lo,
 			},
@@ -91,7 +91,7 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 		for k, v := range pbVal {
 			var err error
 			lot := &Lot{
-				Value: &uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo},
+				Value: uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo},
 			}
 			addressOutpointToBalance, err := AddressOutpointToBalanceFromString(k)
 			if err != nil {
@@ -99,7 +99,7 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 			}
 			addressOutpointToBalance.Address = Address(v.Address)
 			addressOutpointToBalance.RuneId = &RuneId{Block: v.RuneId.Block, Tx: v.RuneId.Tx}
-			addressOutpointToBalance.Balance = lot
+			addressOutpointToBalance.Balance = *lot
 			ret[i] = addressOutpointToBalance
 			i++
 		}
@@ -108,17 +108,11 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 }
 
 func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
-	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
-		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> address is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
-	}
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
 	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) {
-	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
-		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> address is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
-	}
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
 	s.cache.Delete(tblKey)
 }
