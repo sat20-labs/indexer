@@ -5,5 +5,6 @@ import (
 )
 
 type Table[T any] struct {
-	cache *store.Cache[T]
+	IsLessStorage bool
+	cache         *store.Cache[T]
 }

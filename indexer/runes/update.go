@@ -93,7 +93,10 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
-	i := 0
+	debug := 0
+	if tx.Txid == "30c2c5a7cabd2f819e6969504b96988e1ffeb785b5c2b471d0f1b5d9b7c1ec51" {
+		debug++
+	}
 	var artifact *runestone.Artifact
 	artifact, err = parseArtifact(tx)
 	if err != nil {
@@ -198,31 +201,35 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					if len(destinations) > 0 {
 						if amount.Value.Cmp(uint128.Zero) == 0 {
 							destinationsLen := uint128.From64(uint64(len(destinations)))
-							amount := balance.Div(&destinationsLen)
+							value := balance.Div(&destinationsLen)
 							remainder := balance.Rem(&destinationsLen).Value.Big().Uint64()
 							for index, output := range destinations {
 								if index < int(remainder) {
 									one := uint128.From64(1)
-									amount = amount.AddUint128(&one)
+									value = value.AddUint128(&one)
 								}
-								allocate(balance, &amount, output)
+								allocate(balance, &value, output)
 							}
 						} else {
 							for _, output := range destinations {
-								allocate(balance, amount, output)
+								value := runestone.NewLot(&amount.Value)
+								allocate(balance, value, output)
 							}
 						}
 					}
 				} else {
 					// Get the allocatable amount
+					var value *runestone.Lot
 					if amount.Value.Cmp(uint128.Zero) == 0 {
-						amount = balance
+						value = runestone.NewLot(&balance.Value)
 					} else {
 						if balance.Cmp(&amount.Value) < 0 {
-							amount = balance
+							value = runestone.NewLot(&balance.Value)
+						} else {
+							value = runestone.NewLot(&amount.Value)
 						}
 					}
-					allocate(balance, amount, output)
+					allocate(balance, value, output)
 				}
 			}
 		}
@@ -298,6 +305,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if len(balances) == 0 {
 			continue
 		}
+		for _, balance := range balances {
+			if balance.Value.Cmp(uint128.Zero) == 0 {
+				debug++
+			}
+		}
 		// increment burned balances
 		if tx.Outputs[vout].Address.PkScript[0] == txscript.OP_RETURN {
 			for id, balance := range balances {
@@ -351,12 +363,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	}
 
 	// add for balances
-	if len(runeBalanceArray) > 0 {
-		i++
-	}
-	if len(runeBalanceArray) > 1 {
-		i++
-	}
 	for _, runeBalance := range runeBalanceArray {
 		// update runeIdToOutpointToBalance
 		runeIdToOutpointToBalance := &runestone.RuneIdOutpointToBalance{
@@ -409,9 +415,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			if value != nil {
 				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
 				if value.Balance.Value.Cmp(runeBalance.Balance.Value) < 0 {
-					// panic("1")
-					// amount = uint128.Zero
-					amount = value.Balance.Value
+					debug++
+					amount = uint128.Zero
 				} else {
 					amount = value.Balance.Value.Sub(runeBalance.Balance.Value)
 				}
@@ -423,7 +428,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					s.runeIdAddressToBalanceTbl.Remove(value)
 				}
 			} else {
-				// panic("2")
+				debug++
 			}
 		}
 	}
@@ -526,16 +531,14 @@ type RuneIdOutPointAddressId struct {
 
 func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotMap, ret2 []*RuneIdOutPointAddressId) {
 	ret1 = make(runestone.RuneIdLotMap)
-	for _, input := range tx.Inputs {
+	for j, input := range tx.Inputs {
 		outpoint := &runestone.OutPoint{
 			Txid:   input.Txid,
 			Vout:   uint32(input.Vout),
 			UtxoId: input.UtxoId,
 		}
-
 		oldValue := s.outpointToBalancesTbl.Remove(outpoint)
 		if oldValue != nil {
-			ret2 = make([]*RuneIdOutPointAddressId, 0)
 			for _, val := range oldValue.RuneIdLots {
 				if ret1[val.RuneId] == nil {
 					ret1[val.RuneId] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
@@ -553,6 +556,9 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 					OutPoint:  outpoint,
 				}
 				s.addressOutpointToBalancesTbl.Remove(addressOutpointToBalance)
+				if ret2 == nil {
+					ret2 = make([]*RuneIdOutPointAddressId, 0)
+				}
 				ret2 = append(ret2, &RuneIdOutPointAddressId{
 					RuneId:    &val.RuneId,
 					OutPoint:  outpoint,
@@ -560,6 +566,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				})
 			}
 		}
+		j++
 	}
 	return
 }

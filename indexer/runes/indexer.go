@@ -61,6 +61,15 @@ func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseInd
 	}
 }
 
+func (s *Indexer) SetLessStorage() {
+	s.outpointToBalancesTbl.IsLessStorage = true
+	s.runeIdAddressToBalanceTbl.IsLessStorage = true
+	s.runeIdOutpointToBalanceTbl.IsLessStorage = true
+	s.addressOutpointToBalancesTbl.IsLessStorage = true
+	s.runeIdToMintHistoryTbl.IsLessStorage = true
+	s.addressRuneIdToMintHistoryTbl.IsLessStorage = true
+}
+
 func (s *Indexer) Init() {
 	isExist := s.Status.Init()
 	if !isExist && s.chaincfgParam.Net == wire.MainNet {
