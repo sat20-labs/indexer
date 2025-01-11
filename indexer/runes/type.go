@@ -144,61 +144,70 @@ func (s *RuneInfo) BlockHeight() int {
 }
 
 type AddressBalance struct {
-	AddressId uint64
-	Address   string
-	Balance   uint128.Uint128
-	// Pile      *runestone.Pile
+	AddressId    uint64
+	Address      string
+	Balance      uint128.Uint128
+	Divisibility uint8
 }
 
 func (s AddressBalance) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		AddressId uint64 `json:"addressid"`
-		Balance   string `json:"balance"`
+		AddressId    uint64 `json:"addressid"`
+		Balance      string `json:"balance"`
+		Divisibility uint8  `json:"divisibility"`
 	}{
-		AddressId: s.AddressId,
-		Balance:   s.Balance.String(),
+		AddressId:    s.AddressId,
+		Balance:      s.Balance.String(),
+		Divisibility: s.Divisibility,
 	})
 }
 
 func (s *AddressBalance) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		AddressId uint64 `json:"addressid"`
-		Balance   string `json:"balance"`
+		AddressId    uint64 `json:"addressid"`
+		Balance      string `json:"balance"`
+		Divisibility uint8  `json:"divisibility"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	s.AddressId = aux.AddressId
+	s.Divisibility = aux.Divisibility
 	var err error
 	s.Balance, err = uint128.FromString(aux.Balance)
 	return err
 }
 
 type UtxoBalance struct {
-	Utxo     string
-	Outpoint *runestone.OutPoint
-	Balance  uint128.Uint128
+	Utxo         string
+	Outpoint     *runestone.OutPoint
+	Balance      uint128.Uint128
+	Divisibility uint8
 }
 
 func (s UtxoBalance) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Utxo    string `json:"utxo"`
-		Balance string `json:"balance"`
+		Utxo         string `json:"utxo"`
+		Balance      string `json:"balance"`
+		Divisibility uint8  `json:"divisibility"`
 	}{
-		Utxo:    s.Utxo,
-		Balance: s.Balance.String(),
+		Utxo:         s.Utxo,
+		Balance:      s.Balance.String(),
+		Divisibility: s.Divisibility,
 	})
 }
 
 func (s *UtxoBalance) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		Utxo    string `json:"utxo"`
-		Balance string `json:"balance"`
+		Utxo         string `json:"utxo"`
+		Balance      string `json:"balance"`
+		Divisibility uint8  `json:"divisibility"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	s.Utxo = aux.Utxo
+	s.Divisibility = aux.Divisibility
 	var err error
 	s.Balance, err = uint128.FromString(aux.Balance)
 	return err

@@ -14,23 +14,10 @@ func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
 	if runeEntry == nil {
 		return nil
 	}
-	premine, err := runeEntry.Pile(runeEntry.Premine).Uint128()
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Premine).Uint128() err:%s", err.Error())
-	}
-	supply, err := runeEntry.Pile(runeEntry.Supply()).Uint128()
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Supply()).Uint128() err:%s", err.Error())
-	}
-	maxSupply, err := runeEntry.Pile(runeEntry.MaxSupply()).Uint128()
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.MaxSupply()).Uint128() err:%s", err.Error())
-	}
-	burned, err := runeEntry.Pile(runeEntry.Burned).Uint128()
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.genRuneInfo-> runeEntry.Pile(v.Burned).Uint128() err:%s", err.Error())
-	}
-
+	premine := runeEntry.Premine
+	supply := runeEntry.Supply()
+	maxSupply := runeEntry.MaxSupply()
+	burned := runeEntry.Burned
 	percentage := NewDecimal(&uint128.Zero, 2)
 	if runeEntry.Supply().Cmp(uint128.Zero) != 0 {
 		supply := runeEntry.Supply()
@@ -46,11 +33,11 @@ func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
 		Number:            runeEntry.Number,
 		Timestamp:         runeEntry.Timestamp,
 		Id:                runeEntry.RuneId.String(),
-		Supply:            *supply,
-		MaxSupply:         *maxSupply,
-		Premine:           *premine,
+		Supply:            supply,
+		MaxSupply:         maxSupply,
+		Premine:           premine,
 		PreminePercentage: percentageNum,
-		Burned:            *burned,
+		Burned:            burned,
 		Divisibility:      runeEntry.Divisibility,
 		Turbo:             runeEntry.Turbo,
 		Etching:           runeEntry.Etching,
@@ -72,10 +59,7 @@ func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
 			}
 		}
 		if terms.Amount != nil {
-			amount, err := runeEntry.Pile(*terms.Amount).Uint128()
-			if err != nil {
-				common.Log.Panicf("RuneIndexer.getRuneInfoWithId-> runeEntry.Pile(*terms.Amount).Uint128() err:%s", err.Error())
-			}
+			amount := terms.Amount
 			ret.MintInfo.Amount = *amount
 		}
 		ret.MintInfo.Mints = runeEntry.Mints

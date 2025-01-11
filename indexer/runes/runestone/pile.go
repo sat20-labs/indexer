@@ -3,7 +3,9 @@ package runestone
 import (
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/sat20-labs/indexer/common"
 	"lukechampine.com/uint128"
 )
 
@@ -46,7 +48,7 @@ func (p Pile) String() string {
 	return fmt.Sprintf("%s\u00A0%c", result, symbol)
 }
 
-func (p Pile) Uint128() (*uint128.Uint128, error) {
+func (p Pile) Decimal() (*common.Decimal, error) {
 	cutoff, err := calculateCutoff(p.Divisibility)
 	if err != nil {
 		return nil, fmt.Errorf("Error: %v", err)
@@ -68,9 +70,9 @@ func (p Pile) Uint128() (*uint128.Uint128, error) {
 		fractionalStr = fractionalStr[:width]
 		resultStr = fmt.Sprintf("%s.%s", whole.String(), fractionalStr)
 	}
-
-	ret, err := uint128.FromString(resultStr)
-	return &ret, err
+	precision := getPrecision(resultStr)
+	ret := common.NewDecimalFromUint128(p.Amount, precision)
+	return ret, err
 }
 
 func calculateCutoff(divisibility uint8) (uint128.Uint128, error) {
@@ -87,4 +89,12 @@ func calculateCutoff(divisibility uint8) (uint128.Uint128, error) {
 		}
 	}
 	return cutoff, nil
+}
+
+func getPrecision(numberStr string) int {
+	dotIndex := strings.Index(numberStr, ".")
+	if dotIndex == -1 {
+		return 0
+	}
+	return len(numberStr) - dotIndex - 1
 }
