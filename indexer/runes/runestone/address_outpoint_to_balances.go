@@ -109,7 +109,11 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 
 func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
-	s.cache.Set(tblKey, v.ToPb())
+	pbValue := v.ToPb()
+	if s.IsLessStorage {
+		pbValue.Address = ""
+	}
+	s.cache.Set(tblKey, pbValue)
 }
 
 func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) {
