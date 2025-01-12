@@ -9,8 +9,8 @@ import (
 )
 
 type AddressRuneIdToMintHistory struct {
-	Address   Address
 	AddressId uint64
+	Address   Address
 	RuneId    *RuneId
 	OutPoint  *OutPoint
 }
@@ -27,12 +27,13 @@ func AddressRuneIdToMintHistoryFromString(str string) (*AddressRuneIdToMintHisto
 	if err != nil {
 		return nil, err
 	}
-	ret.OutPoint, err = OutPointFromHex(parts[3])
+	ret.OutPoint, err = OutPointFromString(parts[3])
 	if err != nil {
 		return nil, err
 	}
-	ret.Address = Address(parts[1])
-
+	if !IsLessStorage {
+		ret.Address = Address(parts[4])
+	}
 	return ret, nil
 }
 
@@ -40,8 +41,12 @@ func (s *AddressRuneIdToMintHistory) ToPb() *pb.AddressRuneIdToMintHistory {
 	return &pb.AddressRuneIdToMintHistory{}
 }
 
-func (s *AddressRuneIdToMintHistory) Key() string {
-	return strconv.FormatUint(s.AddressId, 16) + "-" + s.RuneId.Hex() + "-" + s.OutPoint.Hex() + "-" + string(s.Address)
+func (s *AddressRuneIdToMintHistory) Key() (ret string) {
+	ret = strconv.FormatUint(s.AddressId, 16) + "-" + s.RuneId.Hex() + "-" + s.OutPoint.Hex()
+	if !IsLessStorage {
+		ret += "-" + string(s.Address)
+	}
+	return
 }
 
 type AddressRuneIdToMintHistoryTable struct {

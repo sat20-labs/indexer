@@ -13,8 +13,8 @@ import (
 
 type AddressOutpointToBalance struct {
 	AddressId uint64
-	OutPoint  *OutPoint
 	Address   Address
+	OutPoint  *OutPoint
 	RuneId    *RuneId
 	Balance   Lot
 }
@@ -27,8 +27,7 @@ func AddressOutpointToBalanceFromString(str string) (*AddressOutpointToBalance, 
 	if err != nil {
 		return nil, err
 	}
-
-	ret.OutPoint, err = OutPointFromHex(parts[2])
+	ret.OutPoint, err = OutPointFromString(parts[2])
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +69,9 @@ func (s *AddressOutpointToBalancesTable) Get(v *AddressOutpointToBalance) (ret *
 		if err != nil {
 			common.Log.Panicf("AddressOutpointToBalanceTable.Get-> AddressOutpointToBalanceFromString(%s) err:%v", string(tblKey), err)
 		}
-		ret.RuneId = &RuneId{Block: pbVal.RuneId.Block, Tx: pbVal.RuneId.Tx}
+		if pbVal.RuneId != nil {
+			ret.RuneId = &RuneId{Block: pbVal.RuneId.Block, Tx: pbVal.RuneId.Tx}
+		}
 		ret.Address = Address(pbVal.Address)
 		ret.Balance = Lot{
 			Value: uint128.Uint128{
@@ -109,11 +110,10 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 
 func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
-	pbValue := v.ToPb()
-	if s.IsLessStorage {
-		pbValue.Address = ""
+	if IsLessStorage {
+		v.Address = ""
 	}
-	s.cache.Set(tblKey, pbValue)
+	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) {

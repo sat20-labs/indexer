@@ -179,19 +179,18 @@ func (s *AddressBalance) UnmarshalJSON(data []byte) error {
 }
 
 type UtxoBalance struct {
-	Utxo         string
-	Outpoint     *runestone.OutPoint
+	UtxoId       uint64
 	Balance      uint128.Uint128
 	Divisibility uint8
 }
 
 func (s UtxoBalance) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Utxo         string `json:"utxo"`
+		UtxoId       uint64 `json:"utxoId"`
 		Balance      string `json:"balance"`
 		Divisibility uint8  `json:"divisibility"`
 	}{
-		Utxo:         s.Utxo,
+		UtxoId:       s.UtxoId,
 		Balance:      s.Balance.String(),
 		Divisibility: s.Divisibility,
 	})
@@ -199,14 +198,14 @@ func (s UtxoBalance) MarshalJSON() ([]byte, error) {
 
 func (s *UtxoBalance) UnmarshalJSON(data []byte) error {
 	aux := struct {
-		Utxo         string `json:"utxo"`
+		UtxoId       uint64 `json:"utxoId"`
 		Balance      string `json:"balance"`
 		Divisibility uint8  `json:"divisibility"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	s.Utxo = aux.Utxo
+	s.UtxoId = aux.UtxoId
 	s.Divisibility = aux.Divisibility
 	var err error
 	s.Balance, err = uint128.FromString(aux.Balance)
@@ -291,6 +290,7 @@ type UtxoAsset struct {
 }
 
 type MintHistory struct {
+	UtxoId    uint64
 	Utxo      string
 	Amount    uint128.Uint128
 	AddressId uint64

@@ -104,16 +104,13 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneId
 
 func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
-	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
-		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> runeId:%s, address:%s ", v.RuneId.String(), v.Address)
+	if IsLessStorage {
+		v.Address = ""
 	}
 	s.cache.Set(tblKey, v.ToPb())
 }
 
 func (s *RuneIdAddressToBalanceTable) Remove(v *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
-	if v.Address == "tb1pc5j5j5nsk00rxhvytthzu26f2aqjzyaxunfjnv73h0hhsg4q48jqk6d4ph" && v.RuneId.Block == 30562 && v.RuneId.Tx == 50 {
-		common.Log.Debugf("RuneIdAddressToBalanceTable.Insert-> address is empty, runeId:%s, addressId:%d", v.RuneId.Hex(), v.AddressId)
-	}
 	s.cache.Delete(tblKey)
 }

@@ -41,6 +41,7 @@ type Indexer struct {
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
 	store.SetDB(db)
+	runestone.IsLessStorage = true
 	return &Indexer{
 		db:                            db,
 		BaseIndexer:                   baseIndexer,
@@ -59,15 +60,6 @@ func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseInd
 		runeIdToMintHistoryTbl:        runestone.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory]()),
 		addressRuneIdToMintHistoryTbl: runestone.NewAddressRuneIdToMintHistoryTable(store.NewCache[pb.AddressRuneIdToMintHistory]()),
 	}
-}
-
-func (s *Indexer) SetLessStorage() {
-	s.outpointToBalancesTbl.IsLessStorage = true
-	s.runeIdAddressToBalanceTbl.IsLessStorage = true
-	s.runeIdOutpointToBalanceTbl.IsLessStorage = true
-	s.addressOutpointToBalancesTbl.IsLessStorage = true
-	s.runeIdToMintHistoryTbl.IsLessStorage = true
-	s.addressRuneIdToMintHistoryTbl.IsLessStorage = true
 }
 
 func (s *Indexer) Init() {

@@ -17,13 +17,13 @@ type RuneIdOutpointToBalance struct {
 
 func RuneIdOutpointToBalanceFromString(str string) (*RuneIdOutpointToBalance, error) {
 	ret := &RuneIdOutpointToBalance{}
-	parts := strings.SplitN(str, "-", 4)
+	parts := strings.SplitN(str, "-", 3)
 	var err error
 	ret.RuneId, err = RuneIdFromHex(parts[1])
 	if err != nil {
 		return nil, err
 	}
-	ret.OutPoint, err = OutPointFromHex(parts[2])
+	ret.OutPoint, err = OutPointFromString(parts[2])
 	if err != nil {
 		return nil, err
 	}

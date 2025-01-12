@@ -18,15 +18,11 @@ type OutPoint struct {
 }
 
 func (s *OutPoint) Hex() string {
-	return fmt.Sprintf("%s:%x:%x", s.Txid, s.Vout, s.UtxoId)
-}
-
-func (s *OutPoint) String() string {
-	return fmt.Sprintf("%s:%d:%d", s.Txid, s.Vout, s.UtxoId)
-}
-
-func (s *OutPoint) Utxo() string {
-	return fmt.Sprintf("%s:%d", s.Txid, s.Vout)
+	if IsLessStorage {
+		return fmt.Sprintf("%x", s.UtxoId)
+	} else {
+		return fmt.Sprintf("%s:%x:%x", s.Txid, s.Vout, s.UtxoId)
+	}
 }
 
 func (s *OutPoint) Key() string {
@@ -37,56 +33,31 @@ func OutPointFromUtxoId(utxoId uint64) *OutPoint {
 	return &OutPoint{UtxoId: utxoId}
 }
 
-func OutPointFromUtxo(utxo string, utxoId uint64) (*OutPoint, error) {
-	outpoint := &OutPoint{}
-	parts := strings.Split(utxo, ":")
-	outpoint.Txid = parts[0]
-	vout, err := strconv.ParseUint(parts[1], 16, 32)
-	if err != nil {
-		return nil, fmt.Errorf("invalid vout: %v", err)
-	}
-	outpoint.Vout = uint32(vout)
-	outpoint.UtxoId = utxoId
-	return outpoint, nil
-}
-
-func OutPointFromHex(str string) (*OutPoint, error) {
-	outpoint := &OutPoint{}
-	parts := strings.Split(str, ":")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid outpoint format")
-	}
-	outpoint.Txid = parts[0]
-	vout, err := strconv.ParseUint(parts[1], 16, 32)
-	if err != nil {
-		return nil, err
-	}
-	outpoint.Vout = uint32(vout)
-	utxoId, err := strconv.ParseUint(parts[2], 16, 64)
-	if err != nil {
-		return nil, err
-	}
-	outpoint.UtxoId = utxoId
-	return outpoint, nil
-}
-
 func OutPointFromString(str string) (*OutPoint, error) {
 	outpoint := &OutPoint{}
-	parts := strings.Split(str, ":")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid outpoint format")
+	if IsLessStorage {
+		utxoId, err := strconv.ParseUint(str, 16, 64)
+		if err != nil {
+			return nil, err
+		}
+		outpoint.UtxoId = utxoId
+	} else {
+		parts := strings.Split(str, ":")
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("invalid outpoint format")
+		}
+		outpoint.Txid = parts[0]
+		vout, err := strconv.ParseUint(parts[1], 16, 32)
+		if err != nil {
+			return nil, err
+		}
+		outpoint.Vout = uint32(vout)
+		utxoId, err := strconv.ParseUint(parts[2], 16, 64)
+		if err != nil {
+			return nil, err
+		}
+		outpoint.UtxoId = utxoId
 	}
-	outpoint.Txid = parts[0]
-	vout, err := strconv.ParseUint(parts[1], 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	outpoint.Vout = uint32(vout)
-	utxoId, err := strconv.ParseUint(parts[2], 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	outpoint.UtxoId = utxoId
 	return outpoint, nil
 }
 
@@ -130,8 +101,8 @@ func (s RuneIdLotMap) GetSortArray() (ret []*RuneIdLot) {
 
 type OutpointToBalancesValue struct {
 	Utxo       string
-	Address    string
 	AddressId  uint64
+	Address    string
 	RuneIdLots []*RuneIdLot
 }
 
@@ -207,6 +178,10 @@ func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalancesValu
 
 func (s *OutpointToBalancesTable) Insert(key *OutPoint, value *OutpointToBalancesValue) (ret *OutpointToBalancesValue) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Key())
+	if IsLessStorage {
+		value.Utxo = ""
+		value.Address = ""
+	}
 	pbVal := s.cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &OutpointToBalancesValue{}

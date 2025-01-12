@@ -171,8 +171,7 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	for _, balance := range balances {
 		totalAmount.AddAssign(&balance.Balance)
 		addressLot := &UtxoBalance{
-			Utxo:         balance.OutPoint.Hex(),
-			Outpoint:     balance.OutPoint,
+			UtxoId:       balance.OutPoint.UtxoId,
 			Balance:      balance.Balance.Value,
 			Divisibility: r.Divisibility,
 		}

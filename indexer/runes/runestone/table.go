@@ -4,7 +4,8 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes/store"
 )
 
+var IsLessStorage bool
+
 type Table[T any] struct {
-	IsLessStorage bool
-	cache         *store.Cache[T]
+	cache *store.Cache[T]
 }
