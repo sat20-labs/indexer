@@ -9,14 +9,14 @@ import (
 
 func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 	result := make(map[string]*common.TickerInfo)
-	tickers := b.RunesIndexer.GetAllTickers()
+	tickers := b.RunesIndexer.GetAllRuneIds()
 	for _, tickerName := range tickers {
 		t := b.GetRunesTickerV2(tickerName)
 		if t != nil {
 			assetName := common.TickerName{
 				Protocol: common.PROTOCOL_NAME_RUNES,
-				Type: common.ASSET_TYPE_FT,
-				Ticker: tickerName,
+				Type:     common.ASSET_TYPE_FT,
+				Ticker:   tickerName,
 			}
 			result[assetName.String()] = t
 		}
@@ -55,7 +55,7 @@ func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {
 	result.DeployBlocktime = int64(ticker.Timestamp)
 	result.DeployTx = ticker.Etching
 
-	_, holders := p.RunesIndexer.GetAllAddressBalances(ticker.Id, 0, 1)
+	holders := ticker.HolderCount
 	result.HoldersCount = int(holders)
 	result.InscriptionId = ""
 	result.Description = ""

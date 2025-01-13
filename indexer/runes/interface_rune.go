@@ -93,7 +93,7 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 	return s.genRuneInfo(runeEntry)
 }
 
-func (s *Indexer) GetAllTickers() []string {
+func (s *Indexer) GetAllRuneIds() []string {
 	runesIds := make([]string, 0)
 	runeEntrys := s.idToEntryTbl.GetList()
 	for _, v := range runeEntrys {
@@ -102,11 +102,7 @@ func (s *Indexer) GetAllTickers() []string {
 	return runesIds
 }
 
-/*
-*
-desc: 获取所有runeInfo
-*/
-func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint64) {
+func (s *Indexer) GetAllRuneInfos() (ret []*RuneInfo) {
 	runeEntrys := s.idToEntryTbl.GetList()
 	var i = 0
 	for _, runeEntry := range runeEntrys {
@@ -115,7 +111,15 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 		ret = append(ret, runeInfo)
 		i++
 	}
+	return
+}
 
+/*
+*
+desc: 获取所有runeInfo
+*/
+func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint64) {
+	ret = s.GetAllRuneInfos()
 	total = uint64(len(ret))
 	end := total
 	if start >= end {

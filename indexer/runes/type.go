@@ -71,6 +71,7 @@ type RuneInfo struct {
 	Number            uint64
 	Timestamp         uint64
 	Id                string
+	HolderCount       uint64
 	MintInfo          *MintInfo
 	Supply            uint128.Uint128
 	MaxSupply         uint128.Uint128
