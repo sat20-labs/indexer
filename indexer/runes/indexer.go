@@ -123,11 +123,26 @@ func (s *Indexer) Clone() *Indexer {
 		}
 		cloneIndex.cacheLogs.Set(log.Key, cacheLog)
 	}
+	if s.wb != nil {
+		cloneIndex.wb = s.wb
+	} else {
+		common.Log.Panicf("RuneIndexer.Clone-> s.wb is nil")
+	}
+	cloneIndex.height = s.height
+	cloneIndex.Status = &runestone.RunesStatus{
+		Version:       s.Status.Version,
+		Height:        s.Status.Height,
+		Number:        s.Status.Number,
+		ReservedRunes: s.Status.ReservedRunes,
+	}
 	cloneIndex.cloneTimeStamp = time.Now().UnixNano()
 	return cloneIndex
 }
 
 func (s *Indexer) Subtract(backupIndexer *Indexer) {
+	if backupIndexer.cacheLogs == nil {
+		return
+	}
 	for log := range backupIndexer.cacheLogs.IterBuffered() {
 		if log.Val.TimeStamp <= s.cloneTimeStamp {
 			s.cacheLogs.Remove(log.Key)

@@ -24,16 +24,10 @@ func (s *Indexer) UpdateDB() {
 	store.SetCacheLogs(s.cacheLogs)
 	store.FlushToDB()
 	s.Status.Height = s.height
-	if s.Status.Height > 61639 {
-		common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d", s.Status.Height)
-	}
 	s.Status.FlushToDB()
 
-	s.wb = nil
-	s.isUpdateing = false
 	setCount := 0
 	delCount := 0
-
 	for v := range s.cacheLogs.IterBuffered() {
 		if v.Val.Type == store.DEL {
 			delCount++
@@ -41,6 +35,11 @@ func (s *Indexer) UpdateDB() {
 			setCount++
 		}
 	}
+
+	s.wb = nil
+	s.isUpdateing = false
+	store.SetCacheLogs(nil)
+	s.cacheLogs = nil
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count:%d, db del count:%d", s.Status.Height, setCount, delCount)
 }
 

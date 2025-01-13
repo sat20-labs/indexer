@@ -50,38 +50,35 @@ func SetCacheLogs(v *cmap.ConcurrentMap[string, *CacheLog]) {
 }
 
 func FlushToDB() {
-	count := logs.Count()
-	if count == 0 {
-		return
-	}
-
 	var totalBytes int64
-	for log := range logs.IterBuffered() {
-		totalBytes += int64(len(log.Key))
-		totalBytes += int64(unsafe.Sizeof(log.Val))
-		totalBytes += int64(len(log.Val.Val))
-		if log.Val.Type == PUT {
-			storeWriteBatch.Set([]byte(log.Key), log.Val.Val)
-		}
-	}
-
-	err := storeWriteBatch.Flush()
-	if err != nil {
-		common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
-	}
-	storeDb.Update(func(txn *badger.Txn) error {
+	count := logs.Count()
+	if count != 0 {
 		for log := range logs.IterBuffered() {
-			if log.Val.Type == DEL && log.Val.ExistInDb {
-				err := txn.Delete([]byte(log.Key))
-				if err != nil {
-					common.Log.Panicf("Cache::FlushToDB-> err: %v", err.Error())
-				}
+			totalBytes += int64(len(log.Key))
+			totalBytes += int64(unsafe.Sizeof(log.Val))
+			totalBytes += int64(len(log.Val.Val))
+			if log.Val.Type == PUT {
+				storeWriteBatch.Set([]byte(log.Key), log.Val.Val)
 			}
 		}
-		return nil
-	})
 
-	common.Log.Debugf("Cache::FlushToDB-> logs count: %d, total bytes: %d", count, totalBytes)
+		err := storeWriteBatch.Flush()
+		if err != nil {
+			common.Log.Panicf("Cache::FlushToDB-> storeWriteBatch.Flush err:%s", err.Error())
+		}
+		storeDb.Update(func(txn *badger.Txn) error {
+			for log := range logs.IterBuffered() {
+				if log.Val.Type == DEL && log.Val.ExistInDb {
+					err := txn.Delete([]byte(log.Key))
+					if err != nil {
+						common.Log.Panicf("Cache::FlushToDB-> storeDb.Update err:%s", err.Error())
+					}
+				}
+			}
+			return nil
+		})
+	}
+	common.Log.Debugf("Cache::FlushToDB-> logs count:%d, total bytes:%d", count, totalBytes)
 }
 
 func (s *Cache[T]) Get(key []byte) (ret *T) {
