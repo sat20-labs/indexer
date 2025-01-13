@@ -33,6 +33,7 @@ func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
 		Number:            runeEntry.Number,
 		Timestamp:         runeEntry.Timestamp,
 		Id:                runeEntry.RuneId.String(),
+		HolderCount:       runeEntry.HolderCount,
 		Supply:            supply,
 		MaxSupply:         maxSupply,
 		Premine:           premine,

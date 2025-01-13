@@ -16,6 +16,7 @@ type RuneEntry struct {
 	Etching      string // Txid
 	Parent       *InscriptionId
 	Mints        uint128.Uint128
+	HolderCount  uint64
 	Number       uint64
 	Premine      uint128.Uint128
 	SpacedRune   SpacedRune

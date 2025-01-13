@@ -60,6 +60,16 @@ func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEnt
 	return
 }
 
+func (s *RuneIdToEntryTable) Remove(key *RuneId) (ret *RuneEntry) {
+	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
+	pbVal := s.cache.Delete(tblKey)
+	if pbVal != nil {
+		ret = &RuneEntry{}
+		ret.FromPb(pbVal)
+	}
+	return
+}
+
 func (s *RuneIdToEntryTable) SetToDB(key *RuneId, value *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
 	s.cache.SetToDB(tblKey, value.ToPb())

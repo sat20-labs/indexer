@@ -84,3 +84,8 @@ func (s *AddressRuneIdToMintHistoryTable) Insert(value *AddressRuneIdToMintHisto
 	}
 	return
 }
+
+func (s *AddressRuneIdToMintHistoryTable) Remove(v *AddressRuneIdToMintHistory) {
+	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + v.Key())
+	s.cache.Delete(tblKey)
+}

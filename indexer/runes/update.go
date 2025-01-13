@@ -361,7 +361,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		return
 	}
 
-	// add for balances
+	// add for balances and holder count
 	for _, runeBalance := range runeBalanceArray {
 		// update runeIdToOutpointToBalance
 		runeIdToOutpointToBalance := &runestone.RuneIdOutpointToBalance{
@@ -384,6 +384,12 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			addressOutpointToBalance.Balance.AddAssign(&oldAddressOutpointToBalance.Balance)
 		}
 		s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
+
+		r := s.idToEntryTbl.Remove(runeBalance.RuneId)
+		if r != nil {
+			r.HolderCount++
+			s.idToEntryTbl.Insert(runeBalance.RuneId, r)
+		}
 	}
 
 	// clean and sub for balances
@@ -558,6 +564,21 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				if ret2 == nil {
 					ret2 = make([]*RuneIdOutPointAddressId, 0)
 				}
+
+				addressRuneIdToMintHistory := &runestone.AddressRuneIdToMintHistory{
+					AddressId: oldValue.AddressId,
+					Address:   runestone.Address(oldValue.Address),
+					RuneId:    &val.RuneId,
+					OutPoint:  outpoint,
+				}
+				s.addressRuneIdToMintHistoryTbl.Remove(addressRuneIdToMintHistory)
+
+				oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
+				if oldRuneEntry != nil && oldRuneEntry.HolderCount > 0 {
+					oldRuneEntry.HolderCount--
+					s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
+				}
+
 				ret2 = append(ret2, &RuneIdOutPointAddressId{
 					RuneId:    &val.RuneId,
 					OutPoint:  outpoint,
