@@ -116,7 +116,43 @@ func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
 	s.cache.Set(tblKey, v.ToPb())
 }
 
-func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) {
+func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) (ret *AddressOutpointToBalance) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
-	s.cache.Delete(tblKey)
+	pbVal := s.cache.Delete(tblKey)
+	if pbVal != nil {
+		ret = &AddressOutpointToBalance{}
+		var err error
+		ret, err = AddressOutpointToBalanceFromString(string(tblKey))
+		if err != nil {
+			common.Log.Panicf("AddressOutpointToBalancesTable.Remove-> AddressOutpointToBalanceFromString(%s) err:%v", string(tblKey), err)
+		}
+	}
+	return
 }
+
+func (s *AddressOutpointToBalancesTable) IsExistOnlyOne(addressId uint64) (ret bool) {
+	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
+	count := 0
+	s.cache.IsExist(tblKey, func(k []byte, v *pb.AddressOutpointToBalance) bool {
+		count++
+		return count > 1
+	})
+	ret = count == 1
+	return
+}
+
+func (s *AddressOutpointToBalancesTable) IsExist(addressId uint64, runeId *RuneId) (ret bool) {
+	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
+	ret = s.cache.IsExist(tblKey, func(k []byte, v *pb.AddressOutpointToBalance) bool {
+		if v.RuneId.Block == runeId.Block && v.RuneId.Tx == runeId.Tx {
+			return true
+		}
+		return false
+	})
+	return
+}
+
+// func (s *AddressOutpointToBalancesTable) IsExist1(addressId uint64) (ret bool) {
+// 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
+// 	return s.cache.IsExist(tblKey)
+// }

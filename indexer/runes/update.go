@@ -43,6 +43,10 @@ func (s *Indexer) UpdateDB() {
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count:%d, db del count:%d", s.Status.Height, setCount, delCount)
 }
 
+var Debug = 0
+var HolderAddCount = 0
+var HolderDelCount = 0
+
 func (s *Indexer) UpdateTransfer(block *common.Block) {
 	if !s.isUpdateing {
 		if block.Height > 0 {
@@ -69,6 +73,9 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		store.SetCacheLogs(s.cacheLogs)
 	}
 
+	HolderAddCount = 0
+	HolderDelCount = 0
+
 	s.height = uint64(block.Height)
 	s.burnedMap = make(runestone.RuneIdLotMap)
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
@@ -86,15 +93,15 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	}
 	sinceTime := time.Since(startTime)
 	txCount := len(block.Transactions)
-	common.Log.Infof("RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, block took time:%v, tx took avg time:%v",
-		block.Height, txCount, sinceTime, sinceTime/time.Duration(txCount))
+	formatStr := "RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, HolderAddCount:%d, HolderDelCount:%d, block took time:%v, tx took avg time:%v"
+	common.Log.Infof(formatStr, block.Height, txCount, HolderAddCount, HolderDelCount, sinceTime, sinceTime/time.Duration(txCount))
 	s.update()
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
-	debug := 0
+
 	if tx.Txid == "30c2c5a7cabd2f819e6969504b96988e1ffeb785b5c2b471d0f1b5d9b7c1ec51" {
-		debug++
+		Debug++
 	}
 	var artifact *runestone.Artifact
 	artifact, err = parseArtifact(tx)
@@ -306,7 +313,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		}
 		for _, balance := range balances {
 			if balance.Value.Cmp(uint128.Zero) == 0 {
-				debug++
+				Debug++
 			}
 		}
 		// increment burned balances
@@ -383,13 +390,15 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if oldAddressOutpointToBalance != nil {
 			addressOutpointToBalance.Balance.AddAssign(&oldAddressOutpointToBalance.Balance)
 		}
-		s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
-
-		r := s.idToEntryTbl.Remove(runeBalance.RuneId)
-		if r != nil {
+		isExist := s.addressOutpointToBalancesTbl.IsExist(runeBalance.AddressId, runeBalance.RuneId)
+		if !isExist {
+			r := s.idToEntryTbl.Remove(runeBalance.RuneId)
 			r.HolderCount++
+			HolderAddCount++
 			s.idToEntryTbl.Insert(runeBalance.RuneId, r)
+			common.Log.Tracef("insert addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, r.HolderCount)
 		}
+		s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
 	}
 
 	// clean and sub for balances
@@ -420,7 +429,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			if value != nil {
 				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
 				if value.Balance.Value.Cmp(runeBalance.Balance.Value) < 0 {
-					debug++
+					Debug++
 					amount = uint128.Zero
 				} else {
 					amount = value.Balance.Value.Sub(runeBalance.Balance.Value)
@@ -433,7 +442,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					s.runeIdAddressToBalanceTbl.Remove(value)
 				}
 			} else {
-				debug++
+				Debug++
 			}
 		}
 	}
@@ -556,14 +565,23 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				}
 				s.runeIdOutpointToBalanceTbl.Remove(runeIdOutpointToBalance)
 
+				isExist := s.addressOutpointToBalancesTbl.IsExistOnlyOne(oldValue.AddressId)
+				if isExist {
+					oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
+					common.Log.Debugf("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount)
+					if oldRuneEntry.HolderCount == 0 {
+						common.Log.Errorf("unallocated-> oldRuneEntry.HolderCount == 0")
+					}
+					oldRuneEntry.HolderCount--
+					HolderDelCount++
+					s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
+
+				}
 				addressOutpointToBalance := &runestone.AddressOutpointToBalance{
 					AddressId: oldValue.AddressId,
 					OutPoint:  outpoint,
 				}
 				s.addressOutpointToBalancesTbl.Remove(addressOutpointToBalance)
-				if ret2 == nil {
-					ret2 = make([]*RuneIdOutPointAddressId, 0)
-				}
 
 				addressRuneIdToMintHistory := &runestone.AddressRuneIdToMintHistory{
 					AddressId: oldValue.AddressId,
@@ -573,12 +591,9 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				}
 				s.addressRuneIdToMintHistoryTbl.Remove(addressRuneIdToMintHistory)
 
-				oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
-				if oldRuneEntry != nil && oldRuneEntry.HolderCount > 0 {
-					oldRuneEntry.HolderCount--
-					s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
+				if ret2 == nil {
+					ret2 = make([]*RuneIdOutPointAddressId, 0)
 				}
-
 				ret2 = append(ret2, &RuneIdOutPointAddressId{
 					RuneId:    &val.RuneId,
 					OutPoint:  outpoint,
