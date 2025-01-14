@@ -43,11 +43,14 @@ func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {
 	result.Id = int64(ticker.Number)
 	result.Divisibility = int(ticker.Divisibility)
 
-	result.TotalMinted = ticker.Supply.String()
-	result.MaxSupply = ticker.MaxSupply.String()
+	decimal := common.NewDecimalFromUint128(ticker.Supply, result.Divisibility)
+	result.TotalMinted = decimal.String()
+	decimal = common.NewDecimalFromUint128(ticker.MaxSupply, result.Divisibility)
+	result.MaxSupply = decimal.String()
 	if ticker.MintInfo != nil {
 		result.MintTimes = ticker.MintInfo.Mints.Big().Int64()
-		result.Limit = ticker.MintInfo.Amount.String()
+		decimal = common.NewDecimalFromUint128(ticker.MintInfo.Amount, result.Divisibility)
+		result.Limit = decimal.String()
 	}
 	result.SelfMint = int(ticker.PreminePercentage)
 

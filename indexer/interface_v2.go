@@ -57,7 +57,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *sw
 		if err != nil {
 			continue
 		}
-		info := b.GetTxOutputWithUtxoV2(utxo)
+		info := b.GetTxOutputWithUtxoV3(utxo)
 		if info == nil {
 			continue
 		}
@@ -144,7 +144,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	}
 }
 
-func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string) *common.AssetsInUtxo {
+func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	info, err := b.rpcService.GetUtxoInfo(utxo)
 	if err != nil {
 		return nil
@@ -318,7 +318,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address))
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-		result[tickName] = common.NewDecimalFromUint128(v.Balance, 0)
+		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
 	}
 
 	plainUtxoMap := make(map[uint64]int64)

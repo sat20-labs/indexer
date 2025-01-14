@@ -122,22 +122,22 @@ type MintInfo struct {
 }
 
 type MintHistory struct {
-	swire.AssetName        `json:"name"`
-	Total    int           `json:"total,omitempty"`
-	Start    int           `json:"start,omitempty"`
-	Limit    int           `json:"limit,omitempty"`
-	Items    []*MintInfo   `json:"items,omitempty"`
+	swire.AssetName        `json:"Name"`
+	Total    int           `json:"Total,omitempty"`
+	Start    int           `json:"Start,omitempty"`
+	Limit    int           `json:"Limit,omitempty"`
+	Items    []*MintInfo   `json:"Items,omitempty"`
 }
 
 type DisplayAsset struct {
-	swire.AssetName        `json:"name"`
-	Amount  string         `json:"amount"`
-	BindingSat bool        `json:"bindingsat"`
-	Offsets []*OffsetRange `json:"offsets"`
+	swire.AssetName        `json:"Name"`
+	Amount  string         `json:"Amount"`
+	BindingSat bool        `json:"BindingSat"`
+	Offsets []*OffsetRange `json:"Offsets"`
 }
 
 type AssetsInUtxo struct {
-	OutPoint    string     `json:"outpoint"`
-	Value       int64      `json:"value"`
-	Assets  	[]*DisplayAsset `json:"assets"`
+	OutPoint    string     `json:"Outpoint"`
+	Value       int64      `json:"Value"`
+	Assets  	[]*DisplayAsset `json:"Assets"`
 }
