@@ -103,8 +103,7 @@ func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common
 
 	for k, v := range info.Tickers {
 		org := result[k]
-		org.Add(&v.AvailableBalance)
-		result[k] = org
+		result[k] = *org.Add(&v.AvailableBalance)
 	}
 
 	return result
@@ -185,7 +184,7 @@ func (p *BRC20Indexer) GetMintAmount(tick string) (*common.Decimal, int64) {
 	}
 
 	for _, info := range tickinfo.InscriptionMap {
-		amount.Add(&info.Amount)
+		amount = *amount.Add(&info.Amount)
 	}
 
 	return &amount, int64(len(tickinfo.InscriptionMap))

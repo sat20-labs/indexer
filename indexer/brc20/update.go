@@ -105,7 +105,7 @@ func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, amt commo
 			tickinfo := common.NewBRC20TickAbbrInfo(amt)
 			info.Tickers[ticker] = tickinfo
 		} else {
-			tickinfo.AvailableBalance.Add(&amt)
+			tickinfo.AvailableBalance = *tickinfo.AvailableBalance.Add(&amt)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt commo
 		if ok {
 			cmp := tickinfo.AvailableBalance.Cmp(&amt)
 			if cmp >= 0 {
-				tickinfo.AvailableBalance.Sub(&amt)
+				tickinfo.AvailableBalance = *tickinfo.AvailableBalance.Sub(&amt)
 				if cmp == 0 {
 					holders := p.tickerToHolderMap[ticker]
 					delete(holders, address)
