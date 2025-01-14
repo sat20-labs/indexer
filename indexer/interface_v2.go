@@ -57,7 +57,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *sw
 		if err != nil {
 			continue
 		}
-		info := b.GetTxOutputWithUtxoV2(utxo)
+		info := b.GetTxOutputWithUtxoV3(utxo)
 		if info == nil {
 			continue
 		}
@@ -144,7 +144,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	}
 }
 
-func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string) *common.AssetsInUtxo {
+func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	info, err := b.rpcService.GetUtxoInfo(utxo)
 	if err != nil {
 		return nil

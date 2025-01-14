@@ -215,7 +215,7 @@ func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*comm
 }
 
 func (s *Model) GetUtxoInfoV3(utxo string) (*common.AssetsInUtxo, error) {
-	return s.indexer.GetTxOutputWithUtxoV2(utxo), nil
+	return s.indexer.GetTxOutputWithUtxoV3(utxo), nil
 }
 
 func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo, error) {
