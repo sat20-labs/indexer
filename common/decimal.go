@@ -331,7 +331,7 @@ func (d *Decimal) ToInt64WithMax(max *Decimal) int64 {
 	// 十进制移位
 	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
 	scaleIndex := decimalDigits(quotient.Uint64())
-	return d.Div(big.NewInt(int64(scaleIndex))).Value.Int64()
+	return d.Div(precisionFactor[scaleIndex]).Value.Int64()
 }
 
 func NewDecimalFromInt64WithMax(value int64, max *Decimal) (*Decimal) {
@@ -344,7 +344,7 @@ func NewDecimalFromInt64WithMax(value int64, max *Decimal) (*Decimal) {
 	scaleIndex := decimalDigits(quotient.Uint64())
 
 	result := NewDecimal(value, max.Precition)
-	return result.Mul(big.NewInt(int64(scaleIndex)))
+	return result.Mul(precisionFactor[scaleIndex])
 }
 
 func NewDecimalFromUint128(n uint128.Uint128, precition int) *Decimal {
