@@ -396,7 +396,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			r.HolderCount++
 			HolderAddCount++
 			s.idToEntryTbl.Insert(runeBalance.RuneId, r)
-			common.Log.Tracef("insert addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, r.HolderCount)
+			common.Log.Debugf("insert addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, r.HolderCount)
 		}
 		s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
 	}
