@@ -164,22 +164,21 @@ func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
 }
 
 func (s *Cache[T]) IsExist(keyPrefix []byte, cb func(key []byte, value *T) bool) (ret bool) {
-	if logs == nil {
-		return false
-	}
-	keyPrefixStr := string(keyPrefix)
-	for log := range logs.IterBuffered() {
-		if strings.HasPrefix(log.Key, keyPrefixStr) {
-			if log.Val.Type != DEL {
-				var out T
-				msg := any(&out).(proto.Message)
-				err := proto.Unmarshal(log.Val.Val, msg)
-				if err != nil {
-					common.Log.Panicf("Cache.GetList-> key: %s, proto.Unmarshal err: %v", log.Key, err.Error())
-				}
-				ret = cb([]byte(log.Key), &out)
-				if ret {
-					return
+	if logs != nil {
+		keyPrefixStr := string(keyPrefix)
+		for log := range logs.IterBuffered() {
+			if strings.HasPrefix(log.Key, keyPrefixStr) {
+				if log.Val.Type != DEL {
+					var out T
+					msg := any(&out).(proto.Message)
+					err := proto.Unmarshal(log.Val.Val, msg)
+					if err != nil {
+						common.Log.Panicf("Cache.GetList-> key: %s, proto.Unmarshal err: %v", log.Key, err.Error())
+					}
+					ret = cb([]byte(log.Key), &out)
+					if ret {
+						return
+					}
 				}
 			}
 		}
