@@ -108,3 +108,7 @@ message AddressOutpointToBalance {
     RuneId runeId = 2;
     Lot Balance = 3;
 }
+
+message RuneIdAddressToCount {
+    uint64 Count = 1;
+}

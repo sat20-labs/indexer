@@ -151,8 +151,3 @@ func (s *AddressOutpointToBalancesTable) IsExist(addressId uint64, runeId *RuneI
 	})
 	return
 }
-
-// func (s *AddressOutpointToBalancesTable) IsExist1(addressId uint64) (ret bool) {
-// 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
-// 	return s.cache.IsExist(tblKey)
-// }

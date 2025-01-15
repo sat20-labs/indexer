@@ -99,10 +99,6 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
-
-	if tx.Txid == "30c2c5a7cabd2f819e6969504b96988e1ffeb785b5c2b471d0f1b5d9b7c1ec51" {
-		Debug++
-	}
 	var artifact *runestone.Artifact
 	artifact, err = parseArtifact(tx)
 	if err != nil {
@@ -390,14 +386,41 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if oldAddressOutpointToBalance != nil {
 			addressOutpointToBalance.Balance.AddAssign(&oldAddressOutpointToBalance.Balance)
 		}
-		isExist := s.addressOutpointToBalancesTbl.IsExist(runeBalance.AddressId, runeBalance.RuneId)
-		if !isExist {
+
+		runeIdAddressToCountKey := &runestone.RuneIdAddressToCount{
+			RuneId:    runeBalance.RuneId,
+			AddressId: runeBalance.AddressId,
+			Address:   runeBalance.Address,
+		}
+		runeIdAddressToCountValue := s.runeIdAddressToCountTbl.Remove(runeIdAddressToCountKey)
+		if runeIdAddressToCountValue == nil {
+			runeIdAddressToCountValue = &runestone.RuneIdAddressToCount{
+				RuneId:    runeBalance.RuneId,
+				AddressId: runeBalance.AddressId,
+				Address:   runeBalance.Address,
+				Count:     0,
+			}
+		}
+		runeIdAddressToCountValue.Count++
+		s.runeIdAddressToCountTbl.Insert(runeIdAddressToCountValue)
+		if runeIdAddressToCountValue.Count == 1 {
 			r := s.idToEntryTbl.Remove(runeBalance.RuneId)
 			r.HolderCount++
 			HolderAddCount++
 			s.idToEntryTbl.Insert(runeBalance.RuneId, r)
 			common.Log.Debugf("insert addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, r.HolderCount)
+		} else {
+			common.Log.Debugf("update addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, runeIdAddressToCountValue.Count)
 		}
+
+		// isExist := s.addressOutpointToBalancesTbl.IsExist(runeBalance.AddressId, runeBalance.RuneId)
+		// if !isExist {
+		// 	r := s.idToEntryTbl.Remove(runeBalance.RuneId)
+		// 	r.HolderCount++
+		// 	HolderAddCount++
+		// 	s.idToEntryTbl.Insert(runeBalance.RuneId, r)
+		// 	common.Log.Debugf("insert addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, r.HolderCount)
+		// }
 		s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
 	}
 
@@ -565,18 +588,38 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				}
 				s.runeIdOutpointToBalanceTbl.Remove(runeIdOutpointToBalance)
 
-				isExist := s.addressOutpointToBalancesTbl.IsExistOnlyOne(oldValue.AddressId)
-				if isExist {
+				runeIdAddressToCountKey := &runestone.RuneIdAddressToCount{
+					RuneId:    &val.RuneId,
+					AddressId: oldValue.AddressId,
+					Address:   runestone.Address(oldValue.Address),
+				}
+				runeIdAddressToCountValue := s.runeIdAddressToCountTbl.Remove(runeIdAddressToCountKey)
+				runeIdAddressToCountValue.Count--
+				if runeIdAddressToCountValue.Count == 0 {
 					oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
-					common.Log.Debugf("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount)
+					common.Log.Debugf("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount-1)
 					if oldRuneEntry.HolderCount == 0 {
 						common.Log.Errorf("unallocated-> oldRuneEntry.HolderCount == 0")
 					}
 					oldRuneEntry.HolderCount--
 					HolderDelCount++
 					s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
-
+				} else {
+					s.runeIdAddressToCountTbl.Insert(runeIdAddressToCountValue)
 				}
+
+				// isExist := s.addressOutpointToBalancesTbl.IsExistOnlyOne(oldValue.AddressId)
+				// if isExist {
+				// 	oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
+				// 	common.Log.Debugf("remove addressid %d, block %d, HolderCount: %d",
+				// 		oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount-1)
+				// 	if oldRuneEntry.HolderCount == 0 {
+				// 		common.Log.Errorf("unallocated-> oldRuneEntry.HolderCount == 0")
+				// 	}
+				// 	oldRuneEntry.HolderCount--
+				// 	HolderDelCount++
+				// 	s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
+				// }
 				addressOutpointToBalance := &runestone.AddressOutpointToBalance{
 					AddressId: oldValue.AddressId,
 					OutPoint:  outpoint,

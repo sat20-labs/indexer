@@ -106,8 +106,6 @@ type OutpointToBalancesValue struct {
 	RuneIdLots []*RuneIdLot
 }
 
-// type OutpointToBalancesValue []RuneIdLot
-
 func (s *OutpointToBalancesValue) ToPb() *pb.OutpointToBalances {
 	pbValue := &pb.OutpointToBalances{
 		Value: &pb.OutpointToBalancesValue{

@@ -305,7 +305,9 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 				return err
 			}
 			ret = cb(key, &out)
-			return nil
+			if ret {
+				return nil
+			}
 		}
 		return nil
 	})

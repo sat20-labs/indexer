@@ -1300,6 +1300,53 @@ func (x *AddressOutpointToBalance) GetBalance() *Lot {
 	return nil
 }
 
+type RuneIdAddressToCount struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Count uint64 `protobuf:"varint,1,opt,name=Count,proto3" json:"Count,omitempty"`
+}
+
+func (x *RuneIdAddressToCount) Reset() {
+	*x = RuneIdAddressToCount{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_indexer_runes_pb_runes_proto_msgTypes[22]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RuneIdAddressToCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuneIdAddressToCount) ProtoMessage() {}
+
+func (x *RuneIdAddressToCount) ProtoReflect() protoreflect.Message {
+	mi := &file_indexer_runes_pb_runes_proto_msgTypes[22]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuneIdAddressToCount.ProtoReflect.Descriptor instead.
+func (*RuneIdAddressToCount) Descriptor() ([]byte, []int) {
+	return file_indexer_runes_pb_runes_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RuneIdAddressToCount) GetCount() uint64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
 var File_indexer_runes_pb_runes_proto protoreflect.FileDescriptor
 
 var file_indexer_runes_pb_runes_proto_rawDesc = []byte{
@@ -1440,8 +1487,11 @@ var file_indexer_runes_pb_runes_proto_rawDesc = []byte{
 	0x65, 0x49, 0x64, 0x52, 0x06, 0x72, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x12, 0x27, 0x0a, 0x07, 0x42,
 	0x61, 0x6c, 0x61, 0x6e, 0x63, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70,
 	0x62, 0x2e, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2e, 0x4c, 0x6f, 0x74, 0x52, 0x07, 0x42, 0x61, 0x6c,
-	0x61, 0x6e, 0x63, 0x65, 0x42, 0x0b, 0x5a, 0x09, 0x2f, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2f, 0x70,
-	0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x61, 0x6e, 0x63, 0x65, 0x22, 0x2c, 0x0a, 0x14, 0x52, 0x75, 0x6e, 0x65, 0x49, 0x64, 0x41, 0x64,
+	0x64, 0x72, 0x65, 0x73, 0x73, 0x54, 0x6f, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x14, 0x0a, 0x05,
+	0x43, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x43, 0x6f, 0x75,
+	0x6e, 0x74, 0x42, 0x0b, 0x5a, 0x09, 0x2f, 0x72, 0x75, 0x6e, 0x65, 0x73, 0x2f, 0x70, 0x62, 0x62,
+	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1456,7 +1506,7 @@ func file_indexer_runes_pb_runes_proto_rawDescGZIP() []byte {
 	return file_indexer_runes_pb_runes_proto_rawDescData
 }
 
-var file_indexer_runes_pb_runes_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_indexer_runes_pb_runes_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_indexer_runes_pb_runes_proto_goTypes = []interface{}{
 	(*Uint128)(nil),                    // 0: pb.runes.Uint128
 	(*Uint8)(nil),                      // 1: pb.runes.Uint8
@@ -1480,6 +1530,7 @@ var file_indexer_runes_pb_runes_proto_goTypes = []interface{}{
 	(*RuneAddressBalance)(nil),         // 19: pb.runes.RuneAddressBalance
 	(*RuneIdAddressToBalance)(nil),     // 20: pb.runes.RuneIdAddressToBalance
 	(*AddressOutpointToBalance)(nil),   // 21: pb.runes.AddressOutpointToBalance
+	(*RuneIdAddressToCount)(nil),       // 22: pb.runes.RuneIdAddressToCount
 }
 var file_indexer_runes_pb_runes_proto_depIdxs = []int32{
 	0,  // 0: pb.runes.Rune.value:type_name -> pb.runes.Uint128
@@ -1782,6 +1833,18 @@ func file_indexer_runes_pb_runes_proto_init() {
 				return nil
 			}
 		}
+		file_indexer_runes_pb_runes_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RuneIdAddressToCount); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1789,7 +1852,7 @@ func file_indexer_runes_pb_runes_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_indexer_runes_pb_runes_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
