@@ -3,6 +3,7 @@
 # .vscode
 *debug_bin*
 db/*
+db1/*
 log/*
 # for conf
 *.env

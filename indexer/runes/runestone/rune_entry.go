@@ -16,6 +16,7 @@ type RuneEntry struct {
 	Etching      string // Txid
 	Parent       *InscriptionId
 	Mints        uint128.Uint128
+	HolderCount  uint64
 	Number       uint64
 	Premine      uint128.Uint128
 	SpacedRune   SpacedRune
@@ -176,6 +177,7 @@ func (s *RuneEntry) ToPb() *pb.RuneEntry {
 		Etching:      s.Etching,
 		Mints:        &pb.Uint128{Hi: s.Mints.Hi, Lo: s.Mints.Lo},
 		Number:       s.Number,
+		HolderCount:  s.HolderCount,
 		Premine:      &pb.Uint128{Hi: s.Premine.Hi, Lo: s.Premine.Lo},
 		SpacedRune: &pb.SpacedRune{
 			Rune:    &pb.Rune{Value: &pb.Uint128{Hi: s.SpacedRune.Rune.Value.Hi, Lo: s.SpacedRune.Rune.Value.Lo}},
@@ -231,6 +233,7 @@ func (s *RuneEntry) FromPb(pbValue *pb.RuneEntry) {
 	s.Parent = &parent
 	s.Mints = uint128.Uint128{Hi: pbValue.Mints.Hi, Lo: pbValue.Mints.Lo}
 	s.Number = pbValue.Number
+	s.HolderCount = pbValue.HolderCount
 	s.Premine = uint128.Uint128{Hi: pbValue.Premine.Hi, Lo: pbValue.Premine.Lo}
 	s.SpacedRune.Rune.Value = uint128.Uint128{
 		Lo: pbValue.SpacedRune.Rune.Value.Lo,
