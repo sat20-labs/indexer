@@ -8,6 +8,12 @@ import (
 	"lukechampine.com/uint128"
 )
 
+type AddressLot struct {
+	Address string
+	Amount  *uint128.Uint128
+}
+type AddressIdToAddressLotMap map[uint64]*AddressLot
+
 // key: addressId, value: amount
 func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
 	rid, err := runestone.RuneIdFromString(runeId)
@@ -25,13 +31,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())
 	}
 
-	type AddressLot struct {
-		Address string
-		Amount  *uint128.Uint128
-	}
-	type AddressIdToAddressLotMap map[uint64]*AddressLot
 	addressIdToAddressLotMap := make(AddressIdToAddressLotMap)
-
 	for _, balance := range balances {
 		if addressIdToAddressLotMap[balance.AddressId] == nil {
 			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
@@ -83,13 +83,7 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())
 	}
 
-	type AddressLot struct {
-		Address string
-		Amount  *uint128.Uint128
-	}
-	type AddressIdToAddressLotMap map[uint64]*AddressLot
 	addressIdToAddressLotMap := make(AddressIdToAddressLotMap)
-
 	for _, balance := range balances {
 		if addressIdToAddressLotMap[balance.AddressId] == nil {
 			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
@@ -97,8 +91,8 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 				Amount:  &uint128.Uint128{Lo: 0, Hi: 0},
 			}
 		}
-		lot := addressIdToAddressLotMap[balance.AddressId].Amount.Add(balance.Balance.Value)
-		addressIdToAddressLotMap[balance.AddressId].Amount = &lot
+		v128 := addressIdToAddressLotMap[balance.AddressId].Amount.Add(balance.Balance.Value)
+		addressIdToAddressLotMap[balance.AddressId].Amount = &v128
 	}
 
 	total := uint64(len(addressIdToAddressLotMap))
@@ -134,7 +128,7 @@ desc: 根据runeId获取所有带有该rune的utxo和该utxo中的资产数量 (
 2 根据utxo获取资产和持有数量 get_rune_balances_for_output(utxo)
 */
 func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
-	rid, err := runestone.RuneIdFromHex(runeId)
+	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.RuneIdFromHex(%s) err:%s", runeId, err.Error())
 		return nil, 0

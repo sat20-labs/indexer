@@ -6,10 +6,12 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/indexer/runes"
+	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/share/base_indexer"
+	"lukechampine.com/uint128"
 )
 
-const firstRuneName = "BESTINSLOT•XYZ"
+var firstRuneName = "BESTINSLOT•XYZ"
 
 var runesIndexer *runes.Indexer
 
@@ -20,6 +22,7 @@ func InitRuneTester() {
 		base_indexer.InitBaseIndexer(indexerMgr)
 		indexerMgr.Init()
 		runesIndexer = indexerMgr.RunesIndexer
+		runestone.IsLessStorage = false
 	}
 }
 
@@ -65,8 +68,7 @@ func TestGetAllAddressBalances(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
-	// TODO optimize
-	addressBalance, total := runesIndexer.GetAllAddressBalances(runeId.Hex(), 0, 10)
+	addressBalance, total := runesIndexer.GetAllAddressBalances(runeId.String(), 0, 10)
 	t.Logf("GetAllAddressBalances return addressBalance total count: %d\n", total)
 	for i, v := range addressBalance {
 		t.Logf("GetAllAddressBalances return addressBalance %d: addressId: %d, balance: %s\n", i, v.AddressId, v.Balance.String())
@@ -80,7 +82,7 @@ func TestGetAllUtxoBalances(t *testing.T) {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
 	// 5
-	allUtxoBalances1, total1 := runesIndexer.GetAllUtxoBalances(runeId.Hex(), 0, 10)
+	allUtxoBalances1, total1 := runesIndexer.GetAllUtxoBalances(runeId.String(), 0, 10)
 	t.Logf("GetAllUtxoBalances return utxoBalance total count: %d\n", total1)
 	for i, v := range allUtxoBalances1.Balances {
 		t.Logf("GetAllUtxoBalances return utxoBalance %d: %+v\n", i, v)
@@ -137,5 +139,38 @@ func TestGetAddressMintHistory(t *testing.T) {
 	t.Logf("GetAddressMintHistory return txids total count: %d\n", total)
 	for i, v := range mintHistorys {
 		t.Logf("GetAddressMintHistory return txids %d: %+v\n", i, v)
+	}
+}
+
+func TestCheckRunesSummary(t *testing.T) {
+	InitRuneTester()
+	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
+	if err != nil {
+		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
+	}
+	t.Logf("rune: %s\n", firstRuneName)
+
+	runeInfo := runesIndexer.GetRuneInfoWithId(runeId.String())
+	_, total := runesIndexer.GetAllAddressBalances(runeId.String(), 0, 1)
+	addressBalances, _ := runesIndexer.GetAllAddressBalances(runeId.String(), 0, total)
+	var addressBalance uint128.Uint128
+	for _, v := range addressBalances {
+		addressBalance = v.Balance.Add(addressBalance)
+	}
+
+	totalAddressBalance := addressBalance.Add(runeInfo.Burned)
+	if addressBalance.Add(runeInfo.Burned).Cmp(totalAddressBalance) != 0 {
+		t.Errorf("all address(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalAddressBalance.String(), runeInfo.Supply.String())
+	} else {
+		t.Logf("all address(%d)'s total balance(%s) + burned is equal to supply(%s)", total, totalAddressBalance.String(), runeInfo.Supply.String())
+	}
+
+	_, total = runesIndexer.GetAllUtxoBalances(runeId.String(), 0, 1)
+	utxoBalances, _ := runesIndexer.GetAllUtxoBalances(runeId.String(), 0, total)
+	totalUtxoBalance := utxoBalances.Total.Add(runeInfo.Burned)
+	if utxoBalances.Total.Add(runeInfo.Burned).Cmp(totalUtxoBalance) != 0 {
+		t.Errorf("all utxo(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
+	} else {
+		t.Logf("all utxo(%d)'s total balance(%s) + burned is equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
 	}
 }

@@ -153,5 +153,42 @@ func (s *Indexer) Subtract(backupIndexer *Indexer) {
 }
 
 func (s *Indexer) CheckSelf() bool {
+	var firstRuneName = ""
+	switch s.chaincfgParam.Net {
+	case wire.TestNet4:
+		firstRuneName = "BESTINSLOT•XYZ"
+	case wire.MainNet:
+		firstRuneName = "UNCOMMON•GOODS"
+	default:
+		common.Log.Panicf("RuneIndexer.CheckSelf-> unknown net:%d", s.chaincfgParam.Net)
+	}
+	runeId, err := s.GetRuneIdWithName(firstRuneName)
+	if err != nil {
+		common.Log.Panicf("GetRuneIdWithName err:%s", err.Error())
+	}
+	common.Log.Debugf("rune: %s\n", firstRuneName)
+
+	runeInfo := s.GetRuneInfoWithId(runeId.String())
+	_, total := s.GetAllAddressBalances(runeId.String(), 0, 1)
+	addressBalances, _ := s.GetAllAddressBalances(runeId.String(), 0, total)
+	var addressBalance uint128.Uint128
+	for _, v := range addressBalances {
+		addressBalance = v.Balance.Add(addressBalance)
+	}
+
+	totalAddressBalance := addressBalance.Add(runeInfo.Burned)
+	if addressBalance.Add(runeInfo.Burned).Cmp(totalAddressBalance) != 0 {
+		common.Log.Errorf("all address(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalAddressBalance.String(), runeInfo.Supply.String())
+		return false
+	}
+
+	_, total = s.GetAllUtxoBalances(runeId.String(), 0, 1)
+	utxoBalances, _ := s.GetAllUtxoBalances(runeId.String(), 0, total)
+	totalUtxoBalance := utxoBalances.Total.Add(runeInfo.Burned)
+	if utxoBalances.Total.Add(runeInfo.Burned).Cmp(totalUtxoBalance) != 0 {
+		common.Log.Errorf("all utxo(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
+		return false
+	}
+
 	return true
 }
