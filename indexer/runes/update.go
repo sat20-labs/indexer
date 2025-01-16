@@ -309,7 +309,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		}
 		for _, balance := range balances {
 			if balance.Value.Cmp(uint128.Zero) == 0 {
-				Debug++
+				common.Log.Panicf("RuneIndexer.index_runes-> balance is zero")
 			}
 		}
 		// increment burned balances
