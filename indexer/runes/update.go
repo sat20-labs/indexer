@@ -8,44 +8,24 @@ import (
 
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/txscript"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
-	"github.com/sat20-labs/indexer/indexer/runes/store"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"lukechampine.com/uint128"
 )
 
 func (s *Indexer) UpdateDB() {
-	if s.wb == nil {
+	if !s.isUpdateing {
 		return
 	}
 
-	store.SetCacheLogs(s.cacheLogs)
-	store.FlushToDB()
 	s.Status.Height = s.height
-	s.Status.FlushToDB()
-
-	setCount := 0
-	delCount := 0
-	for v := range s.cacheLogs.IterBuffered() {
-		if v.Val.Type == store.DEL {
-			delCount++
-		} else if v.Val.Type == store.PUT {
-			setCount++
-		}
-	}
-
-	s.wb = nil
+	s.Status.Update()
+	s.dbWrite.FlushToDB()
 	s.isUpdateing = false
-	store.SetCacheLogs(nil)
-	s.cacheLogs = nil
-	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d, set db count:%d, db del count:%d", s.Status.Height, setCount, delCount)
-}
 
-var Debug = 0
-var HolderAddCount = 0
-var HolderDelCount = 0
+	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d", s.Status.Height)
+}
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
 	if !s.isUpdateing {
@@ -62,22 +42,10 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 				return
 			}
 		}
-		s.isUpdateing = true
 	}
 
-	if s.wb == nil {
-		s.wb = s.db.NewWriteBatch()
-		store.SetWriteBatch(s.wb)
-	}
-
-	if store.GetCacheLogs() == nil {
-		cacheLogs := cmap.New[*store.CacheLog]()
-		s.cacheLogs = &cacheLogs
-		store.SetCacheLogs(s.cacheLogs)
-	}
-
-	HolderAddCount = 0
-	HolderDelCount = 0
+	s.HolderUpdateCount = 0
+	s.HolderRemoveCount = 0
 
 	s.height = uint64(block.Height)
 	s.burnedMap = make(runestone.RuneIdLotMap)
@@ -96,9 +64,10 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	}
 	sinceTime := time.Since(startTime)
 	txCount := len(block.Transactions)
-	formatStr := "RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, HolderAddCount:%d, HolderDelCount:%d, block took time:%v, tx took avg time:%v"
-	common.Log.Infof(formatStr, block.Height, txCount, HolderAddCount, HolderDelCount, sinceTime, sinceTime/time.Duration(txCount))
+	format := "RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, update holder count:%d, remove holder count:%d, block took time:%v, tx took avg time:%v"
+	common.Log.Infof(format, block.Height, txCount, s.HolderUpdateCount, s.HolderRemoveCount, sinceTime, sinceTime/time.Duration(txCount))
 	s.update()
+	s.isUpdateing = true
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
@@ -409,7 +378,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if runeIdAddressToCountValue.Count == 1 {
 			r := s.idToEntryTbl.Remove(runeBalance.RuneId)
 			r.HolderCount++
-			HolderAddCount++
+			s.HolderUpdateCount++
 			s.idToEntryTbl.Insert(runeBalance.RuneId, r)
 			common.Log.Debugf("insert addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, r.HolderCount)
 		} else {
@@ -571,7 +540,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 						common.Log.Errorf("unallocated-> oldRuneEntry.HolderCount == 0")
 					}
 					oldRuneEntry.HolderCount--
-					HolderDelCount++
+					s.HolderRemoveCount++
 					s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
 				} else {
 					s.runeIdAddressToCountTbl.Insert(runeIdAddressToCountValue)

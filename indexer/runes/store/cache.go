@@ -20,75 +20,117 @@ const (
 	DEL  ActionType = 2
 )
 
-type CacheLog struct {
+type DbLog struct {
 	Val       []byte
 	Type      ActionType
 	ExistInDb bool
 	TimeStamp int64
 }
 
-var (
-	storeDb         *badger.DB
-	storeWriteBatch *badger.WriteBatch
-	logs            *cmap.ConcurrentMap[string, *CacheLog]
-)
-
-type Cache[T any] struct{}
-
-func NewCache[T any]() *Cache[T] { return &Cache[T]{} }
-
-func SetDB(v *badger.DB) {
-	storeDb = v
+type DbWrite struct {
+	Db             *badger.DB
+	logs           *cmap.ConcurrentMap[string, *DbLog]
+	cloneTimeStamp int64
 }
 
-func SetWriteBatch(v *badger.WriteBatch) {
-	storeWriteBatch = v
+func NewDbWrite(db *badger.DB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
+	return &DbWrite{
+		Db:   db,
+		logs: logs,
+	}
 }
 
-func SetCacheLogs(v *cmap.ConcurrentMap[string, *CacheLog]) {
-	logs = v
+func (s *DbWrite) clearLogs() {
+	s.logs.Clear()
 }
 
-func GetCacheLogs() (ret *cmap.ConcurrentMap[string, *CacheLog]) {
-	return logs
-}
-
-func FlushToDB() {
+func (s *DbWrite) FlushToDB() {
 	var totalBytes int64
-	count := logs.Count()
+	count := s.logs.Count()
 	if count != 0 {
-		for log := range logs.IterBuffered() {
+		wb := s.Db.NewWriteBatch()
+		for log := range s.logs.IterBuffered() {
 			totalBytes += int64(len(log.Key))
 			totalBytes += int64(unsafe.Sizeof(log.Val))
 			totalBytes += int64(len(log.Val.Val))
 			if log.Val.Type == PUT {
-				storeWriteBatch.Set([]byte(log.Key), log.Val.Val)
+				wb.Set([]byte(log.Key), log.Val.Val)
 			}
 		}
 
-		err := storeWriteBatch.Flush()
+		err := wb.Flush()
 		if err != nil {
-			common.Log.Panicf("Cache::FlushToDB-> storeWriteBatch.Flush err:%s", err.Error())
+			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
 		}
-		storeDb.Update(func(txn *badger.Txn) error {
-			for log := range logs.IterBuffered() {
+		s.Db.Update(func(txn *badger.Txn) error {
+			for log := range s.logs.IterBuffered() {
 				if log.Val.Type == DEL && log.Val.ExistInDb {
 					err := txn.Delete([]byte(log.Key))
 					if err != nil {
-						common.Log.Panicf("Cache::FlushToDB-> storeDb.Update err:%s", err.Error())
+						common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
 					}
 				}
 			}
 			return nil
 		})
 	}
-	common.Log.Debugf("Cache::FlushToDB-> logs count:%d, total bytes:%d", count, totalBytes)
+	s.clearLogs()
+
+	updateCount := 0
+	remmoveCount := 0
+	for v := range s.logs.IterBuffered() {
+		if v.Val.Type == DEL {
+			remmoveCount++
+		} else if v.Val.Type == PUT {
+			updateCount++
+		}
+	}
+	common.Log.Infof("DbWrite.FlushToDB-> logs count:%d, update count:%d, remove count:%d, total bytes:%d",
+		count, updateCount, remmoveCount, totalBytes)
+}
+
+func (s *DbWrite) Clone() *DbWrite {
+	logs := cmap.New[*DbLog]()
+	clone := NewDbWrite(s.Db, &logs)
+	for log := range s.logs.IterBuffered() {
+		newLog := &DbLog{
+			Type:      log.Val.Type,
+			ExistInDb: log.Val.ExistInDb,
+			TimeStamp: log.Val.TimeStamp,
+		}
+		if log.Val.Val != nil {
+			newLog.Val = make([]byte, len(log.Val.Val))
+			copy(newLog.Val, log.Val.Val)
+		}
+		clone.logs.Set(log.Key, newLog)
+	}
+
+	clone.cloneTimeStamp = time.Now().UnixNano()
+	return clone
+}
+
+func (s *DbWrite) Subtract(dbWrite *DbWrite) {
+	for log := range s.logs.IterBuffered() {
+		if log.Val.TimeStamp <= s.cloneTimeStamp {
+			dbWrite.logs.Remove(log.Key)
+		}
+	}
+}
+
+type Cache[T any] struct {
+	dbWrite *DbWrite
+}
+
+func NewCache[T any](dbWrite *DbWrite) *Cache[T] {
+	return &Cache[T]{
+		dbWrite: dbWrite,
+	}
 }
 
 func (s *Cache[T]) Get(key []byte) (ret *T) {
 	keyStr := string(key)
-	if logs != nil {
-		log, ok := logs.Get(keyStr)
+	if s.dbWrite.logs.Count() != 0 {
+		log, ok := s.dbWrite.logs.Get(keyStr)
 		if ok {
 			if log.Type == DEL {
 				return
@@ -106,8 +148,8 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 
 	var raw []byte
 	ret, raw = s.GetFromDB(key)
-	if logs != nil && len(raw) > 0 {
-		logs.Set(keyStr, &CacheLog{
+	if len(raw) > 0 {
+		s.dbWrite.logs.Set(keyStr, &DbLog{
 			Val:       raw,
 			Type:      INIT,
 			ExistInDb: true,
@@ -122,7 +164,7 @@ func (s *Cache[T]) Delete(key []byte) (ret *T) {
 	if ret == nil {
 		return
 	}
-	log, ok := logs.Get(string(key))
+	log, ok := s.dbWrite.logs.Get(string(key))
 	if ok {
 		log.Type = DEL
 		log.TimeStamp = time.Now().UnixNano()
@@ -139,10 +181,10 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 	if err != nil {
 		common.Log.Panicf("Cache.Set-> key: %s, proto.Marshal err: %v", string(key), err.Error())
 	}
-	log, ok := logs.Get(string(key))
+	log, ok := s.dbWrite.logs.Get(string(key))
 	if !ok {
-		log = &CacheLog{}
-		logs.Set(string(key), log)
+		log = &DbLog{}
+		s.dbWrite.logs.Set(string(key), log)
 	}
 	log.Type = PUT
 	log.Val = val
@@ -151,7 +193,7 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 }
 
 func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
-	err := storeDb.Update(func(txn *badger.Txn) error {
+	err := s.dbWrite.Db.Update(func(txn *badger.Txn) error {
 		val, err := proto.Marshal(val)
 		if err != nil {
 			return err
@@ -164,9 +206,9 @@ func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
 }
 
 func (s *Cache[T]) IsExist(keyPrefix []byte, cb func(key []byte, value *T) bool) (ret bool) {
-	if logs != nil {
+	if s.dbWrite.logs.Count() != 0 {
 		keyPrefixStr := string(keyPrefix)
-		for log := range logs.IterBuffered() {
+		for log := range s.dbWrite.logs.IterBuffered() {
 			if strings.HasPrefix(log.Key, keyPrefixStr) {
 				if log.Val.Type != DEL {
 					var out T
@@ -192,11 +234,8 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 	if len(ret) == 0 {
 		ret = make(map[string]*T)
 	}
-	if logs == nil {
-		return
-	}
 	keyPrefixStr := string(keyPrefix)
-	for log := range logs.IterBuffered() {
+	for log := range s.dbWrite.logs.IterBuffered() {
 		if strings.HasPrefix(log.Key, keyPrefixStr) {
 			if log.Val.Type == DEL {
 				delete(ret, log.Key)
@@ -216,7 +255,7 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 			}
 		}
 	}
-	for log := range logs.IterBuffered() {
+	for log := range s.dbWrite.logs.IterBuffered() {
 		if strings.HasPrefix(log.Key, keyPrefixStr) {
 			if log.Val.Type == DEL {
 				delete(ret, log.Key)
@@ -240,7 +279,7 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 }
 
 func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
-	err := storeDb.View(func(txn *badger.Txn) error {
+	err := s.dbWrite.Db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 		for it.Seek(keyPrefix); it.ValidForPrefix(keyPrefix); it.Next() {
@@ -282,7 +321,7 @@ func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[st
 }
 
 func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T) bool) (ret bool) {
-	err := storeDb.View(func(txn *badger.Txn) error {
+	err := s.dbWrite.Db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 		for it.Seek(keyPrefix); it.ValidForPrefix(keyPrefix); it.Next() {
@@ -319,7 +358,7 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 }
 
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
-	err := storeDb.View(func(txn *badger.Txn) error {
+	err := s.dbWrite.Db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil && err != badger.ErrKeyNotFound {
 			return err

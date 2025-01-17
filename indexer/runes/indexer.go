@@ -1,8 +1,6 @@
 package runes
 
 import (
-	"time"
-
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
@@ -16,19 +14,18 @@ import (
 )
 
 type Indexer struct {
-	db                            *badger.DB
+	dbWrite                       *store.DbWrite
 	RpcService                    *base.RpcIndexer
 	BaseIndexer                   *base.BaseIndexer
-	cloneTimeStamp                int64
 	isUpdateing                   bool
-	wb                            *badger.WriteBatch
-	cacheLogs                     *cmap.ConcurrentMap[string, *store.CacheLog]
 	chaincfgParam                 *chaincfg.Params
 	height                        uint64
 	blockTime                     uint64
 	Status                        *runestone.RunesStatus
 	minimumRune                   *runestone.Rune
 	burnedMap                     runestone.RuneIdLotMap
+	HolderUpdateCount             int
+	HolderRemoveCount             int
 	idToEntryTbl                  *runestone.RuneIdToEntryTable
 	runeToIdTbl                   *runestone.RuneToIdTable
 	outpointToBalancesTbl         *runestone.OutpointToBalancesTable
@@ -41,26 +38,25 @@ type Indexer struct {
 }
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
-	store.SetDB(db)
+	logs := cmap.New[*store.DbLog]()
+	dbWrite := store.NewDbWrite(db, &logs)
 	runestone.IsLessStorage = true
 	return &Indexer{
-		db:                            db,
 		BaseIndexer:                   baseIndexer,
 		RpcService:                    rpcService,
-		cloneTimeStamp:                0,
-		cacheLogs:                     nil,
+		dbWrite:                       dbWrite,
 		chaincfgParam:                 param,
 		burnedMap:                     nil,
-		Status:                        runestone.NewRunesStatus(store.NewCache[pb.RunesStatus]()),
-		idToEntryTbl:                  runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry]()),
-		runeToIdTbl:                   runestone.NewRuneToIdTable(store.NewCache[pb.RuneId]()),
-		outpointToBalancesTbl:         runestone.NewOutpointToBalancesTable(store.NewCache[pb.OutpointToBalances]()),
-		runeIdAddressToBalanceTbl:     runestone.NewRuneIdAddressToBalanceTable(store.NewCache[pb.RuneIdAddressToBalance]()),
-		runeIdOutpointToBalanceTbl:    runestone.NewRuneIdOutpointToBalancesTable(store.NewCache[pb.RuneBalance]()),
-		addressOutpointToBalancesTbl:  runestone.NewAddressOutpointToBalancesTable(store.NewCache[pb.AddressOutpointToBalance]()),
-		runeIdAddressToCountTbl:       runestone.NewRuneIdAddressToCountTable(store.NewCache[pb.RuneIdAddressToCount]()),
-		runeIdToMintHistoryTbl:        runestone.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory]()),
-		addressRuneIdToMintHistoryTbl: runestone.NewAddressRuneIdToMintHistoryTable(store.NewCache[pb.AddressRuneIdToMintHistory]()),
+		Status:                        runestone.NewRunesStatus(store.NewCache[pb.RunesStatus](dbWrite)),
+		idToEntryTbl:                  runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry](dbWrite)),
+		runeToIdTbl:                   runestone.NewRuneToIdTable(store.NewCache[pb.RuneId](dbWrite)),
+		outpointToBalancesTbl:         runestone.NewOutpointToBalancesTable(store.NewCache[pb.OutpointToBalances](dbWrite)),
+		runeIdAddressToBalanceTbl:     runestone.NewRuneIdAddressToBalanceTable(store.NewCache[pb.RuneIdAddressToBalance](dbWrite)),
+		runeIdOutpointToBalanceTbl:    runestone.NewRuneIdOutpointToBalancesTable(store.NewCache[pb.RuneBalance](dbWrite)),
+		addressOutpointToBalancesTbl:  runestone.NewAddressOutpointToBalancesTable(store.NewCache[pb.AddressOutpointToBalance](dbWrite)),
+		runeIdAddressToCountTbl:       runestone.NewRuneIdAddressToCountTable(store.NewCache[pb.RuneIdAddressToCount](dbWrite)),
+		runeIdToMintHistoryTbl:        runestone.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory](dbWrite)),
+		addressRuneIdToMintHistoryTbl: runestone.NewAddressRuneIdToMintHistoryTable(store.NewCache[pb.AddressRuneIdToMintHistory](dbWrite)),
 	}
 }
 
@@ -79,7 +75,7 @@ func (s *Indexer) Init() {
 		s.runeToIdTbl.SetToDB(&r, id)
 
 		s.Status.Number = 1
-		s.Status.FlushToDB()
+		s.Status.UpdateDb()
 
 		symbol := defaultRuneSymbol
 		startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)
@@ -108,28 +104,7 @@ func (s *Indexer) Init() {
 }
 
 func (s *Indexer) Clone() *Indexer {
-	cloneIndex := NewIndexer(s.db, s.chaincfgParam, s.BaseIndexer, s.RpcService)
-	for log := range s.cacheLogs.IterBuffered() {
-		cacheLog := &store.CacheLog{
-			Type:      log.Val.Type,
-			ExistInDb: log.Val.ExistInDb,
-			TimeStamp: log.Val.TimeStamp,
-		}
-		if log.Val.Val != nil {
-			cacheLog.Val = make([]byte, len(log.Val.Val))
-			copy(cacheLog.Val, log.Val.Val)
-		}
-		if cloneIndex.cacheLogs == nil {
-			cacheLogs := cmap.New[*store.CacheLog]()
-			cloneIndex.cacheLogs = &cacheLogs
-		}
-		cloneIndex.cacheLogs.Set(log.Key, cacheLog)
-	}
-	if s.wb != nil {
-		cloneIndex.wb = s.wb
-	} else {
-		common.Log.Panicf("RuneIndexer.Clone-> s.wb is nil")
-	}
+	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, s.BaseIndexer, s.RpcService)
 	cloneIndex.height = s.height
 	cloneIndex.Status = &runestone.RunesStatus{
 		Version:       s.Status.Version,
@@ -137,19 +112,12 @@ func (s *Indexer) Clone() *Indexer {
 		Number:        s.Status.Number,
 		ReservedRunes: s.Status.ReservedRunes,
 	}
-	cloneIndex.cloneTimeStamp = time.Now().UnixNano()
+	cloneIndex.dbWrite = s.dbWrite.Clone()
 	return cloneIndex
 }
 
 func (s *Indexer) Subtract(backupIndexer *Indexer) {
-	if backupIndexer.cacheLogs == nil {
-		return
-	}
-	for log := range backupIndexer.cacheLogs.IterBuffered() {
-		if log.Val.TimeStamp <= s.cloneTimeStamp {
-			s.cacheLogs.Remove(log.Key)
-		}
-	}
+	backupIndexer.dbWrite.Subtract(s.dbWrite)
 }
 
 func (s *Indexer) CheckSelf() bool {
