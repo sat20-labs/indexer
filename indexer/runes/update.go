@@ -68,6 +68,9 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	if s.wb == nil {
 		s.wb = s.db.NewWriteBatch()
 		store.SetWriteBatch(s.wb)
+	}
+
+	if store.GetCacheLogs() == nil {
 		cacheLogs := cmap.New[*store.CacheLog]()
 		s.cacheLogs = &cacheLogs
 		store.SetCacheLogs(s.cacheLogs)
