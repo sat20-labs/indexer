@@ -532,8 +532,8 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 					Address:   runestone.Address(oldValue.Address),
 				}
 				runeIdAddressToCountValue := s.runeIdAddressToCountTbl.Remove(runeIdAddressToCountKey)
-				runeIdAddressToCountValue.Count--
-				if runeIdAddressToCountValue.Count == 0 {
+
+				if runeIdAddressToCountValue != nil && (runeIdAddressToCountValue.Count-1) == 0 {
 					oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
 					common.Log.Debugf("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount-1)
 					if oldRuneEntry.HolderCount == 0 {
@@ -543,6 +543,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 					s.HolderRemoveCount++
 					s.idToEntryTbl.Insert(&val.RuneId, oldRuneEntry)
 				} else {
+					runeIdAddressToCountValue.Count--
 					s.runeIdAddressToCountTbl.Insert(runeIdAddressToCountValue)
 				}
 
