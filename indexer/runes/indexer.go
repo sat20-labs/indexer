@@ -38,7 +38,7 @@ type Indexer struct {
 }
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
-	logs := cmap.New[store.DbLog]()
+	logs := cmap.New[*store.DbLog]()
 	dbWrite := store.NewDbWrite(db, &logs)
 	runestone.IsLessStorage = true
 	return &Indexer{

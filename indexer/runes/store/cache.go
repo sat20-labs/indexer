@@ -29,11 +29,11 @@ type DbLog struct {
 
 type DbWrite struct {
 	Db             *badger.DB
-	logs           *cmap.ConcurrentMap[string, DbLog]
+	logs           *cmap.ConcurrentMap[string, *DbLog]
 	cloneTimeStamp int64
 }
 
-func NewDbWrite(db *badger.DB, logs *cmap.ConcurrentMap[string, DbLog]) *DbWrite {
+func NewDbWrite(db *badger.DB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
 	return &DbWrite{
 		Db:   db,
 		logs: logs,
@@ -90,10 +90,10 @@ func (s *DbWrite) FlushToDB() {
 }
 
 func (s *DbWrite) Clone() *DbWrite {
-	logs := cmap.New[DbLog]()
+	logs := cmap.New[*DbLog]()
 	clone := NewDbWrite(s.Db, &logs)
 	for log := range s.logs.IterBuffered() {
-		newLog := DbLog{
+		newLog := &DbLog{
 			Type:      log.Val.Type,
 			ExistInDb: log.Val.ExistInDb,
 			TimeStamp: log.Val.TimeStamp,
@@ -149,7 +149,7 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 	var raw []byte
 	ret, raw = s.GetFromDB(key)
 	if len(raw) > 0 {
-		s.dbWrite.logs.Set(keyStr, DbLog{
+		s.dbWrite.logs.Set(keyStr, &DbLog{
 			Val:       raw,
 			Type:      INIT,
 			ExistInDb: true,
@@ -183,7 +183,7 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 	}
 	log, ok := s.dbWrite.logs.Get(string(key))
 	if !ok {
-		log = DbLog{}
+		log = &DbLog{}
 		s.dbWrite.logs.Set(string(key), log)
 	}
 	log.Type = PUT
