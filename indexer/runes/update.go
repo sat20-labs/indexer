@@ -21,11 +21,6 @@ func (s *Indexer) UpdateDB() {
 
 	s.Status.Height = s.height
 	s.Status.Update()
-
-	if !s.isUpdateing {
-		return
-	}
-
 	s.dbWrite.FlushToDB()
 	s.isUpdateing = false
 
