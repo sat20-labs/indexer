@@ -130,7 +130,8 @@ func NewCache[T any](dbWrite *DbWrite) *Cache[T] {
 func (s *Cache[T]) Get(key []byte) (ret *T) {
 	keyStr := string(key)
 	logs := s.dbWrite.logs
-	if logs.Count() != 0 {
+	count := logs.Count()
+	if count != 0 {
 		log, ok := logs.Get(keyStr)
 		if ok {
 			if log.Type == DEL {
