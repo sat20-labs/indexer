@@ -89,9 +89,7 @@ func (s *DbWrite) FlushToDB() {
 		count, updateCount, remmoveCount, totalBytes)
 }
 
-func (s *DbWrite) Clone() *DbWrite {
-	logs := cmap.New[*DbLog]()
-	clone := NewDbWrite(s.Db, &logs)
+func (s *DbWrite) Clone(clone *DbWrite) *DbWrite {
 	for log := range s.logs.IterBuffered() {
 		newLog := &DbLog{
 			Type:      log.Val.Type,

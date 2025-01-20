@@ -112,7 +112,7 @@ func (s *Indexer) Clone() *Indexer {
 		Number:        s.Status.Number,
 		ReservedRunes: s.Status.ReservedRunes,
 	}
-	cloneIndex.dbWrite = s.dbWrite.Clone()
+	s.dbWrite.Clone(cloneIndex.dbWrite)
 	return cloneIndex
 }
 
