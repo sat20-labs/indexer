@@ -57,12 +57,12 @@ type RuneToMintHistoryTable struct {
 }
 
 func NewRuneIdToMintHistoryTable(store *store.Cache[pb.RuneIdToMintHistory]) *RuneToMintHistoryTable {
-	return &RuneToMintHistoryTable{Table: Table[pb.RuneIdToMintHistory]{cache: store}}
+	return &RuneToMintHistoryTable{Table: Table[pb.RuneIdToMintHistory]{Cache: store}}
 }
 
 func (s *RuneToMintHistoryTable) GetList(runeId *RuneId) (ret []*RuneIdToMintHistory, err error) {
 	tblKey := []byte(store.RUNEID_TO_MINT_HISTORYS + runeId.Hex() + "-")
-	pbVal := s.cache.GetList(tblKey, false)
+	pbVal := s.Cache.GetList(tblKey, false)
 
 	if pbVal != nil {
 		ret = make([]*RuneIdToMintHistory, len(pbVal))
@@ -87,7 +87,7 @@ func (s *RuneToMintHistoryTable) Insert(v *RuneIdToMintHistory) (ret RuneIdToMin
 		v.Utxo = ""
 		v.Address = ""
 	}
-	pbVal := s.cache.Set(tblKey, v.ToPb())
+	pbVal := s.Cache.Set(tblKey, v.ToPb())
 	if pbVal != nil {
 		ret = *v
 	}

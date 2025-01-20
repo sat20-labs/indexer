@@ -7,5 +7,5 @@ import (
 var IsLessStorage bool
 
 type Table[T any] struct {
-	cache *store.Cache[T]
+	Cache *store.Cache[T]
 }

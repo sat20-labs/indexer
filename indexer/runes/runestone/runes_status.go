@@ -16,12 +16,12 @@ type RunesStatus struct {
 
 func NewRunesStatus(s *store.Cache[pb.RunesStatus]) *RunesStatus {
 	return &RunesStatus{
-		Table: Table[pb.RunesStatus]{cache: s},
+		Table: Table[pb.RunesStatus]{Cache: s},
 	}
 }
 
 func (s *RunesStatus) Init() (ret bool) {
-	stats, _ := s.cache.GetFromDB([]byte(store.STATUS_KEY))
+	stats, _ := s.Cache.GetFromDB([]byte(store.STATUS_KEY))
 	common.Log.Infof("RunesStatus.Init-> stats:%v", stats)
 	if stats == nil {
 		s.Version = store.DB_VERSION
@@ -47,7 +47,7 @@ func (s *RunesStatus) UpdateDb() {
 		Number:        s.Number,
 		ReservedRunes: s.ReservedRunes,
 	}
-	s.cache.SetToDB(key, value)
+	s.Cache.SetToDB(key, value)
 }
 
 func (s *RunesStatus) Update() {
@@ -58,5 +58,5 @@ func (s *RunesStatus) Update() {
 		Number:        s.Number,
 		ReservedRunes: s.ReservedRunes,
 	}
-	s.cache.Set(key, value)
+	s.Cache.Set(key, value)
 }

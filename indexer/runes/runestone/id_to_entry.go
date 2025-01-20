@@ -12,12 +12,12 @@ type RuneIdToEntryTable struct {
 }
 
 func NewRuneIdToEntryTable(store *store.Cache[pb.RuneEntry]) *RuneIdToEntryTable {
-	return &RuneIdToEntryTable{Table: Table[pb.RuneEntry]{cache: store}}
+	return &RuneIdToEntryTable{Table: Table[pb.RuneEntry]{Cache: store}}
 }
 
 func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
-	pbVal := s.cache.Get(tblKey)
+	pbVal := s.Cache.Get(tblKey)
 	if pbVal != nil {
 		ret = &RuneEntry{}
 		ret.FromPb(pbVal)
@@ -27,7 +27,7 @@ func (s *RuneIdToEntryTable) Get(key *RuneId) (ret *RuneEntry) {
 
 func (s *RuneIdToEntryTable) GetFromDB(key *RuneId) (ret *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
-	pbVal, _ := s.cache.GetFromDB(tblKey)
+	pbVal, _ := s.Cache.GetFromDB(tblKey)
 	if pbVal != nil {
 		ret = &RuneEntry{}
 		ret.FromPb(pbVal)
@@ -37,7 +37,7 @@ func (s *RuneIdToEntryTable) GetFromDB(key *RuneId) (ret *RuneEntry) {
 
 func (s *RuneIdToEntryTable) GetList() (ret map[string]*RuneEntry) {
 	prefixKey := []byte(store.ID_TO_ENTRY)
-	list := s.cache.GetList(prefixKey, true)
+	list := s.Cache.GetList(prefixKey, true)
 	if len(list) == 0 {
 		return
 	}
@@ -52,7 +52,7 @@ func (s *RuneIdToEntryTable) GetList() (ret map[string]*RuneEntry) {
 
 func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
-	pbVal := s.cache.Set(tblKey, value.ToPb())
+	pbVal := s.Cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &RuneEntry{}
 		ret.FromPb(pbVal)
@@ -62,7 +62,7 @@ func (s *RuneIdToEntryTable) Insert(key *RuneId, value *RuneEntry) (ret *RuneEnt
 
 func (s *RuneIdToEntryTable) Remove(key *RuneId) (ret *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
-	pbVal := s.cache.Delete(tblKey)
+	pbVal := s.Cache.Delete(tblKey)
 	if pbVal != nil {
 		ret = &RuneEntry{}
 		ret.FromPb(pbVal)
@@ -72,5 +72,5 @@ func (s *RuneIdToEntryTable) Remove(key *RuneId) (ret *RuneEntry) {
 
 func (s *RuneIdToEntryTable) SetToDB(key *RuneId, value *RuneEntry) {
 	tblKey := []byte(store.ID_TO_ENTRY + key.Hex())
-	s.cache.SetToDB(tblKey, value.ToPb())
+	s.Cache.SetToDB(tblKey, value.ToPb())
 }

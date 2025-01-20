@@ -60,12 +60,12 @@ type RuneIdAddressToCountTable struct {
 }
 
 func NewRuneIdAddressToCountTable(v *store.Cache[pb.RuneIdAddressToCount]) *RuneIdAddressToCountTable {
-	return &RuneIdAddressToCountTable{Table: Table[pb.RuneIdAddressToCount]{cache: v}}
+	return &RuneIdAddressToCountTable{Table: Table[pb.RuneIdAddressToCount]{Cache: v}}
 }
 
 func (s *RuneIdAddressToCountTable) Get(v *RuneIdAddressToCount) (ret *RuneIdAddressToCount) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_COUNT + v.Key())
-	pbVal := s.cache.Get(tblKey)
+	pbVal := s.Cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
 		ret, err = RuneIdAddressToCountFromString(string(tblKey))
@@ -84,12 +84,12 @@ func (s *RuneIdAddressToCountTable) Insert(v *RuneIdAddressToCount) {
 	if IsLessStorage {
 		v.Address = ""
 	}
-	s.cache.Set(tblKey, v.ToPb())
+	s.Cache.Set(tblKey, v.ToPb())
 }
 
 func (s *RuneIdAddressToCountTable) Remove(v *RuneIdAddressToCount) (ret *RuneIdAddressToCount) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_COUNT + v.Key())
-	pbVal := s.cache.Delete(tblKey)
+	pbVal := s.Cache.Delete(tblKey)
 	if pbVal != nil {
 		ret = &RuneIdAddressToCount{}
 		ret.FromPb(pbVal)

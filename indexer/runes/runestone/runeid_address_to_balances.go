@@ -56,12 +56,12 @@ type RuneIdAddressToBalanceTable struct {
 }
 
 func NewRuneIdAddressToBalanceTable(v *store.Cache[pb.RuneIdAddressToBalance]) *RuneIdAddressToBalanceTable {
-	return &RuneIdAddressToBalanceTable{Table: Table[pb.RuneIdAddressToBalance]{cache: v}}
+	return &RuneIdAddressToBalanceTable{Table: Table[pb.RuneIdAddressToBalance]{Cache: v}}
 }
 
 func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
-	pbVal := s.cache.Get(tblKey)
+	pbVal := s.Cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
 		ret, err = RuneIdAddressToBalanceFromString(string(tblKey))
@@ -82,7 +82,7 @@ func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneI
 
 func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneIdAddressToBalance, err error) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + runeId.Hex() + "-")
-	pbVal := s.cache.GetList(tblKey, true)
+	pbVal := s.Cache.GetList(tblKey, true)
 	if pbVal != nil {
 		ret = make([]*RuneIdAddressToBalance, len(pbVal))
 		var i = 0
@@ -107,10 +107,10 @@ func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {
 	if IsLessStorage {
 		v.Address = ""
 	}
-	s.cache.Set(tblKey, v.ToPb())
+	s.Cache.Set(tblKey, v.ToPb())
 }
 
 func (s *RuneIdAddressToBalanceTable) Remove(v *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
-	s.cache.Delete(tblKey)
+	s.Cache.Delete(tblKey)
 }

@@ -51,12 +51,12 @@ type RuneIdOutpointToBalanceTable struct {
 }
 
 func NewRuneIdOutpointToBalancesTable(v *store.Cache[pb.RuneBalance]) *RuneIdOutpointToBalanceTable {
-	return &RuneIdOutpointToBalanceTable{Table: Table[pb.RuneBalance]{cache: v}}
+	return &RuneIdOutpointToBalanceTable{Table: Table[pb.RuneBalance]{Cache: v}}
 }
 
 func (s *RuneIdOutpointToBalanceTable) Get(v *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {
 	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + v.Key())
-	pbVal := s.cache.Get(tblKey)
+	pbVal := s.Cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
 		ret, err = RuneIdOutpointToBalanceFromString(string(tblKey))
@@ -75,7 +75,7 @@ func (s *RuneIdOutpointToBalanceTable) Get(v *RuneIdOutpointToBalance) (ret *Run
 
 func (s *RuneIdOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneIdOutpointToBalance, err error) {
 	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + runeId.Hex() + "-")
-	pbVal := s.cache.GetList(tblKey, true)
+	pbVal := s.Cache.GetList(tblKey, true)
 	if pbVal != nil {
 		ret = make([]*RuneIdOutpointToBalance, len(pbVal))
 		var i = 0
@@ -101,7 +101,7 @@ func (s *RuneIdOutpointToBalanceTable) GetBalances(runeId *RuneId) (ret []*RuneI
 
 func (s *RuneIdOutpointToBalanceTable) Insert(v *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {
 	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + v.Key())
-	pbVal := s.cache.Set(tblKey, v.ToPb())
+	pbVal := s.Cache.Set(tblKey, v.ToPb())
 	if pbVal != nil {
 		balance := &Lot{
 			Value: uint128.Uint128{
@@ -121,7 +121,7 @@ func (s *RuneIdOutpointToBalanceTable) Insert(v *RuneIdOutpointToBalance) (ret *
 
 func (s *RuneIdOutpointToBalanceTable) Remove(key *RuneIdOutpointToBalance) (ret *RuneIdOutpointToBalance) {
 	tblKey := []byte(store.RUNEID_OUTPOINT_TO_BALANCE + key.Key())
-	pbVal := s.cache.Delete(tblKey)
+	pbVal := s.Cache.Delete(tblKey)
 	if pbVal != nil {
 		balance := &Lot{
 			Value: uint128.Uint128{

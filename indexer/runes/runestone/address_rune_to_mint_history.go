@@ -54,12 +54,12 @@ type AddressRuneIdToMintHistoryTable struct {
 }
 
 func NewAddressRuneIdToMintHistoryTable(cache *store.Cache[pb.AddressRuneIdToMintHistory]) *AddressRuneIdToMintHistoryTable {
-	return &AddressRuneIdToMintHistoryTable{Table: Table[pb.AddressRuneIdToMintHistory]{cache: cache}}
+	return &AddressRuneIdToMintHistoryTable{Table: Table[pb.AddressRuneIdToMintHistory]{Cache: cache}}
 }
 
 func (s *AddressRuneIdToMintHistoryTable) GetList(addressId uint64, runeId *RuneId) (ret []*AddressRuneIdToMintHistory, err error) {
 	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + strconv.FormatUint(addressId, 16) + "-" + runeId.Hex() + "-")
-	pbVal := s.cache.GetList(tblKey, false)
+	pbVal := s.Cache.GetList(tblKey, false)
 
 	if pbVal != nil {
 		ret = make([]*AddressRuneIdToMintHistory, len(pbVal))
@@ -78,7 +78,7 @@ func (s *AddressRuneIdToMintHistoryTable) GetList(addressId uint64, runeId *Rune
 
 func (s *AddressRuneIdToMintHistoryTable) Insert(value *AddressRuneIdToMintHistory) (ret AddressRuneIdToMintHistory) {
 	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + value.Key())
-	pbVal := s.cache.Set(tblKey, value.ToPb())
+	pbVal := s.Cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = *value
 	}
@@ -87,5 +87,5 @@ func (s *AddressRuneIdToMintHistoryTable) Insert(value *AddressRuneIdToMintHisto
 
 func (s *AddressRuneIdToMintHistoryTable) Remove(v *AddressRuneIdToMintHistory) {
 	tblKey := []byte(store.ADDRESS_RUNEID_TO_MINT_HISTORYS + v.Key())
-	s.cache.Delete(tblKey)
+	s.Cache.Delete(tblKey)
 }

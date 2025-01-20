@@ -161,12 +161,12 @@ type OutpointToBalancesTable struct {
 }
 
 func NewOutpointToBalancesTable(s *store.Cache[pb.OutpointToBalances]) *OutpointToBalancesTable {
-	return &OutpointToBalancesTable{Table: Table[pb.OutpointToBalances]{cache: s}}
+	return &OutpointToBalancesTable{Table: Table[pb.OutpointToBalances]{Cache: s}}
 }
 
 func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalancesValue) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Key())
-	pbVal := s.cache.Get(tblKey)
+	pbVal := s.Cache.Get(tblKey)
 	if pbVal != nil {
 		ret = OutpointToBalancesValue{}
 		ret.FromPb(pbVal)
@@ -180,7 +180,7 @@ func (s *OutpointToBalancesTable) Insert(key *OutPoint, value *OutpointToBalance
 		value.Utxo = ""
 		value.Address = ""
 	}
-	pbVal := s.cache.Set(tblKey, value.ToPb())
+	pbVal := s.Cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &OutpointToBalancesValue{}
 		ret.FromPb(pbVal)
@@ -190,7 +190,7 @@ func (s *OutpointToBalancesTable) Insert(key *OutPoint, value *OutpointToBalance
 
 func (s *OutpointToBalancesTable) Remove(key *OutPoint) (ret *OutpointToBalancesValue) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Key())
-	pbVal := s.cache.Delete(tblKey)
+	pbVal := s.Cache.Delete(tblKey)
 	if pbVal != nil {
 		ret = &OutpointToBalancesValue{}
 		ret.FromPb(pbVal)

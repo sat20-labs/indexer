@@ -57,12 +57,12 @@ type AddressOutpointToBalancesTable struct {
 }
 
 func NewAddressOutpointToBalancesTable(v *store.Cache[pb.AddressOutpointToBalance]) *AddressOutpointToBalancesTable {
-	return &AddressOutpointToBalancesTable{Table: Table[pb.AddressOutpointToBalance]{cache: v}}
+	return &AddressOutpointToBalancesTable{Table: Table[pb.AddressOutpointToBalance]{Cache: v}}
 }
 
 func (s *AddressOutpointToBalancesTable) Get(v *AddressOutpointToBalance) (ret *AddressOutpointToBalance) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
-	pbVal := s.cache.Get(tblKey)
+	pbVal := s.Cache.Get(tblKey)
 	if pbVal != nil {
 		var err error
 		ret, err = AddressOutpointToBalanceFromString(string(tblKey))
@@ -85,7 +85,7 @@ func (s *AddressOutpointToBalancesTable) Get(v *AddressOutpointToBalance) (ret *
 
 func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*AddressOutpointToBalance, err error) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
-	pbVal := s.cache.GetList(tblKey, true)
+	pbVal := s.Cache.GetList(tblKey, true)
 	if pbVal != nil {
 		ret = make([]*AddressOutpointToBalance, len(pbVal))
 		var i = 0
@@ -113,12 +113,12 @@ func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
 	if IsLessStorage {
 		v.Address = ""
 	}
-	s.cache.Set(tblKey, v.ToPb())
+	s.Cache.Set(tblKey, v.ToPb())
 }
 
 func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) (ret *AddressOutpointToBalance) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
-	pbVal := s.cache.Delete(tblKey)
+	pbVal := s.Cache.Delete(tblKey)
 	if pbVal != nil {
 		ret = &AddressOutpointToBalance{}
 		var err error
@@ -133,7 +133,7 @@ func (s *AddressOutpointToBalancesTable) Remove(v *AddressOutpointToBalance) (re
 func (s *AddressOutpointToBalancesTable) IsExistOnlyOne(addressId uint64) (ret bool) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
 	count := 0
-	s.cache.IsExist(tblKey, func(k []byte, v *pb.AddressOutpointToBalance) bool {
+	s.Cache.IsExist(tblKey, func(k []byte, v *pb.AddressOutpointToBalance) bool {
 		count++
 		return count > 1
 	})
@@ -143,7 +143,7 @@ func (s *AddressOutpointToBalancesTable) IsExistOnlyOne(addressId uint64) (ret b
 
 func (s *AddressOutpointToBalancesTable) IsExist(addressId uint64, runeId *RuneId) (ret bool) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + fmt.Sprintf("%x", addressId) + "-")
-	ret = s.cache.IsExist(tblKey, func(k []byte, v *pb.AddressOutpointToBalance) bool {
+	ret = s.Cache.IsExist(tblKey, func(k []byte, v *pb.AddressOutpointToBalance) bool {
 		if v.RuneId.Block == runeId.Block && v.RuneId.Tx == runeId.Tx {
 			return true
 		}
