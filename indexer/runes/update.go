@@ -15,12 +15,17 @@ import (
 )
 
 func (s *Indexer) UpdateDB() {
-	if !s.isUpdateing {
-		return
+	if s.Status.Height != 0 && s.Status.Height >= s.height {
+		common.Log.Panicf("RuneIndexer.UpdateDB-> err: status.Height(%d) >= height(%d)", s.Status.Height, s.height)
 	}
 
 	s.Status.Height = s.height
 	s.Status.Update()
+
+	if !s.isUpdateing {
+		return
+	}
+
 	s.dbWrite.FlushToDB()
 	s.isUpdateing = false
 
@@ -36,18 +41,14 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 				common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.Status.Height, block.Height)
 				return
 			}
-		} else {
-			if s.Status.Height > uint64(block.Height) {
-				common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.Status.Height, block.Height)
-				return
-			}
 		}
 	}
+	s.height = uint64(block.Height)
+	s.isUpdateing = true
 
 	s.HolderUpdateCount = 0
 	s.HolderRemoveCount = 0
 
-	s.height = uint64(block.Height)
 	s.burnedMap = make(runestone.RuneIdLotMap)
 	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
 	s.minimumRune = &minimum
@@ -67,7 +68,6 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	format := "RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, update holder count:%d, remove holder count:%d, block took time:%v, tx took avg time:%v"
 	common.Log.Infof(format, block.Height, txCount, s.HolderUpdateCount, s.HolderRemoveCount, sinceTime, sinceTime/time.Duration(txCount))
 	s.update()
-	s.isUpdateing = true
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
