@@ -15,7 +15,15 @@ import (
 )
 
 func (s *Indexer) UpdateDB() {
-	if s.Status.Height != 0 && s.Status.Height >= s.height {
+	if s.height == 0 {
+		common.Log.Warnf("RuneIndexer.UpdateDB-> err: height(%d) == 0", s.height)
+		return
+	}
+	if s.Status.Height == s.height {
+		common.Log.Warnf("RuneIndexer.UpdateDB-> err: status.Height(%d) == height(%d)", s.Status.Height, s.height)
+		return
+	}
+	if s.Status.Height > s.height {
 		common.Log.Panicf("RuneIndexer.UpdateDB-> err: status.Height(%d) >= height(%d)", s.Status.Height, s.height)
 	}
 
@@ -121,7 +129,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				// edicts with output values greater than the number of outputs
 				// should never be produced by the edict parser
 				output := edict.Output
-				if output >= uint32(len(tx.Outputs)) {
+				if output > uint32(len(tx.Outputs)) {
 					common.Log.Panicf("RuneIndexer.index_runes-> output is greater than transaction output count")
 				}
 
