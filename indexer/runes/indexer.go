@@ -106,12 +106,10 @@ func (s *Indexer) Init() {
 func (s *Indexer) Clone() *Indexer {
 	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, s.BaseIndexer, s.RpcService)
 	cloneIndex.height = s.height
-	cloneIndex.Status = &runestone.RunesStatus{
-		Version:       s.Status.Version,
-		Height:        s.Status.Height,
-		Number:        s.Status.Number,
-		ReservedRunes: s.Status.ReservedRunes,
-	}
+	cloneIndex.Status.Version = s.Status.Version
+	cloneIndex.Status.Height = s.Status.Height
+	cloneIndex.Status.Number = s.Status.Number
+	cloneIndex.Status.ReservedRunes = s.Status.ReservedRunes
 	s.dbWrite.Clone(cloneIndex.dbWrite)
 	return cloneIndex
 }
