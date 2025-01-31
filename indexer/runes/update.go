@@ -568,17 +568,19 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				key := &runestone.RuneIdAddressToBalance{RuneId: &val.RuneId, AddressId: oldValue.AddressId}
 				oldruneIdAddressToBalanceValue := s.runeIdAddressToBalanceTbl.Get(key)
 
-				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
-				if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
-					amount = uint128.Zero
-				} else {
-					amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
-				}
-				if amount.Cmp(uint128.Zero) != 0 {
-					oldruneIdAddressToBalanceValue.Balance.Value = amount
-					s.runeIdAddressToBalanceTbl.Insert(oldruneIdAddressToBalanceValue)
-				} else {
-					s.runeIdAddressToBalanceTbl.Remove(oldruneIdAddressToBalanceValue)
+				if oldruneIdAddressToBalanceValue != nil {
+					var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
+					if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
+						amount = uint128.Zero
+					} else {
+						amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
+					}
+					if amount.Cmp(uint128.Zero) != 0 {
+						oldruneIdAddressToBalanceValue.Balance.Value = amount
+						s.runeIdAddressToBalanceTbl.Insert(oldruneIdAddressToBalanceValue)
+					} else {
+						s.runeIdAddressToBalanceTbl.Remove(oldruneIdAddressToBalanceValue)
+					}
 				}
 			}
 		}
