@@ -134,6 +134,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	}
 
 	return &common.TxOutput{
+		UtxoId:      info.UtxoId,
 		OutPointStr: utxo,
 		OutValue: wire.TxOut{
 			Value:    common.GetOrdinalsSize(info.Ordinals),

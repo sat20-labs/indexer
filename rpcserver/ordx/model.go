@@ -132,6 +132,7 @@ func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutputInfo, error) {
 	}
 
 	output := rpcwire.TxOutputInfo{
+		UtxoId:    txOut.UtxoId,
 		OutPoint:  utxo,
 		OutValue:  txOut.OutValue,
 		AssetInfo: assets,
@@ -180,6 +181,7 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 		}
 
 		output := rpcwire.TxOutputInfo{
+			UtxoId:    txOut.UtxoId,
 			OutPoint:  txOut.OutPointStr,
 			OutValue:  txOut.OutValue,
 			AssetInfo: assets,

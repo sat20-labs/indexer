@@ -87,13 +87,74 @@ func TestDecimal_Runes1(t *testing.T) {
 
 	{
 		// 测试通过整数创建 runes
-		precision := int(10)
-		d0, err := NewDecimalFromString("123456789012345678901234567890", int(precision))
+		precision := int(1)
+		d0, err := NewDecimalFromString("100000000000000100000000000000", int(precision))
 		if err != nil {
 			t.Fatalf("Failed to create decimal from string: %v", err)
 		}
-		fmt.Printf("MaxInt64 %s\n", d0.GetMaxInt64().String()) // 9223372036854775807
 		fmt.Printf("Decimal 0: %s\n", d0.String())
+		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
+		amt, _ := NewDecimalFromString("990010000000000", int(precision))
+		
+		value := amt.ToInt64WithMax(d0)
+		fmt.Printf("value %d\n", value)
+		amt2 := NewDecimalFromInt64WithMax(value, d0)
+		fmt.Printf("amt1 %s\n", amt.String())
+		fmt.Printf("amt2 %s\n", amt2.String())
+	}
+
+	{
+		// 测试通过整数创建 runes
+		precision := int(1)
+		d0, err := NewDecimalFromString("20000000", int(precision))
+		if err != nil {
+			t.Fatalf("Failed to create decimal from string: %v", err)
+		}
+		fmt.Printf("Decimal 0: %s\n", d0.String())
+		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
+		amt, _ := NewDecimalFromString("1.1", int(precision))
+		
+		value := amt.ToInt64WithMax(d0)
+		fmt.Printf("value %d\n", value)
+		amt2 := NewDecimalFromInt64WithMax(value, d0)
+		fmt.Printf("amt1 %s\n", amt.String())
+		fmt.Printf("amt2 %s\n", amt2.String())
+	}
+
+	{
+		// 测试通过整数创建 runes
+		precision := int(0)
+		d0, err := NewDecimalFromString("21000000000000000", int(precision))
+		if err != nil {
+			t.Fatalf("Failed to create decimal from string: %v", err)
+		}
+		fmt.Printf("Decimal 0: %s\n", d0.String())
+		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
+		amt, _ := NewDecimalFromString("1000", int(precision))
+		
+		value := amt.ToInt64WithMax(d0)
+		fmt.Printf("value %d\n", value)
+		amt2 := NewDecimalFromInt64WithMax(value, d0)
+		fmt.Printf("amt1 %s\n", amt.String())
+		fmt.Printf("amt2 %s\n", amt2.String())
+	}
+
+	{
+		precision := int(1)
+		d0, err := NewDecimalFromString("100000000000000100000000000000", int(precision))
+		if err != nil {
+			t.Fatalf("Failed to create decimal from string: %v", err)
+		}
+		fmt.Printf("Decimal 0: %s\n", d0.String())
+		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
+		amt, _ := NewDecimalFromString("990010000000000", int(precision))
+		
+		value := amt.ToInt64WithMax(d0)
+		fmt.Printf("value %d\n", value)
+		amt2 := NewDecimalFromInt64WithMax(value, d0)
+		fmt.Printf("amt1 %s\n", amt.String())
+		fmt.Printf("amt2 %s\n", amt2.String())
+
 		shift := 0
 		d := NewDecimal(10, 0)
 		for d0.IsOverflowInt64() {
@@ -178,9 +239,15 @@ func convertTest(t *testing.T, supply, amt uint128.Uint128) {
 
 func TestDecimal_Runes3(t *testing.T) {
 
-	supply, _ := uint128.FromString("100000000000000100000000000000")
-	amt, _ := uint128.FromString("1100000000000000")
+	supply, _ := uint128.FromString("10000000")
+	amt, _ := uint128.FromString("60")
 	convertTest(t, supply, amt)
+	decimal := NewDecimalFromUint128(amt, 1)
+	fmt.Printf("amt %s\n", decimal.String())
+
+	amt2, _ := NewDecimalFromString("60", 1)
+	fmt.Printf("amt2 %s\n", amt2.String())
+	fmt.Printf("amt2 integer %d\n", amt2.IntegerPart())
 	
 
 	supply, _ = uint128.FromString("2000000")
