@@ -32,6 +32,7 @@ func (s *Model) newTickerStatusResp(ticker *common.Ticker) *rpcwire.TickerStatus
 		ID:              (ticker.Id),
 		InscriptionId:   ticker.Base.InscriptionId,
 		Limit:           ticker.Limit,
+		N:               ticker.N,
 		SelfMint:        ticker.SelfMint,
 		Max:             ticker.Max, // 无效：< 0
 		StartBlock:      ticker.BlockStart,

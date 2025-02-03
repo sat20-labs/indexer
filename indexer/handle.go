@@ -106,6 +106,26 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		}
 	}
 
+	n := int(1)
+	if content.N != "" {
+		n, err = strconv.Atoi(content.N)
+		if err != nil {
+			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid n: %s",
+				nft.Base.InscriptionId, content.Ticker, content.N)
+			return nil
+		}
+		if n < 0 || n > 100000000 {
+			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid n: %d",
+				nft.Base.InscriptionId, content.Ticker, n)
+			return nil
+		}
+		if lim%int64(n) != 0 {
+			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid lim/n: %d %d",
+				nft.Base.InscriptionId, content.Ticker, lim, n)
+			return nil
+		}
+	}
+
 	selfmint := 0
 	if content.SelfMint != "" {
 		selfmint, err = getPercentage(content.SelfMint)
@@ -231,6 +251,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		Desc:       content.Des,
 		Type:       common.ASSET_TYPE_FT,
 		Limit:      lim,
+		N:          n,
 		SelfMint:   selfmint,
 		Max:        max,
 		BlockStart: blockStart,
@@ -295,6 +316,11 @@ func (s *IndexerMgr) handleMintTicker(rngs []*common.Range, satpoint int, out *c
 				inscriptionId, content.Ticker, amt, deployTicker.Limit)
 			return nil
 		}
+		if amt%int64(deployTicker.N) != 0 {
+			common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, amt(%d) / n(%d)",
+				inscriptionId, content.Ticker, amt, deployTicker.N)
+			return nil
+		}
 	}
 	addressId := s.compiling.GetAddressId(out.Address.Addresses[0])
 	permitAmt := s.getMintAmount(deployTicker.Name, addressId)
@@ -305,7 +331,7 @@ func (s *IndexerMgr) handleMintTicker(rngs []*common.Range, satpoint int, out *c
 	}
 
 	var newRngs []*common.Range
-	satsNum := int64(amt)
+	satsNum := int64(amt) / int64(deployTicker.N)
 	var sat int64 = nft.Base.Sat
 	if indexer.IsRaritySatRequired(&deployTicker.Attr) {
 		// check trz=N

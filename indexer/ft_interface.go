@@ -60,6 +60,7 @@ func (p *IndexerMgr) GetTickerV2(tickerName string) *common.TickerInfo {
 	result.TotalMinted = fmt.Sprintf("%d", minted)
 	result.MintTimes = ms
 	result.Limit = fmt.Sprintf("%d", ticker.Limit)
+	result.N = fmt.Sprintf("%d", ticker.N)
 	if ticker.Max < 0 {
 		result.MaxSupply = fmt.Sprintf("%d", common.MaxSupply)
 	} else {

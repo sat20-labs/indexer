@@ -8,6 +8,7 @@ import (
 
 const TickerSeparatedFromName = true
 
+// amt / n == sizeof(ordinals)
 type Mint struct {
 	Base     *InscribeBaseContent
 	Id       int64
@@ -26,6 +27,7 @@ type Ticker struct {
 
 	Type       string  `json:"type,omitempty"` // 默认是FT，留待以后扩展
 	Limit      int64   `json:"limit,omitempty"`
+	N          int     `json:"n,omitempty"`
 	SelfMint   int     `json:"selfmint,omitempty"` // 0-100
 	Max        int64   `json:"max,omitempty"`
 	BlockStart int     `json:"blockStart,omitempty"`
@@ -50,6 +52,7 @@ type MintAbbrInfo struct {
 
 // key: mint时的inscriptionId。 value: 某个资产对应的ranges
 type TickAbbrInfo struct {
+	N int
 	MintInfo map[string][]*Range
 }
 
@@ -97,6 +100,7 @@ type TickerInfo struct {
 	DeployBlocktime int64  `json:"deployBlockTime"`
 	DeployTx        string `json:"deployTx"`
 	Limit           string `json:"limit"`
+	N               string `json:"n"`
 	TotalMinted     string `json:"totalMinted"`
 	MintTimes       int64  `json:"mintTimes"`
 	MaxSupply       string `json:"maxSupply,omitempty"`

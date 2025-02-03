@@ -52,15 +52,15 @@ func (p *FTIndexer) UpdateMint(inUtxo uint64, mint *common.Mint) {
 	mintInfo := make(map[string][]*common.Range, 0)
 	mintInfo[mint.Base.InscriptionId] = mint.Ordinals
 	tickers := make(map[string]*common.TickAbbrInfo, 0)
-	tickers[strings.ToLower(mint.Name)] = &common.TickAbbrInfo{MintInfo: mintInfo}
+	tickers[strings.ToLower(mint.Name)] = &common.TickAbbrInfo{N: ticker.Ticker.N, MintInfo: mintInfo}
 	action := HolderAction{UtxoId: inUtxo, AddressId: mint.Base.InscriptionAddress, Tickers: tickers, Action: 1}
 	p.holderActionList = append(p.holderActionList, &action)
 	// 仅仅为了让UpdateTransfer能检查到输入的input中有资产，所以该tx的output才会进行资产检查工作
-	p.addHolder(inUtxo, mint.Name, mint.Base.InscriptionAddress, 0, mint.Base.InscriptionId, mint.Ordinals)
+	p.addHolder(inUtxo, mint.Name, ticker.Ticker.N, mint.Base.InscriptionAddress, 0, mint.Base.InscriptionId, mint.Ordinals)
 }
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，在mintutxo铸造，资产的聪范围。聪范围可以累加，因为资产都来自不同的utxo。
-func (p *FTIndexer) addHolder(utxo uint64, ticker string, address uint64, index int, inscriptionId string, rngs []*common.Range) {
+func (p *FTIndexer) addHolder(utxo uint64, ticker string, n int, address uint64, index int, inscriptionId string, rngs []*common.Range) {
 	ticker = strings.ToLower(ticker)
 
 	mintinfo := make(map[string][]*common.Range, 0)
@@ -68,7 +68,7 @@ func (p *FTIndexer) addHolder(utxo uint64, ticker string, address uint64, index 
 
 	info, ok := p.holderInfo[utxo]
 	if !ok {
-		tickinfo := common.TickAbbrInfo{MintInfo: mintinfo}
+		tickinfo := common.TickAbbrInfo{N: n, MintInfo: mintinfo}
 		tickers := make(map[string]*common.TickAbbrInfo, 0)
 		tickers[ticker] = &tickinfo
 		info = &HolderInfo{AddressId: address, Index: index, Tickers: tickers}
@@ -78,7 +78,7 @@ func (p *FTIndexer) addHolder(utxo uint64, ticker string, address uint64, index 
 		info.Index = index
 		tickinfo, ok := info.Tickers[ticker]
 		if !ok {
-			tickinfo := common.TickAbbrInfo{MintInfo: mintinfo}
+			tickinfo := common.TickAbbrInfo{N:n, MintInfo: mintinfo}
 			info.Tickers[ticker] = &tickinfo
 		} else {
 			tickinfo.MintInfo[inscriptionId] = append(tickinfo.MintInfo[inscriptionId], rngs...)
@@ -88,10 +88,10 @@ func (p *FTIndexer) addHolder(utxo uint64, ticker string, address uint64, index 
 	utxovalue, ok := p.utxoMap[ticker]
 	if !ok {
 		newutxovalue := make(map[uint64]int64, 0)
-		newutxovalue[utxo] = common.GetOrdinalsSize(rngs)
+		newutxovalue[utxo] = common.GetOrdinalsSize(rngs) * int64(n)
 		p.utxoMap[ticker] = &newutxovalue
 	} else {
-		(*utxovalue)[utxo] += common.GetOrdinalsSize(rngs)
+		(*utxovalue)[utxo] += common.GetOrdinalsSize(rngs) * int64(n)
 	}
 }
 
@@ -164,12 +164,12 @@ func (p *FTIndexer) innerUpdateTransfer(output *common.Output) {
 		for mintutxo, ranges := range mintinfo {
 			for i, address := range output.Address.Addresses {
 				addressId := p.nftIndexer.GetBaseIndexer().GetAddressId(address)
-				p.addHolder(utxo, t.Name, addressId, i, mintutxo, ranges)
+				p.addHolder(utxo, t.Name, t.Ticker.N, addressId, i, mintutxo, ranges)
 			}
 			bUpdated = true
 		}
 		if len(mintinfo) > 0 {
-			tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{MintInfo: mintinfo}
+			tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{N:t.Ticker.N, MintInfo: mintinfo}
 		}
 	}
 

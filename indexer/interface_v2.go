@@ -103,6 +103,13 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			return offsets[i].Start < offsets[j].Start
 		})
 
+		if common.IsOrdx(&k) {
+			ticker := b.GetTicker(k.Ticker)
+			if ticker != nil {
+				value = value * int64(ticker.N)
+			}
+		}
+
 		asset := swire.AssetInfo{
 			Name:       k,
 			Amount:     value,
@@ -170,6 +177,13 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 		sort.Slice(offsets, func(i, j int) bool {
 			return offsets[i].Start < offsets[j].Start
 		})
+
+		if common.IsOrdx(&k) {
+			ticker := b.GetTicker(k.Ticker)
+			if ticker != nil {
+				value = value * int64(ticker.N)
+			}
+		}
 
 		asset := common.DisplayAsset{
 			AssetName:  k,
@@ -385,15 +399,11 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 // return: ticker -> asset info (inscriptinId -> asset ranges)
 func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
 	result := make(map[common.TickerName]*common.Decimal)
-	ftAssets := b.ftIndexer.GetAssetsWithUtxo(utxoId)
+	ftAssets := b.ftIndexer.GetAssetsWithUtxoV2(utxoId)
 	if len(ftAssets) > 0 {
 		for k, v := range ftAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
-			amt := int64(0)
-			for _, rngs := range v {
-				amt += common.GetOrdinalsSize(rngs)
-			}
-			result[tickName] = common.NewDecimal(amt, 0)
+			result[tickName] = common.NewDecimal(v, 0)
 		}
 	}
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
