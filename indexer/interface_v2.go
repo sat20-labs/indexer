@@ -103,9 +103,11 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			return offsets[i].Start < offsets[j].Start
 		})
 
+		n := 1
 		if common.IsOrdx(&k) {
 			ticker := b.GetTicker(k.Ticker)
 			if ticker != nil {
+				n = ticker.N
 				value = value * int64(ticker.N)
 			}
 		}
@@ -113,7 +115,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		asset := swire.AssetInfo{
 			Name:       k,
 			Amount:     value,
-			BindingSat: 1,
+			BindingSat: uint16(n),
 		}
 
 		if assets == nil {
@@ -178,17 +180,19 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 			return offsets[i].Start < offsets[j].Start
 		})
 
+		n := 1
 		if common.IsOrdx(&k) {
 			ticker := b.GetTicker(k.Ticker)
 			if ticker != nil {
 				value = value * int64(ticker.N)
+				n = ticker.N
 			}
 		}
 
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     fmt.Sprintf("%d", value),
-			BindingSat: true,
+			BindingSat: n,
 			Offsets:    offsets,
 		}
 
@@ -200,7 +204,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     v.String(),
-			BindingSat: false,
+			BindingSat: 0,
 		}
 
 		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
@@ -530,4 +534,14 @@ func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 		result, _ = b.GetRunesMintHistory(tickerName.Ticker, start, limit)
 	}
 	return result
+}
+
+func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
+	if common.IsOrdx(tickerName) {
+		ticker := b.GetTicker(tickerName.Ticker)
+		if ticker != nil {
+			return ticker.N
+		}
+	}
+	return 0
 }
