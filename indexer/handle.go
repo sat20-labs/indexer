@@ -114,7 +114,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 				nft.Base.InscriptionId, content.Ticker, content.N)
 			return nil
 		}
-		if n < 0 || n > 65535 {
+		if n <= 0 || n > 65535 {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid n: %d",
 				nft.Base.InscriptionId, content.Ticker, n)
 			return nil
