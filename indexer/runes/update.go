@@ -189,8 +189,13 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 							}
 						} else {
 							for _, output := range destinations {
-								value := runestone.NewLot(&amount.Value)
-								allocate(balance, value, output)
+								var lot *runestone.Lot
+								if balance.Cmp(&amount.Value) > 0 {
+									lot = runestone.NewLot(&amount.Value)
+								} else {
+									lot = balance
+								}
+								allocate(balance, lot, output)
 							}
 						}
 					}
@@ -282,11 +287,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if len(balances) == 0 {
 			continue
 		}
-		for _, balance := range balances {
-			if balance.Value.Cmp(uint128.Zero) == 0 {
-				common.Log.Panicf("RuneIndexer.index_runes-> balance is zero")
-			}
-		}
+		// for _, balance := range balances {
+		// 	if balance.Value.Cmp(uint128.Zero) == 0 {
+		// 		common.Log.Panicf("RuneIndexer.index_runes-> balance is zero")
+		// 	}
+		// }
 		// increment burned balances
 		if tx.Outputs[vout].Address.PkScript[0] == txscript.OP_RETURN {
 			for id, balance := range balances {
