@@ -69,7 +69,7 @@ func (p *IndexerMgr) GetTickerV2(tickerName string) *common.TickerInfo {
 	result.SelfMint = ticker.SelfMint
 	result.DeployHeight = int(ticker.Base.BlockHeight)
 	result.DeployBlocktime = ticker.Base.BlockTime
-	result.DeployTx = ""
+	result.DeployTx = common.TxIdFromInscriptionId(ticker.Base.InscriptionId)
 	holders := p.GetHoldersWithTick(ticker.Name)
 	result.HoldersCount = len(holders)
 	result.InscriptionId = ticker.Base.InscriptionId

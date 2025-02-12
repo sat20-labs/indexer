@@ -57,7 +57,7 @@ func (p *IndexerMgr) GetBRC20TickerV2(tickerName string) *common.TickerInfo {
 	
 	result.DeployHeight = int(ticker.Nft.Base.BlockHeight)
 	result.DeployBlocktime = ticker.Nft.Base.BlockTime
-	result.DeployTx = ""
+	result.DeployTx = common.TxIdFromInscriptionId(ticker.Nft.Base.InscriptionId)
 	
 	holders := p.brc20Indexer.GetHoldersWithTick(ticker.Name)
 	result.HoldersCount = len(holders)
