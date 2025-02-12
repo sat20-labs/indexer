@@ -70,10 +70,17 @@ func findOutputWithSat(tx *common.Transaction, sat int64) *common.Output {
 func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out *common.Output,
 	content *common.OrdxDeployContent, nft *common.Nft) *common.Ticker {
 	height := nft.Base.BlockHeight
-	if !common.IsValidSat20Name(content.Ticker) || len(content.Ticker) == 4 {
+	if len(content.Ticker) == 4 {
 		common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid ticker",
 			nft.Base.InscriptionId, content.Ticker)
 		return nil
+	}
+	if !common.IsValidSat20Name(content.Ticker) {
+		if !s.isLptTicker(content.Ticker) {
+			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid ticker",
+				nft.Base.InscriptionId, content.Ticker)
+			return nil
+		}
 	}
 
 	// 名字不跟ticker挂钩
@@ -1059,4 +1066,41 @@ func (b *IndexerMgr) getMintAmount(ticker string, addressId uint64) int64 {
 		}
 	}
 	return amt
+}
+
+func (b *IndexerMgr) isLptTicker(name string) bool {
+
+	// 支持lpt： xxx.lptnnn or xxx.runes.lptnnn
+	parts := strings.Split(name, ".")
+	if len(parts) < 2 {
+		return false
+	}
+
+	org := parts[0]
+	if !b.ftIndexer.TickExisted(org) {
+		return false
+	}
+
+	var protocol, lpt string
+	if len(parts) == 3 {
+		protocol = parts[1]
+		lpt = parts[2]
+	} else if len(parts) == 2 {
+		lpt = parts[1]
+	} else {
+		return false
+	}
+
+	if protocol != "" {
+		if protocol != common.PROTOCOL_NAME_RUNES && protocol != common.PROTOCOL_NAME_BRC20 {
+			return false
+		}
+	}
+
+	num, has := strings.CutPrefix(lpt, "lpt")
+	if !has {
+		return false
+	}
+	_, err :=  strconv.Atoi(num)
+	return err == nil
 }
