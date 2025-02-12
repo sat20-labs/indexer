@@ -538,7 +538,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 runestone.RuneIdLotM
 				if runeIdAddressToCountValue != nil {
 					if runeIdAddressToCountValue.Count-1 == 0 {
 						oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
-						common.Log.Debugf("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount-1)
+						common.Log.Tracef("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount-1)
 						if oldRuneEntry.HolderCount == 0 {
 							common.Log.Errorf("unallocated-> oldRuneEntry.HolderCount == 0")
 						}
