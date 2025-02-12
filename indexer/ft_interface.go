@@ -60,6 +60,7 @@ func (p *IndexerMgr) GetTickerV2(tickerName string) *common.TickerInfo {
 	result.TotalMinted = fmt.Sprintf("%d", minted)
 	result.MintTimes = ms
 	result.Limit = fmt.Sprintf("%d", ticker.Limit)
+	result.N = ticker.N
 	if ticker.Max < 0 {
 		result.MaxSupply = fmt.Sprintf("%d", common.MaxSupply)
 	} else {
@@ -68,7 +69,7 @@ func (p *IndexerMgr) GetTickerV2(tickerName string) *common.TickerInfo {
 	result.SelfMint = ticker.SelfMint
 	result.DeployHeight = int(ticker.Base.BlockHeight)
 	result.DeployBlocktime = ticker.Base.BlockTime
-	result.DeployTx = ""
+	result.DeployTx = common.TxIdFromInscriptionId(ticker.Base.InscriptionId)
 	holders := p.GetHoldersWithTick(ticker.Name)
 	result.HoldersCount = len(holders)
 	result.InscriptionId = ticker.Base.InscriptionId

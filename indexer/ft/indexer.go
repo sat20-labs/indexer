@@ -236,7 +236,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 				}
 				amountInHolder := int64(0)
 				for _, rngs := range tickinfo.MintInfo {
-					amountInHolder += common.GetOrdinalsSize(rngs)
+					amountInHolder += common.GetOrdinalsSize(rngs) * int64(tickinfo.N)
 				}
 				if amountInHolder != amoutInUtxo {
 					common.Log.Errorf("ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)

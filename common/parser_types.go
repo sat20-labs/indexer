@@ -32,6 +32,7 @@ type OrdxDeployContent struct {
 	Ticker   string `json:"tick,omitempty"`
 	Type     string `json:"type,omitempty"`
 	Lim      string `json:"lim,omitempty"`
+	N        string `json:"n,omitempty"`
 	Max      string `json:"max,omitempty"`
 	SelfMint string `json:"selfmint,omitempty"`
 	Block    string `json:"block,omitempty"`

@@ -34,23 +34,28 @@ func (p *AssetOffsets) Clone() AssetOffsets {
 	return result
 }
 
-func (p *AssetOffsets) Split(offset int64) (AssetOffsets, AssetOffsets) {
+func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 	var left, right []*OffsetRange
 
+	remaining := amt
+	offset := int64(0)
 	for _, r := range *p {
-		if r.End <= offset {
-			// 完全在左边
-			left = append(left, r)
-		} else if r.Start >= offset {
-			// 完全在右边
+		if remaining > 0 {
+			if r.End - r.Start <= remaining {
+				// 完全在左边
+				left = append(left, r)
+			} else {
+				// 跨越 offset，需要拆分
+				left = append(left, &OffsetRange{Start: r.Start, End: r.Start+remaining})
+				offset = r.Start+remaining
+				right = append(right, &OffsetRange{Start: 0, End: r.End - offset})
+			}
+			remaining -= r.End - r.Start
+		} else {
 			n := r.Clone()
 			n.Start -= offset
 			n.End -= offset
 			right = append(right, n)
-		} else {
-			// 跨越 offset，需要拆分
-			left = append(left, &OffsetRange{Start: r.Start, End: offset})
-			right = append(right, &OffsetRange{Start: 0, End: r.End-offset})
 		}
 	}
 
@@ -82,6 +87,7 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 type TxAssets = swire.TxAssets
 
 type TxOutput struct {
+	UtxoId      uint64
 	OutPointStr string
 	OutValue    wire.TxOut
 	//Sats        TxRanges  废弃。需要时重新获取
@@ -93,6 +99,7 @@ type TxOutput struct {
 
 func NewTxOutput(value int64) *TxOutput {
 	return &TxOutput{
+		UtxoId:      INVALID_ID,
 		OutPointStr: "",
 		OutValue:    wire.TxOut{Value: value},
 		Assets:      nil,
@@ -102,6 +109,7 @@ func NewTxOutput(value int64) *TxOutput {
 
 func (p *TxOutput) Clone() *TxOutput {
 	n := &TxOutput{
+		UtxoId:      p.UtxoId,
 		OutPointStr: p.OutPointStr,
 		OutValue:    p.OutValue,
 		Assets:      p.Assets.Clone(),
@@ -112,6 +120,14 @@ func (p *TxOutput) Clone() *TxOutput {
 		n.Offsets[i] = u.Clone()
 	}
 	return n
+}
+
+func (p *TxOutput) Height() int {
+	if p.UtxoId == INVALID_ID {
+		return -1
+	}
+	h, _, _ := FromUtxoId(p.UtxoId)
+	return h
 }
 
 func (p *TxOutput) Value() int64 {
@@ -188,18 +204,7 @@ func (p *TxOutput) TxIn_SatsNet() *swire.TxIn {
 }
 
 func (p *TxOutput) SizeOfBindingSats() int64 {
-	bindingSats := int64(0)
-	for _, asset := range p.Assets {
-		amount := int64(0)
-		if asset.BindingSat != 0 {
-			amount = (asset.Amount)
-		}
-
-		if amount > (bindingSats) {
-			bindingSats = amount
-		}
-	}
-	return bindingSats
+	return p.Assets.GetBindingSatAmout()
 }
 
 func (p *TxOutput) Append(another *TxOutput) error {
@@ -234,10 +239,12 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	}
 	p.OutValue.Value += another.OutValue.Value
 
+	p.UtxoId = INVALID_ID
+	p.OutPointStr = ""
+
 	return nil
 }
 
-// 非绑定资产，第一个输出的value为0，所有聪放在第二个返回值
 func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *TxOutput, error) {
 
 	if p.Value() < value {
@@ -261,6 +268,16 @@ func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *T
 	if err != nil {
 		return nil, nil, err
 	}
+	n := asset.BindingSat
+	if n != 0 {
+		if amt%int64(n) != 0 {
+			return nil, nil, fmt.Errorf("amt must be times of %d", n)
+		}
+		requiredValue := GetBindingSatNum(amt, asset.BindingSat)
+		if requiredValue > value {
+			return nil, nil, fmt.Errorf("value too small")
+		}
+	}
 
 	if asset.Amount < amt {
 		return nil, nil, fmt.Errorf("amount too large")
@@ -271,9 +288,11 @@ func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *T
 	asset2.Amount = asset.Amount - amt
 
 	part1.Assets = swire.TxAssets{*asset1}
-	part2.Assets = swire.TxAssets{*asset2}
-
-	if IsBindingSat(name) == 0 {
+	if asset2.Amount != 0 {
+		part2.Assets = swire.TxAssets{*asset2}
+	}
+	
+	if !IsBindingSat(name) {
 		// runes：no offsets
 		return part1, part2, nil
 	}
@@ -284,9 +303,12 @@ func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *T
 	}
 	if asset.Amount == amt {
 		part1.Offsets[*name] = offsets.Clone()
-		return part1, nil, nil
+		if part2.Value() == 0 {
+			part2 = nil
+		}
+		return part1, part2, nil
 	}
-	offset1, offset2 := offsets.Split(amt)
+	offset1, offset2 := offsets.Split(GetBindingSatNum(amt, n))
 	part1.Offsets[*name] = offset1
 	part2.Offsets[*name] = offset2
 
@@ -295,7 +317,7 @@ func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *T
 
 func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, error) {
 
-	if IsBindingSat(name) == 0 {
+	if !IsBindingSat(name) {
 		return 330, nil
 	}
 
@@ -314,13 +336,19 @@ func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, erro
 		return 0, fmt.Errorf("no asset in %s", p.OutPointStr)
 	}
 
-	total := p.GetAsset(name)
+	asset, err := p.Assets.Find(name)
+	if err != nil {
+		return 0, err
+	}
+
+	total := asset.Amount
 	if amt > total {
 		return 0, fmt.Errorf("amt too large")
 	} else if amt == total {
 		return offsets[len(offsets)-1].End, nil
 	}
 
+	amt = GetBindingSatNum(amt, asset.BindingSat)
 	for _, off := range offsets {
 		if amt >= off.End-off.Start {
 			amt -= off.End - off.Start
@@ -346,6 +374,7 @@ func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
 // should fill out Assets parameters.
 func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 	return &TxOutput{
+		UtxoId:      INVALID_ID,
 		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
 		OutValue:    *tx.TxOut[index],
 		Offsets:     make(map[swire.AssetName]AssetOffsets),
@@ -363,16 +392,16 @@ func IsPlainAsset(assetName *swire.AssetName) bool {
 	return ASSET_PLAIN_SAT == *assetName
 }
 
-func IsBindingSat(name *swire.AssetName) uint16 {
+func IsBindingSat(name *swire.AssetName) bool {
 	if name == nil {
-		return 1 // ordx asset
+		return true // ordx asset
 	}
 	if name.Protocol == PROTOCOL_NAME_ORD ||
 		name.Protocol == PROTOCOL_NAME_ORDX ||
 		name.Protocol == "" {
-		return 1
+		return true
 	}
-	return 0
+	return false
 }
 
 
@@ -382,4 +411,20 @@ func IsFungibleToken(name *swire.AssetName) bool {
 	}
 	
 	return name.Type == ASSET_TYPE_FT
+}
+
+func IsOrdx(name *swire.AssetName) bool {
+	if name == nil {
+		return false
+	}
+	
+	return name.Protocol == PROTOCOL_NAME_ORDX && name.Type == ASSET_TYPE_FT
+}
+
+// amt的资产需要多少聪
+func GetBindingSatNum(amt int64, n uint16) int64 {
+	if n == 0 {
+		return 0
+	}
+	return (amt + int64(n) - 1)/int64(n)
 }

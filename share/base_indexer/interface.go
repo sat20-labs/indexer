@@ -105,6 +105,7 @@ type Indexer interface {
 	GetAssetUTXOsInAddressWithTickV2(address string, tickerName *common.TickerName) (map[uint64]*common.TxOutput, error)
 	GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.TickerName) (map[uint64]*common.AssetsInUtxo, error)
 	GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo
+	GetBindingSat(tickerName *common.TickerName) int
 
 	GetAssetSummaryInAddressV2(address string) map[common.TickerName]int64
 	GetAssetSummaryInAddressV3(address string) map[common.TickerName]*common.Decimal

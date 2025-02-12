@@ -178,7 +178,7 @@ func (p *FTIndexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]
 		for k, v := range info.Tickers {
 			amount := int64(0)
 			for _, rng := range v.MintInfo {
-				amount += common.GetOrdinalsSize(rng)
+				amount += common.GetOrdinalsSize(rng) * int64(v.N)
 			}
 			result[k] += amount
 		}
@@ -250,6 +250,30 @@ func (p *FTIndexer) GetAssetsWithUtxo(utxo uint64) map[string]map[string][]*comm
 	return nil
 }
 
+
+// 获取utxo的资产详细信息
+// return: ticker -> assets(inscriptionId->Ranges)
+func (p *FTIndexer) GetAssetsWithUtxoV2(utxo uint64) map[string]int64 {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	result := make(map[string]int64, 0)
+
+	holders := p.holderInfo[utxo]
+	if holders != nil {
+		for ticker, info := range holders.Tickers {
+			// deep copy
+			value := int64(0)
+			for _, mintRngs := range info.MintInfo {
+				value += common.GetOrdinalsSize(mintRngs) * int64(info.N)	
+			}
+			result[ticker] = value
+		}
+		return result
+	}
+
+	return nil
+}
+
 // return: ticker -> assets(inscriptionId->Ranges)
 func (p *FTIndexer) GetAssetsWithRanges(rngs []*common.Range) map[string]map[string][]*common.Range {
 	p.mutex.RLock()
@@ -310,6 +334,33 @@ func (p *FTIndexer) GetAssetRangesWithUtxo(utxo uint64, tickerName string) map[s
 	result := make(map[string][]*common.Range, 0)
 	for id, ranges := range tickinfo.MintInfo {
 		result[id] = ranges
+	}
+
+	return result
+}
+
+
+// 获取该utxo中哪些range有指定的tick资产
+// return: inscriptionId -> assets range
+func (p *FTIndexer) GetAssetsWithUtxoV3(utxo uint64, tickerName string) int64 {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	tickerName = strings.ToLower(tickerName)
+
+	holder := p.holderInfo[utxo]
+	if holder == nil {
+		return 0
+	}
+
+	tickinfo := holder.Tickers[tickerName]
+	if tickinfo == nil {
+		return 0
+	}
+
+	result := int64(0)
+	for _, ranges := range tickinfo.MintInfo {
+		result += common.GetOrdinalsSize(ranges) * int64(tickinfo.N)
 	}
 
 	return result

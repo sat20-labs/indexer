@@ -62,7 +62,9 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *sw
 			continue
 		}
 
-		if ticker == nil || common.IsPlainAsset(ticker) {
+		if ticker == nil {
+			result[utxoId] = info
+		} else if common.IsPlainAsset(ticker) {
 			if len(info.Assets) == 0 {
 				result[utxoId] = info
 			}
@@ -103,10 +105,19 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			return offsets[i].Start < offsets[j].Start
 		})
 
+		n := 1
+		if common.IsOrdx(&k) {
+			ticker := b.GetTicker(k.Ticker)
+			if ticker != nil {
+				n = ticker.N
+				value = value * int64(ticker.N)
+			}
+		}
+
 		asset := swire.AssetInfo{
 			Name:       k,
 			Amount:     value,
-			BindingSat: 1,
+			BindingSat: uint16(n),
 		}
 
 		if assets == nil {
@@ -134,6 +145,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	}
 
 	return &common.TxOutput{
+		UtxoId:      info.UtxoId,
 		OutPointStr: utxo,
 		OutValue: wire.TxOut{
 			Value:    common.GetOrdinalsSize(info.Ordinals),
@@ -170,10 +182,19 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 			return offsets[i].Start < offsets[j].Start
 		})
 
+		n := 1
+		if common.IsOrdx(&k) {
+			ticker := b.GetTicker(k.Ticker)
+			if ticker != nil {
+				value = value * int64(ticker.N)
+				n = ticker.N
+			}
+		}
+
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     fmt.Sprintf("%d", value),
-			BindingSat: true,
+			BindingSat: n,
 			Offsets:    offsets,
 		}
 
@@ -185,7 +206,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     v.String(),
-			BindingSat: false,
+			BindingSat: 0,
 		}
 
 		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
@@ -384,15 +405,11 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 // return: ticker -> asset info (inscriptinId -> asset ranges)
 func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
 	result := make(map[common.TickerName]*common.Decimal)
-	ftAssets := b.ftIndexer.GetAssetsWithUtxo(utxoId)
+	ftAssets := b.ftIndexer.GetAssetsWithUtxoV2(utxoId)
 	if len(ftAssets) > 0 {
 		for k, v := range ftAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
-			amt := int64(0)
-			for _, rngs := range v {
-				amt += common.GetOrdinalsSize(rngs)
-			}
-			result[tickName] = common.NewDecimal(amt, 0)
+			result[tickName] = common.NewDecimal(v, 0)
 		}
 	}
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
@@ -519,4 +536,14 @@ func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 		result, _ = b.GetRunesMintHistory(tickerName.Ticker, start, limit)
 	}
 	return result
+}
+
+func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
+	if common.IsOrdx(tickerName) {
+		ticker := b.GetTicker(tickerName.Ticker)
+		if ticker != nil {
+			return ticker.N
+		}
+	}
+	return 0
 }

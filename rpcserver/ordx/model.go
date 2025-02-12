@@ -32,6 +32,7 @@ func (s *Model) newTickerStatusResp(ticker *common.Ticker) *rpcwire.TickerStatus
 		ID:              (ticker.Id),
 		InscriptionId:   ticker.Base.InscriptionId,
 		Limit:           ticker.Limit,
+		N:               ticker.N,
 		SelfMint:        ticker.SelfMint,
 		Max:             ticker.Max, // 无效：< 0
 		StartBlock:      ticker.BlockStart,
@@ -100,7 +101,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 		resp := &swire.AssetInfo{}
 		resp.Name = tickName
 		resp.Amount = balance
-		resp.BindingSat = common.IsBindingSat(&tickName)
+		resp.BindingSat = uint16(s.indexer.GetBindingSat(&tickName))
 		result.Data = append(result.Data, resp)
 	}
 	result.Start = 0
@@ -132,6 +133,7 @@ func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutputInfo, error) {
 	}
 
 	output := rpcwire.TxOutputInfo{
+		UtxoId:    txOut.UtxoId,
 		OutPoint:  utxo,
 		OutValue:  txOut.OutValue,
 		AssetInfo: assets,
@@ -180,6 +182,7 @@ func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([
 		}
 
 		output := rpcwire.TxOutputInfo{
+			UtxoId:    txOut.UtxoId,
 			OutPoint:  txOut.OutPointStr,
 			OutValue:  txOut.OutValue,
 			AssetInfo: assets,
@@ -203,7 +206,7 @@ func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*comm
 		resp := &common.DisplayAsset{}
 		resp.AssetName = tickName
 		resp.Amount = balance.String()
-		resp.BindingSat = common.IsBindingSat(&tickName) > 0
+		resp.BindingSat = s.indexer.GetBindingSat(&tickName)
 		result = append(result, resp)
 	}
 

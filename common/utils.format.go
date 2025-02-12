@@ -39,6 +39,14 @@ func TxIdFromUtxo(utxo string) string {
 	return parts[0]
 }
 
+func TxIdFromInscriptionId(id string) string {
+	parts := strings.Split(id, "i")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
+}
+
 func ParseUtxo(utxo string) (txid string, vout int, err error) {
 	parts := strings.Split(utxo, ":")
 	if len(parts) != 2 {
