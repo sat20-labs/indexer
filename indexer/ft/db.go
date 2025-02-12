@@ -10,6 +10,7 @@ import (
 
 func (s *FTIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
 	tickinfo := newTickerInfo(tickerName)
+	tickinfo.Ticker = s.getTickerFromDB(tickerName)
 	s.loadMintInfoFromDB(tickinfo)
 	return tickinfo
 }
