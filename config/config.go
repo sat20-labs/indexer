@@ -59,7 +59,17 @@ func GetBaseDir() string {
 }
 
 func InitConfig() *YamlConf {
-	cfgFile := GetBaseDir()+"/.env"
+	
+	configFile := ".env"
+	for i, item := range os.Args {
+		if item == "-env" {
+			if i < len(os.Args) {
+				configFile = os.Args[i+1]
+				break
+			}
+		}
+	}
+	cfgFile := GetBaseDir()+"/"+configFile
 	cfg, err := LoadYamlConf(cfgFile)
 	if err != nil {
 		return nil
