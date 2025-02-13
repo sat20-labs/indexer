@@ -8,6 +8,7 @@ import (
 
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -19,11 +20,11 @@ func (s *Indexer) UpdateDB() {
 		common.Log.Warnf("RuneIndexer.UpdateDB-> err: height(%d) == 0", s.height)
 		return
 	}
+
 	if s.Status.Height == s.height {
 		common.Log.Warnf("RuneIndexer.UpdateDB-> err: status.Height(%d) == height(%d)", s.Status.Height, s.height)
 		return
-	}
-	if s.Status.Height > s.height {
+	} else if s.Status.Height > s.height {
 		common.Log.Panicf("RuneIndexer.UpdateDB-> err: status.Height(%d) >= height(%d)", s.Status.Height, s.height)
 	}
 
@@ -32,18 +33,23 @@ func (s *Indexer) UpdateDB() {
 	s.dbWrite.FlushToDB()
 	s.isUpdateing = false
 
+	if s.chaincfgParam.Net == wire.MainNet && s.height < 840000 {
+		return
+	}
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d", s.Status.Height)
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
-	if !s.isUpdateing {
-		if block.Height > 0 {
-			if s.Status.Height < uint64(block.Height-1) {
-				common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.Status.Height, block.Height-1)
-			} else if s.Status.Height >= uint64(block.Height) {
-				common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.Status.Height, block.Height)
-				return
-			}
+	if s.chaincfgParam.Net == wire.MainNet && s.height < 840000 {
+		return
+	}
+
+	if !s.isUpdateing && block.Height > 0 {
+		if s.Status.Height >= uint64(block.Height) {
+			common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.Status.Height, block.Height)
+			return
+		} else if s.Status.Height < uint64(block.Height-1) {
+			common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.Status.Height, block.Height-1)
 		}
 	}
 	s.height = uint64(block.Height)
