@@ -6,9 +6,9 @@ db/*
 db1/*
 log/*
 # for conf
-*.env
 .env
 !example.env
 !example.yaml
 # build execute file
 indexer-*
+no-hup.out

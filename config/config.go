@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -60,7 +61,7 @@ func GetBaseDir() string {
 
 func InitConfig() *YamlConf {
 	
-	configFile := ".env"
+	configFile := "./.env"
 	for i, item := range os.Args {
 		if item == "-env" {
 			if i < len(os.Args) {
@@ -69,8 +70,13 @@ func InitConfig() *YamlConf {
 			}
 		}
 	}
-	cfgFile := GetBaseDir()+"/"+configFile
-	cfg, err := LoadYamlConf(cfgFile)
+	if !strings.HasPrefix(configFile, "/")  {
+		configFile = filepath.Join(GetBaseDir(), configFile)
+	}
+
+	fmt.Printf("config file: %s\n", configFile)
+	
+	cfg, err := LoadYamlConf(configFile)
 	if err != nil {
 		return nil
 	}
