@@ -45,7 +45,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 	s.nft.UpdateTransfer(block)
 	s.ns.UpdateTransfer(block)
 	s.ftIndexer.UpdateTransfer(block)
-	s.brc20Indexer.UpdateTransfer(block)
+	//s.brc20Indexer.UpdateTransfer(block)
 	s.RunesIndexer.UpdateTransfer(block)
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
@@ -880,7 +880,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 	case "brc-20":
 		if inscriptionId == 0 {
 			// TODO brc20 只处理tx中的第一个铭文？
-			s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+			// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
 		}
 
 	case "primary-name":
