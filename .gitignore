@@ -11,4 +11,4 @@ log/*
 !example.yaml
 # build execute file
 indexer-*
-no-hup.out
+nohup.out
