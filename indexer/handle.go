@@ -250,7 +250,6 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		return nil
 	}
 
-	nft.Base.TypeName = common.ASSET_TYPE_NS
 	nft.Base.UserData = []byte(content.Ticker)
 	ticker := &common.Ticker{
 		Base:       common.CloneBaseContent(nft.Base),
@@ -268,6 +267,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 
 	if !common.TickerSeparatedFromName {
 		if reg == nil {
+			nft.Base.TypeName = common.ASSET_TYPE_NS
 			reg = &ns.NameRegister{
 				Nft:  nft,
 				Name: strings.ToLower(ticker.Name),
