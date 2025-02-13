@@ -493,6 +493,27 @@ func (p *FTIndexer) GetMintHistoryWithAddressV2(addressId uint64, tick string, s
 	return result[start:end], total
 }
 
+
+// return: mint的总量
+func (p *FTIndexer) GetMintAmountWithAddressId(addressId uint64, tick string) (int64) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	tickinfo, ok := p.tickerMap[strings.ToLower(tick)]
+	if !ok {
+		return 0
+	}
+
+	amount := int64(0)
+	for _, info := range tickinfo.InscriptionMap {
+		if info.Address == addressId {
+			amount += info.Amount
+		}
+	}
+
+	return amount
+}
+
 // return: mint的总量和次数
 func (p *FTIndexer) GetMintAmount(tick string) (int64, int64) {
 	p.mutex.RLock()

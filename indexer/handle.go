@@ -81,6 +81,14 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 				nft.Base.InscriptionId, content.Ticker)
 			return nil
 		}
+
+		// 目前只允许持有足够的pearl的用户可以部署lpt
+		addressId := s.compiling.GetAddressId(out.Address.Addresses[0])
+		if !s.isEligibleUser(addressId) {
+			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, not eligible user",
+				nft.Base.InscriptionId, content.Ticker)
+			return nil
+		}
 	}
 
 	// 名字不跟ticker挂钩
@@ -1015,8 +1023,19 @@ func (s *IndexerMgr) hasSameTickerInRange(ticker string, rngs []*common.Range) b
 }
 
 func (s *IndexerMgr) getMintAmountByAddressId(ticker string, address uint64) int64 {
+	return s.ftIndexer.GetMintAmountWithAddressId(address, ticker)
+}
+
+func (s *IndexerMgr) isEligibleUser(address uint64) bool {
+	ticker := "pearl"
+	amt := int64(1000000)
+	if !s.IsMainnet() {
+		ticker = "dogecoin"
+		amt = 10000
+	}
 	addrmap := s.GetHoldersWithTick(ticker)
-	return addrmap[address]
+	value := addrmap[address]
+	return value >= amt
 }
 
 func (s *IndexerMgr) isSat20Actived(height int) bool {
