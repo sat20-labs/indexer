@@ -350,6 +350,10 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		return
 	}
 
+	if len(burned) > 0 {
+		return
+	}
+
 	// add for balances and holder count
 	for _, runeBalance := range runeBalanceArray {
 		// update runeIdToOutpointToBalance
