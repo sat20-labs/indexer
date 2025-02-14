@@ -125,6 +125,9 @@ func (s *Indexer) CheckSelf() bool {
 		firstRuneName = "BESTINSLOT•XYZ"
 	case wire.MainNet:
 		firstRuneName = "UNCOMMON•GOODS"
+		if s.height < 840000 {
+			return true
+		}
 	default:
 		common.Log.Panicf("RuneIndexer.CheckSelf-> unknown net:%d", s.chaincfgParam.Net)
 	}
