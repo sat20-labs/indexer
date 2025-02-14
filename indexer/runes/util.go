@@ -13,24 +13,6 @@ import (
 	"lukechampine.com/uint128"
 )
 
-// func ParseMintHistoryKey(input string) (string, string, error) {
-// 	if !strings.HasPrefix(input, DB_PREFIX_MINT_HISTORY) {
-// 		return "", "", fmt.Errorf("invalid string format")
-// 	}
-// 	str := strings.TrimPrefix(input, DB_PREFIX_MINT_HISTORY)
-// 	parts := strings.Split(str, "-")
-
-// 	if len(parts) != 2 {
-// 		return "", "", fmt.Errorf("invalid string format")
-// 	}
-
-// 	return parts[0], parts[1], nil
-// }
-
-/**
- * It must be the first INSCRIPTION encountered in the VOUTS of this transaction,
- * so it's necessary to verify that the INSCRIPTION at this position exists
- */
 func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.InscriptionId) {
 	for _, input := range transaction.Inputs {
 		_, err := common.ParseInscription(input.Witness)
@@ -102,6 +84,7 @@ func parseTapscript(witness wire.TxWitness) []byte {
 
 func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 	// Opcode.classify(self, ctx: ClassifyContext) -> Class
+	availDataLen := len(tapscript)
 	for i := 0; i < len(tapscript); {
 		b := tapscript[i]
 		i++
@@ -151,12 +134,19 @@ func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 			ret = append(ret, []byte{b})
 			continue
 		}
-		var n int = int(b)
-		if len(tapscript) >= n {
-			slice := tapscript[i : i+n]
+		n := int(uint(b))
+		if availDataLen >= n {
+			end := i + n
 			if n > 0 {
+				slice := tapscript[i:end]
+				ret = append(ret, slice)
 				i += n
 			}
+			availDataLen = len(tapscript) - end
+		} else if availDataLen != 0 {
+			end := len(tapscript)
+			slice := tapscript[i:end]
+			i = end
 			ret = append(ret, slice)
 		}
 	}

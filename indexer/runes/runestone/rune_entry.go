@@ -229,8 +229,10 @@ func (s *RuneEntry) FromPb(pbValue *pb.RuneEntry) {
 	s.Burned = uint128.Uint128{Hi: pbValue.Burned.Hi, Lo: pbValue.Burned.Lo}
 	s.Divisibility = uint8(pbValue.Divisibility.Value)
 	s.Etching = pbValue.Etching
-	parent := InscriptionId(pbValue.Parent.Value)
-	s.Parent = &parent
+	if pbValue.Parent != nil {
+		parent := InscriptionId(pbValue.Parent.Value)
+		s.Parent = &parent
+	}
 	s.Mints = uint128.Uint128{Hi: pbValue.Mints.Hi, Lo: pbValue.Mints.Lo}
 	s.Number = pbValue.Number
 	s.HolderCount = pbValue.HolderCount

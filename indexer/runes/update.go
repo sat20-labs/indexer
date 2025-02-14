@@ -40,11 +40,11 @@ func (s *Indexer) UpdateDB() {
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
-	if s.chaincfgParam.Net == wire.MainNet && s.height < 840000 {
+	if s.chaincfgParam.Net == wire.MainNet && block.Height < 840000 {
 		return
 	}
 
-	if !s.isUpdateing && block.Height > 0 {
+	if !s.isUpdateing && block.Height > 0 && s.Status.Height > 0 {
 		if s.Status.Height >= uint64(block.Height) {
 			common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.Status.Height, block.Height)
 			return
