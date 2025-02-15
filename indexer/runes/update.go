@@ -184,14 +184,16 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					if len(destinations) > 0 {
 						if amount.Value.Cmp(uint128.Zero) == 0 {
 							destinationsLen := uint128.From64(uint64(len(destinations)))
-							value := balance.Div(&destinationsLen)
+							amount := balance.Div(&destinationsLen)
 							remainder := balance.Rem(&destinationsLen).Value.Big().Uint64()
 							for index, output := range destinations {
 								if index < int(remainder) {
 									one := uint128.From64(1)
-									value = value.AddUint128(&one)
+									addAmount := amount.AddUint128(&one)
+									allocate(balance, &addAmount, output)
+								} else {
+									allocate(balance, &amount, output)
 								}
-								allocate(balance, &value, output)
 							}
 						} else {
 							for _, output := range destinations {
