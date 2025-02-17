@@ -93,19 +93,21 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
-		value := int64(0)
-		var offsets common.AssetOffsets
+		tmpRngs := make([]*common.Range, 0)
 		for _, rngs := range v {
-			for _, rng := range rngs {
-				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
-				value += rng.Size
-			}
+			tmpRngs = append(tmpRngs, rngs...)
 		}
-
-		sort.Slice(offsets, func(i, j int) bool {
-			return offsets[i].Start < offsets[j].Start
+		sort.Slice(tmpRngs, func(i, j int) bool {
+			return tmpRngs[i].Start < tmpRngs[j].Start
 		})
+		
+		var offsets common.AssetOffsets
+		value := int64(0)
+		for _, rng := range tmpRngs {
+			start := common.GetSatOffset(info.Ordinals, rng.Start)
+			offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
+			value += rng.Size
+		}
 
 		n := 1
 		if common.IsOrdx(&k) {
@@ -170,19 +172,21 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
-		value := int64(0)
-		var offsets common.AssetOffsets
+		tmpRngs := make([]*common.Range, 0)
 		for _, rngs := range v {
-			for _, rng := range rngs {
-				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
-				value += rng.Size
-			}
+			tmpRngs = append(tmpRngs, rngs...)
 		}
-
-		sort.Slice(offsets, func(i, j int) bool {
-			return offsets[i].Start < offsets[j].Start
+		sort.Slice(tmpRngs, func(i, j int) bool {
+			return tmpRngs[i].Start < tmpRngs[j].Start
 		})
+		
+		var offsets common.AssetOffsets
+		value := int64(0)
+		for _, rng := range tmpRngs {
+			start := common.GetSatOffset(info.Ordinals, rng.Start)
+			offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
+			value += rng.Size
+		}
 
 		n := 1
 		if common.IsOrdx(&k) {
