@@ -94,11 +94,11 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
 		value := int64(0)
-		var offsets []*common.OffsetRange
+		var offsets common.AssetOffsets
 		for _, rngs := range v {
 			for _, rng := range rngs {
 				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start + rng.Size})
+				offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
 				value += rng.Size
 			}
 		}
@@ -171,11 +171,11 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
 		value := int64(0)
-		var offsets []*common.OffsetRange
+		var offsets common.AssetOffsets
 		for _, rngs := range v {
 			for _, rng := range rngs {
 				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets = append(offsets, &common.OffsetRange{Start: start, End: start + rng.Size})
+				offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
 				value += rng.Size
 			}
 		}

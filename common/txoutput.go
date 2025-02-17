@@ -62,6 +62,26 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 	return left, right
 }
 
+
+// 同一个utxo中的offset合并
+func (p *AssetOffsets) Cat(r2 *OffsetRange) {
+	if r2 == nil {
+		return
+	}
+	var r1 *OffsetRange
+	len1 := len(*p)
+	if len1 > 0 {
+		r1 = (*p)[len1-1]
+		if r1.End == r2.Start {
+			r1.End = r2.End
+		} else {
+			*p = append(*p, r2)
+		}
+	} else {
+		*p = append(*p, r2)
+	}
+}
+
 // another 已经调整过偏移值
 func (p *AssetOffsets) Append(another AssetOffsets) {
 	var r1, r2 *OffsetRange
@@ -83,6 +103,7 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 		*p = append(*p, another...)
 	}
 }
+
 
 type TxAssets = swire.TxAssets
 
