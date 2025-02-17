@@ -188,6 +188,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						}
 					} else {
 						b.updateDB()
+						b.dbgc()
 						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
 						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
 						// 	period := 1000
@@ -252,7 +253,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	common.Log.Info("IndexerMgr exited.")
 }
 
-func (b *IndexerMgr) closeDB() {
+func (b *IndexerMgr) dbgc() {
 	common.RunBadgerGC(b.localDB)
 	common.RunBadgerGC(b.baseDB)
 	common.RunBadgerGC(b.nftDB)
@@ -260,6 +261,10 @@ func (b *IndexerMgr) closeDB() {
 	common.RunBadgerGC(b.ftDB)
 	common.RunBadgerGC(b.brc20DB)
 	common.RunBadgerGC(b.runesDB)
+}
+
+func (b *IndexerMgr) closeDB() {
+	b.dbgc()
 
 	b.runesDB.Close()
 	b.brc20DB.Close()
