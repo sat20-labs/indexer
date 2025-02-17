@@ -261,6 +261,7 @@ func (b *IndexerMgr) dbgc() {
 	common.RunBadgerGC(b.ftDB)
 	common.RunBadgerGC(b.brc20DB)
 	common.RunBadgerGC(b.runesDB)
+	common.Log.Infof("dbgc completed")
 }
 
 func (b *IndexerMgr) closeDB() {

@@ -332,7 +332,7 @@ func RunBadgerGC(db *badger.DB) {
 
 	for {
 		err := db.RunValueLogGC(0.5)
-		Log.Infof("RunValueLogGC return %v", err)
+		//Log.Infof("RunValueLogGC return %v", err)
 		if err == badger.ErrNoRewrite {
 			break
 		} else if err != nil {
@@ -340,9 +340,7 @@ func RunBadgerGC(db *badger.DB) {
 		}
 	}
 	db.Sync()
-	Log.Info("badgerGc: RunValueLogGC is done")
-
-	//Log.Infof("levels: %v", db.LevelsToString())
+	//Log.Info("badgerGc: RunValueLogGC is done")
 }
 
 func BackupDB(fname string, db *badger.DB) error {
