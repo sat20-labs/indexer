@@ -7,6 +7,8 @@ replace github.com/btcsuite/btcd => github.com/sat20-labs/btcd v0.24.3
 
 replace github.com/btcsuite/btcwallet => github.com/sat20-labs/btcwallet v0.16.11
 
+replace github.com/sat20-lab/satsnet_btcd => ../satsnet_btcd
+
 require (
 	github.com/OLProtocol/go-bitcoind v0.0.0-20240716001842-eaea89a7c02d
 	github.com/andybalholm/brotli v1.1.0
@@ -25,7 +27,7 @@ require (
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
-	github.com/sat20-labs/satsnet_btcd v0.0.0-20241213071731-f5e1b98a4654
+	github.com/sat20-labs/satsnet_btcd v0.0.0-20250218020706-22be756fc8dd
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/files v1.0.1
@@ -44,9 +46,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
-	golang.org/x/crypto v0.29.0 // indirect
+	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/net v0.31.0 // indirect
-	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
 )
 
 require (
@@ -95,7 +97,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
