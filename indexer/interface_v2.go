@@ -121,7 +121,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		asset := swire.AssetInfo{
 			Name:       k,
 			Amount:     value,
-			BindingSat: uint16(n),
+			BindingSat: uint32(n),
 		}
 
 		if assets == nil {

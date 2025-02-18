@@ -101,7 +101,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 		resp := &swire.AssetInfo{}
 		resp.Name = tickName
 		resp.Amount = balance
-		resp.BindingSat = uint16(s.indexer.GetBindingSat(&tickName))
+		resp.BindingSat = uint32(s.indexer.GetBindingSat(&tickName))
 		result.Data = append(result.Data, resp)
 	}
 	result.Start = 0
