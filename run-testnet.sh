@@ -4,7 +4,7 @@ rm indexer-testnet
 go build -o indexer-testnet
 
 if [ $# -eq 0 ]; then
-  nohup ./indexer-testnet -env ./testnet.env &
+  nohup ./indexer-testnet -env ./testnet.env > ./nohup_testnet.log 2>&1 &
   disown
 else
   if [ "$1" = "off" ]; then

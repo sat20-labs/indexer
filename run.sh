@@ -4,7 +4,7 @@ rm indexer-mainnet
 go build -o indexer-mainnet
 
 if [ $# -eq 0 ]; then
-  nohup ./indexer-mainnet -env ./mainnet.env &
+  nohup ./indexer-mainnet -env ./mainnet.env > ./nohup_mainnet.log 2>&1 &
   disown
 else
   if [ "$1" = "off" ]; then
