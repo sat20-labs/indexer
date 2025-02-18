@@ -129,7 +129,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 				nft.Base.InscriptionId, content.Ticker, content.N)
 			return nil
 		}
-		if n <= 0 || n > 65535 {
+		if n <= 0 || n > 100000000 {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid n: %d",
 				nft.Base.InscriptionId, content.Ticker, n)
 			return nil
@@ -167,6 +167,11 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		if max < 0 {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid max: %d",
 				nft.Base.InscriptionId, content.Ticker, max)
+			return nil
+		}
+		if max%int64(n) != 0 {
+			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid max/n: %d %d",
+				nft.Base.InscriptionId, content.Ticker, max, n)
 			return nil
 		}
 	}
