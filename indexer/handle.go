@@ -1035,8 +1035,8 @@ func (s *IndexerMgr) isEligibleUser(address uint64) bool {
 	ticker := "pearl"
 	amt := int64(1000000)
 	if !s.IsMainnet() {
-		ticker = "dogecoin"
-		amt = 10000
+		ticker = "dogcoin"
+		amt = 1000
 	}
 	addrmap := s.GetHoldersWithTick(ticker)
 	value := addrmap[address]
