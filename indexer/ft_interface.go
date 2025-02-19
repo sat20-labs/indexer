@@ -50,7 +50,7 @@ func (p *IndexerMgr) GetTickerV2(tickerName string) *common.TickerInfo {
 	result := &common.TickerInfo{}
 	result.Protocol = common.PROTOCOL_NAME_ORDX
 	result.Type = common.ASSET_TYPE_FT
-	result.Ticker = ticker.Name
+	result.Ticker = strings.ToLower(ticker.Name)
 	result.DisplayName = ticker.Name
 	result.Id = ticker.Id
 	result.Divisibility = 0

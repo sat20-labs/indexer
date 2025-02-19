@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sat20-labs/indexer/common"
 )
@@ -37,7 +38,7 @@ func (p *IndexerMgr) GetBRC20TickerV2(tickerName string) *common.TickerInfo {
 	result := &common.TickerInfo{}
 	result.Protocol = common.PROTOCOL_NAME_BRC20
 	result.Type = common.ASSET_TYPE_FT
-	result.Ticker = ticker.Name
+	result.Ticker = strings.ToLower(ticker.Name)
 	result.DisplayName = ticker.Name
 	result.Id = ticker.Id
 	result.Divisibility = int(ticker.Decimal)
