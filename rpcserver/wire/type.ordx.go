@@ -9,6 +9,7 @@ import (
 
 type TickersResp struct {
 	BaseResp
+	Total int
 	Data []string `json:"data"`
 }
 

@@ -224,7 +224,15 @@ func (s *Handle) getTickerList(c *gin.Context) {
 	}
 
 	protocol := c.Param("protocol")
-	resp.Data = s.model.GetTickerList(protocol)
+	start, err := strconv.Atoi(c.DefaultQuery("start", "0"))
+	if err != nil {
+		start = 0
+	}
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	if err != nil {
+		limit = 100
+	}
+	resp.Data, resp.Total = s.model.GetTickerList(protocol, start, limit)
 
 	c.JSON(http.StatusOK, resp)
 }
