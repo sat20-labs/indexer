@@ -592,7 +592,8 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			b.blockprocCB(block)
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> blockproc: cost: %v", time.Since(localStartTime))
 
-			if block.Height%b.periodFlushToDB == 0 && height-block.Height > b.keepBlockHistory {
+			if (block.Height%b.periodFlushToDB == 0 && height-block.Height > b.keepBlockHistory) ||
+			height-block.Height == b.keepBlockHistory+1 {
 				//localStartTime = time.Now()
 				b.forceUpdateDB()
 				//common.Log.Infof("BaseIndexer.SyncToBlock-> forceUpdateDB: cost: %v", time.Since(localStartTime))
@@ -613,7 +614,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 
 	//b.forceUpdateDB()
 
-	common.Log.Infof("BaseIndexer.SyncToBlock-> already synced to block %d-%d\n", b.lastHeight, b.stats.SyncHeight)
+	common.Log.Infof("BaseIndexer.SyncToBlock-> already sync to block %d-%d\n", b.lastHeight, b.stats.SyncHeight)
 	return 0
 }
 
