@@ -33,6 +33,8 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 	indexer := &RpcIndexer{
 		BaseIndexer:        *base.Clone(),
 		bSearching:         false,
+		addressValueMap:    make(map[string]*common.AddressValueInDB),
+		addressIdMap:       make(map[uint64]string),
 		satSearchingStatus: make(map[int64]*SatSearchingStatus),
 	}
 
