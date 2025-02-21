@@ -68,7 +68,7 @@ func NewBaseIndexer(
 		db:               basicDB,
 		stats:            &SyncStats{},
 		periodFlushToDB:  periodFlushToDB,
-		keepBlockHistory: 10,
+		keepBlockHistory: 12,
 		blocksChan:       make(chan *common.Block, BLOCK_PREFETCH),
 		chaincfgParam:    chaincfgParam,
 		maxIndexHeight:   maxIndexHeight,
@@ -584,8 +584,8 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			b.lastHeight = block.Height
 			b.lastHash = block.Hash
 			b.prevBlockHashMap[b.lastHeight] = b.lastHash
-			if len(b.prevBlockHashMap) > 6 {
-				delete(b.prevBlockHashMap, b.lastHeight-6)
+			if len(b.prevBlockHashMap) > b.keepBlockHistory {
+				delete(b.prevBlockHashMap, b.lastHeight-b.keepBlockHistory)
 			}
 
 			//localStartTime = time.Now()
@@ -593,7 +593,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> blockproc: cost: %v", time.Since(localStartTime))
 
 			if (block.Height%b.periodFlushToDB == 0 && height-block.Height > b.keepBlockHistory) ||
-			height-block.Height == b.keepBlockHistory+1 {
+			height-block.Height == b.keepBlockHistory {
 				//localStartTime = time.Now()
 				b.forceUpdateDB()
 				//common.Log.Infof("BaseIndexer.SyncToBlock-> forceUpdateDB: cost: %v", time.Since(localStartTime))
