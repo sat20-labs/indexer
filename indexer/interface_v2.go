@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
@@ -93,20 +92,14 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
-		tmpRngs := make([]*common.Range, 0)
-		for _, rngs := range v {
-			tmpRngs = append(tmpRngs, rngs...)
-		}
-		sort.Slice(tmpRngs, func(i, j int) bool {
-			return tmpRngs[i].Start < tmpRngs[j].Start
-		})
-		
 		var offsets common.AssetOffsets
 		value := int64(0)
-		for _, rng := range tmpRngs {
-			start := common.GetSatOffset(info.Ordinals, rng.Start)
-			offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
-			value += rng.Size
+		for _, rngs := range v {
+			for _, rng := range rngs {
+				start := common.GetSatOffset(info.Ordinals, rng.Start)
+				offsets.Insert(&common.OffsetRange{Start: start, End: start + rng.Size})
+				value += rng.Size
+			}
 		}
 
 		n := 1
@@ -172,20 +165,14 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
-		tmpRngs := make([]*common.Range, 0)
-		for _, rngs := range v {
-			tmpRngs = append(tmpRngs, rngs...)
-		}
-		sort.Slice(tmpRngs, func(i, j int) bool {
-			return tmpRngs[i].Start < tmpRngs[j].Start
-		})
-		
 		var offsets common.AssetOffsets
 		value := int64(0)
-		for _, rng := range tmpRngs {
-			start := common.GetSatOffset(info.Ordinals, rng.Start)
-			offsets.Cat(&common.OffsetRange{Start: start, End: start + rng.Size})
-			value += rng.Size
+		for _, rngs := range v {
+			for _, rng := range rngs {
+				start := common.GetSatOffset(info.Ordinals, rng.Start)
+				offsets.Insert(&common.OffsetRange{Start: start, End: start + rng.Size})
+				value += rng.Size
+			}
 		}
 
 		n := 1
