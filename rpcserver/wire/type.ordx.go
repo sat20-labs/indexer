@@ -9,8 +9,8 @@ import (
 
 type TickersResp struct {
 	BaseResp
-	Total int
-	Data []*common.TickerInfo `json:"data"`
+	Total int                  `json:"total"`
+	Data  []*common.TickerInfo `json:"data"`
 }
 
 type TickerInfoResp struct {
@@ -480,7 +480,6 @@ type TxOutputListResp struct {
 	BaseResp
 	Data []*TxOutputInfo `json:"data"`
 }
-
 
 type TxOutputRespV3 struct {
 	BaseResp
