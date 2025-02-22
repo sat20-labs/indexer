@@ -23,7 +23,7 @@ type APIDoc struct {
 }
 
 //	@contact.name	API Support
-//	@contact.url	https://ordx.space
+//	@contact.url	https://sat20.org
 //	@contact.email	support@tinyverse.space
 
 // @securityDefinitions.apikey	Bearer
