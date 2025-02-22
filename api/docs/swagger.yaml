@@ -1,0 +1,1599 @@
+definitions:
+  common.Range:
+    properties:
+      size:
+        type: integer
+      start:
+        type: integer
+    type: object
+  wire.AssetAbbrInfo:
+    properties:
+      amount:
+        type: integer
+      ticker:
+        type: string
+      type:
+        type: string
+    type: object
+  wire.AssetDetailInfo:
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/wire.TickerAsset'
+        type: array
+      ranges:
+        items:
+          $ref: '#/definitions/common.Range'
+        type: array
+      utxo:
+        type: string
+      value:
+        type: integer
+    type: object
+  wire.AssetListResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/wire.AssetAbbrInfo'
+        type: array
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.AssetsData:
+    properties:
+      detail:
+        $ref: '#/definitions/wire.AssetDetailInfo'
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  wire.AssetsResp_deprecated:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.AssetsData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.BalanceSummary:
+    properties:
+      balance:
+        type: integer
+      ticker:
+        type: string
+      type:
+        type: string
+    type: object
+  wire.BalanceSummaryListData:
+    properties:
+      detail:
+        items:
+          $ref: '#/definitions/wire.BalanceSummary'
+        type: array
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  wire.BalanceSummaryListResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.BalanceSummaryListData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.BestBlockHeightResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        type: integer
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.BestHeightResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        additionalProperties:
+          type: integer
+        example:
+          height: 100
+        type: object
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.BlockHashResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        example: ""
+        type: string
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.ExoticSatRangeUtxo:
+    properties:
+      sats:
+        items:
+          $ref: '#/definitions/wire.SatDetailInfo'
+        type: array
+      utxo:
+        type: string
+      value:
+        type: integer
+    type: object
+  wire.HealthStatusResp:
+    properties:
+      basedbver:
+        example: 1.0.
+        type: string
+      ordxdbver:
+        example: 1.0.0
+        type: string
+      status:
+        example: ok
+        type: string
+      version:
+        example: 0.2.1
+        type: string
+    type: object
+  wire.Holder:
+    properties:
+      total_balance:
+        type: integer
+      wallet:
+        type: string
+    type: object
+  wire.HolderListData:
+    properties:
+      detail:
+        items:
+          $ref: '#/definitions/wire.Holder'
+        type: array
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  wire.HolderListResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.HolderListData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.InscriptionAsset:
+    properties:
+      assetamount:
+        type: integer
+      inscriptionId:
+        type: string
+      inscriptionnum:
+        type: integer
+      ranges:
+        items:
+          $ref: '#/definitions/common.Range'
+        type: array
+      ticker:
+        type: string
+      type:
+        type: string
+    type: object
+  wire.KVItem:
+    properties:
+      inscriptionId:
+        type: string
+      key:
+        type: string
+      value:
+        type: string
+    type: object
+  wire.MintDetailInfo:
+    properties:
+      address:
+        type: string
+      amount:
+        type: integer
+      content:
+        items:
+          type: integer
+        type: array
+      contenttype:
+        type: string
+      delegate:
+        type: string
+      id:
+        example: 1
+        type: integer
+      inscriptionId:
+        type: string
+      inscriptionNumber:
+        type: integer
+      mintTimes:
+        type: integer
+      ranges:
+        items:
+          $ref: '#/definitions/common.Range'
+        type: array
+      ticker:
+        type: string
+    type: object
+  wire.MintDetailInfoResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.MintDetailInfo'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.MintHistory:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/wire.MintHistoryItem'
+        type: array
+      limit:
+        type: integer
+      start:
+        type: integer
+      ticker:
+        type: string
+      total:
+        type: integer
+      type:
+        type: string
+    type: object
+  wire.MintHistoryData:
+    properties:
+      detail:
+        $ref: '#/definitions/wire.MintHistory'
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  wire.MintHistoryItem:
+    properties:
+      balance:
+        example: 546
+        type: integer
+      holderaddress:
+        type: string
+      inscriptionId:
+        example: bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0
+        type: string
+      inscriptionNumber:
+        example: 67269474
+        type: integer
+      mintaddress:
+        example: bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5
+        type: string
+    type: object
+  wire.MintHistoryResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.MintHistoryData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.NSStatusData:
+    properties:
+      names:
+        items:
+          $ref: '#/definitions/wire.NftItem'
+        type: array
+      start:
+        type: integer
+      total:
+        type: integer
+      version:
+        type: string
+    type: object
+  wire.NSStatusResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.NSStatusData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.NamePropertiesResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.OrdinalsName'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.NamesWithAddressData:
+    properties:
+      address:
+        type: string
+      names:
+        items:
+          $ref: '#/definitions/wire.OrdinalsName'
+        type: array
+      total:
+        type: integer
+    type: object
+  wire.NamesWithAddressResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.NamesWithAddressData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.NftItem:
+    properties:
+      address:
+        type: string
+      height:
+        type: integer
+      id:
+        type: integer
+      inscriptionAddress:
+        type: string
+      inscriptionId:
+        type: string
+      name:
+        type: string
+      sat:
+        type: integer
+      time:
+        type: integer
+      utxo:
+        type: string
+      value:
+        type: integer
+    type: object
+  wire.OrdinalsName:
+    properties:
+      address:
+        type: string
+      height:
+        type: integer
+      id:
+        type: integer
+      inscriptionAddress:
+        type: string
+      inscriptionId:
+        type: string
+      kvs:
+        items:
+          $ref: '#/definitions/wire.KVItem'
+        type: array
+      name:
+        type: string
+      sat:
+        type: integer
+      start:
+        type: integer
+      time:
+        type: integer
+      total:
+        type: integer
+      utxo:
+        type: string
+      value:
+        type: integer
+    type: object
+  wire.PlainUtxo:
+    properties:
+      txid:
+        type: string
+      value:
+        type: integer
+      vout:
+        type: integer
+    type: object
+  wire.PlainUtxosResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/wire.PlainUtxo'
+        type: array
+      msg:
+        example: ok
+        type: string
+      total:
+        type: integer
+    type: object
+  wire.RawBlockResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        example: ""
+        type: string
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.SatDetailInfo:
+    properties:
+      block:
+        type: integer
+      offset:
+        type: integer
+      satributes:
+        items:
+          type: string
+        type: array
+      size:
+        type: integer
+      start:
+        type: integer
+    type: object
+  wire.SatInfo:
+    properties:
+      cycle:
+        type: integer
+      epoch:
+        type: integer
+      height:
+        type: integer
+      period:
+        type: integer
+      sat:
+        type: integer
+      satributes:
+        items:
+          type: string
+        type: array
+    type: object
+  wire.SatInfoResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.SatInfo'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.SatRange:
+    properties:
+      offset:
+        type: integer
+      size:
+        type: integer
+      start:
+        type: integer
+    type: object
+  wire.SatRangeResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.ExoticSatRangeUtxo'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.SatRangeUtxoResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/wire.ExoticSatRangeUtxo'
+        type: array
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.SatributesResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        items:
+          type: string
+        type: array
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.Seed:
+    properties:
+      seed:
+        type: string
+      ticker:
+        type: string
+      type:
+        type: string
+    type: object
+  wire.SeedsResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/wire.Seed'
+        type: array
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.SendRawTxResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        example: ae74538baa914f3799081ba78429d5d84f36a0127438e9f721dff584ac17b346
+        type: string
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.SpecificExoticUtxo:
+    properties:
+      amount:
+        type: integer
+      sats:
+        items:
+          $ref: '#/definitions/wire.SatRange'
+        type: array
+      type:
+        type: string
+      utxo:
+        type: string
+      value:
+        type: integer
+    type: object
+  wire.SpecificSat:
+    properties:
+      address:
+        type: string
+      sats:
+        items:
+          $ref: '#/definitions/wire.SatRange'
+        type: array
+      specificsat:
+        type: integer
+      utxo:
+        type: string
+      value:
+        type: integer
+    type: object
+  wire.SpecificSatResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/wire.SpecificSat'
+        type: array
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.StatusListData:
+    properties:
+      detail:
+        items:
+          $ref: '#/definitions/wire.TickerStatus'
+        type: array
+      height:
+        type: integer
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  wire.StatusListResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.StatusListData'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.StatusResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.TickerStatus'
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.TickerAsset:
+    properties:
+      amount:
+        type: integer
+      assetamount:
+        type: integer
+      assets:
+        items:
+          $ref: '#/definitions/wire.InscriptionAsset'
+        type: array
+      ticker:
+        type: string
+      type:
+        type: string
+      utxo:
+        type: string
+    type: object
+  wire.TickerStatus:
+    properties:
+      content:
+        items:
+          type: integer
+        type: array
+      contenttype:
+        example: xxx
+        type: string
+      delegate:
+        example: xxx
+        type: string
+      deployAddress:
+        example: bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5
+        type: string
+      deployBlocktime:
+        example: 100
+        type: integer
+      deployHeight:
+        example: 100
+        type: integer
+      description:
+        example: xxx
+        type: string
+      endBlock:
+        example: 200
+        type: integer
+      holdersCount:
+        example: 100
+        type: integer
+      id:
+        example: 1
+        type: integer
+      inscriptionId:
+        example: bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0
+        type: string
+      inscriptionNum:
+        example: 67269474
+        type: integer
+      limit:
+        example: 100
+        type: integer
+      max:
+        example: 10000
+        type: integer
+      mintTimes:
+        example: 100
+        type: integer
+      "n":
+        example: 100
+        type: integer
+      rarity:
+        example: xxx
+        type: string
+      selfmint:
+        example: 100
+        type: integer
+      startBlock:
+        example: 100
+        type: integer
+      ticker:
+        example: BTC
+        type: string
+      totalMinted:
+        example: 546
+        type: integer
+      txid:
+        example: xxx
+        type: string
+    type: object
+  wire.TxResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data: {}
+      msg:
+        example: ok
+        type: string
+    type: object
+  wire.UtxoListData:
+    properties:
+      detail:
+        items:
+          $ref: '#/definitions/wire.TickerAsset'
+        type: array
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  wire.UtxoListResp:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/wire.UtxoListData'
+      msg:
+        example: ok
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /address/assets/{utxo}:
+    get:
+      description: Get asset details in a UTXO
+      parameters:
+      - description: UTXO
+        in: path
+        name: utxo
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.AssetsResp_deprecated'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get asset details in a UTXO
+      tags:
+      - ordx.utxo
+  /address/history/{address}/{:ticker}:
+    get:
+      description: Get the mint history for a specific address with pagination
+      parameters:
+      - description: Name of the ticker
+        in: path
+        name: tickerName
+        required: true
+        type: string
+      - description: Address to get the mint history for
+        in: path
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.MintHistoryResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get mint history for a specific address
+      tags:
+      - ordx.address
+  /address/summary/{address}:
+    get:
+      description: Get a summary list of balances for a specific address
+      parameters:
+      - description: Address
+        in: path
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.BalanceSummaryListResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Balance Summary List
+      tags:
+      - ordx.address
+  /address/utxolist/{address}/{ticker}:
+    get:
+      description: Get a list of UTXOs for a specific address and ticker
+      parameters:
+      - description: Address
+        in: path
+        name: address
+        required: true
+        type: string
+      - description: Ticker symbol
+        in: path
+        name: ticker
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.UtxoListResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Utxo List
+      tags:
+      - ordx.address
+  /bestheight:
+    get:
+      description: the current btc height
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.BestHeightResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get the current btc height
+      tags:
+      - ordx
+  /btc/block/{blockhash}:
+    get:
+      description: get raw block with blockhash
+      parameters:
+      - description: blockHash
+        in: path
+        name: blockHash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.RawBlockResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get raw block with blockhash
+      tags:
+      - ordx.btc
+  /btc/block/bestblockheight:
+    get:
+      description: get best block height
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.BestBlockHeightResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get best block height
+      tags:
+      - ordx.btc
+  /btc/block/blockhash/{height}:
+    get:
+      description: get block hash with height
+      parameters:
+      - description: height
+        in: path
+        name: height
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.BlockHashResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get block hash with height
+      tags:
+      - ordx.btc
+  /btc/rawtx/{txid}:
+    get:
+      description: get raw tx with txid
+      parameters:
+      - description: txid
+        in: path
+        name: txid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.TxResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get raw tx with txid
+      tags:
+      - ordx.btc
+  /btc/tx:
+    post:
+      description: send Raw Transaction
+      parameters:
+      - description: Signed transaction hex
+        in: body
+        name: signedTxHex
+        required: true
+        schema:
+          type: string
+      - description: 'Reject transactions whose fee rate is higher than the specified
+          value, expressed in BTC/kB.default:'
+        in: body
+        name: maxfeerate
+        schema:
+          type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.SendRawTxResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: send Raw Transaction
+      tags:
+      - ordx.btc
+  /btc/tx/{txid}:
+    get:
+      description: get tx with txid
+      parameters:
+      - description: txid
+        in: path
+        name: txid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.TxResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get tx with txid
+      tags:
+      - ordx.btc
+  /exotic/address/{address}:
+    get:
+      description: Retrieves UTXOs which have exotic sat for a given address
+      parameters:
+      - description: Address
+        in: path
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              $ref: '#/definitions/wire.SatRangeUtxoResp'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Retrieves UTXOs which have exotic sat for a given address
+      tags:
+      - ordx.exotic
+  /exotic/address/{address}/{type}:
+    get:
+      description: Get UTXOs which is the specific exotic type in a address
+      parameters:
+      - description: address
+        in: path
+        name: address
+        required: true
+        type: string
+      - description: type
+        in: path
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of SpecificExoticUtxo
+          schema:
+            items:
+              $ref: '#/definitions/wire.SpecificExoticUtxo'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: getExoticUtxosWithType
+      tags:
+      - ordx.exotic
+  /exotic/utxo/{utxo}:
+    get:
+      description: Retrieves all sat ranges and attributes in a given utxo
+      parameters:
+      - description: utxo
+        in: path
+        name: utxo
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              $ref: '#/definitions/wire.SatRangeResp'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Retrieves all sat ranges and attributes in a given utxo
+      tags:
+      - ordx.exotic
+  /getAssetByUtxo/{utxo}:
+    get:
+      description: Get assets with abbreviated info in the UTXO
+      parameters:
+      - description: UTXO value
+        in: path
+        name: utxo
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/wire.AssetListResp'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get assets with abbreviated info in the UTXO
+      tags:
+      - ordx.utxo
+  /health:
+    get:
+      description: Check the health status of the service
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.HealthStatusResp'
+      summary: Health Check
+      tags:
+      - ordx
+  /height:
+    get:
+      description: the height block info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.BestHeightResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get the height block info
+      tags:
+      - ordx
+  /info/satributes:
+    get:
+      description: Retrieves the supported attributes of a sat
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              $ref: '#/definitions/wire.SatributesResp'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Retrieves the supported attributes of a sat
+      tags:
+      - ordx
+  /mint/details/{inscriptionid}:
+    get:
+      description: Get detailed information about a mint based on the inscription
+        ID
+      parameters:
+      - description: Inscription ID
+        in: path
+        name: inscriptionid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.MintDetailInfoResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Mint Detail
+      tags:
+      - ordx.mint
+  /ns/address:
+    get:
+      description: Get all names in an address
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/wire.NamesWithAddressResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get all names in an address
+      tags:
+      - ordx
+  /ns/name:
+    get:
+      description: Get name's properties
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/wire.NamePropertiesResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get name's properties
+      tags:
+      - ordx
+  /ns/status:
+    get:
+      description: Get name service status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/wire.NSStatusResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get name service status
+      tags:
+      - ordx
+  /ord/content/{inscriptionid}:
+    get:
+      description: get ordinal content
+      parameters:
+      - description: inscription ID
+        in: path
+        name: inscriptionid
+        required: true
+        type: string
+      produces:
+      - image/*
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              type: integer
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get ordinal content 一个字符串，判断这个字符串每个字符
+      tags:
+      - ordx.ord
+  /ord/preview/{inscriptionid}:
+    get:
+      description: get ordinal preview
+      parameters:
+      - description: inscription ID
+        in: path
+        name: inscriptionid
+        required: true
+        type: string
+      produces:
+      - image/*
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              type: integer
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: get ordinal preview
+      tags:
+      - ordx.ord
+  /ord/r/metadata/{inscriptionid}:
+    get:
+      description: ordinal recursive endpoint for get hex-encoded CBOR metadata of
+        an inscription
+      parameters:
+      - description: 'inscription ID example: a4b6fccd00222e79ec0307d52fe9f8bfa3713cd0c170f95065f5d859e0c6a0f5i0'
+        in: path
+        name: inscriptionid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              type: integer
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: ordinal recursive endpoint for get hex-encoded CBOR metadata of an
+        inscription
+      tags:
+      - ordx.ord.r
+  /range/{start}/{size}:
+    get:
+      description: Get asset details in a range
+      parameters:
+      - description: start
+        in: path
+        name: start
+        required: true
+        type: string
+      - description: size
+        in: path
+        name: size
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.AssetsResp_deprecated'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get asset details in a range
+      tags:
+      - ordx.range
+  /ranges:
+    post:
+      description: Get asset details in a range
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.AssetsResp_deprecated'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get asset details in a range
+      tags:
+      - ordx.range
+  /sat/{sat}:
+    get:
+      description: Retrieves information about a sat based on the given sat ID
+      parameters:
+      - description: Sat ID
+        in: path
+        name: sat
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.SatInfoResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Retrieves information about a sat
+      tags:
+      - ordx
+  /sat/FindSatsInAddress/:
+    post:
+      description: find specific sats in address
+      parameters:
+      - description: address
+        in: body
+        name: address
+        required: true
+        schema:
+          type: string
+      - description: sats
+        in: body
+        name: sats
+        required: true
+        schema:
+          items:
+            type: number
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.SpecificSatResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: find specific sats in address
+      tags:
+      - ordx
+  /tick/history/{ticker}:
+    get:
+      description: Get the mint history for a specific ticker
+      parameters:
+      - description: Ticker name
+        in: path
+        name: ticker
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.MintHistoryResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Mint History
+      tags:
+      - ordx.tick
+  /tick/holders/{ticker}:
+    get:
+      description: Get a list of holders for a specific ticker
+      parameters:
+      - description: Ticker name
+        in: path
+        name: ticker
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/wire.HolderListResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Holder List
+      tags:
+      - ordx.tick
+  /tick/info/{ticker}:
+    get:
+      description: Get the status of a specific ticker
+      parameters:
+      - description: Ticker name
+        in: path
+        name: tickerName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/wire.StatusResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get a ticker's status
+      tags:
+      - ordx.tick
+  /tick/status:
+    get:
+      description: Get status list for all tickers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/wire.StatusListResp'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get status list for all tickers
+      tags:
+      - ordx
+  /utxo/address/{address}/{value}:
+    post:
+      description: Get UTXOs in a address and its value is greater than the specific
+        value. If value=0, get all UTXOs
+      parameters:
+      - description: address
+        in: path
+        name: address
+        required: true
+        type: string
+      - description: value
+        in: path
+        name: value
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            items:
+              $ref: '#/definitions/wire.PlainUtxosResp'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Retrieves available UTXOs
+      tags:
+      - ordx
+  /utxo/seed/{utxo}:
+    get:
+      description: Get seed of sats in the UTXO, according to ticker and sat's attributes
+      parameters:
+      - description: UTXO value
+        in: path
+        name: utxo
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/wire.SeedsResp'
+            type: array
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get seed of sats in the UTXO
+      tags:
+      - ordx.utxo
+swagger: "2.0"

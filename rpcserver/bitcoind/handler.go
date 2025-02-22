@@ -19,7 +19,7 @@ import (
 // @Param signedTxHex body string true "Signed transaction hex"
 // @Param maxfeerate body number false "Reject transactions whose fee rate is higher than the specified value, expressed in BTC/kB.default:"0.01"
 // @Security Bearer
-// @Success 200 {object} SendRawTxResp "Successful response"
+// @Success 200 {object} rpcwire.SendRawTxResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/tx [post]
 func (s *Service) sendRawTx(c *gin.Context) {
@@ -56,7 +56,7 @@ func (s *Service) sendRawTx(c *gin.Context) {
 // @Produce json
 // @Param blockHash path string true "blockHash"
 // @Security Bearer
-// @Success 200 {object} RawBlockResp "Successful response"
+// @Success 200 {object} rpcwire.RawBlockResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/block/{blockhash} [get]
 func (s *Service) getRawBlock(c *gin.Context) {
@@ -86,7 +86,7 @@ func (s *Service) getRawBlock(c *gin.Context) {
 // @Produce json
 // @Param height path string true "height"
 // @Security Bearer
-// @Success 200 {object} BlockHashResp "Successful response"
+// @Success 200 {object} rpcwire.BlockHashResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/block/blockhash/{height} [get]
 func (s *Service) getBlockHash(c *gin.Context) {
@@ -123,7 +123,7 @@ func (s *Service) getBlockHash(c *gin.Context) {
 // @Produce json
 // @Param txid path string true "txid"
 // @Security Bearer
-// @Success 200 {object} TxResp "Successful response"
+// @Success 200 {object} rpcwire.TxResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/tx/{txid} [get]
 func (s *Service) getTxInfo(c *gin.Context) {
@@ -260,7 +260,7 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 // @Produce json
 // @Param txid path string true "txid"
 // @Security Bearer
-// @Success 200 {object} TxResp "Successful response"
+// @Success 200 {object} rpcwire.TxResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/rawtx/{txid} [get]
 func (s *Service) getRawTx(c *gin.Context) {
@@ -289,7 +289,7 @@ func (s *Service) getRawTx(c *gin.Context) {
 // @Tags ordx.btc
 // @Produce json
 // @Security Bearer
-// @Success 200 {object} BestBlockHeightResp "Successful response"
+// @Success 200 {object} rpcwire.BestBlockHeightResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /btc/block/bestblockheight [get]
 func (s *Service) getBestBlockHeight(c *gin.Context) {

@@ -1,0 +1,2458 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/address/assets/{utxo}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get asset details in a UTXO",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.utxo"
+                ],
+                "summary": "Get asset details in a UTXO",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UTXO",
+                        "name": "utxo",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.AssetsResp_deprecated"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/address/history/{address}/{:ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get the mint history for a specific address with pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.address"
+                ],
+                "summary": "Get mint history for a specific address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the ticker",
+                        "name": "tickerName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Address to get the mint history for",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.MintHistoryResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/address/summary/{address}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get a summary list of balances for a specific address",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.address"
+                ],
+                "summary": "Get Balance Summary List",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.BalanceSummaryListResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/address/utxolist/{address}/{ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get a list of UTXOs for a specific address and ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.address"
+                ],
+                "summary": "Get Utxo List",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Ticker symbol",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.UtxoListResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/bestheight": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "the current btc height",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Get the current btc height",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.BestHeightResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/btc/block/bestblockheight": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get best block height",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.btc"
+                ],
+                "summary": "get best block height",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.BestBlockHeightResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/btc/block/blockhash/{height}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get block hash with height",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.btc"
+                ],
+                "summary": "get block hash with height",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "height",
+                        "name": "height",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.BlockHashResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/btc/block/{blockhash}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get raw block with blockhash",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.btc"
+                ],
+                "summary": "get raw block with blockhash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "blockHash",
+                        "name": "blockHash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.RawBlockResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/btc/rawtx/{txid}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get raw tx with txid",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.btc"
+                ],
+                "summary": "get raw tx with txid",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "txid",
+                        "name": "txid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.TxResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/btc/tx": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "send Raw Transaction",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.btc"
+                ],
+                "summary": "send Raw Transaction",
+                "parameters": [
+                    {
+                        "description": "Signed transaction hex",
+                        "name": "signedTxHex",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Reject transactions whose fee rate is higher than the specified value, expressed in BTC/kB.default:",
+                        "name": "maxfeerate",
+                        "in": "body",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.SendRawTxResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/btc/tx/{txid}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get tx with txid",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.btc"
+                ],
+                "summary": "get tx with txid",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "txid",
+                        "name": "txid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.TxResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/exotic/address/{address}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieves UTXOs which have exotic sat for a given address",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.exotic"
+                ],
+                "summary": "Retrieves UTXOs which have exotic sat for a given address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.SatRangeUtxoResp"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/exotic/address/{address}/{type}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get UTXOs which is the specific exotic type in a address",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.exotic"
+                ],
+                "summary": "getExoticUtxosWithType",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "type",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of SpecificExoticUtxo",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.SpecificExoticUtxo"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/exotic/utxo/{utxo}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieves all sat ranges and attributes in a given utxo",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.exotic"
+                ],
+                "summary": "Retrieves all sat ranges and attributes in a given utxo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "utxo",
+                        "name": "utxo",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.SatRangeResp"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/getAssetByUtxo/{utxo}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get assets with abbreviated info in the UTXO",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.utxo"
+                ],
+                "summary": "Get assets with abbreviated info in the UTXO",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UTXO value",
+                        "name": "utxo",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.AssetListResp"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check the health status of the service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Health Check",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.HealthStatusResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/height": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "the height block info",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Get the height block info",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.BestHeightResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/info/satributes": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieves the supported attributes of a sat",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Retrieves the supported attributes of a sat",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.SatributesResp"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/mint/details/{inscriptionid}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get detailed information about a mint based on the inscription ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.mint"
+                ],
+                "summary": "Get Mint Detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Inscription ID",
+                        "name": "inscriptionid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.MintDetailInfoResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ns/address": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get all names in an address",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Get all names in an address",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/wire.NamesWithAddressResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ns/name": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get name's properties",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Get name's properties",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/wire.NamePropertiesResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ns/status": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get name service status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Get name service status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/wire.NSStatusResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ord/content/{inscriptionid}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get ordinal content",
+                "produces": [
+                    "image/*"
+                ],
+                "tags": [
+                    "ordx.ord"
+                ],
+                "summary": "get ordinal content 一个字符串，判断这个字符串每个字符",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "inscription ID",
+                        "name": "inscriptionid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ord/preview/{inscriptionid}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "get ordinal preview",
+                "produces": [
+                    "image/*"
+                ],
+                "tags": [
+                    "ordx.ord"
+                ],
+                "summary": "get ordinal preview",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "inscription ID",
+                        "name": "inscriptionid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ord/r/metadata/{inscriptionid}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "ordinal recursive endpoint for get hex-encoded CBOR metadata of an inscription",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.ord.r"
+                ],
+                "summary": "ordinal recursive endpoint for get hex-encoded CBOR metadata of an inscription",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "inscription ID example: a4b6fccd00222e79ec0307d52fe9f8bfa3713cd0c170f95065f5d859e0c6a0f5i0",
+                        "name": "inscriptionid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/range/{start}/{size}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get asset details in a range",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.range"
+                ],
+                "summary": "Get asset details in a range",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "start",
+                        "name": "start",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "size",
+                        "name": "size",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.AssetsResp_deprecated"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/ranges": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get asset details in a range",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.range"
+                ],
+                "summary": "Get asset details in a range",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.AssetsResp_deprecated"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/sat/FindSatsInAddress/": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "find specific sats in address",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "find specific sats in address",
+                "parameters": [
+                    {
+                        "description": "address",
+                        "name": "address",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "sats",
+                        "name": "sats",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "number"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.SpecificSatResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/sat/{sat}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieves information about a sat based on the given sat ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Retrieves information about a sat",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Sat ID",
+                        "name": "sat",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.SatInfoResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/tick/history/{ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get the mint history for a specific ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.tick"
+                ],
+                "summary": "Get Mint History",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticker name",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.MintHistoryResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/tick/holders/{ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get a list of holders for a specific ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.tick"
+                ],
+                "summary": "Get Holder List",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticker name",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/wire.HolderListResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/tick/info/{ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get the status of a specific ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.tick"
+                ],
+                "summary": "Get a ticker's status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticker name",
+                        "name": "tickerName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/wire.StatusResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/tick/status": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get status list for all tickers",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Get status list for all tickers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/wire.StatusListResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/utxo/address/{address}/{value}": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get UTXOs in a address and its value is greater than the specific value. If value=0, get all UTXOs",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx"
+                ],
+                "summary": "Retrieves available UTXOs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "address",
+                        "name": "address",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "value",
+                        "name": "value",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.PlainUtxosResp"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/utxo/seed/{utxo}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get seed of sats in the UTXO, according to ticker and sat's attributes",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.utxo"
+                ],
+                "summary": "Get seed of sats in the UTXO",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UTXO value",
+                        "name": "utxo",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/wire.SeedsResp"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "common.Range": {
+            "type": "object",
+            "properties": {
+                "size": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.AssetAbbrInfo": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.AssetDetailInfo": {
+            "type": "object",
+            "properties": {
+                "assets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.TickerAsset"
+                    }
+                },
+                "ranges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/common.Range"
+                    }
+                },
+                "utxo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.AssetListResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.AssetAbbrInfo"
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.AssetsData": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "$ref": "#/definitions/wire.AssetDetailInfo"
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "wire.AssetsResp_deprecated": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.AssetsData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.BalanceSummary": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "integer"
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.BalanceSummaryListData": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.BalanceSummary"
+                    }
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "wire.BalanceSummaryListResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.BalanceSummaryListData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.BestBlockHeightResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.BestHeightResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    },
+                    "example": {
+                        "height": 100
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.BlockHashResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "string",
+                    "example": ""
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.ExoticSatRangeUtxo": {
+            "type": "object",
+            "properties": {
+                "sats": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.SatDetailInfo"
+                    }
+                },
+                "utxo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.HealthStatusResp": {
+            "type": "object",
+            "properties": {
+                "basedbver": {
+                    "type": "string",
+                    "example": "1.0."
+                },
+                "ordxdbver": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "0.2.1"
+                }
+            }
+        },
+        "wire.Holder": {
+            "type": "object",
+            "properties": {
+                "total_balance": {
+                    "type": "integer"
+                },
+                "wallet": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.HolderListData": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.Holder"
+                    }
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "wire.HolderListResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.HolderListData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.InscriptionAsset": {
+            "type": "object",
+            "properties": {
+                "assetamount": {
+                    "type": "integer"
+                },
+                "inscriptionId": {
+                    "type": "string"
+                },
+                "inscriptionnum": {
+                    "type": "integer"
+                },
+                "ranges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/common.Range"
+                    }
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.KVItem": {
+            "type": "object",
+            "properties": {
+                "inscriptionId": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.MintDetailInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "contenttype": {
+                    "type": "string"
+                },
+                "delegate": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "inscriptionId": {
+                    "type": "string"
+                },
+                "inscriptionNumber": {
+                    "type": "integer"
+                },
+                "mintTimes": {
+                    "type": "integer"
+                },
+                "ranges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/common.Range"
+                    }
+                },
+                "ticker": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.MintDetailInfoResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.MintDetailInfo"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.MintHistory": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.MintHistoryItem"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.MintHistoryData": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "$ref": "#/definitions/wire.MintHistory"
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "wire.MintHistoryItem": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "integer",
+                    "example": 546
+                },
+                "holderaddress": {
+                    "type": "string"
+                },
+                "inscriptionId": {
+                    "type": "string",
+                    "example": "bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0"
+                },
+                "inscriptionNumber": {
+                    "type": "integer",
+                    "example": 67269474
+                },
+                "mintaddress": {
+                    "type": "string",
+                    "example": "bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5"
+                }
+            }
+        },
+        "wire.MintHistoryResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.MintHistoryData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.NSStatusData": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.NftItem"
+                    }
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.NSStatusResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.NSStatusData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.NamePropertiesResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.OrdinalsName"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.NamesWithAddressData": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "names": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.OrdinalsName"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.NamesWithAddressResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.NamesWithAddressData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.NftItem": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "inscriptionAddress": {
+                    "type": "string"
+                },
+                "inscriptionId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sat": {
+                    "type": "integer"
+                },
+                "time": {
+                    "type": "integer"
+                },
+                "utxo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.OrdinalsName": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "inscriptionAddress": {
+                    "type": "string"
+                },
+                "inscriptionId": {
+                    "type": "string"
+                },
+                "kvs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.KVItem"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sat": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "time": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "utxo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.PlainUtxo": {
+            "type": "object",
+            "properties": {
+                "txid": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                },
+                "vout": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.PlainUtxosResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.PlainUtxo"
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.RawBlockResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "string",
+                    "example": ""
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.SatDetailInfo": {
+            "type": "object",
+            "properties": {
+                "block": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "satributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.SatInfo": {
+            "type": "object",
+            "properties": {
+                "cycle": {
+                    "type": "integer"
+                },
+                "epoch": {
+                    "type": "integer"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "period": {
+                    "type": "integer"
+                },
+                "sat": {
+                    "type": "integer"
+                },
+                "satributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "wire.SatInfoResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.SatInfo"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.SatRange": {
+            "type": "object",
+            "properties": {
+                "offset": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.SatRangeResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.ExoticSatRangeUtxo"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.SatRangeUtxoResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.ExoticSatRangeUtxo"
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.SatributesResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.Seed": {
+            "type": "object",
+            "properties": {
+                "seed": {
+                    "type": "string"
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.SeedsResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.Seed"
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.SendRawTxResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "string",
+                    "example": "ae74538baa914f3799081ba78429d5d84f36a0127438e9f721dff584ac17b346"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.SpecificExoticUtxo": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "sats": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.SatRange"
+                    }
+                },
+                "type": {
+                    "type": "string"
+                },
+                "utxo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.SpecificSat": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "sats": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.SatRange"
+                    }
+                },
+                "specificsat": {
+                    "type": "integer"
+                },
+                "utxo": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "wire.SpecificSatResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.SpecificSat"
+                    }
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.StatusListData": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.TickerStatus"
+                    }
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "wire.StatusListResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.StatusListData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.StatusResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.TickerStatus"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.TickerAsset": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "assetamount": {
+                    "type": "integer"
+                },
+                "assets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.InscriptionAsset"
+                    }
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "utxo": {
+                    "type": "string"
+                }
+            }
+        },
+        "wire.TickerStatus": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "contenttype": {
+                    "type": "string",
+                    "example": "xxx"
+                },
+                "delegate": {
+                    "type": "string",
+                    "example": "xxx"
+                },
+                "deployAddress": {
+                    "type": "string",
+                    "example": "bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5"
+                },
+                "deployBlocktime": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "deployHeight": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "description": {
+                    "type": "string",
+                    "example": "xxx"
+                },
+                "endBlock": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "holdersCount": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "inscriptionId": {
+                    "type": "string",
+                    "example": "bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0"
+                },
+                "inscriptionNum": {
+                    "type": "integer",
+                    "example": 67269474
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "max": {
+                    "type": "integer",
+                    "example": 10000
+                },
+                "mintTimes": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "n": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "rarity": {
+                    "type": "string",
+                    "example": "xxx"
+                },
+                "selfmint": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "startBlock": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "ticker": {
+                    "type": "string",
+                    "example": "BTC"
+                },
+                "totalMinted": {
+                    "type": "integer",
+                    "example": 546
+                },
+                "txid": {
+                    "type": "string",
+                    "example": "xxx"
+                }
+            }
+        },
+        "wire.TxResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {},
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "wire.UtxoListData": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/wire.TickerAsset"
+                    }
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "wire.UtxoListResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/wire.UtxoListData"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        }
+    }
+}

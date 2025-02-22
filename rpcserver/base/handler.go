@@ -15,7 +15,7 @@ import (
 // @Description Check the health status of the service
 // @Tags ordx
 // @Produce json
-// @Success 200 {object} HealthStatusResp "Successful response"
+// @Success 200 {object} wire.HealthStatusResp "Successful response"
 // @Router /health [get]
 func (s *Service) getHealth(c *gin.Context) {
 	rsp := &wire.HealthStatusResp{
@@ -42,7 +42,7 @@ func (s *Service) getHealth(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param sat path int true "Sat ID"
-// @Success 200 {object} SatInfoResp "Successful response"
+// @Success 200 {object} wire.SatInfoResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /sat/{sat} [get]
 func (s *Service) getSatInfo(c *gin.Context) {
@@ -71,7 +71,7 @@ func (s *Service) getSatInfo(c *gin.Context) {
 // @Security Bearer
 // @Param address body string true "address"
 // @Param sats body []number true "sats"
-// @Success 200 {object} SpecificSatResp "Successful response"
+// @Success 200 {object} wire.SpecificSatResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /sat/FindSatsInAddress/ [post]
 func (s *Service) findSatsInAddress(c *gin.Context) {
@@ -148,7 +148,7 @@ func (s *Service) findSat(c *gin.Context) {
 // @Tags ordx
 // @Produce json
 // @Security Bearer
-// @Success 200 {array} SatributesResp "Successful response"
+// @Success 200 {array} wire.SatributesResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /info/satributes [get]
 func (s *Service) getSatributes(c *gin.Context) {
@@ -168,7 +168,7 @@ func (s *Service) getSatributes(c *gin.Context) {
 // @Produce json
 // @Param utxo path string true "utxo"
 // @Security Bearer
-// @Success 200 {array} SatributeRange "Successful response"
+// @Success 200 {array} wire.SatRangeResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /exotic/utxo/{utxo} [get]
 func (s *Service) getExoticWithUtxo(c *gin.Context) {
@@ -198,7 +198,7 @@ func (s *Service) getExoticWithUtxo(c *gin.Context) {
 // @Produce json
 // @Param address path string true "Address"
 // @Security Bearer
-// @Success 200 {array} SatRangeUtxoResp "Successful response"
+// @Success 200 {array} wire.SatRangeUtxoResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /exotic/address/{address} [get]
 func (s *Service) getExoticUtxos(c *gin.Context) {
@@ -229,7 +229,7 @@ func (s *Service) getExoticUtxos(c *gin.Context) {
 // @Param address path string true "address"
 // @Param value path int64 true "value"
 // @Security Bearer
-// @Success 200 {array} PlainUtxo "Successful response"
+// @Success 200 {array} wire.PlainUtxosResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /utxo/address/{address}/{value} [post]
 func (s *Service) getPlainUtxos(c *gin.Context) {
@@ -311,7 +311,7 @@ func (s *Service) getAllUtxos(c *gin.Context) {
 // @Param address path string true "address"
 // @Param type path string true "type"
 // @Security Bearer
-// @Success 200 {array} SpecificExoticUtxo "List of SpecificExoticUtxo"
+// @Success 200 {array} wire.SpecificExoticUtxo "List of SpecificExoticUtxo"
 // @Failure 401 "Invalid API Key"
 // @Router /exotic/address/{address}/{type} [get]
 func (s *Service) getExoticUtxosWithType(c *gin.Context) {

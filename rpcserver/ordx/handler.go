@@ -27,7 +27,7 @@ func NewHandle(indexer base_indexer.Indexer) *Handle {
 // @Tags ordx
 // @Produce json
 // @Security Bearer
-// @Success 200 {object} BestHeightResp "Successful response"
+// @Success 200 {object} rpcwire.BestHeightResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /bestheight [get]
 func (s *Handle) getBestHeight(c *gin.Context) {
@@ -46,7 +46,7 @@ func (s *Handle) getBestHeight(c *gin.Context) {
 // @Tags ordx
 // @Produce json
 // @Security Bearer
-// @Success 200 {object} BestHeightResp "Successful response"
+// @Success 200 {object} rpcwire.BestHeightResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /height [get]
 func (s *Handle) getBlockInfo(c *gin.Context) {
@@ -97,7 +97,6 @@ func (s *Handle) isDeployAllowed(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-
 func (s *Handle) getMintableTickers(c *gin.Context) {
 	resp := &rpcwire.StatusListResp{
 		BaseResp: rpcwire.BaseResp{
@@ -145,7 +144,7 @@ func (s *Handle) getMintableTickers(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} StatusListResp
+// @Success 200 {object} rpcwire.StatusListResp
 // @Failure 401 "Invalid API Key"
 // @Router /tick/status [get]
 func (s *Handle) getTickerStatusList(c *gin.Context) {
@@ -189,7 +188,7 @@ func (s *Handle) getTickerStatusList(c *gin.Context) {
 // @Produce json
 // @Param tickerName path string true "Ticker name"
 // @Security Bearer
-// @Success 200 {object} StatusResp
+// @Success 200 {object} rpcwire.StatusResp
 // @Failure 401 "Invalid API Key"
 // @Router /tick/info/{ticker} [get]
 func (s *Handle) getTickerStatus(c *gin.Context) {
@@ -212,7 +211,6 @@ func (s *Handle) getTickerStatus(c *gin.Context) {
 	resp.Data = tickerStatus
 	c.JSON(http.StatusOK, resp)
 }
-
 
 func (s *Handle) getTickerList(c *gin.Context) {
 	resp := &rpcwire.TickersResp{
@@ -266,7 +264,7 @@ func (s *Handle) getTickerInfo(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} HolderListResp "Successful response"
+// @Success 200 {object} rpcwire.HolderListResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /tick/holders/{ticker} [get]
 func (s *Handle) getHolderList(c *gin.Context) {
@@ -312,7 +310,7 @@ func (s *Handle) getHolderList(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} MintHistoryResp "Successful response"
+// @Success 200 {object} rpcwire.MintHistoryResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /tick/history/{ticker} [get]
 func (s *Handle) getMintHistory(c *gin.Context) {
@@ -382,7 +380,7 @@ func (s *Handle) getSplittedInscriptionList(c *gin.Context) {
 // @Produce json
 // @Param inscriptionid path string true "Inscription ID"
 // @Security Bearer
-// @Success 200 {object} MintDetailInfoResp "Successful response"
+// @Success 200 {object} rpcwire.MintDetailInfoResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /mint/details/{inscriptionid} [get]
 func (s *Handle) getMintDetailInfo(c *gin.Context) {
@@ -485,7 +483,7 @@ func (s *Handle) getFeeInfo(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} BalanceSummaryListResp "Successful response"
+// @Success 200 {object} rpcwire.BalanceSummaryListResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /address/summary/{address} [get]
 func (s *Handle) getBalanceSummaryList(c *gin.Context) {
@@ -533,7 +531,7 @@ func (s *Handle) getBalanceSummaryList(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} UtxoListResp "Successful response"
+// @Success 200 {object} rpcwire.UtxoListResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /address/utxolist/{address}/{ticker} [get]
 func (s *Handle) getUtxoList(c *gin.Context) {
@@ -658,7 +656,7 @@ func (s *Handle) getUtxoList3(c *gin.Context) {
 // @Query start query int false "Start index for pagination" default(0)
 // @Query limit query int false "Number of items to fetch" default(100)
 // @Security Bearer
-// @Success 200 {object} MintHistoryResp "Successful response"
+// @Success 200 {object} rpcwire.MintHistoryResp "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /address/history/{address}/{:ticker} [get]
 func (s *Handle) getAddressMintHistory(c *gin.Context) {
@@ -709,7 +707,7 @@ func (s *Handle) getAddressMintHistory(c *gin.Context) {
 // @Produce json
 // @Param utxo path string true "UTXO"
 // @Security Bearer
-// @Success 200 {object} AssetsResp "Successful response"
+// @Success 200 {object} rpcwire.AssetsResp_deprecated "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /address/assets/{utxo} [get]
 func (s *Handle) getAssetDetailInfo(c *gin.Context) {
@@ -774,7 +772,7 @@ func (s *Handle) getAssetOffset(c *gin.Context) {
 // @Produce json
 // @Param utxo path string true "UTXO value"
 // @Security Bearer
-// @Success 200 {array} AssetAbbrInfo
+// @Success 200 {array} rpcwire.AssetListResp
 // @Failure 401 "Invalid API Key"
 // @Router /getAssetByUtxo/{utxo} [get]
 func (s *Handle) getAbbrAssetsWithUtxo(c *gin.Context) {
@@ -803,7 +801,7 @@ func (s *Handle) getAbbrAssetsWithUtxo(c *gin.Context) {
 // @Produce json
 // @Param utxo path string true "UTXO value"
 // @Security Bearer
-// @Success 200 {array} Seed
+// @Success 200 {array} rpcwire.SeedsResp
 // @Failure 401 "Invalid API Key"
 // @Router /utxo/seed/{utxo} [get]
 func (s *Handle) getSeedWithUtxo(c *gin.Context) {
@@ -907,7 +905,7 @@ func (s *Handle) getExistingUtxos(c *gin.Context) {
 // @Param start path string true "start"
 // @Param size path string true "size"
 // @Security Bearer
-// @Success 200 {object} AssetsResp "Successful response"
+// @Success 200 {object} rpcwire.AssetsResp_deprecated "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /range/{start}/{size} [get]
 func (s *Handle) getAssetDetailInfoWithRange(c *gin.Context) {
@@ -957,7 +955,7 @@ func (s *Handle) getAssetDetailInfoWithRange(c *gin.Context) {
 // @Tags ordx.range
 // @Produce json
 // @Security Bearer
-// @Success 200 {object} AssetsResp "Successful response"
+// @Success 200 {object} rpcwire.AssetsResp_deprecated "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /ranges [post]
 func (s *Handle) getAssetDetailInfoWithRanges(c *gin.Context) {
@@ -1002,7 +1000,7 @@ func (s *Handle) getAssetDetailInfoWithRanges(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} NSStatusResp
+// @Success 200 {object} rpcwire.NSStatusResp
 // @Failure 401 "Invalid API Key"
 // @Router /ns/status [get]
 func (s *Handle) getNSStatus(c *gin.Context) {
@@ -1038,7 +1036,7 @@ func (s *Handle) getNSStatus(c *gin.Context) {
 // @Tags ordx
 // @Produce json
 // @Security Bearer
-// @Success 200 {object} NamePropertiesResp
+// @Success 200 {object} rpcwire.NamePropertiesResp
 // @Failure 401 "Invalid API Key"
 // @Router /ns/name [get]
 func (s *Handle) getNameInfo(c *gin.Context) {
@@ -1115,7 +1113,7 @@ func (s *Handle) getNameRouting(c *gin.Context) {
 // @Tags ordx
 // @Produce json
 // @Security Bearer
-// @Success 200 {object} NamesWithAddressResp
+// @Success 200 {object} rpcwire.NamesWithAddressResp
 // @Failure 401 "Invalid API Key"
 // @Router /ns/address [get]
 func (s *Handle) getNamesWithAddress(c *gin.Context) {
