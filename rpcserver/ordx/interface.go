@@ -73,8 +73,8 @@ func (s *Model) GetTickerStatus(tickerName string) (*rpcwire.TickerStatus, error
 	return s.getTicker(tickerName)
 }
 
-func (s *Model) GetTickerList(protocol string, start, limit int) ([]string, int) {
-	result := make([]string, 0)
+func (s *Model) GetTickerList(protocol string, start, limit int) ([]*common.TickerInfo, int) {
+	result := make([]*common.TickerInfo, 0)
 	tickmap := s.indexer.GetTickerMapV2(protocol)
 	mid := make(map[int64]string)
 	for k, v := range tickmap {
@@ -91,7 +91,12 @@ func (s *Model) GetTickerList(protocol string, start, limit int) ([]string, int)
 	}
 
 	for i := start; i < limit; i++ {
-		result = append(result, mid[int64(i)])
+		name := mid[int64(i)]
+		info, err := s.GetTickerInfo(name)
+		if err != nil {
+			common.Log.Warnf("GetTickerInfon %s failed, %v", name, err)
+		}
+		result = append(result, info)
 	}
 	return result, total
 }
