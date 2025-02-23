@@ -248,9 +248,6 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 						common.Log.Panicf("Cache.GetList-> key: %s, proto.Unmarshal err: %v", log.Key, err.Error())
 					}
 				}
-				if ret == nil {
-					ret = make(map[string]*T)
-				}
 				ret[log.Key] = &out
 			}
 		}
