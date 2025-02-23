@@ -9,18 +9,60 @@ import (
 
 func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 	result := make(map[string]*common.TickerInfo)
-	tickers := b.RunesIndexer.GetAllRuneIds()
-	for _, tickerName := range tickers {
-		t := b.GetRunesTickerV2(tickerName)
-		if t != nil {
-			assetName := common.TickerName{
-				Protocol: common.PROTOCOL_NAME_RUNES,
-				Type:     common.ASSET_TYPE_FT,
-				Ticker:   tickerName,
-			}
-			result[assetName.String()] = t
+	runeInfos := b.RunesIndexer.GetAllRuneInfos()
+	for _, runeInfo := range runeInfos {
+		assetName := common.TickerName{
+			Protocol: common.PROTOCOL_NAME_RUNES,
+			Type:     common.ASSET_TYPE_FT,
+			Ticker:   runeInfo.Id,
 		}
+
+		tickerInfo := &common.TickerInfo{
+			AssetName:       assetName,
+			DisplayName:     runeInfo.Name,
+			Id:              int64(runeInfo.Number),
+			Divisibility:    int(runeInfo.Divisibility),
+			StartBlock:      0,
+			EndBlock:        0,
+			SelfMint:        int(runeInfo.PreminePercentage),
+			DeployHeight:    runeInfo.BlockHeight(),
+			DeployBlocktime: int64(runeInfo.Timestamp),
+			DeployTx:        runeInfo.Etching,
+			Limit:           "",
+			N:               0,
+			TotalMinted:     common.NewDecimalFromUint128(runeInfo.Supply, int(runeInfo.Divisibility)).String(),
+			MintTimes:       0,
+			MaxSupply:       common.NewDecimalFromUint128(runeInfo.MaxSupply, int(runeInfo.Divisibility)).String(),
+			HoldersCount:    int(runeInfo.HolderCount),
+			InscriptionId:   "",
+			InscriptionNum:  0,
+			Description:     "",
+			Rarity:          "",
+			DeployAddress:   "",
+			Content:         []byte{},
+			ContentType:     "",
+			Delegate:        "",
+		}
+
+		if runeInfo.MintInfo != nil {
+			tickerInfo.MintTimes = runeInfo.MintInfo.Mints.Big().Int64()
+			tickerInfo.Limit = common.NewDecimalFromUint128(runeInfo.MintInfo.Amount, tickerInfo.Divisibility).String()
+		}
+		result[assetName.String()] = tickerInfo
 	}
+	// tickers := b.RunesIndexer.GetAllRuneIds()
+	// for _, tickerName := range tickers {
+	// 	t := b.GetRunesTickerV2(tickerName)
+	// 	if t != nil {
+	// 		assetName := common.TickerName{
+	// 			Protocol: common.PROTOCOL_NAME_RUNES,
+	// 			Type:     common.ASSET_TYPE_FT,
+	// 			Ticker:   tickerName,
+
+	// 		}
+	// 		result[assetName.String()] = t
+	// 	}
+	// }
 	return result
 }
 
