@@ -255,26 +255,6 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 			}
 		}
 	}
-	for log := range s.dbWrite.logs.IterBuffered() {
-		if strings.HasPrefix(log.Key, keyPrefixStr) {
-			if log.Val.Type == DEL {
-				delete(ret, log.Key)
-			} else if log.Val.Type == PUT {
-				var out T
-				if isNeedValue {
-					msg := any(&out).(proto.Message)
-					err := proto.Unmarshal(log.Val.Val, msg)
-					if err != nil {
-						common.Log.Panicf("Cache.GetList-> key: %s, proto.Unmarshal err: %v", log.Key, err.Error())
-					}
-				}
-				if ret == nil {
-					ret = make(map[string]*T)
-				}
-				ret[log.Key] = &out
-			}
-		}
-	}
 	return
 }
 
