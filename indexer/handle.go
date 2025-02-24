@@ -1101,24 +1101,30 @@ func (b *IndexerMgr) isLptTicker(name string) bool {
 	}
 
 	org := parts[0]
-	if !b.ftIndexer.TickExisted(org) {
-		return false
-	}
 
 	var protocol, lpt string
 	if len(parts) == 3 {
 		protocol = parts[1]
 		lpt = parts[2]
 	} else if len(parts) == 2 {
+		protocol = common.PROTOCOL_NAME_ORDX
 		lpt = parts[1]
 	} else {
 		return false
 	}
 
-	if protocol != "" {
-		if protocol != common.PROTOCOL_NAME_RUNES && protocol != common.PROTOCOL_NAME_BRC20 {
+	switch protocol {
+	case common.PROTOCOL_NAME_ORDX:
+		if !b.ftIndexer.TickExisted(org) {
 			return false
 		}
+	case common.PROTOCOL_NAME_RUNES:
+		if !b.RunesIndexer.IsExistRuneWithId(org) {
+			return false
+		}
+	case common.PROTOCOL_NAME_BRC20:
+	default:
+		return false
 	}
 
 	num, has := strings.CutPrefix(lpt, "lpt")
