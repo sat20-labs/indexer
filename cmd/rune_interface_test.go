@@ -1,7 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/sat20-labs/indexer/indexer"
@@ -173,4 +177,156 @@ func TestCheckRunesSummary(t *testing.T) {
 	} else {
 		t.Logf("all utxo(%d)'s total balance(%s) + burned is equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
 	}
+}
+
+func TestCheckAllRuneInfos(t *testing.T) {
+	InitRuneTester()
+	status, err := getStatusData()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	var runeCount uint64 = status.Runes
+	startTime := time.Now()
+	var i uint64 = 16463
+	var count uint64 = 0
+	for ; i <= runeCount; i++ {
+
+		runeData, err := getRuneData(i)
+		if err != nil {
+			t.Fatalf("getRuneData err:%s", err.Error())
+		}
+
+		if runeData.Entry.Block > runesIndexer.Status.Height {
+			break
+		}
+		runeInfo := runesIndexer.GetRuneInfoWithName(runeData.Entry.SpacedRune)
+		if runeInfo == nil {
+			t.Fatal("GetRuneInfoWithName err: rune not found")
+		}
+		if runeInfo.Number != runeData.Entry.Number {
+			t.Fatal("GetRuneInfoWithName err: number not equal")
+		}
+		count++
+		t.Logf("number: %d, rune: %s\n", i, runeData.Entry.SpacedRune)
+	}
+	duration := time.Since(startTime)
+	t.Logf("Total time for checking %d runes: %s", count, duration)
+}
+
+const OrdinalRpcURL = "http://192.168.10.102:81"
+
+type RuneData struct {
+	Entry struct {
+		Block        uint64      `json:"block"`
+		Burned       json.Number `json:"burned"`
+		Divisibility uint8       `json:"divisibility"`
+		Etching      string      `json:"etching"`
+		Mints        uint64      `json:"mints"`
+		Number       uint64      `json:"number"`
+		Premine      json.Number `json:"premine"`
+		SpacedRune   string      `json:"spaced_rune"`
+		Symbol       string      `json:"symbol"`
+		Terms        Terms       `json:"terms"`
+		Timestamp    uint64      `json:"timestamp"`
+		Turbo        bool        `json:"turbo"`
+	} `json:"entry"`
+	ID       string `json:"id"`
+	Mintable bool   `json:"mintable"`
+	Parent   string `json:"parent"`
+}
+
+type Terms struct {
+	Amount json.Number `json:"amount"`
+	Cap    json.Number `json:"cap"`
+	Height [2]*int64   `json:"height"`
+	Offset [2]uint64   `json:"offset"`
+}
+
+func getRuneData(runeID uint64) (*RuneData, error) {
+	url := fmt.Sprintf("%s/rune/%d", OrdinalRpcURL, runeID)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
+	}
+
+	var data RuneData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+type StatusData struct {
+	AddressIndex            bool      `json:"address_index"`
+	BlessedInscriptions     uint64    `json:"blessed_inscriptions"`
+	Chain                   string    `json:"chain"`
+	CursedInscriptions      uint64    `json:"cursed_inscriptions"`
+	Height                  uint64    `json:"height"`
+	InitialSyncTime         Duration  `json:"initial_sync_time"`
+	InscriptionIndex        bool      `json:"inscription_index"`
+	Inscriptions            uint64    `json:"inscriptions"`
+	JsonAPI                 bool      `json:"json_api"`
+	LostSats                uint64    `json:"lost_sats"`
+	MinimumRuneForNextBlock string    `json:"minimum_rune_for_next_block"`
+	RuneIndex               bool      `json:"rune_index"`
+	Runes                   uint64    `json:"runes"`
+	SatIndex                bool      `json:"sat_index"`
+	Started                 time.Time `json:"started"`
+	TransactionIndex        bool      `json:"transaction_index"`
+	UnrecoverablyReorged    bool      `json:"unrecoverably_reorged"`
+	Uptime                  Duration  `json:"uptime"`
+}
+
+type Duration struct {
+	Secs  int64 `json:"secs"`
+	Nanos int64 `json:"nanos"`
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var v map[string]int64
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	d.Secs = v["secs"]
+	d.Nanos = v["nanos"]
+	return nil
+}
+
+func getStatusData() (*StatusData, error) {
+	url := OrdinalRpcURL + "/status"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
+	}
+
+	var data StatusData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
 }

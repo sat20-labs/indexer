@@ -1,6 +1,7 @@
 package runes
 
 import (
+	"bytes"
 	"errors"
 	"math/big"
 
@@ -82,7 +83,7 @@ func parseTapscript(witness wire.TxWitness) []byte {
 	return nil
 }
 
-func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
+func parseTapscriptLegacyInstructions(tapscript []byte, commitment []byte) (ret [][]byte) {
 	// Opcode.classify(self, ctx: ClassifyContext) -> Class
 	availDataLen := len(tapscript)
 	for i := 0; i < len(tapscript); {
@@ -91,7 +92,8 @@ func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 		switch b {
 		// 0x65 0x66 0xff, All/IllegalOp
 		case txscript.OP_VERIF, txscript.OP_VERIFY, txscript.OP_INVALIDOPCODE:
-			return
+			availDataLen--
+			continue
 		// 0x76 0xa9 0x87 0x88, Legacy/IllegalOp
 		case txscript.OP_CAT, txscript.OP_SUBSTR,
 			txscript.OP_LEFT, txscript.OP_RIGHT,
@@ -100,54 +102,65 @@ func parseTapscriptLegacyInstructions(tapscript []byte) (ret [][]byte) {
 			txscript.OP_2MUL, txscript.OP_2DIV,
 			txscript.OP_MUL, txscript.OP_DIV, txscript.OP_MOD,
 			txscript.OP_LSHIFT, txscript.OP_RSHIFT:
-			return
+			availDataLen--
+			continue
 		// 80, 98, 126-129, 131-134, 137-138, 141-142, 149-153, 187-254, TapScript/SuccessOp
 		// case ...
 		// 0x61 0xb0 0xb1 0xb2 0xb3 0xb4 0xb5 0xb6 0xb7 0xb8 0xb9, All/NoOp
 		case txscript.OP_NOP,
 			txscript.OP_NOP1, txscript.OP_NOP2, txscript.OP_NOP3, txscript.OP_NOP4, txscript.OP_NOP5,
 			txscript.OP_NOP6, txscript.OP_NOP7, txscript.OP_NOP8, txscript.OP_NOP9, txscript.OP_NOP10:
-			return
+			availDataLen--
+			continue
 		// 0x6a, All/ReturnOp
 		case txscript.OP_RETURN:
-			return
+			availDataLen--
+			continue
 		// 0x50, 0x89, 0x8a, 0x62, Legacy/ReturnOp
 		case txscript.OP_RESERVED, txscript.OP_RESERVED1, txscript.OP_RESERVED2, txscript.OP_VER:
-			return
+			availDataLen--
+			continue
 		// OP_1NEGATE(OP_PUSHNUM_NEG1):0x4f, All/PushNum(-1)
 		case txscript.OP_1NEGATE:
-			return
+			availDataLen--
+			continue
 		default:
 			// 0xba, All/ReturnOp
 			if b >= txscript.OP_CHECKSIGADD {
-				return
+				availDataLen--
+				continue
 			}
 			// OP_1(OP_PUSHNUM_1):0x60, 0x51:OP_16(OP_PUSHNUM_16), All/PushNum(1 + code - OP_PUSHNUM_1)
 			if b >= txscript.OP_1 && b <= txscript.OP_16 {
-				return
+				availDataLen--
+				continue
 			}
 			// OP_DATA_75(OP_PUSHBYTES_75):0x4b, All/PushBytes(b)
 			if b <= txscript.OP_DATA_75 {
 				break
 			}
 			// All/Ordinary(b)
-			ret = append(ret, []byte{b})
+			availDataLen--
 			continue
 		}
 		n := int(uint(b))
+		var slice []byte
 		if availDataLen >= n {
 			end := i + n
-			if n > 0 {
-				slice := tapscript[i:end]
+			if n > 0 && end <= len(tapscript) {
+				slice = tapscript[i:end]
 				ret = append(ret, slice)
 				i += n
 			}
 			availDataLen = len(tapscript) - end
 		} else if availDataLen != 0 {
 			end := len(tapscript)
-			slice := tapscript[i:end]
+			slice = tapscript[i:end]
 			i = end
 			ret = append(ret, slice)
+		}
+		if bytes.Equal(slice, commitment) {
+			return
 		}
 	}
 	return

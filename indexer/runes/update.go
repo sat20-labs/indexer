@@ -80,6 +80,9 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
+	if tx.Txid == "9ad1ba215e80ff9a31ef2d261365c5268686fad84493ef8461b5ef4338983d1e" {
+		common.Log.Trace("RuneIndexer.index_runes-> location tx")
+	}
 	var artifact *runestone.Artifact
 	artifact, err = parseArtifact(tx)
 	if err != nil {
@@ -669,7 +672,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			continue
 		}
 
-		instructions := parseTapscriptLegacyInstructions(tapscript)
+		instructions := parseTapscriptLegacyInstructions(tapscript, commitment)
 		for _, instruction := range instructions {
 			// ignore errors, since the extracted script may not be valid
 			if !bytes.Equal(instruction, commitment) {
