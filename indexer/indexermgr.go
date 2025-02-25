@@ -1,14 +1,18 @@
 package indexer
 
 import (
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/config"
 	base_indexer "github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/brc20"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/ft"
+	"github.com/sat20-labs/indexer/indexer/mpn"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/runes"
@@ -19,6 +23,7 @@ import (
 )
 
 type IndexerMgr struct {
+	cfg   *config.YamlConf
 	dbDir string
 	// data from blockchain
 	baseDB  *badger.DB
@@ -36,6 +41,8 @@ type IndexerMgr struct {
 	ordFirstHeight  int
 	maxIndexHeight  int
 	periodFlushToDB int
+
+	mpn *mpn.MemPoolNode
 
 	brc20Indexer *brc20.BRC20Indexer
 	RunesIndexer *runes.Indexer
@@ -68,25 +75,39 @@ type IndexerMgr struct {
 var instance *IndexerMgr
 
 func NewIndexerMgr(
-	dbDir string,
-	chaincfgParam *chaincfg.Params,
-	maxIndexHeight int,
-	periodFlushToDB int,
+	yamlcfg *config.YamlConf,
 ) *IndexerMgr {
 
 	if instance != nil {
 		return instance
 	}
 
-	if periodFlushToDB == 0 {
-		periodFlushToDB = 12
+	if yamlcfg.BasicIndex.PeriodFlushToDB == 0 {
+		yamlcfg.BasicIndex.PeriodFlushToDB = 12
+	}
+
+	chainParam := &chaincfg.MainNetParams
+	switch yamlcfg.Chain {
+	case common.ChainTestnet:
+		chainParam = &chaincfg.TestNet4Params
+	case common.ChainTestnet4:
+		chainParam = &chaincfg.TestNet4Params
+	case common.ChainMainnet:
+		chainParam = &chaincfg.MainNetParams
+	default:
+		chainParam = &chaincfg.MainNetParams
+	}
+	dbDir := yamlcfg.DB.Path
+	if !filepath.IsAbs(dbDir) {
+		dbDir = filepath.Clean(dbDir) + string(filepath.Separator)
 	}
 
 	mgr := &IndexerMgr{
+		cfg:             yamlcfg,
 		dbDir:           dbDir,
-		chaincfgParam:   chaincfgParam,
-		maxIndexHeight:  maxIndexHeight,
-		periodFlushToDB: periodFlushToDB,
+		chaincfgParam:   chainParam,
+		maxIndexHeight:  int(yamlcfg.BasicIndex.MaxIndexHeight),
+		periodFlushToDB: yamlcfg.BasicIndex.PeriodFlushToDB,
 	}
 
 	instance = mgr
@@ -167,6 +188,12 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		common.Log.Infof("repaired, check again.")
 		return
 	}
+
+	// mpnode, err := mpn.StartMPN(b.cfg, b.localDB, stopIndexerChan)
+	// if err != nil {
+	// 	common.Log.Errorf("StartMPN failed, %v", err)
+	// 	return
+	// }
 
 	bWantExit := false
 	isRunning := false
@@ -250,17 +277,19 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	// close all
 	b.closeDB()
 
+	// mpn.StopMPN(mpnode)
+
 	common.Log.Info("IndexerMgr exited.")
 }
 
 func (b *IndexerMgr) dbgc() {
-	common.RunBadgerGC(b.localDB)
-	common.RunBadgerGC(b.baseDB)
-	common.RunBadgerGC(b.nftDB)
-	common.RunBadgerGC(b.nsDB)
-	common.RunBadgerGC(b.ftDB)
-	common.RunBadgerGC(b.brc20DB)
-	common.RunBadgerGC(b.runesDB)
+	db.RunBadgerGC(b.localDB)
+	db.RunBadgerGC(b.baseDB)
+	db.RunBadgerGC(b.nftDB)
+	db.RunBadgerGC(b.nsDB)
+	db.RunBadgerGC(b.ftDB)
+	db.RunBadgerGC(b.brc20DB)
+	db.RunBadgerGC(b.runesDB)
 	common.Log.Infof("dbgc completed")
 }
 
@@ -279,15 +308,15 @@ func (b *IndexerMgr) closeDB() {
 func (b *IndexerMgr) checkSelf() {
 	start := time.Now()
 	if b.compiling.CheckSelf() &&
-	b.exotic.CheckSelf() &&
-	b.nft.CheckSelf(b.baseDB) &&
-	b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
-	b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) &&
-	b.RunesIndexer.CheckSelf() &&
-	b.ns.CheckSelf(b.baseDB) {
+		b.exotic.CheckSelf() &&
+		b.nft.CheckSelf(b.baseDB) &&
+		b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
+		b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) &&
+		b.RunesIndexer.CheckSelf() &&
+		b.ns.CheckSelf(b.baseDB) {
 		common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
 	}
-	
+
 }
 
 func (b *IndexerMgr) forceUpdateDB() {

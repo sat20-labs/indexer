@@ -245,3 +245,23 @@ func DeleteUtxo(arr []*UtxoIdInDB, utxoId uint64) []*UtxoIdInDB {
 
 	return arr
 }
+
+
+func Uint64ToBytes(value uint64) []byte {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, value)
+	return bytes
+}
+
+func BytesToUint64(bytes []byte) uint64 {
+	return binary.BigEndian.Uint64(bytes)
+}
+
+func CheckUtxoFormat(utxo string) error {
+	parts := strings.Split(utxo, ":")
+	_, err := hex.DecodeString(parts[0])
+	if err != nil {
+		return fmt.Errorf("wrong utxo format %v", err)
+	}
+	return nil
+}

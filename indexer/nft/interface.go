@@ -3,6 +3,7 @@ package nft
 import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
@@ -35,7 +36,7 @@ func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 	var value InscriptionInDB
 	err := p.db.View(func(txn *badger.Txn) error {
 		key := GetInscriptionIdKey(inscriptionId)
-		return common.GetValueFromDB([]byte(key), txn, &value)
+		return db.GetValueFromDB([]byte(key), txn, &value)
 	})
 
 	if err != nil {
@@ -160,7 +161,7 @@ func (p *NftIndexer) GetNftsWithRanges(rngs []*common.Range) []int64 {
 	for _, rng := range rngs {
 		startKey := []byte(GetSatKey(rng.Start))
 		endKey := []byte(GetSatKey(rng.Start + rng.Size - 1))
-		err := common.IterateRangeInDB(p.db, startKey, endKey, func(key, value []byte) error {
+		err := db.IterateRangeInDB(p.db, startKey, endKey, func(key, value []byte) error {
 			sat, err := ParseSatKey(string(key))
 			if err == nil {
 				result = append(result, sat)

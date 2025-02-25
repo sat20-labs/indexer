@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 // deploy
@@ -267,7 +268,7 @@ func (p *BRC20Indexer) UpdateDB() {
 	// new ticker
 	for _, v := range p.tickerAdded {
 		key := GetTickerKey(v.Name)
-		err := common.SetDB([]byte(key), v, wb)
+		err := db.SetDB([]byte(key), v, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}
@@ -277,7 +278,7 @@ func (p *BRC20Indexer) UpdateDB() {
 	for _, ticker := range p.tickerMap {
 		for _, v := range ticker.MintAdded {
 			key := GetMintHistoryKey(ticker.Name, v.Nft.Base.InscriptionId)
-			err := common.SetDB([]byte(key), v, wb)
+			err := db.SetDB([]byte(key), v, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", key, err)
 			}
@@ -297,7 +298,7 @@ func (p *BRC20Indexer) UpdateDB() {
 			fromKey := GetHolderInfoKey(action.FromAddr, action.Ticker)
 			value, ok := p.holderMap[action.FromAddr]
 			if ok {
-				err := common.SetDB([]byte(fromKey), value, wb)
+				err := db.SetDB([]byte(fromKey), value, wb)
 				if err != nil {
 					common.Log.Panicf("Error setting %s in db %v", fromKey, err)
 				}
@@ -312,7 +313,7 @@ func (p *BRC20Indexer) UpdateDB() {
 		toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
 		value, ok := p.holderMap[action.ToAddr]
 		if ok {
-			err := common.SetDB([]byte(toKey), value, wb)
+			err := db.SetDB([]byte(toKey), value, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", toKey, err)
 			}
@@ -337,7 +338,7 @@ func (p *BRC20Indexer) UpdateDB() {
 			}
 
 			key := GetTransferHistoryKey(action.Ticker, action.Utxo)
-			err := common.SetDB([]byte(key), &history, wb)
+			err := db.SetDB([]byte(key), &history, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", key, err)
 			}

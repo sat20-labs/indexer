@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 const key_last = "exotic-lastkey"
@@ -203,7 +204,7 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 	defer wb.Cancel()
 	for bucket, value := range buckets {
 		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		err = common.SetDB(dbkey, value, wb)
+		err = db.SetDB(dbkey, value, wb)
 		if err != nil {
 			common.Log.Panicf("SetDB %s failed. %v", dbkey, err)
 		}
@@ -211,7 +212,7 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 
 	lastKeyBytes := make([]byte, binary.MaxVarintLen32)
 	binary.BigEndian.PutUint32(lastKeyBytes, uint32(lastkey))
-	err = common.SetRawDB([]byte(key_last), lastKeyBytes, wb)
+	err = db.SetRawDB([]byte(key_last), lastKeyBytes, wb)
 	if err != nil {
 		common.Log.Panicf("SetRawDB %s failed. %v", key_last, err)
 	}

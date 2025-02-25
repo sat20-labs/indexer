@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 func (s *BRC20Indexer) initTickInfoFromDB(tickerName string) *BRC20TickInfo {
@@ -59,7 +60,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 				if err != nil {
 					common.Log.Errorln("ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &info)
+					err = db.DecodeBytes(value, &info)
 					if err == nil {
 						holder, ok := holderMap[addrId]
 						if ok {
@@ -162,7 +163,7 @@ func (s *BRC20Indexer) getMintFromDB(ticker, inscriptionId string) *common.BRC20
 	var result common.BRC20Mint
 	err := s.db.View(func(txn *badger.Txn) error {
 		key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
-		err := common.GetValueFromDB([]byte(key), txn, &result)
+		err := db.GetValueFromDB([]byte(key), txn, &result)
 		if err == badger.ErrKeyNotFound {
 			common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 			return err
@@ -205,7 +206,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 				if err != nil {
 					common.Log.Errorln("loadMintDataFromDB ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &mint)
+					err = db.DecodeBytes(value, &mint)
 					if err == nil {
 						result[inscriptionId] = &mint
 					} else {
@@ -254,7 +255,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 				if err != nil {
 					common.Log.Errorln("loadTransferHistoryFromDB ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &history)
+					err = db.DecodeBytes(value, &history)
 					if err == nil {
 						result = append(result, &history)
 					} else {
@@ -282,7 +283,7 @@ func (s *BRC20Indexer) getTickerFromDB(tickerName string) *common.BRC20Ticker {
 	var result common.BRC20Ticker
 	err := s.db.View(func(txn *badger.Txn) error {
 		key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
-		err := common.GetValueFromDB([]byte(key), txn, &result)
+		err := db.GetValueFromDB([]byte(key), txn, &result)
 		if err == badger.ErrKeyNotFound {
 			common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 			return err

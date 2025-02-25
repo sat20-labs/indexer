@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
@@ -13,13 +11,6 @@ import (
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"github.com/sirupsen/logrus"
 )
-
-type Config struct {
-	DBDir           string
-	ChainParam      *chaincfg.Params
-	MaxIndexHeight  int
-	PeriodFlushToDB int
-}
 
 func init() {
 	config.InitSigInt()
@@ -41,9 +32,7 @@ func main() {
 		return
 	}
 
-	cfg := GetConfig(yamlcfg)
-
-	indexerMgr := indexer.NewIndexerMgr(cfg.DBDir, cfg.ChainParam, cfg.MaxIndexHeight, cfg.PeriodFlushToDB)
+	indexerMgr := indexer.NewIndexerMgr(yamlcfg)
 	base_indexer.InitBaseIndexer(indexerMgr)
 	indexerMgr.Init()
 
@@ -63,44 +52,6 @@ func main() {
 	indexerMgr.StartDaemon(stopChan)
 
 	common.Log.Info("prepare to release resource...")
-}
-
-
-func GetConfig(conf *config.YamlConf) *Config {
-	maxIndexHeight := int64(0)
-	periodFlushToDB := int(0)
-	
-	maxIndexHeight = conf.BasicIndex.MaxIndexHeight
-	periodFlushToDB = conf.BasicIndex.PeriodFlushToDB
-	chain := conf.Chain
-
-	chainParam := &chaincfg.MainNetParams
-	switch chain {
-	case common.ChainTestnet:
-		chainParam = &chaincfg.TestNet4Params
-	case common.ChainTestnet4:
-		chainParam = &chaincfg.TestNet4Params
-	case common.ChainMainnet:
-		chainParam = &chaincfg.MainNetParams
-	default:
-		chainParam = &chaincfg.MainNetParams
-	}
-	dbDir := ""
-	if conf != nil {
-		dbDir = conf.DB.Path
-	} else {
-		dbDir = "./"
-	}
-	if !filepath.IsAbs(dbDir) {
-		dbDir = filepath.Clean(dbDir) + string(filepath.Separator)
-	}
-
-	return &Config{
-		DBDir:           dbDir,
-		ChainParam:      chainParam,
-		MaxIndexHeight:  int(maxIndexHeight),
-		PeriodFlushToDB: periodFlushToDB,
-	}
 }
 
 

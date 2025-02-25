@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 const key_last = DB_PREFIX_BUCK + "lk"
@@ -254,7 +255,7 @@ func (bs *NftBuckStore) BatchPut(valuemap map[int64]*BuckValue) error {
 	defer wb.Cancel()
 	for bucket, value := range buckets {
 		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		err = common.SetDB(dbkey, value, wb)
+		err = db.SetDB(dbkey, value, wb)
 		if err != nil {
 			common.Log.Panicf("SetDB %s failed. %v", dbkey, err)
 		}
@@ -263,7 +264,7 @@ func (bs *NftBuckStore) BatchPut(valuemap map[int64]*BuckValue) error {
 	if lastkey != -1 {
 		lastKeyBytes := make([]byte, binary.MaxVarintLen64)
 		binary.BigEndian.PutUint64(lastKeyBytes, uint64(lastkey))
-		err = common.SetRawDB([]byte(key_last), lastKeyBytes, wb)
+		err = db.SetRawDB([]byte(key_last), lastKeyBytes, wb)
 		if err != nil {
 			common.Log.Panicf("SetRawDB %s failed. %v", key_last, err)
 		}

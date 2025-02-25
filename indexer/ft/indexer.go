@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
 )
 
@@ -58,14 +59,14 @@ func NewOrdxIndexer(db *badger.DB) *FTIndexer {
 }
 
 func (s *FTIndexer) setDBVersion() {
-	err := common.SetRawValueToDB([]byte(ORDX_DB_VER_KEY), []byte(ORDX_DB_VERSION), s.db)
+	err := db.SetRawValueToDB([]byte(ORDX_DB_VER_KEY), []byte(ORDX_DB_VERSION), s.db)
 	if err != nil {
 		common.Log.Panicf("SetRawValueToDB failed %v", err)
 	}
 }
 
 func (s *FTIndexer) GetDBVersion() string {
-	value, err := common.GetRawValueFromDB([]byte(ORDX_DB_VER_KEY), s.db)
+	value, err := db.GetRawValueFromDB([]byte(ORDX_DB_VER_KEY), s.db)
 	if err != nil {
 		common.Log.Errorf("GetRawValueFromDB failed %v", err)
 		return ""

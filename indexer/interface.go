@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"lukechampine.com/uint128"
 )
 
@@ -269,15 +270,14 @@ func (b *IndexerMgr) U128ToInt64(runeId string, amt uint128.Uint128) int64 {
 	if info == nil {
 		return amt.Big().Int64()
 	}
-	
+
 	return common.Uint128ToInt64(info.MaxSupply, amt)
 }
-
 
 // return: ticker -> assets(amt)
 func (b *IndexerMgr) GetUnbindingAssetsWithUtxo(utxoId uint64) map[common.TickerName]int64 {
 	result := make(map[common.TickerName]int64)
-	
+
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
 	if len(runesAssets) > 0 {
 		for _, v := range runesAssets {
@@ -289,11 +289,10 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxo(utxoId uint64) map[common.Ticker
 	return result
 }
 
-
 // return: ticker -> assets(amt)
 func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
 	result := make(map[common.TickerName]*common.Decimal)
-	
+
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
 	if len(runesAssets) > 0 {
 		for _, v := range runesAssets {
@@ -304,7 +303,6 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.Tick
 
 	return result
 }
-
 
 // return: ticker -> assets(inscriptionId->Ranges)
 func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[string][]*common.Range {
@@ -528,7 +526,7 @@ func (b *IndexerMgr) AddCollection(ntype, ticker string, ids []string) error {
 	key := getCollectionKey(ntype, ticker)
 	switch ntype {
 	case common.ASSET_TYPE_NFT:
-		err := common.GobSetDB1(key, ids, b.localDB)
+		err := db.GobSetDB1(key, ids, b.localDB)
 		if err != nil {
 			common.Log.Errorf("AddCollection %s %s failed: %v", ntype, ticker, err)
 		} else {
@@ -550,7 +548,7 @@ func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string
 	switch ntype {
 	case common.ASSET_TYPE_NFT:
 		err := b.localDB.View(func(txn *badger.Txn) error {
-			return common.GetValueFromDB(key, txn, value)
+			return db.GetValueFromDB(key, txn, value)
 		})
 		if err != nil {
 			common.Log.Errorf("GetCollection %s %s failed: %v", ntype, ticker, err)

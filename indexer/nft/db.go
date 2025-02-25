@@ -7,12 +7,13 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func initStatusFromDB(db *badger.DB) *common.NftStatus {
+func initStatusFromDB(ldb *badger.DB) *common.NftStatus {
 	stats := &common.NftStatus{}
-	db.View(func(txn *badger.Txn) error {
-		err := common.GetValueFromDB([]byte(NFT_STATUS_KEY), txn, stats)
+	ldb.View(func(txn *badger.Txn) error {
+		err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), txn, stats)
 		if err == badger.ErrKeyNotFound {
 			common.Log.Info("initStatusFromDB no stats found in db")
 			stats.Version = NFT_DB_VERSION
@@ -65,14 +66,14 @@ func getNftsWithAddressFromDB(addressId uint64, db *badger.DB) []int64 {
 
 func loadNftFromDB(sat int64, value *common.NftsInSat, txn *badger.Txn) error {
 	key := GetSatKey(sat)
-	// return common.GetValueFromDB([]byte(key), txn, value)
-	return common.GetValueFromDBWithProto3([]byte(key), txn, value)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromDBWithProto3([]byte(key), txn, value)
 }
 
 func loadUtxoValueFromDB(utxoId uint64, value *NftsInUtxo, txn *badger.Txn) error {
 	key := GetUtxoKey(utxoId)
-	// return common.GetValueFromDB([]byte(key), txn, value)
-	return common.GetValueFromDBWithProto3([]byte(key), txn, value)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromDBWithProto3([]byte(key), txn, value)
 }
 
 func hasNftInUtxo(utxoId uint64, txn *badger.Txn) bool {

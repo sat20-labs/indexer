@@ -7,6 +7,7 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 
 	"github.com/dgraph-io/badger/v4"
 )
@@ -200,9 +201,9 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 	return result
 }
 
-func initEpochSat(db *badger.DB, height int) {
+func initEpochSat(ldb *badger.DB, height int) {
 
-	db.View(func(txn *badger.Txn) error {
+	ldb.View(func(txn *badger.Txn) error {
 
 		currentEpoch := height / HalvingInterval
 		underpays := int64(0)
@@ -210,8 +211,8 @@ func initEpochSat(db *badger.DB, height int) {
 		for epoch := (height / HalvingInterval); epoch > 0; epoch-- {
 
 			value := &common.BlockValueInDB{}
-			key := common.GetBlockDBKey(210000 * epoch)
-			err := common.GetValueFromDB(key, txn, value)
+			key := db.GetBlockDBKey(210000 * epoch)
+			err := db.GetValueFromDB(key, txn, value)
 			if err != nil {
 				common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
 			}

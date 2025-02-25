@@ -5,6 +5,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {
@@ -22,9 +23,9 @@ func (p *ExoticIndexer) getBlockRange(height int, txn *badger.Txn) *common.Range
 		return &block.Ordinals
 	}
 
-	key := common.GetBlockDBKey(height)
+	key := db.GetBlockDBKey(height)
 	block = &common.BlockValueInDB{}
-	err := common.GetValueFromDB([]byte(key), txn, block)
+	err := db.GetValueFromDB([]byte(key), txn, block)
 	if err != nil {
 		common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
 	}

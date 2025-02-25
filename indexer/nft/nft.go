@@ -8,6 +8,7 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 type SatInfo struct {
@@ -310,8 +311,8 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 			if !ok {
 				key := GetSatKey(sat)
 				oldvalue := common.NftsInSat{}
-				// err := common.GetValueFromDB([]byte(key), txn, &oldvalue)
-				err := common.GetValueFromDBWithProto3([]byte(key), txn, &oldvalue)
+				// err := db.GetValueFromDB([]byte(key), txn, &oldvalue)
+				err := db.GetValueFromDBWithProto3([]byte(key), txn, &oldvalue)
 				if err == nil {
 					oldvalue.OwnerAddressId = info.AddressId
 					oldvalue.UtxoId = info.UtxoId
@@ -369,13 +370,13 @@ func (p *NftIndexer) UpdateDB() {
 	for _, nft := range p.nftAdded {
 		key := GetInscriptionIdKey(nft.Base.InscriptionId)
 		value := InscriptionInDB{Sat: nft.Base.Sat, Id: nft.Base.Id}
-		err := common.SetDB([]byte(key), &value, wb)
+		err := db.SetDB([]byte(key), &value, wb)
 		if err != nil {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
 		}
 
 		key = GetInscriptionAddressKey(nft.Base.InscriptionAddress, nft.Base.Id)
-		err = common.SetDB([]byte(key), nft.Base.Sat, wb)
+		err = db.SetDB([]byte(key), nft.Base.Sat, wb)
 		if err != nil {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
 		}
@@ -386,8 +387,8 @@ func (p *NftIndexer) UpdateDB() {
 	// 处理nft的转移
 	for sat, nft := range nftmap {
 		key := GetSatKey(sat)
-		err := common.SetDBWithProto3([]byte(key), nft, wb)
-		//err := common.SetDB([]byte(key), nft, wb)
+		err := db.SetDBWithProto3([]byte(key), nft, wb)
+		//err := db.SetDB([]byte(key), nft, wb)
 		if err != nil {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
 		}
@@ -404,14 +405,14 @@ func (p *NftIndexer) UpdateDB() {
 	for utxoId, sats := range p.utxoMap {
 		utxokey := GetUtxoKey(utxoId)
 		utxoValue := NftsInUtxo{Sats: mapToVector(sats)}
-		// err := common.SetDB([]byte(utxokey), &utxoValue, wb)
-		err := common.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
+		// err := db.SetDB([]byte(utxokey), &utxoValue, wb)
+		err := db.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
 		if err != nil {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", utxokey, err)
 		}
 	}
 
-	err := common.SetDB([]byte(NFT_STATUS_KEY), p.status, wb)
+	err := db.SetDB([]byte(NFT_STATUS_KEY), p.status, wb)
 	if err != nil {
 		common.Log.Panicf("NftIndexer->UpdateDB Error setting in db %v", err)
 	}
@@ -469,8 +470,8 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 			}
 			var value common.NftsInSat
 			err = item.Value(func(data []byte) error {
-				// return common.DecodeBytes(data, &value)
-				return common.DecodeBytesWithProto3(data, &value)
+				// return db.DecodeBytes(data, &value)
+				return db.DecodeBytesWithProto3(data, &value)
 			})
 			if err != nil {
 				common.Log.Panicf("item.Value error: %v", err)
@@ -510,8 +511,8 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 			}
 			var value NftsInUtxo
 			err = item.Value(func(data []byte) error {
-				// return common.DecodeBytes(data, &value)
-				return common.DecodeBytesWithProto3(data, &value)
+				// return db.DecodeBytes(data, &value)
+				return db.DecodeBytesWithProto3(data, &value)
 			})
 			if err != nil {
 				common.Log.Panicf("item.Value error: %v", err)
@@ -557,7 +558,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		defer wg.Done()
 		startTime2 := time.Now()
 		for address := range addressesInT1 {
-			key := common.GetAddressIdKey(address)
+			key := db.GetAddressIdKey(address)
 			_, err := txn.Get(key)
 			if err != nil {
 				wrongAddress = append(wrongAddress, address)
@@ -571,7 +572,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		startTime2 := time.Now()
 		// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
 		for utxo := range utxosInT2 {
-			key := common.GetUtxoIdKey(utxo)
+			key := db.GetUtxoIdKey(utxo)
 			_, err := txn.Get(key)
 			if err != nil {
 				wrongUtxo2 = append(wrongUtxo2, utxo)
@@ -695,9 +696,9 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 }
 
 // only for test
-func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, db *badger.DB) map[uint64]string {
+func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb *badger.DB) map[uint64]string {
 	result := make(map[uint64]string)
-	db.View(func(txn *badger.Txn) error {
+	ldb.View(func(txn *badger.Txn) error {
 		var err error
 		prefix := []byte(common.DB_KEY_UTXO)
 		itr := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -710,7 +711,7 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, db *badger.DB) map[uint6
 			}
 			var value common.UtxoValueInDB
 			err = item.Value(func(data []byte) error {
-				return common.DecodeBytesWithProto3(data, &value)
+				return db.DecodeBytesWithProto3(data, &value)
 			})
 			if err != nil {
 				common.Log.Errorf("item.Value error: %v", err)
@@ -720,7 +721,7 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, db *badger.DB) map[uint6
 			// 用于打印不存在table中的utxo
 			if _, ok := utxos[value.UtxoId]; ok {
 				key := item.Key()
-				str, err := common.GetUtxoByDBKey(key)
+				str, err := db.GetUtxoByDBKey(key)
 				if err == nil {
 					common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
 					result[value.UtxoId] = str

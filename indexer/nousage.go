@@ -14,6 +14,7 @@ import (
 	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/emirpasic/gods/utils"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
@@ -628,11 +629,11 @@ func (p *IndexerMgr) SearchPredefinedName() bool {
 func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 
 	pizzaAddrMap := make(map[uint64]int64)
-	db := p.compiling.GetBaseDB()
+	ldb := p.compiling.GetBaseDB()
 	key := []byte("pizza-holder")
 
-	err := db.View(func(txn *badger.Txn) error {
-		err := common.GetValueFromDB(key, txn, &pizzaAddrMap)
+	err := ldb.View(func(txn *badger.Txn) error {
+		err := db.GetValueFromDB(key, txn, &pizzaAddrMap)
 		if err != nil {
 			return err
 		}
@@ -641,7 +642,7 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	if err != nil || bRegenerat {
 		pizzaAddrMap = make(map[uint64]int64)
 		pizzaAddrMap[0] = int64(p.GetSyncHeight())
-		db.View(func(txn *badger.Txn) error {
+		ldb.View(func(txn *badger.Txn) error {
 			var err error
 			prefix := []byte(common.DB_KEY_UTXO)
 			itr := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -658,7 +659,7 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 				}
 				var value common.UtxoValueInDB
 				err = item.Value(func(data []byte) error {
-					return common.DecodeBytesWithProto3(data, &value)
+					return db.DecodeBytesWithProto3(data, &value)
 				})
 				if err != nil {
 					common.Log.Panicf("item.Value error: %v", err)
@@ -682,7 +683,7 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 			return nil
 		})
 
-		common.GobSetDB1(key, pizzaAddrMap, db)
+		db.GobSetDB1(key, pizzaAddrMap, ldb)
 	}
 
 	syncHeight := pizzaAddrMap[0]
@@ -707,14 +708,14 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	theTaprootAddresses := make([]*AddressPizza, 0)
 	total2 := int64(0)
 
-	db.View(func(txn *badger.Txn) error {
+	ldb.View(func(txn *badger.Txn) error {
 		it := addrTreeMap.Iterator()
 		it.End()
 
 		for it.Prev() {
 			pizza := it.Key().(int64)
 			addressId := it.Value().(uint64)
-			address, err := common.GetAddressByIDFromDBTxn(txn, addressId)
+			address, err := db.GetAddressByIDFromDBTxn(txn, addressId)
 			if err != nil {
 				common.Log.Warnf("GetAddressByIDFromDBTxn %d failed. %v", addressId, err)
 			} else {
@@ -1177,7 +1178,7 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 			}
 			var value ns.NameValueInDB
 			err = item.Value(func(data []byte) error {
-				return common.DecodeBytesWithProto3(data, &value)
+				return db.DecodeBytesWithProto3(data, &value)
 			})
 			if err != nil {
 				common.Log.Panicf("item.Value error: %v", err)
@@ -1215,7 +1216,7 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 		for k := range satsInT1 {
 			var value common.NftsInSat
 			key := nft.GetSatKey(k)
-			err := common.GetValueFromDBWithProto3([]byte(key), txn, &value)
+			err := db.GetValueFromDBWithProto3([]byte(key), txn, &value)
 			if err == nil {
 				addrInT1[value.OwnerAddressId] += len(value.Nfts)
 			}
@@ -1305,8 +1306,8 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 			}
 			var value ns.NameValueInDB
 			err = item.Value(func(data []byte) error {
-				// return common.DecodeBytes(data, &value)
-				return common.DecodeBytesWithProto3(data, &value)
+				// return db.DecodeBytes(data, &value)
+				return db.DecodeBytesWithProto3(data, &value)
 			})
 			if err != nil {
 				common.Log.Panicf("item.Value error: %v", err)
@@ -1335,7 +1336,7 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 		for _, v := range nameMap {
 			key := nft.GetSatKey(v)
 			nfts := &common.NftsInSat{}
-			err := common.GetValueFromDBWithProto3([]byte(key), txn, nfts)
+			err := db.GetValueFromDBWithProto3([]byte(key), txn, nfts)
 			if err == nil {
 				addrIdMap[nfts.OwnerAddressId]++
 			}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 // 每个deploy都调用
@@ -78,7 +79,7 @@ func (p *FTIndexer) addHolder(utxo uint64, ticker string, n int, address uint64,
 		info.Index = index
 		tickinfo, ok := info.Tickers[ticker]
 		if !ok {
-			tickinfo := common.TickAbbrInfo{N:n, MintInfo: mintinfo}
+			tickinfo := common.TickAbbrInfo{N: n, MintInfo: mintinfo}
 			info.Tickers[ticker] = &tickinfo
 		} else {
 			tickinfo.MintInfo[inscriptionId] = append(tickinfo.MintInfo[inscriptionId], rngs...)
@@ -169,7 +170,7 @@ func (p *FTIndexer) innerUpdateTransfer(output *common.Output) {
 			bUpdated = true
 		}
 		if len(mintinfo) > 0 {
-			tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{N:t.Ticker.N, MintInfo: mintinfo}
+			tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{N: t.Ticker.N, MintInfo: mintinfo}
 		}
 	}
 
@@ -192,7 +193,7 @@ func (p *FTIndexer) UpdateDB() {
 
 	for _, v := range p.tickerAdded {
 		key := GetTickerKey(v.Name)
-		err := common.SetDB([]byte(key), v, wb)
+		err := db.SetDB([]byte(key), v, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}
@@ -203,7 +204,7 @@ func (p *FTIndexer) UpdateDB() {
 	for _, ticker := range p.tickerMap {
 		for _, v := range ticker.MintAdded {
 			key := GetMintHistoryKey(ticker.Name, v.Base.InscriptionId)
-			err := common.SetDB([]byte(key), v, wb)
+			err := db.SetDB([]byte(key), v, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", key, err)
 			}
@@ -222,7 +223,7 @@ func (p *FTIndexer) UpdateDB() {
 		} else if action.Action > 0 {
 			value, ok := p.holderInfo[action.UtxoId]
 			if ok {
-				err := common.SetDB([]byte(key), value, wb)
+				err := db.SetDB([]byte(key), value, wb)
 				if err != nil {
 					common.Log.Panicf("Error setting %s in db %v", key, err)
 				}
@@ -245,7 +246,7 @@ func (p *FTIndexer) UpdateDB() {
 				if ok {
 					amount, ok = (*value)[action.UtxoId]
 					if ok {
-						err := common.SetDB([]byte(key), &amount, wb)
+						err := db.SetDB([]byte(key), &amount, wb)
 						if err != nil {
 							common.Log.Panicf("Error setting %s in db %v", key, err)
 						}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 func (s *FTIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
@@ -58,7 +59,7 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 				if err != nil {
 					common.Log.Errorln("ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &info)
+					err = db.DecodeBytes(value, &info)
 					if err == nil {
 						result[utxo] = &info
 					} else {
@@ -113,7 +114,7 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
 				if err != nil {
 					common.Log.Errorln("ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &amount)
+					err = db.DecodeBytes(value, &amount)
 					if err == nil {
 						oldmap, ok := result[ticker]
 						if ok {
@@ -192,7 +193,7 @@ func (s *FTIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
 	err := s.db.View(func(txn *badger.Txn) error {
 		key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
-		err := common.GetValueFromDB([]byte(key), txn, &result)
+		err := db.GetValueFromDB([]byte(key), txn, &result)
 		if err == badger.ErrKeyNotFound {
 			common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 			return err
@@ -235,7 +236,7 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 				if err != nil {
 					common.Log.Errorln("loadMintDataFromDB ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &mint)
+					err = db.DecodeBytes(value, &mint)
 					if err == nil {
 						result[utxo] = &mint
 					} else {
@@ -263,7 +264,7 @@ func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	var result common.Ticker
 	err := s.db.View(func(txn *badger.Txn) error {
 		key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
-		err := common.GetValueFromDB([]byte(key), txn, &result)
+		err := db.GetValueFromDB([]byte(key), txn, &result)
 		if err == badger.ErrKeyNotFound {
 			common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 			return err

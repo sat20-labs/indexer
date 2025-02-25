@@ -15,6 +15,8 @@ require (
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/btcsuite/btcd/btcutil/psbt v1.1.9
+	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
+	github.com/decred/dcrd/lru v1.0.0
 	github.com/dgraph-io/badger/v4 v4.5.0
 	github.com/didip/tollbooth/v7 v7.0.2
 	github.com/emirpasic/gods v1.18.1
@@ -42,8 +44,8 @@ require (
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
-	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
+	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect

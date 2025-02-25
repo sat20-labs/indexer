@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
 )
 
@@ -121,8 +122,8 @@ func (p *NameService) UpdateDB() {
 			Sat:   name.Nft.Base.Sat,
 			Name:  name.Name,
 		}
-		err := common.SetDBWithProto3([]byte(key), &value, wb)
-		//err := common.SetDB([]byte(key), &value, wb)
+		err := db.SetDBWithProto3([]byte(key), &value, wb)
+		//err := db.SetDB([]byte(key), &value, wb)
 		if err != nil {
 			common.Log.Panicf("NameService->UpdateDB Error setting %s in db %v", key, err)
 		}
@@ -134,14 +135,14 @@ func (p *NameService) UpdateDB() {
 		for _, kv := range update.KVs {
 			key := GetKVKey(update.Name, kv.Key)
 			value := &common.KeyValueInDB{Value: kv.Value, InscriptionId: update.InscriptionId}
-			err := common.SetDB([]byte(key), value, wb)
+			err := db.SetDB([]byte(key), value, wb)
 			if err != nil {
 				common.Log.Panicf("NameService->UpdateDB Error setting %s in db %v", key, err)
 			}
 		}
 	}
 
-	err := common.SetDB([]byte(NS_STATUS_KEY), p.status, wb)
+	err := db.SetDB([]byte(NS_STATUS_KEY), p.status, wb)
 	if err != nil {
 		common.Log.Panicf("NameService->UpdateDB Error setting in db %v", err)
 	}
@@ -196,8 +197,8 @@ func (p *NameService) CheckSelf(baseDB *badger.DB) bool {
 			}
 			var value NameValueInDB
 			err = item.Value(func(data []byte) error {
-				// return common.DecodeBytes(data, &value)
-				return common.DecodeBytesWithProto3(data, &value)
+				// return db.DecodeBytes(data, &value)
+				return db.DecodeBytesWithProto3(data, &value)
 			})
 			if err != nil {
 				common.Log.Panicf("item.Value error: %v", err)

@@ -3,7 +3,7 @@ package base
 import (
 	"time"
 
-	"github.com/sat20-labs/indexer/common"
+	//"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
@@ -14,7 +14,7 @@ func getBlockCount() (uint64, error) {
 	if err != nil {
 		n := 1
 		for n < 10 {
-			common.Log.Infof("GetBlockCount failed. try again ...")
+			//common.Log.Infof("GetBlockCount failed. try again ...")
 			time.Sleep(time.Duration(n) * time.Second)
 			n++
 			h, err = bitcoin_rpc.ShareBitconRpc.GetBlockCount()
@@ -32,7 +32,7 @@ func getBlockHash(height uint64) (string, error) {
 	if err != nil {
 		n := 1
 		for n < 10 {
-			common.Log.Infof("GetBlockHash failed. try again ...")
+			//common.Log.Infof("GetBlockHash failed. try again ...")
 			time.Sleep(time.Duration(n) * time.Second)
 			n++
 			h, err = bitcoin_rpc.ShareBitconRpc.GetBlockHash(height)
@@ -49,7 +49,7 @@ func getRawBlock(blockHash string) (string, error) {
 	if err != nil {
 		n := 1
 		for n < 10 {
-			common.Log.Infof("GetRawBlock failed %v. try again ...", err)
+			//common.Log.Infof("GetRawBlock failed %v. try again ...", err)
 			time.Sleep(time.Duration(n) * time.Second)
 			n++
 			h, err = bitcoin_rpc.ShareBitconRpc.GetRawBlock(blockHash)

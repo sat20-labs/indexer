@@ -6,17 +6,18 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func openDB(filepath string, opts badger.Options) (db *badger.DB, err error) {
+func openDB(filepath string, opts badger.Options) (ldb *badger.DB, err error) {
 	opts = opts.WithDir(filepath).WithValueDir(filepath).WithLoggingLevel(badger.WARNING)
-	db, err = badger.Open(opts)
+	ldb, err = badger.Open(opts)
 	if err != nil {
 		return nil, err
 	}
 	common.Log.Infof("InitDB-> start db gc for %s", filepath)
-	common.RunBadgerGC(db)
-	return db, nil
+	db.RunBadgerGC(ldb)
+	return ldb, nil
 }
 
 func (p *IndexerMgr) initDB() (err error) {
@@ -105,7 +106,7 @@ func (p *IndexerMgr) initCollections() {
 				if err != nil {
 					common.Log.Errorln("initCollections ValueCopy " + key + " " + err.Error())
 				} else {
-					err = common.DecodeBytes(value, &ids)
+					err = db.DecodeBytes(value, &ids)
 					if err == nil {
 						p.clmap[common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: nty, Ticker: name}] = inscriptionIdsToCollectionMap(ids)
 					} else {

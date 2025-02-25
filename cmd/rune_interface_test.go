@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/indexer/runes"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
@@ -22,7 +22,17 @@ var runesIndexer *runes.Indexer
 func InitRuneTester() {
 	if runesIndexer == nil {
 		dbdir := "../db/testnet/"
-		indexerMgr := indexer.NewIndexerMgr(dbdir, &chaincfg.TestNet4Params, 61680, 20)
+		yamlcfg := config.YamlConf{
+			Chain: "testnet",
+			DB: config.DB{
+				Path: dbdir,
+			},
+			BasicIndex: config.BasicIndex{
+				MaxIndexHeight: 61680,
+				PeriodFlushToDB: 20,
+			},
+		}
+		indexerMgr := indexer.NewIndexerMgr(&yamlcfg)
 		base_indexer.InitBaseIndexer(indexerMgr)
 		indexerMgr.Init()
 		runesIndexer = indexerMgr.RunesIndexer

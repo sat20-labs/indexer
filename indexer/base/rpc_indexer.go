@@ -9,6 +9,7 @@ import (
 	"github.com/sat20-labs/indexer/common"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 type SatSearchingStatus struct {
@@ -65,9 +66,9 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 
 	output := &common.UtxoValueInDB{}
 	err := b.db.View(func(txn *badger.Txn) error {
-		key := common.GetUTXODBKey(utxo)
-		//err := common.GetValueFromDB(key, txn, output)
-		err := common.GetValueFromDBWithProto3(key, txn, output)
+		key := db.GetUTXODBKey(utxo)
+		//err := db.GetValueFromDB(key, txn, output)
+		err := db.GetValueFromDBWithProto3(key, txn, output)
 		if err != nil {
 			common.Log.Errorf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
 			return err
@@ -103,9 +104,9 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 
 	output := &common.UtxoValueInDB{}
 	err := b.db.View(func(txn *badger.Txn) error {
-		key := common.GetUTXODBKey(utxo)
-		//err := common.GetValueFromDB(key, txn, output)
-		err := common.GetValueFromDBWithProto3(key, txn, output)
+		key := db.GetUTXODBKey(utxo)
+		//err := db.GetValueFromDB(key, txn, output)
+		err := db.GetValueFromDBWithProto3(key, txn, output)
 		if err != nil {
 			common.Log.Errorf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
 			return err
@@ -159,7 +160,7 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 // only for api access
 func (b *RpcIndexer) getAddressValue2(address string, txn *badger.Txn) *common.AddressValueInDB {
 	result := &common.AddressValueInDB{AddressId: common.INVALID_ID}
-	addressId, err := common.GetAddressIdFromDBTxn(txn, address)
+	addressId, err := db.GetAddressIdFromDBTxn(txn, address)
 	if err == nil {
 		utxos := make(map[uint64]*common.UtxoValue)
 		prefix := []byte(fmt.Sprintf("%s%x-", common.DB_KEY_ADDRESSVALUE, addressId))
@@ -221,7 +222,7 @@ func (b *RpcIndexer) getAddressValue2(address string, txn *badger.Txn) *common.A
 
 // only for RPC interface
 func (b *RpcIndexer) GetUtxoByID(id uint64) (string, error) {
-	utxo, err := common.GetUtxoByID(b.db, id)
+	utxo, err := db.GetUtxoByID(b.db, id)
 	if err != nil {
 		for key, value := range b.utxoIndex.Index {
 			if common.GetUtxoId(value) == id {
@@ -244,7 +245,7 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 		return addrStr, nil
 	}
 
-	address, err := common.GetAddressByID(b.db, id)
+	address, err := db.GetAddressByID(b.db, id)
 	if err != nil {
 		common.Log.Errorf("RpcIndexer->GetAddressByID %d failed, err: %v", id, err)
 		return "", err
@@ -261,7 +262,7 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 // only for RPC interface
 func (b *RpcIndexer) GetAddressId(address string) uint64 {
 
-	id, err := common.GetAddressIdFromDB(b.db, address)
+	id, err := db.GetAddressIdFromDB(b.db, address)
 	if err != nil {
 		id, _ = b.BaseIndexer.getAddressId(address)
 		if id != common.INVALID_ID {
@@ -348,7 +349,7 @@ func (b *RpcIndexer) searhing(sat int64) {
 				}
 
 				err = item.Value(func(data []byte) error {
-					return common.DecodeBytesWithProto3(data, &value)
+					return db.DecodeBytesWithProto3(data, &value)
 				})
 				if err != nil {
 					common.Log.Errorf("item.Value error: %v", err)
@@ -366,8 +367,8 @@ func (b *RpcIndexer) searhing(sat int64) {
 			return nil
 		})
 		if bFound {
-			address, _ = common.GetAddressByID(b.db, value.AddressIds[0])
-			utxo, _ = common.GetUtxoByID(b.db, value.UtxoId)
+			address, _ = db.GetAddressByID(b.db, value.AddressIds[0])
+			utxo, _ = db.GetUtxoByID(b.db, value.UtxoId)
 		}
 	}
 
@@ -469,10 +470,10 @@ func (b *RpcIndexer) GetBlockInfo(height int) (*common.BlockInfo, error) {
 		}
 	}
 
-	key := common.GetBlockDBKey(height)
+	key := db.GetBlockDBKey(height)
 	block := common.BlockValueInDB{}
 	err := b.db.View(func(txn *badger.Txn) error {
-		return common.GetValueFromDB(key, txn, &block)
+		return db.GetValueFromDB(key, txn, &block)
 	})
 	if err != nil {
 		return nil, err

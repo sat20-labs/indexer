@@ -1,4 +1,4 @@
-package common
+package db
 
 import (
 	badger "github.com/dgraph-io/badger/v4"

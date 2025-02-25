@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
 )
 
@@ -19,16 +20,16 @@ type BRC20TickInfo struct {
 }
 
 type HolderAction struct {
-	Height    int
-	Utxo      string   
-	NftId     int64
-	FromAddr  uint64
-	ToAddr    uint64
-	
-	Ticker    string
-	Amount    common.Decimal
+	Height   int
+	Utxo     string
+	NftId    int64
+	FromAddr uint64
+	ToAddr   uint64
 
-	Action    int  // 0: inscribe-mint  1: inscribe-transfer  2: transfer
+	Ticker string
+	Amount common.Decimal
+
+	Action int // 0: inscribe-mint  1: inscribe-transfer  2: transfer
 }
 
 type HolderInfo struct {
@@ -37,10 +38,10 @@ type HolderInfo struct {
 }
 
 type TransferNftInfo struct {
-	AddressId      uint64
-	Index        int
-	Ticker       string
-	TransferNft  *common.TransferNFT
+	AddressId   uint64
+	Index       int
+	Ticker      string
+	TransferNft *common.TransferNFT
 }
 
 type BRC20Indexer struct {
@@ -50,10 +51,10 @@ type BRC20Indexer struct {
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
 	// 禁止直接遍历holderInfo和utxoMap，因为数据量太大（ord有亿级数据）
-	mutex             sync.RWMutex               // 只保护这几个结构
-	tickerMap         map[string]*BRC20TickInfo  // ticker -> TickerInfo.  name 小写。 数据由mint数据构造
-	holderMap         map[uint64]*HolderInfo     // addrId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
-	tickerToHolderMap map[string]map[uint64]bool // ticker -> addrId. 动态数据，跟随Holder变更，内存数据。
+	mutex             sync.RWMutex                // 只保护这几个结构
+	tickerMap         map[string]*BRC20TickInfo   // ticker -> TickerInfo.  name 小写。 数据由mint数据构造
+	holderMap         map[uint64]*HolderInfo      // addrId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
+	tickerToHolderMap map[string]map[uint64]bool  // ticker -> addrId. 动态数据，跟随Holder变更，内存数据。
 	transferNftMap    map[uint64]*TransferNftInfo // utxoId -> HolderInfo中的TransferableData的Nft
 
 	// 其他辅助信息
@@ -68,14 +69,14 @@ func NewIndexer(db *badger.DB) *BRC20Indexer {
 }
 
 func (s *BRC20Indexer) setDBVersion() {
-	err := common.SetRawValueToDB([]byte(BRC20_DB_VER_KEY), []byte(BRC20_DB_VERSION), s.db)
+	err := db.SetRawValueToDB([]byte(BRC20_DB_VER_KEY), []byte(BRC20_DB_VERSION), s.db)
 	if err != nil {
 		common.Log.Panicf("SetRawValueToDB failed %v", err)
 	}
 }
 
 func (s *BRC20Indexer) GetDBVersion() string {
-	value, err := common.GetRawValueFromDB([]byte(BRC20_DB_VER_KEY), s.db)
+	value, err := db.GetRawValueFromDB([]byte(BRC20_DB_VER_KEY), s.db)
 	if err != nil {
 		common.Log.Errorf("GetRawValueFromDB failed %v", err)
 		return ""
@@ -111,7 +112,7 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	newInst.holderMap = make(map[uint64]*HolderInfo, 0)
 	newInst.tickerToHolderMap = make(map[string]map[uint64]bool, 0)
 	for _, action := range s.holderActionList {
-		
+
 		value, ok := s.holderMap[action.FromAddr]
 		if ok {
 			info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
@@ -123,7 +124,7 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 			info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
 			newInst.holderMap[action.ToAddr] = &info
 		}
-		
+
 		holders, ok := s.tickerToHolderMap[action.Ticker]
 		if ok {
 			newInst.tickerToHolderMap[action.Ticker] = holders
@@ -172,7 +173,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 		}
 
 		s.loadHolderInfoFromDB()
-	
+
 		s.holderActionList = make([]*HolderAction, 0)
 		s.tickerAdded = make(map[string]*common.BRC20Ticker, 0)
 

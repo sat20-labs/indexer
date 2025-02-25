@@ -1,6 +1,7 @@
-package common
+package db
 
 import (
+	"github.com/sat20-labs/indexer/common"
 
 	badger "github.com/dgraph-io/badger/v4"
 )
@@ -15,7 +16,7 @@ func IterateRangeInDB(db *badger.DB, startKey, endKey []byte, processFunc func(k
 		for it.Valid() {
 			item := it.Item()
 			if item.IsDeletedOrExpired() {
-				Log.Errorf("IsDeletedOrExpired return true")
+				common.Log.Errorf("IsDeletedOrExpired return true")
 				it.Next()
 				continue
 			}
