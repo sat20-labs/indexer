@@ -65,7 +65,7 @@ func TestDecode() {
 	txOut := wire.NewTxOut(0, pkScript)
 	tx.AddTxOut(txOut)
 	r := &runestone.Runestone{}
-	artifact, err := r.Decipher(&tx)
+	artifact, err := r.DecipherFromTx(&tx)
 	if err != nil {
 		fmt.Println(err)
 		return

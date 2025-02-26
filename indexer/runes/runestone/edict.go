@@ -14,7 +14,21 @@ type Edict struct {
 	Output uint32
 }
 
-func EdictFromIntegers(tx *wire.MsgTx, id RuneId, amount uint128.Uint128, output uint128.Uint128) (*Edict, error) {
+// EdictFromIntegers2
+func NewEdict(id RuneId, amount uint128.Uint128, output uint128.Uint128) (*Edict, error) {
+	if output.Hi > 0 || output.Lo > math.MaxUint32 {
+		return nil, errors.New("output overflow")
+	}
+	output32 := uint32(output.Lo)
+
+	return &Edict{
+		ID:     id,
+		Amount: amount,
+		Output: output32,
+	}, nil
+}
+
+func NewEdictFromTx(tx *wire.MsgTx, id RuneId, amount uint128.Uint128, output uint128.Uint128) (*Edict, error) {
 	if output.Hi > 0 || output.Lo > math.MaxUint32 {
 		return nil, errors.New("output overflow")
 	}
