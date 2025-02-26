@@ -15,7 +15,7 @@ import (
 type AddressOutpointToBalance struct {
 	AddressId uint64
 	Address   runestone.Address
-	OutPoint  *runestone.OutPoint
+	OutPoint  *OutPoint
 	RuneId    *runestone.RuneId
 	Balance   runestone.Lot
 }
@@ -28,7 +28,7 @@ func AddressOutpointToBalanceFromString(str string) (*AddressOutpointToBalance, 
 	if err != nil {
 		return nil, err
 	}
-	ret.OutPoint, err = runestone.OutPointFromString(parts[2])
+	ret.OutPoint, err = OutPointFromString(parts[2])
 	if err != nil {
 		return nil, err
 	}

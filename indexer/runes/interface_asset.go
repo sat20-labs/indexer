@@ -5,6 +5,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
+	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"lukechampine.com/uint128"
 )
 
@@ -243,7 +244,7 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 desc: 根据utxo获取ticker名字和资产数量
 */
 func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
-	outpoint := runestone.OutPointFromUtxoId(utxoId)
+	outpoint := table.OutPointFromUtxoId(utxoId)
 	outpointToBalancesValue := s.outpointToBalancesTbl.Get(outpoint)
 	ret := make([]*UtxoAsset, len(outpointToBalancesValue.RuneIdLots))
 	for i, runeIdLot := range outpointToBalancesValue.RuneIdLots {
@@ -269,7 +270,7 @@ desc: 判断utxo中是否有runes资产
 实现: balances = get_rune_balances_for_output(utxo); return len(balances) > 0
 */
 func (s *Indexer) IsExistAsset(utxoId uint64) bool {
-	outpoint := runestone.OutPointFromUtxoId(utxoId)
+	outpoint := table.OutPointFromUtxoId(utxoId)
 	outpointToBalancesValue := s.outpointToBalancesTbl.Get(outpoint)
 	total := len(outpointToBalancesValue.RuneIdLots)
 	return total > 0

@@ -13,7 +13,7 @@ type AddressRuneIdToMintHistory struct {
 	AddressId uint64
 	Address   runestone.Address
 	RuneId    *runestone.RuneId
-	OutPoint  *runestone.OutPoint
+	OutPoint  *OutPoint
 }
 
 func AddressRuneIdToMintHistoryFromString(str string) (*AddressRuneIdToMintHistory, error) {
@@ -28,7 +28,7 @@ func AddressRuneIdToMintHistoryFromString(str string) (*AddressRuneIdToMintHisto
 	if err != nil {
 		return nil, err
 	}
-	ret.OutPoint, err = runestone.OutPointFromString(parts[3])
+	ret.OutPoint, err = OutPointFromString(parts[3])
 	if err != nil {
 		return nil, err
 	}

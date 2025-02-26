@@ -22,20 +22,20 @@ type Indexer struct {
 	chaincfgParam                 *chaincfg.Params
 	height                        uint64
 	blockTime                     uint64
-	Status                        *runestone.RunesStatus
+	Status                        *table.RunesStatus
 	minimumRune                   *runestone.Rune
-	burnedMap                     runestone.RuneIdLotMap
+	burnedMap                     table.RuneIdLotMap
 	HolderUpdateCount             int
 	HolderRemoveCount             int
-	idToEntryTbl                  *runestone.RuneIdToEntryTable
-	runeToIdTbl                   *runestone.RuneToIdTable
-	outpointToBalancesTbl         *runestone.OutpointToBalancesTable
-	runeIdAddressToBalanceTbl     *runestone.RuneIdAddressToBalanceTable
-	runeIdOutpointToBalanceTbl    *runestone.RuneIdOutpointToBalanceTable
-	addressOutpointToBalancesTbl  *runestone.AddressOutpointToBalancesTable
-	runeIdAddressToCountTbl       *runestone.RuneIdAddressToCountTable
-	runeIdToMintHistoryTbl        *runestone.RuneToMintHistoryTable
-	addressRuneIdToMintHistoryTbl *runestone.AddressRuneIdToMintHistoryTable
+	idToEntryTbl                  *table.RuneIdToEntryTable
+	runeToIdTbl                   *table.RuneToIdTable
+	outpointToBalancesTbl         *table.OutpointToBalancesTable
+	runeIdAddressToBalanceTbl     *table.RuneIdAddressToBalanceTable
+	runeIdOutpointToBalanceTbl    *table.RuneIdOutpointToBalanceTable
+	addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable
+	runeIdAddressToCountTbl       *table.RuneIdAddressToCountTable
+	runeIdToMintHistoryTbl        *table.RuneToMintHistoryTable
+	addressRuneIdToMintHistoryTbl *table.AddressRuneIdToMintHistoryTable
 }
 
 func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
@@ -48,16 +48,16 @@ func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseInd
 		dbWrite:                       dbWrite,
 		chaincfgParam:                 param,
 		burnedMap:                     nil,
-		Status:                        runestone.NewRunesStatus(store.NewCache[pb.RunesStatus](dbWrite)),
-		idToEntryTbl:                  runestone.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry](dbWrite)),
-		runeToIdTbl:                   runestone.NewRuneToIdTable(store.NewCache[pb.RuneId](dbWrite)),
-		outpointToBalancesTbl:         runestone.NewOutpointToBalancesTable(store.NewCache[pb.OutpointToBalances](dbWrite)),
-		runeIdAddressToBalanceTbl:     runestone.NewRuneIdAddressToBalanceTable(store.NewCache[pb.RuneIdAddressToBalance](dbWrite)),
-		runeIdOutpointToBalanceTbl:    runestone.NewRuneIdOutpointToBalancesTable(store.NewCache[pb.RuneBalance](dbWrite)),
-		addressOutpointToBalancesTbl:  runestone.NewAddressOutpointToBalancesTable(store.NewCache[pb.AddressOutpointToBalance](dbWrite)),
-		runeIdAddressToCountTbl:       runestone.NewRuneIdAddressToCountTable(store.NewCache[pb.RuneIdAddressToCount](dbWrite)),
-		runeIdToMintHistoryTbl:        runestone.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory](dbWrite)),
-		addressRuneIdToMintHistoryTbl: runestone.NewAddressRuneIdToMintHistoryTable(store.NewCache[pb.AddressRuneIdToMintHistory](dbWrite)),
+		Status:                        table.NewRunesStatus(store.NewCache[pb.RunesStatus](dbWrite)),
+		idToEntryTbl:                  table.NewRuneIdToEntryTable(store.NewCache[pb.RuneEntry](dbWrite)),
+		runeToIdTbl:                   table.NewRuneToIdTable(store.NewCache[pb.RuneId](dbWrite)),
+		outpointToBalancesTbl:         table.NewOutpointToBalancesTable(store.NewCache[pb.OutpointToBalances](dbWrite)),
+		runeIdAddressToBalanceTbl:     table.NewRuneIdAddressToBalanceTable(store.NewCache[pb.RuneIdAddressToBalance](dbWrite)),
+		runeIdOutpointToBalanceTbl:    table.NewRuneIdOutpointToBalancesTable(store.NewCache[pb.RuneBalance](dbWrite)),
+		addressOutpointToBalancesTbl:  table.NewAddressOutpointToBalancesTable(store.NewCache[pb.AddressOutpointToBalance](dbWrite)),
+		runeIdAddressToCountTbl:       table.NewRuneIdAddressToCountTable(store.NewCache[pb.RuneIdAddressToCount](dbWrite)),
+		runeIdToMintHistoryTbl:        table.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory](dbWrite)),
+		addressRuneIdToMintHistoryTbl: table.NewAddressRuneIdToMintHistoryTable(store.NewCache[pb.AddressRuneIdToMintHistory](dbWrite)),
 	}
 }
 
