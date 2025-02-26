@@ -18,6 +18,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
 
+	"github.com/sat20-labs/indexer/indexer/base"
 	utils "github.com/sat20-labs/indexer/indexer/mpn/utils"
 )
 
@@ -196,7 +197,13 @@ func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
-	return false
+	// Protect concurrent access.  Using a read lock only so multiple
+	// readers can query without blocking each other.
+	b.orphanLock.RLock()
+	_, exists := b.orphans[*hash]
+	b.orphanLock.RUnlock()
+
+	return exists
 }
 
 // GetOrphanRoot returns the head of the chain for the provided hash from the
@@ -353,7 +360,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 
 	// If we're performing block validation, then we need to query the BIP9
 	// state.
-	if !csvSoftforkActive {
+	//if !csvSoftforkActive {
 		// Obtain the latest BIP9 version bits state for the
 		// CSV-package soft-fork deployment. The adherence of sequence
 		// locks depends on the current soft-fork state.
@@ -362,7 +369,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 		// 	return nil, err
 		// }
 		// csvSoftforkActive = csvState == ThresholdActive
-	}
+	//}
 
 	// If the transaction's version is less than 2, and BIP 68 has not yet
 	// been activated then sequence locks are disabled. Additionally,
@@ -1159,12 +1166,6 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 // connected and disconnected to and from the tip of the main chain for the
 // purpose of supporting optional indexes.
 type IndexManager interface {
-	// Init is invoked during chain initialize in order to allow the index
-	// manager to initialize itself and any indexes it is managing.  The
-	// channel parameter specifies a channel the caller can close to signal
-	// that the process should be interrupted.  It can be nil if that
-	// behavior is not desired.
-	Init(*BlockChain, <-chan struct{}) error
 
 	// ConnectBlock is invoked when a new block has been connected to the
 	// main chain. The set of output spent within a block is also passed in
@@ -1177,6 +1178,9 @@ type IndexManager interface {
 	// this block is also returned so indexers can clean up the prior index
 	// state for this block.
 	DisconnectBlock( *btcutil.Block, []SpentTxOut) error
+
+	// 不能保存，使用后就无效的对象
+	GetBlockIndexer() *base.RpcIndexer
 }
 
 // Config is a descriptor which specifies the blockchain instance configuration.
@@ -1334,15 +1338,6 @@ func New(config *Config) (*BlockChain, error) {
 	// if err := b.maybeUpgradeDbBuckets(config.Interrupt); err != nil {
 	// 	return nil, err
 	// }
-
-	// Initialize and catch up all of the currently active optional indexes
-	// as needed.
-	if config.IndexManager != nil {
-		err := config.IndexManager.Init(&b, config.Interrupt)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	// Initialize rule change threshold state caches.
 	if err := b.initThresholdCaches(); err != nil {

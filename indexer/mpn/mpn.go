@@ -27,7 +27,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 
 	"github.com/sat20-labs/indexer/indexer/mpn/addrmgr"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain/indexers"
 	"github.com/sat20-labs/indexer/indexer/mpn/connmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/peer"
 
@@ -2675,6 +2674,7 @@ out:
 // connections from peers.
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db *badger.DB, chainParams *chaincfg.Params,
+	indexManager blockchain.IndexManager,
 	interrupt <-chan struct{}) (*MemPoolNode, error) {
 
 	services := defaultServices
@@ -2732,44 +2732,6 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
 	}
-
-	// Create the transaction and address indexes if needed.
-	//
-	// CAUTION: the txindex needs to be first in the indexes array because
-	// the addrindex uses data from the txindex during catchup.  If the
-	// addrindex is run first, it may not have the transactions from the
-	// current block indexed.
-	// var indexes []indexers.Indexer
-	// if _cfg.TxIndex || _cfg.AddrIndex {
-	// 	// Enable transaction index if address index is enabled since it
-	// 	// requires it.
-	// 	if !_cfg.TxIndex {
-	// 		common.Log.Infof("Transaction index enabled because it " +
-	// 			"is required by the address index")
-	// 		_cfg.TxIndex = true
-	// 	} else {
-	// 		common.Log.Info("Transaction index is enabled")
-	// 	}
-
-	// 	s.txIndex = indexers.NewTxIndex(db)
-	// 	indexes = append(indexes, s.txIndex)
-	// }
-	// if _cfg.AddrIndex {
-	// 	common.Log.Info("Address index is enabled")
-	// 	s.addrIndex = indexers.NewAddrIndex(db, chainParams)
-	// 	indexes = append(indexes, s.addrIndex)
-	// }
-	// if !_cfg.NoCFilters {
-	// 	common.Log.Info("Committed filter index is enabled")
-	// 	s.cfIndex = indexers.NewCfIndex(db, chainParams)
-	// 	indexes = append(indexes, s.cfIndex)
-	// }
-
-	// // Create an index manager if any of the optional indexes are enabled.
-	var indexManager blockchain.IndexManager
-	//if len(indexes) > 0 {
-	indexManager = indexers.NewManager(db)
-	//}
 
 	// Merge given checkpoints with the default ones unless they are disabled.
 	var checkpoints []chaincfg.Checkpoint

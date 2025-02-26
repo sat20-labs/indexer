@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
+	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
 )
 
 const (
@@ -25,7 +26,8 @@ var (
 // optional serverChan parameter is mainly used by the service code to be
 // notified with the MemPoolNode once it is setup so it can gracefully stop it when
 // requested from the service control manager.
-func StartMPN(yamlCfg *config.YamlConf, db *badger.DB, interrupt <-chan struct{}) (*MemPoolNode, error) {
+func StartMPN(yamlCfg *config.YamlConf, db *badger.DB, indexManager blockchain.IndexManager, 
+	interrupt <-chan struct{}) (*MemPoolNode, error) {
 	// Load configuration and parse command line.  This function also
 	// initializes logging and configures it accordingly.
 	tcfg, err := loadConfig(yamlCfg)
@@ -126,7 +128,7 @@ func StartMPN(yamlCfg *config.YamlConf, db *badger.DB, interrupt <-chan struct{}
 
 	// Create MemPoolNode and start it.
 	MemPoolNode, err := newServer(_cfg.Listeners, _cfg.AgentBlacklist,
-		_cfg.AgentWhitelist, db, activeNetParams.Params, interrupt)
+		_cfg.AgentWhitelist, db, activeNetParams.Params, indexManager, interrupt)
 	if err != nil {
 		// TODO: this logging could do with some beautifying.
 		common.Log.Errorf("Unable to start MemPoolNode on %v: %v",
