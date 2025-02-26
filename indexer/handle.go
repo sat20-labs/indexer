@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"encoding/hex"
 	"strconv"
 	"strings"
 	"time"
@@ -83,8 +84,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out 
 		}
 
 		// 目前只允许持有足够的pearl的用户可以部署lpt
-		addressId := s.compiling.GetAddressId(out.Address.Addresses[0])
-		if !s.isEligibleUser(addressId) {
+		if !s.isEligibleUser(out.Address.Addresses[0], content.Des) {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, not eligible user",
 				nft.Base.InscriptionId, content.Ticker)
 			return nil
@@ -1031,16 +1031,45 @@ func (s *IndexerMgr) getMintAmountByAddressId(ticker string, address uint64) int
 	return s.ftIndexer.GetMintAmountWithAddressId(address, ticker)
 }
 
-func (s *IndexerMgr) isEligibleUser(address uint64) bool {
+// 有资格的地址：跟引导节点建立了通道，而且该通道持有足够的资产
+func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 	ticker := "pearl"
 	amt := int64(1000000)
 	if !s.IsMainnet() {
 		ticker = "dogcoin"
 		amt = 1000
 	}
+
+	pubkeyBytes, err := hex.DecodeString(pubkey)
+	if err != nil {
+		common.Log.Errorf("DecodeString %s failed", pubkey)
+		return false
+	}
+
+	address2, err := GetP2TRAddressFromPubkey(pubkeyBytes, s.chaincfgParam)
+	if err != nil {
+		common.Log.Errorf("GetP2TRAddressFromPubkey %s failed, %v", pubkey, err)
+		return false
+	}
+	if address != address2 {
+		common.Log.Errorf("address %s != address2 %s", address, address2)
+		return false
+	}
+
+	address3, err := GetCoreNodeChannelAddress(pubkeyBytes, s.chaincfgParam)
+	if err != nil {
+		common.Log.Errorf("GetCoreNodeChannelAddress %s failed, %v", pubkey, err)
+		return false
+	}
+
 	addrmap := s.GetHoldersWithTick(ticker)
-	value := addrmap[address]
-	return value >= amt
+	addressId := s.compiling.GetAddressId(address3)
+	value := addrmap[addressId]
+	result := value >= amt
+	if !result {
+		common.Log.Errorf("not enough assets, value %d, amt %d", value, amt)
+	}
+	return result
 }
 
 func (s *IndexerMgr) isSat20Actived(height int) bool {
