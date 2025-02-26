@@ -1,0 +1,47 @@
+name: Test Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Echo Hello World
+      run: echo "Hello, World!"
+
+    - name: Print GitHub context
+      run: echo '${{ toJson(github) }}'
+
+    - name: List files in the repository
+      run: ls -R
+
+    - name: Print environment variables
+      run: env
+
+    - name: Check GitHub Actions runner
+      run: |
+        echo "GitHub Actions Runner Info:"
+        echo "OS: ${{ runner.os }}"
+        echo "Architecture: ${{ runner.arch }}"
+
+    - name: Test simple command
+      run: |
+        current_date=$(date)
+        echo "Current date and time: $current_date"
+
+    - name: Check GitHub API
+      run: |
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://api.github.com)
+        echo "GitHub API response code: $response"
+
+    - name: Final step
+      run: echo "Workflow execution completed"
