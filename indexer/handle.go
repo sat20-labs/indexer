@@ -1063,7 +1063,8 @@ func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 	}
 
 	addrmap := s.GetHoldersWithTick(ticker)
-	addressId := s.compiling.GetAddressId(address3)
+	//addressId := s.compiling.GetAddressId(address3) address3 不是跑数据过程中交易相关地址，不能通过这个函数获取
+	addressId := s.rpcService.GetAddressId(address3)
 	value := addrmap[addressId]
 	result := value >= amt
 	if !result {
