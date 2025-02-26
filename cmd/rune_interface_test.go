@@ -10,7 +10,7 @@ import (
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/indexer/runes"
-	"github.com/sat20-labs/indexer/indexer/runes/runestone"
+	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"lukechampine.com/uint128"
 )
@@ -28,7 +28,7 @@ func InitRuneTester() {
 				Path: dbdir,
 			},
 			BasicIndex: config.BasicIndex{
-				MaxIndexHeight: 61680,
+				MaxIndexHeight:  61680,
 				PeriodFlushToDB: 20,
 			},
 		}
@@ -36,7 +36,7 @@ func InitRuneTester() {
 		base_indexer.InitBaseIndexer(indexerMgr)
 		indexerMgr.Init()
 		runesIndexer = indexerMgr.RunesIndexer
-		runestone.IsLessStorage = false
+		table.IsLessStorage = false
 	}
 }
 

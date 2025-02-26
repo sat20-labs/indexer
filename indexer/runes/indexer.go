@@ -10,6 +10,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
+	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"lukechampine.com/uint128"
 )
 
@@ -40,7 +41,7 @@ type Indexer struct {
 func NewIndexer(db *badger.DB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
 	logs := cmap.New[*store.DbLog]()
 	dbWrite := store.NewDbWrite(db, &logs)
-	runestone.IsLessStorage = true
+	table.IsLessStorage = true
 	return &Indexer{
 		BaseIndexer:                   baseIndexer,
 		RpcService:                    rpcService,
