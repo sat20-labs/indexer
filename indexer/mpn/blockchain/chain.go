@@ -18,7 +18,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/dgraph-io/badger/v4"
 
-	"github.com/sat20-labs/indexer/indexer/base"
 	utils "github.com/sat20-labs/indexer/indexer/mpn/utils"
 )
 
@@ -27,7 +26,6 @@ const (
 	// queued.
 	maxOrphanBlocks = 100
 )
-
 
 // orphanBlock represents a block that we don't yet have the parent for.  It
 // is a normal block plus an expiration time to prevent caching the orphan
@@ -361,14 +359,14 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 	// If we're performing block validation, then we need to query the BIP9
 	// state.
 	//if !csvSoftforkActive {
-		// Obtain the latest BIP9 version bits state for the
-		// CSV-package soft-fork deployment. The adherence of sequence
-		// locks depends on the current soft-fork state.
-		// csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// csvSoftforkActive = csvState == ThresholdActive
+	// Obtain the latest BIP9 version bits state for the
+	// CSV-package soft-fork deployment. The adherence of sequence
+	// locks depends on the current soft-fork state.
+	// csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// csvSoftforkActive = csvState == ThresholdActive
 	//}
 
 	// If the transaction's version is less than 2, and BIP 68 has not yet
@@ -393,7 +391,7 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *btcutil.Tx, utxoView 
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return sequenceLock, ruleError(ErrMissingTxOut, str)
+			return sequenceLock, MakeRuleError(ErrMissingTxOut, str)
 		}
 
 		// If the input height is set to the mempool height, then we
@@ -1160,27 +1158,6 @@ func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
 // This function is safe for concurrent access.
 func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 	return nil
-}
-
-// IndexManager provides a generic interface that the is called when blocks are
-// connected and disconnected to and from the tip of the main chain for the
-// purpose of supporting optional indexes.
-type IndexManager interface {
-
-	// ConnectBlock is invoked when a new block has been connected to the
-	// main chain. The set of output spent within a block is also passed in
-	// so indexers can access the previous output scripts input spent if
-	// required.
-	ConnectBlock( *btcutil.Block, []SpentTxOut) error
-
-	// DisconnectBlock is invoked when a block has been disconnected from
-	// the main chain. The set of outputs scripts that were spent within
-	// this block is also returned so indexers can clean up the prior index
-	// state for this block.
-	DisconnectBlock( *btcutil.Block, []SpentTxOut) error
-
-	// 不能保存，使用后就无效的对象
-	GetBlockIndexer() *base.RpcIndexer
 }
 
 // Config is a descriptor which specifies the blockchain instance configuration.

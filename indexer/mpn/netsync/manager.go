@@ -793,29 +793,29 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		// block height from the scriptSig of the coinbase transaction.
 		// Extraction is only attempted if the block's version is
 		// high enough (ver 2+).
-		header := &bmsg.block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
-			coinbaseTx := bmsg.block.Transactions()[0]
-			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
-			if err != nil {
-				common.Log.Warnf("Unable to extract height from "+
-					"coinbase tx: %v", err)
-			} else {
-				common.Log.Debugf("Extracted height of %v from "+
-					"orphan block", cbHeight)
-				heightUpdate = cbHeight
-				blkHashUpdate = blockHash
-			}
-		}
+		// header := &bmsg.block.MsgBlock().Header
+		// if blockchain.ShouldHaveSerializedBlockHeight(header) {
+		// 	coinbaseTx := bmsg.block.Transactions()[0]
+		// 	cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+		// 	if err != nil {
+		// 		common.Log.Warnf("Unable to extract height from "+
+		// 			"coinbase tx: %v", err)
+		// 	} else {
+		// 		common.Log.Debugf("Extracted height of %v from "+
+		// 			"orphan block", cbHeight)
+		// 		heightUpdate = cbHeight
+		// 		blkHashUpdate = blockHash
+		// 	}
+		// }
 
-		orphanRoot := sm.chain.GetOrphanRoot(blockHash)
-		locator, err := sm.chain.LatestBlockLocator()
-		if err != nil {
-			common.Log.Warnf("Failed to get block locator for the "+
-				"latest block: %v", err)
-		} else {
-			peer.PushGetBlocksMsg(locator, orphanRoot)
-		}
+		// orphanRoot := sm.chain.GetOrphanRoot(blockHash)
+		// locator, err := sm.chain.LatestBlockLocator()
+		// if err != nil {
+		// 	common.Log.Warnf("Failed to get block locator for the "+
+		// 		"latest block: %v", err)
+		// } else {
+		// 	peer.PushGetBlocksMsg(locator, orphanRoot)
+		// }
 	} else {
 		if peer == sm.syncPeer {
 			sm.lastProgressTime = time.Now()
@@ -1262,21 +1262,21 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			// resending the orphan block as an available block
 			// to signal there are more missing blocks that need to
 			// be requested.
-			if sm.chain.IsKnownOrphan(&iv.Hash) {
-				// Request blocks starting at the latest known
-				// up to the root of the orphan that just came
-				// in.
-				orphanRoot := sm.chain.GetOrphanRoot(&iv.Hash)
-				locator, err := sm.chain.LatestBlockLocator()
-				if err != nil {
-					common.Log.Errorf("PEER: Failed to get block "+
-						"locator for the latest block: "+
-						"%v", err)
-					continue
-				}
-				peer.PushGetBlocksMsg(locator, orphanRoot)
-				continue
-			}
+			// if sm.chain.IsKnownOrphan(&iv.Hash) {
+			// 	// Request blocks starting at the latest known
+			// 	// up to the root of the orphan that just came
+			// 	// in.
+			// 	orphanRoot := sm.chain.GetOrphanRoot(&iv.Hash)
+			// 	locator, err := sm.chain.LatestBlockLocator()
+			// 	if err != nil {
+			// 		common.Log.Errorf("PEER: Failed to get block "+
+			// 			"locator for the latest block: "+
+			// 			"%v", err)
+			// 		continue
+			// 	}
+			// 	peer.PushGetBlocksMsg(locator, orphanRoot)
+			// 	continue
+			// }
 
 			// We already have the final block advertised by this
 			// inventory message, so force a request for more.  This

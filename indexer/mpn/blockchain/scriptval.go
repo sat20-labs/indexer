@@ -65,7 +65,7 @@ out:
 					"transaction %s:%d",
 					txIn.PreviousOutPoint, txVI.tx.Hash(),
 					txVI.txInIndex)
-				err := ruleError(ErrMissingTxOut, str)
+				err := MakeRuleError(ErrMissingTxOut, str)
 				v.sendResult(err)
 				break out
 			}
@@ -88,7 +88,7 @@ out:
 					txVI.tx.Hash(), txVI.txInIndex,
 					txIn.PreviousOutPoint, err, witness,
 					sigScript, pkScript)
-				err := ruleError(ErrScriptMalformed, str)
+				err := MakeRuleError(ErrScriptMalformed, str)
 				v.sendResult(err)
 				break out
 			}
@@ -102,7 +102,7 @@ out:
 					txVI.tx.Hash(), txVI.txInIndex,
 					txIn.PreviousOutPoint, err, witness,
 					sigScript, pkScript)
-				err := ruleError(ErrScriptValidation, str)
+				err := MakeRuleError(ErrScriptValidation, str)
 				v.sendResult(err)
 				break out
 			}

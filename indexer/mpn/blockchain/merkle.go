@@ -231,12 +231,12 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 	if len(blk.Transactions()) == 0 {
 		str := "cannot validate witness commitment of block without " +
 			"transactions"
-		return ruleError(ErrNoTransactions, str)
+		return MakeRuleError(ErrNoTransactions, str)
 	}
 
 	coinbaseTx := blk.Transactions()[0]
 	if len(coinbaseTx.MsgTx().TxIn) == 0 {
-		return ruleError(ErrNoTxInputs, "transaction has no inputs")
+		return MakeRuleError(ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	witnessCommitment, witnessFound := ExtractWitnessCommitment(coinbaseTx)
@@ -250,7 +250,7 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 			if msgTx.HasWitness() {
 				str := fmt.Sprintf("block contains transaction with witness" +
 					" data, yet no witness commitment present")
-				return ruleError(ErrUnexpectedWitness, str)
+				return MakeRuleError(ErrUnexpectedWitness, str)
 			}
 		}
 		return nil
@@ -265,14 +265,14 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 		str := fmt.Sprintf("the coinbase transaction has %d items in "+
 			"its witness stack when only one is allowed",
 			len(coinbaseWitness))
-		return ruleError(ErrInvalidWitnessCommitment, str)
+		return MakeRuleError(ErrInvalidWitnessCommitment, str)
 	}
 	witnessNonce := coinbaseWitness[0]
 	if len(witnessNonce) != CoinbaseWitnessDataLen {
 		str := fmt.Sprintf("the coinbase transaction witness nonce "+
 			"has %d bytes when it must be %d bytes",
 			len(witnessNonce), CoinbaseWitnessDataLen)
-		return ruleError(ErrInvalidWitnessCommitment, str)
+		return MakeRuleError(ErrInvalidWitnessCommitment, str)
 	}
 
 	// Finally, with the preliminary checks out of the way, we can check if
@@ -290,7 +290,7 @@ func ValidateWitnessCommitment(blk *btcutil.Block) error {
 		str := fmt.Sprintf("witness commitment does not match: "+
 			"computed %v, coinbase includes %v", computedCommitment,
 			witnessCommitment)
-		return ruleError(ErrWitnessCommitmentMismatch, str)
+		return MakeRuleError(ErrWitnessCommitmentMismatch, str)
 	}
 
 	return nil

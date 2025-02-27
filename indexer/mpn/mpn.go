@@ -41,7 +41,9 @@ import (
 const (
 	// defaultServices describes the default services that are supported by
 	// the MemPoolNode.
-	defaultServices = wire.SFNodeNetwork | wire.SFNodeNetworkLimited |
+	// defaultServices = wire.SFNodeNetwork | wire.SFNodeNetworkLimited |
+	// 	wire.SFNodeBloom | wire.SFNodeWitness | wire.SFNodeCF
+	defaultServices = wire.SFNodeNetworkLimited |
 		wire.SFNodeBloom | wire.SFNodeWitness | wire.SFNodeCF
 
 	// defaultRequiredServices describes the default services that are
@@ -60,7 +62,7 @@ const (
 var (
 	// userAgentName is the user agent name and is used to help identify
 	// ourselves to other bitcoin peers.
-	userAgentName = "btcd"
+	userAgentName = "sat20"
 
 	// userAgentVersion is the user agent version and is used to help
 	// identify ourselves to other bitcoin peers.
