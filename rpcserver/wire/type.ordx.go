@@ -445,16 +445,16 @@ type NamesWithAddressResp struct {
 	Data *NamesWithAddressData `json:"data"`
 }
 
-type AssetInfo struct {
+type UtxoAssetInfo struct {
 	Asset   swire.AssetInfo     `json:"asset"`
 	Offsets common.AssetOffsets `json:"offsets"`
 }
 
 type TxOutputInfo struct {
-	UtxoId    uint64       `json:"utxoid"`
-	OutPoint  string       `json:"outpoint"`
-	OutValue  wire.TxOut   `json:"outvalue"`
-	AssetInfo []*AssetInfo `json:"assets"`
+	UtxoId    uint64           `json:"utxoid"`
+	OutPoint  string           `json:"outpoint"`
+	OutValue  wire.TxOut       `json:"outvalue"`
+	AssetInfo []*UtxoAssetInfo `json:"assets"`
 }
 
 //type TxOutput2 = common.TxOutput

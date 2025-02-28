@@ -311,6 +311,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		result[tickName] = common.NewDecimal(v, 0)
 	}
 
+	// 合集
 	nftAsset := b.GetNftAmountWithAddress(address)
 	for k, v := range nftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
