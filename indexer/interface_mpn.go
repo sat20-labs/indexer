@@ -246,6 +246,47 @@ func (b *IndexerMgr) LocateHeaders(locator mpnCommon.BlockLocator,
 	return nil
 }
 
+
+// IntervalBlockHashes returns hashes for all blocks that are ancestors of
+// endHash where the block height is a positive multiple of interval.
+//
+// This function is safe for concurrent access.
+func (b *IndexerMgr) IntervalBlockHashes(endHash *chainhash.Hash, interval int,
+	) ([]chainhash.Hash, error) {
+	
+	// endNode := b.index.LookupNode(endHash)
+	// if endNode == nil {
+	// 	return nil, fmt.Errorf("no known block header with hash %v", endHash)
+	// }
+	// if !b.index.NodeStatus(endNode).KnownValid() {
+	// 	return nil, fmt.Errorf("block %v is not yet validated", endHash)
+	// }
+	// endHeight := endNode.height
+
+	// resultsLength := int(endHeight) / interval
+	// hashes := make([]chainhash.Hash, resultsLength)
+
+	// b.bestChain.mtx.Lock()
+	// defer b.bestChain.mtx.Unlock()
+
+	// blockNode := endNode
+	// for index := int(endHeight) / interval; index > 0; index-- {
+	// 	// Use the bestChain chainView for faster lookups once lookup intersects
+	// 	// the best chain.
+	// 	blockHeight := int32(index * interval)
+	// 	if b.bestChain.contains(blockNode) {
+	// 		blockNode = b.bestChain.nodeByHeight(blockHeight)
+	// 	} else {
+	// 		blockNode = blockNode.Ancestor(blockHeight)
+	// 	}
+
+	// 	hashes[index-1] = blockNode.hash
+	// }
+
+	// return hashes, nil
+	return nil, nil
+}
+
 // BlockByHash returns the block from the main chain with the given hash with
 // the appropriate chain height set.
 //
@@ -519,6 +560,78 @@ func (m *IndexerMgr) DisconnectBlock( block *btcutil.Block,
 	common.Log.Infof("DisconnectBlock %v", block)
 	
 	return nil
+}
+
+
+// HeightToHashRange returns a range of block hashes for the given start height
+// and end hash, inclusive on both ends.  The hashes are for all blocks that are
+// ancestors of endHash with height greater than or equal to startHeight.  The
+// end hash must belong to a block that is known to be valid.
+//
+// This function is safe for concurrent access.
+func (b *IndexerMgr) HeightToHashRange(startHeight int32,
+	endHash *chainhash.Hash, maxResults int) ([]chainhash.Hash, error) {
+
+	// endNode := b.index.LookupNode(endHash)
+	// if endNode == nil {
+	// 	return nil, fmt.Errorf("no known block header with hash %v", endHash)
+	// }
+	// if !b.index.NodeStatus(endNode).KnownValid() {
+	// 	return nil, fmt.Errorf("block %v is not yet validated", endHash)
+	// }
+	// endHeight := endNode.height
+
+	// if startHeight < 0 {
+	// 	return nil, fmt.Errorf("start height (%d) is below 0", startHeight)
+	// }
+	// if startHeight > endHeight {
+	// 	return nil, fmt.Errorf("start height (%d) is past end height (%d)",
+	// 		startHeight, endHeight)
+	// }
+
+	// resultsLength := int(endHeight - startHeight + 1)
+	// if resultsLength > maxResults {
+	// 	return nil, fmt.Errorf("number of results (%d) would exceed max (%d)",
+	// 		resultsLength, maxResults)
+	// }
+
+	// // Walk backwards from endHeight to startHeight, collecting block hashes.
+	// node := endNode
+	// hashes := make([]chainhash.Hash, resultsLength)
+	// for i := resultsLength - 1; i >= 0; i-- {
+	// 	hashes[i] = node.hash
+	// 	node = node.parent
+	// }
+	// return hashes, nil
+	return nil, nil
+}
+
+// FilterHeadersByBlockHashes returns the serialized contents of a block's
+// basic committed filter header for a set of blocks by hash.
+func (b *IndexerMgr) FilterHeadersByBlockHashes(blockHashes []*chainhash.Hash,
+	filterType wire.FilterType) ([][]byte, error) {
+	return nil, nil
+}
+
+// FiltersByBlockHashes returns the serialized contents of a block's basic or
+// committed filter for a set of blocks by hash.
+func (b *IndexerMgr) FiltersByBlockHashes(blockHashes []*chainhash.Hash,
+	filterType wire.FilterType) ([][]byte, error) {
+	return nil, nil
+}
+
+// FilterHeaderByBlockHash returns the serialized contents of a block's basic
+// committed filter header.
+func (b *IndexerMgr) FilterHeaderByBlockHash(h *chainhash.Hash,
+	filterType wire.FilterType) ([]byte, error) {
+	return nil,nil
+}
+
+// FilterHashesByBlockHashes returns the serialized contents of a block's basic
+// committed filter hash for a set of blocks by hash.
+func (b *IndexerMgr) FilterHashesByBlockHashes(blockHashes []*chainhash.Hash,
+	filterType wire.FilterType) ([][]byte, error) {
+	return nil, nil
 }
 
 // Ensure the Manager type implements the mpnCommon.IndexManager interface.

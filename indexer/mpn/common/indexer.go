@@ -35,6 +35,8 @@ type IndexManager interface {
 	LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash,
 		maxHashes uint32) []chainhash.Hash
 	LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader
+	IntervalBlockHashes(endHash *chainhash.Hash, interval int) ([]chainhash.Hash, error)
+	
 	BlockByHash(hash *chainhash.Hash) (*btcutil.Block, error)
 	BlockByHeight(height int32) (*btcutil.Block, error)
 	ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, bool, error)
@@ -44,4 +46,16 @@ type IndexManager interface {
 	FetchUtxoEntry(outpoint wire.OutPoint) (*UtxoEntry, error)
 	Checkpoints() []chaincfg.Checkpoint
 	Subscribe(callback NotificationCallback)
+
+	HeightToHashRange(startHeight int32, endHash *chainhash.Hash, 
+		maxResults int) ([]chainhash.Hash, error)
+
+	FilterHeadersByBlockHashes(blockHashes []*chainhash.Hash,
+		filterType wire.FilterType) ([][]byte, error)
+	FiltersByBlockHashes(blockHashes []*chainhash.Hash,
+		filterType wire.FilterType) ([][]byte, error)
+	FilterHeaderByBlockHash(h *chainhash.Hash,
+		filterType wire.FilterType) ([]byte, error)
+	FilterHashesByBlockHashes(blockHashes []*chainhash.Hash,
+		filterType wire.FilterType) ([][]byte, error)
 }

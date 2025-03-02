@@ -1,7 +1,6 @@
 package mpn
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -210,7 +209,7 @@ type MemPoolNode struct {
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
 	syncManager          *netsync.SyncManager
-	chain                localCommon.IndexManager
+	indexer                localCommon.IndexManager
 	txMemPool            *mempool.TxPool
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
@@ -296,7 +295,7 @@ func newServerPeer(s *MemPoolNode, isPersistent bool) *serverPeer {
 // newestBlock returns the current best block hash and height using the format
 // required by the configuration for the peer package.
 func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
-	best := sp.MemPoolNode.chain.BestSnapshot()
+	best := sp.MemPoolNode.indexer.BestSnapshot()
 	return &best.Hash, best.Height, nil
 }
 
@@ -496,15 +495,13 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		// After soft-fork activation, only make outbound
 		// connection to peers if they flag that they're segwit
 		// enabled.
-		// chain := sp.MemPoolNode.chain
-		// segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		// if err != nil {
-		// 	common.Log.Errorf("Unable to query for segwit soft-fork state: %v",
-		// 		err)
-		// 	return nil
-		// }
+		segwitActive, err := sp.MemPoolNode.indexer.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		if err != nil {
+			common.Log.Errorf("Unable to query for segwit soft-fork state: %v",
+				err)
+			return nil
+		}
 
-		segwitActive := true
 		if segwitActive && !sp.IsWitnessEnabled() {
 			common.Log.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
 				"enabled and we need more segwit enabled peers", sp)
@@ -771,7 +768,7 @@ func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
 	// over with the genesis block if unknown block locators are provided.
 	//
 	// This mirrors the behavior in the reference implementation.
-	chain := sp.MemPoolNode.chain
+	chain := sp.MemPoolNode.indexer
 	hashList := chain.LocateBlocks(msg.BlockLocatorHashes, &msg.HashStop,
 		wire.MaxBlocksPerMsg)
 
@@ -815,7 +812,7 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 	// over with the genesis block if unknown block locators are provided.
 	//
 	// This mirrors the behavior in the reference implementation.
-	chain := sp.MemPoolNode.chain
+	chain := sp.MemPoolNode.indexer
 	headers := chain.LocateHeaders(msg.BlockLocatorHashes, &msg.HashStop)
 
 	// Send found headers to the requesting peer.
@@ -828,329 +825,326 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
 
 // OnGetCFilters is invoked when a peer receives a getcfilters bitcoin message.
 func (sp *serverPeer) OnGetCFilters(_ *peer.Peer, msg *wire.MsgGetCFilters) {
-	return
 	// Ignore getcfilters requests if not in sync.
-	// if !sp.MemPoolNode.syncManager.IsCurrent() {
-	// 	return
-	// }
+	if !sp.MemPoolNode.syncManager.IsCurrent() {
+		return
+	}
 
-	// // We'll also ensure that the remote party is requesting a set of
-	// // filters that we actually currently maintain.
-	// switch msg.FilterType {
-	// case wire.GCSFilterRegular:
-	// 	break
+	// We'll also ensure that the remote party is requesting a set of
+	// filters that we actually currently maintain.
+	switch msg.FilterType {
+	case wire.GCSFilterRegular:
+		break
 
-	// default:
-	// 	common.Log.Debugf("Filter request for unknown filter: %v",
-	// 		msg.FilterType)
-	// 	return
-	// }
+	default:
+		common.Log.Debugf("Filter request for unknown filter: %v",
+			msg.FilterType)
+		return
+	}
 
-	// hashes, err := sp.MemPoolNode.chain.HeightToHashRange(
-	// 	int32(msg.StartHeight), &msg.StopHash, wire.MaxGetCFiltersReqRange,
-	// )
-	// if err != nil {
-	// 	common.Log.Debugf("Invalid getcfilters request: %v", err)
-	// 	return
-	// }
+	hashes, err := sp.MemPoolNode.indexer.HeightToHashRange(
+		int32(msg.StartHeight), &msg.StopHash, wire.MaxGetCFiltersReqRange,
+	)
+	if err != nil {
+		common.Log.Debugf("Invalid getcfilters request: %v", err)
+		return
+	}
 
-	// // Create []*chainhash.Hash from []chainhash.Hash to pass to
-	// // FiltersByBlockHashes.
-	// hashPtrs := make([]*chainhash.Hash, len(hashes))
-	// for i := range hashes {
-	// 	hashPtrs[i] = &hashes[i]
-	// }
+	// Create []*chainhash.Hash from []chainhash.Hash to pass to
+	// FiltersByBlockHashes.
+	hashPtrs := make([]*chainhash.Hash, len(hashes))
+	for i := range hashes {
+		hashPtrs[i] = &hashes[i]
+	}
 
-	// filters, err := sp.MemPoolNode.cfIndex.FiltersByBlockHashes(
-	// 	hashPtrs, msg.FilterType,
-	// )
-	// if err != nil {
-	// 	common.Log.Errorf("Error retrieving cfilters: %v", err)
-	// 	return
-	// }
+	filters, err := sp.MemPoolNode.indexer.FiltersByBlockHashes(
+		hashPtrs, msg.FilterType,
+	)
+	if err != nil {
+		common.Log.Errorf("Error retrieving cfilters: %v", err)
+		return
+	}
 
-	// for i, filterBytes := range filters {
-	// 	if len(filterBytes) == 0 {
-	// 		common.Log.Warnf("Could not obtain cfilter for %v",
-	// 			hashes[i])
-	// 		return
-	// 	}
+	for i, filterBytes := range filters {
+		if len(filterBytes) == 0 {
+			common.Log.Warnf("Could not obtain cfilter for %v",
+				hashes[i])
+			return
+		}
 
-	// 	filterMsg := wire.NewMsgCFilter(
-	// 		msg.FilterType, &hashes[i], filterBytes,
-	// 	)
-	// 	sp.QueueMessage(filterMsg, nil)
-	// }
+		filterMsg := wire.NewMsgCFilter(
+			msg.FilterType, &hashes[i], filterBytes,
+		)
+		sp.QueueMessage(filterMsg, nil)
+	}
 }
 
 // OnGetCFHeaders is invoked when a peer receives a getcfheader bitcoin message.
 func (sp *serverPeer) OnGetCFHeaders(_ *peer.Peer, msg *wire.MsgGetCFHeaders) {
-	return
 	// Ignore getcfilterheader requests if not in sync.
-	// if !sp.MemPoolNode.syncManager.IsCurrent() {
-	// 	return
-	// }
+	if !sp.MemPoolNode.syncManager.IsCurrent() {
+		return
+	}
 
-	// // We'll also ensure that the remote party is requesting a set of
-	// // headers for filters that we actually currently maintain.
-	// switch msg.FilterType {
-	// case wire.GCSFilterRegular:
-	// 	break
+	// We'll also ensure that the remote party is requesting a set of
+	// headers for filters that we actually currently maintain.
+	switch msg.FilterType {
+	case wire.GCSFilterRegular:
+		break
 
-	// default:
-	// 	common.Log.Debug("Filter request for unknown headers for "+
-	// 		"filter: %v", msg.FilterType)
-	// 	return
-	// }
+	default:
+		common.Log.Debug("Filter request for unknown headers for "+
+			"filter: %v", msg.FilterType)
+		return
+	}
 
-	// startHeight := int32(msg.StartHeight)
-	// maxResults := wire.MaxCFHeadersPerMsg
+	startHeight := int32(msg.StartHeight)
+	maxResults := wire.MaxCFHeadersPerMsg
 
-	// // If StartHeight is positive, fetch the predecessor block hash so we
-	// // can populate the PrevFilterHeader field.
-	// if msg.StartHeight > 0 {
-	// 	startHeight--
-	// 	maxResults++
-	// }
+	// If StartHeight is positive, fetch the predecessor block hash so we
+	// can populate the PrevFilterHeader field.
+	if msg.StartHeight > 0 {
+		startHeight--
+		maxResults++
+	}
 
-	// // Fetch the hashes from the block index.
-	// hashList, err := sp.MemPoolNode.chain.HeightToHashRange(
-	// 	startHeight, &msg.StopHash, maxResults,
-	// )
-	// if err != nil {
-	// 	common.Log.Debugf("Invalid getcfheaders request: %v", err)
-	// }
+	// Fetch the hashes from the block index.
+	hashList, err := sp.MemPoolNode.indexer.HeightToHashRange(
+		startHeight, &msg.StopHash, maxResults,
+	)
+	if err != nil {
+		common.Log.Debugf("Invalid getcfheaders request: %v", err)
+	}
 
-	// // This is possible if StartHeight is one greater that the height of
-	// // StopHash, and we pull a valid range of hashes including the previous
-	// // filter header.
-	// if len(hashList) == 0 || (msg.StartHeight > 0 && len(hashList) == 1) {
-	// 	common.Log.Debug("No results for getcfheaders request")
-	// 	return
-	// }
+	// This is possible if StartHeight is one greater that the height of
+	// StopHash, and we pull a valid range of hashes including the previous
+	// filter header.
+	if len(hashList) == 0 || (msg.StartHeight > 0 && len(hashList) == 1) {
+		common.Log.Debug("No results for getcfheaders request")
+		return
+	}
 
-	// // Create []*chainhash.Hash from []chainhash.Hash to pass to
-	// // FilterHeadersByBlockHashes.
-	// hashPtrs := make([]*chainhash.Hash, len(hashList))
-	// for i := range hashList {
-	// 	hashPtrs[i] = &hashList[i]
-	// }
+	// Create []*chainhash.Hash from []chainhash.Hash to pass to
+	// FilterHeadersByBlockHashes.
+	hashPtrs := make([]*chainhash.Hash, len(hashList))
+	for i := range hashList {
+		hashPtrs[i] = &hashList[i]
+	}
 
-	// // Fetch the raw filter hash bytes from the database for all blocks.
-	// filterHashes, err := sp.MemPoolNode.cfIndex.FilterHashesByBlockHashes(
-	// 	hashPtrs, msg.FilterType,
-	// )
-	// if err != nil {
-	// 	common.Log.Errorf("Error retrieving cfilter hashes: %v", err)
-	// 	return
-	// }
+	// Fetch the raw filter hash bytes from the database for all blocks.
+	filterHashes, err := sp.MemPoolNode.indexer.FilterHashesByBlockHashes(
+		hashPtrs, msg.FilterType,
+	)
+	if err != nil {
+		common.Log.Errorf("Error retrieving cfilter hashes: %v", err)
+		return
+	}
 
-	// // Generate cfheaders message and send it.
-	// headersMsg := wire.NewMsgCFHeaders()
+	// Generate cfheaders message and send it.
+	headersMsg := wire.NewMsgCFHeaders()
 
-	// // Populate the PrevFilterHeader field.
-	// if msg.StartHeight > 0 {
-	// 	prevBlockHash := &hashList[0]
+	// Populate the PrevFilterHeader field.
+	if msg.StartHeight > 0 {
+		prevBlockHash := &hashList[0]
 
-	// 	// Fetch the raw committed filter header bytes from the
-	// 	// database.
-	// 	headerBytes, err := sp.MemPoolNode.cfIndex.FilterHeaderByBlockHash(
-	// 		prevBlockHash, msg.FilterType)
-	// 	if err != nil {
-	// 		common.Log.Errorf("Error retrieving CF header: %v", err)
-	// 		return
-	// 	}
-	// 	if len(headerBytes) == 0 {
-	// 		common.Log.Warnf("Could not obtain CF header for %v", prevBlockHash)
-	// 		return
-	// 	}
+		// Fetch the raw committed filter header bytes from the
+		// database.
+		headerBytes, err := sp.MemPoolNode.indexer.FilterHeaderByBlockHash(
+			prevBlockHash, msg.FilterType)
+		if err != nil {
+			common.Log.Errorf("Error retrieving CF header: %v", err)
+			return
+		}
+		if len(headerBytes) == 0 {
+			common.Log.Warnf("Could not obtain CF header for %v", prevBlockHash)
+			return
+		}
 
-	// 	// Deserialize the hash into PrevFilterHeader.
-	// 	err = headersMsg.PrevFilterHeader.SetBytes(headerBytes)
-	// 	if err != nil {
-	// 		common.Log.Warnf("Committed filter header deserialize "+
-	// 			"failed: %v", err)
-	// 		return
-	// 	}
+		// Deserialize the hash into PrevFilterHeader.
+		err = headersMsg.PrevFilterHeader.SetBytes(headerBytes)
+		if err != nil {
+			common.Log.Warnf("Committed filter header deserialize "+
+				"failed: %v", err)
+			return
+		}
 
-	// 	hashList = hashList[1:]
-	// 	filterHashes = filterHashes[1:]
-	// }
+		hashList = hashList[1:]
+		filterHashes = filterHashes[1:]
+	}
 
-	// // Populate HeaderHashes.
-	// for i, hashBytes := range filterHashes {
-	// 	if len(hashBytes) == 0 {
-	// 		common.Log.Warnf("Could not obtain CF hash for %v", hashList[i])
-	// 		return
-	// 	}
+	// Populate HeaderHashes.
+	for i, hashBytes := range filterHashes {
+		if len(hashBytes) == 0 {
+			common.Log.Warnf("Could not obtain CF hash for %v", hashList[i])
+			return
+		}
 
-	// 	// Deserialize the hash.
-	// 	filterHash, err := chainhash.NewHash(hashBytes)
-	// 	if err != nil {
-	// 		common.Log.Warnf("Committed filter hash deserialize "+
-	// 			"failed: %v", err)
-	// 		return
-	// 	}
+		// Deserialize the hash.
+		filterHash, err := chainhash.NewHash(hashBytes)
+		if err != nil {
+			common.Log.Warnf("Committed filter hash deserialize "+
+				"failed: %v", err)
+			return
+		}
 
-	// 	headersMsg.AddCFHash(filterHash)
-	// }
+		headersMsg.AddCFHash(filterHash)
+	}
 
-	// headersMsg.FilterType = msg.FilterType
-	// headersMsg.StopHash = msg.StopHash
+	headersMsg.FilterType = msg.FilterType
+	headersMsg.StopHash = msg.StopHash
 
-	// sp.QueueMessage(headersMsg, nil)
+	sp.QueueMessage(headersMsg, nil)
 }
 
 // OnGetCFCheckpt is invoked when a peer receives a getcfcheckpt bitcoin message.
 func (sp *serverPeer) OnGetCFCheckpt(_ *peer.Peer, msg *wire.MsgGetCFCheckpt) {
-	return
 	// Ignore getcfcheckpt requests if not in sync.
-	// if !sp.MemPoolNode.syncManager.IsCurrent() {
-	// 	return
-	// }
+	if !sp.MemPoolNode.syncManager.IsCurrent() {
+		return
+	}
 
-	// // We'll also ensure that the remote party is requesting a set of
-	// // checkpoints for filters that we actually currently maintain.
-	// switch msg.FilterType {
-	// case wire.GCSFilterRegular:
-	// 	break
+	// We'll also ensure that the remote party is requesting a set of
+	// checkpoints for filters that we actually currently maintain.
+	switch msg.FilterType {
+	case wire.GCSFilterRegular:
+		break
 
-	// default:
-	// 	common.Log.Debugf("Filter request for unknown checkpoints for "+
-	// 		"filter: %v", msg.FilterType)
-	// 	return
-	// }
+	default:
+		common.Log.Debugf("Filter request for unknown checkpoints for "+
+			"filter: %v", msg.FilterType)
+		return
+	}
 
-	// // Now that we know the client is fetching a filter that we know of,
-	// // we'll fetch the block hashes et each check point interval so we can
-	// // compare against our cache, and create new check points if necessary.
-	// blockHashes, err := sp.MemPoolNode.chain.IntervalBlockHashes(
-	// 	&msg.StopHash, wire.CFCheckptInterval,
-	// )
-	// if err != nil {
-	// 	common.Log.Debugf("Invalid getcfilters request: %v", err)
-	// 	return
-	// }
+	// Now that we know the client is fetching a filter that we know of,
+	// we'll fetch the block hashes et each check point interval so we can
+	// compare against our cache, and create new check points if necessary.
+	blockHashes, err := sp.MemPoolNode.indexer.IntervalBlockHashes(
+		&msg.StopHash, wire.CFCheckptInterval,
+	)
+	if err != nil {
+		common.Log.Debugf("Invalid getcfilters request: %v", err)
+		return
+	}
 
-	// checkptMsg := wire.NewMsgCFCheckpt(
-	// 	msg.FilterType, &msg.StopHash, len(blockHashes),
-	// )
+	checkptMsg := wire.NewMsgCFCheckpt(
+		msg.FilterType, &msg.StopHash, len(blockHashes),
+	)
 
-	// // Fetch the current existing cache so we can decide if we need to
-	// // extend it or if its adequate as is.
-	// sp.MemPoolNode.cfCheckptCachesMtx.RLock()
-	// checkptCache := sp.MemPoolNode.cfCheckptCaches[msg.FilterType]
+	// Fetch the current existing cache so we can decide if we need to
+	// extend it or if its adequate as is.
+	sp.MemPoolNode.cfCheckptCachesMtx.RLock()
+	checkptCache := sp.MemPoolNode.cfCheckptCaches[msg.FilterType]
 
-	// // If the set of block hashes is beyond the current size of the cache,
-	// // then we'll expand the size of the cache and also retain the write
-	// // lock.
-	// var updateCache bool
-	// if len(blockHashes) > len(checkptCache) {
-	// 	// Now that we know we'll need to modify the size of the cache,
-	// 	// we'll release the read lock and grab the write lock to
-	// 	// possibly expand the cache size.
-	// 	sp.MemPoolNode.cfCheckptCachesMtx.RUnlock()
+	// If the set of block hashes is beyond the current size of the cache,
+	// then we'll expand the size of the cache and also retain the write
+	// lock.
+	var updateCache bool
+	if len(blockHashes) > len(checkptCache) {
+		// Now that we know we'll need to modify the size of the cache,
+		// we'll release the read lock and grab the write lock to
+		// possibly expand the cache size.
+		sp.MemPoolNode.cfCheckptCachesMtx.RUnlock()
 
-	// 	sp.MemPoolNode.cfCheckptCachesMtx.Lock()
-	// 	defer sp.MemPoolNode.cfCheckptCachesMtx.Unlock()
+		sp.MemPoolNode.cfCheckptCachesMtx.Lock()
+		defer sp.MemPoolNode.cfCheckptCachesMtx.Unlock()
 
-	// 	// Now that we have the write lock, we'll check again as it's
-	// 	// possible that the cache has already been expanded.
-	// 	checkptCache = sp.MemPoolNode.cfCheckptCaches[msg.FilterType]
+		// Now that we have the write lock, we'll check again as it's
+		// possible that the cache has already been expanded.
+		checkptCache = sp.MemPoolNode.cfCheckptCaches[msg.FilterType]
 
-	// 	// If we still need to expand the cache, then We'll mark that
-	// 	// we need to update the cache for below and also expand the
-	// 	// size of the cache in place.
-	// 	if len(blockHashes) > len(checkptCache) {
-	// 		updateCache = true
+		// If we still need to expand the cache, then We'll mark that
+		// we need to update the cache for below and also expand the
+		// size of the cache in place.
+		if len(blockHashes) > len(checkptCache) {
+			updateCache = true
 
-	// 		additionalLength := len(blockHashes) - len(checkptCache)
-	// 		newEntries := make([]cfHeaderKV, additionalLength)
+			additionalLength := len(blockHashes) - len(checkptCache)
+			newEntries := make([]cfHeaderKV, additionalLength)
 
-	// 		common.Log.Infof("Growing size of checkpoint cache from %v to %v "+
-	// 			"block hashes", len(checkptCache), len(blockHashes))
+			common.Log.Infof("Growing size of checkpoint cache from %v to %v "+
+				"block hashes", len(checkptCache), len(blockHashes))
 
-	// 		checkptCache = append(
-	// 			sp.MemPoolNode.cfCheckptCaches[msg.FilterType],
-	// 			newEntries...,
-	// 		)
-	// 	}
-	// } else {
-	// 	// Otherwise, we'll hold onto the read lock for the remainder
-	// 	// of this method.
-	// 	defer sp.MemPoolNode.cfCheckptCachesMtx.RUnlock()
+			checkptCache = append(
+				sp.MemPoolNode.cfCheckptCaches[msg.FilterType],
+				newEntries...,
+			)
+		}
+	} else {
+		// Otherwise, we'll hold onto the read lock for the remainder
+		// of this method.
+		defer sp.MemPoolNode.cfCheckptCachesMtx.RUnlock()
 
-	// 	common.Log.Tracef("Serving stale cache of size %v",
-	// 		len(checkptCache))
-	// }
+		common.Log.Tracef("Serving stale cache of size %v",
+			len(checkptCache))
+	}
 
-	// // Now that we know the cache is of an appropriate size, we'll iterate
-	// // backwards until the find the block hash. We do this as it's possible
-	// // a re-org has occurred so items in the db are now in the main china
-	// // while the cache has been partially invalidated.
-	// var forkIdx int
-	// for forkIdx = len(blockHashes); forkIdx > 0; forkIdx-- {
-	// 	if checkptCache[forkIdx-1].blockHash == blockHashes[forkIdx-1] {
-	// 		break
-	// 	}
-	// }
+	// Now that we know the cache is of an appropriate size, we'll iterate
+	// backwards until the find the block hash. We do this as it's possible
+	// a re-org has occurred so items in the db are now in the main china
+	// while the cache has been partially invalidated.
+	var forkIdx int
+	for forkIdx = len(blockHashes); forkIdx > 0; forkIdx-- {
+		if checkptCache[forkIdx-1].blockHash == blockHashes[forkIdx-1] {
+			break
+		}
+	}
 
-	// // Now that we know the how much of the cache is relevant for this
-	// // query, we'll populate our check point message with the cache as is.
-	// // Shortly below, we'll populate the new elements of the cache.
-	// for i := 0; i < forkIdx; i++ {
-	// 	checkptMsg.AddCFHeader(&checkptCache[i].filterHeader)
-	// }
+	// Now that we know the how much of the cache is relevant for this
+	// query, we'll populate our check point message with the cache as is.
+	// Shortly below, we'll populate the new elements of the cache.
+	for i := 0; i < forkIdx; i++ {
+		checkptMsg.AddCFHeader(&checkptCache[i].filterHeader)
+	}
 
-	// // We'll now collect the set of hashes that are beyond our cache so we
-	// // can look up the filter headers to populate the final cache.
-	// blockHashPtrs := make([]*chainhash.Hash, 0, len(blockHashes)-forkIdx)
-	// for i := forkIdx; i < len(blockHashes); i++ {
-	// 	blockHashPtrs = append(blockHashPtrs, &blockHashes[i])
-	// }
-	// filterHeaders, err := sp.MemPoolNode.cfIndex.FilterHeadersByBlockHashes(
-	// 	blockHashPtrs, msg.FilterType,
-	// )
-	// if err != nil {
-	// 	common.Log.Errorf("Error retrieving cfilter headers: %v", err)
-	// 	return
-	// }
+	// We'll now collect the set of hashes that are beyond our cache so we
+	// can look up the filter headers to populate the final cache.
+	blockHashPtrs := make([]*chainhash.Hash, 0, len(blockHashes)-forkIdx)
+	for i := forkIdx; i < len(blockHashes); i++ {
+		blockHashPtrs = append(blockHashPtrs, &blockHashes[i])
+	}
+	filterHeaders, err := sp.MemPoolNode.indexer.FilterHeadersByBlockHashes(
+		blockHashPtrs, msg.FilterType,
+	)
+	if err != nil {
+		common.Log.Errorf("Error retrieving cfilter headers: %v", err)
+		return
+	}
 
-	// // Now that we have the full set of filter headers, we'll add them to
-	// // the checkpoint message, and also update our cache in line.
-	// for i, filterHeaderBytes := range filterHeaders {
-	// 	if len(filterHeaderBytes) == 0 {
-	// 		common.Log.Warnf("Could not obtain CF header for %v",
-	// 			blockHashPtrs[i])
-	// 		return
-	// 	}
+	// Now that we have the full set of filter headers, we'll add them to
+	// the checkpoint message, and also update our cache in line.
+	for i, filterHeaderBytes := range filterHeaders {
+		if len(filterHeaderBytes) == 0 {
+			common.Log.Warnf("Could not obtain CF header for %v",
+				blockHashPtrs[i])
+			return
+		}
 
-	// 	filterHeader, err := chainhash.NewHash(filterHeaderBytes)
-	// 	if err != nil {
-	// 		common.Log.Warnf("Committed filter header deserialize "+
-	// 			"failed: %v", err)
-	// 		return
-	// 	}
+		filterHeader, err := chainhash.NewHash(filterHeaderBytes)
+		if err != nil {
+			common.Log.Warnf("Committed filter header deserialize "+
+				"failed: %v", err)
+			return
+		}
 
-	// 	checkptMsg.AddCFHeader(filterHeader)
+		checkptMsg.AddCFHeader(filterHeader)
 
-	// 	// If the new main chain is longer than what's in the cache,
-	// 	// then we'll override it beyond the fork point.
-	// 	if updateCache {
-	// 		checkptCache[forkIdx+i] = cfHeaderKV{
-	// 			blockHash:    blockHashes[forkIdx+i],
-	// 			filterHeader: *filterHeader,
-	// 		}
-	// 	}
-	// }
+		// If the new main chain is longer than what's in the cache,
+		// then we'll override it beyond the fork point.
+		if updateCache {
+			checkptCache[forkIdx+i] = cfHeaderKV{
+				blockHash:    blockHashes[forkIdx+i],
+				filterHeader: *filterHeader,
+			}
+		}
+	}
 
-	// // Finally, we'll update the cache if we need to, and send the final
-	// // message back to the requesting peer.
-	// if updateCache {
-	// 	sp.MemPoolNode.cfCheckptCaches[msg.FilterType] = checkptCache
-	// }
+	// Finally, we'll update the cache if we need to, and send the final
+	// message back to the requesting peer.
+	if updateCache {
+		sp.MemPoolNode.cfCheckptCaches[msg.FilterType] = checkptCache
+	}
 
-	// sp.QueueMessage(checkptMsg, nil)
+	sp.QueueMessage(checkptMsg, nil)
 }
 
 // enforceNodeBloomFlag disconnects the peer if the MemPoolNode is not configured to
@@ -1561,7 +1555,7 @@ func (s *MemPoolNode) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCha
 	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
 
 	// Fetch the raw block bytes from the database.
-	var blockBytes []byte
+	// var blockBytes []byte
 	// err := sp.MemPoolNode.db.View(func(dbTx database.Tx) error {
 	// 	var err error
 	// 	blockBytes, err = dbTx.FetchBlock(hash)
@@ -1578,17 +1572,23 @@ func (s *MemPoolNode) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCha
 	// }
 
 	// Deserialize the block.
-	var msgBlock wire.MsgBlock
-	err := msgBlock.Deserialize(bytes.NewReader(blockBytes))
-	if err != nil {
-		common.Log.Tracef("Unable to deserialize requested block hash "+
-			"%v: %v", hash, err)
+	// var msgBlock wire.MsgBlock
+	// err := msgBlock.Deserialize(bytes.NewReader(blockBytes))
+	// if err != nil {
+	// 	common.Log.Tracef("Unable to deserialize requested block hash "+
+	// 		"%v: %v", hash, err)
 
-		if doneChan != nil {
-			doneChan <- struct{}{}
-		}
+	// 	if doneChan != nil {
+	// 		doneChan <- struct{}{}
+	// 	}
+	// 	return err
+	// }
+
+	block, err := s.indexer.BlockByHash(hash)
+	if err != nil {
 		return err
 	}
+	msgBlock := block.MsgBlock()
 
 	// Once we have fetched data wait for any previous operation to finish.
 	if waitChan != nil {
@@ -1603,7 +1603,7 @@ func (s *MemPoolNode) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCha
 	if !sendInv {
 		dc = doneChan
 	}
-	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
+	sp.QueueMessageWithEncoding(msgBlock, dc, encoding)
 
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
@@ -1611,7 +1611,7 @@ func (s *MemPoolNode) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneCha
 	// to trigger it to issue another getblocks message for the next
 	// batch of inventory.
 	if sendInv {
-		best := sp.MemPoolNode.chain.BestSnapshot()
+		best := sp.MemPoolNode.indexer.BestSnapshot()
 		invMsg := wire.NewMsgInvSizeHint(1)
 		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash)
 		invMsg.AddInvVect(iv)
@@ -1637,7 +1637,7 @@ func (s *MemPoolNode) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
 	}
 
 	// Fetch the raw block bytes from the database.
-	blk, err := sp.MemPoolNode.chain.BlockByHash(hash)
+	blk, err := sp.MemPoolNode.indexer.BlockByHash(hash)
 	if err != nil {
 		common.Log.Tracef("Unable to fetch requested block hash %v: %v",
 			hash, err)
@@ -2734,35 +2734,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		agentWhitelist:       agentWhitelist,
 	}
 
-	// Merge given checkpoints with the default ones unless they are disabled.
-	// var checkpoints []chaincfg.Checkpoint
-	// if !_cfg.DisableCheckpoints {
-	// 	checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, _cfg.addCheckpoints)
-	// }
-
-	// // Log that the node is pruned.
-	// if _cfg.Prune != 0 {
-	// 	common.Log.Infof("Prune set to %d MiB", _cfg.Prune)
-	// }
-
-	// Create a new block chain instance with the appropriate configuration.
-	// var err error
-	// s.chain, err = localCommon..New(&localCommon..Config{
-	// 	DB:               db,
-	// 	Interrupt:        interrupt,
-	// 	ChainParams:      s.chainParams,
-	// 	Checkpoints:      checkpoints,
-	// 	TimeSource:       s.timeSource,
-	// 	SigCache:         s.sigCache,
-	// 	IndexManager:     indexManager,
-	// 	HashCache:        s.hashCache,
-	// 	Prune:            _cfg.Prune * 1024 * 1024,
-	// 	UtxoCacheMaxSize: uint64(_cfg.UtxoCacheMaxSizeMiB) * 1024 * 1024,
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	s.chain = indexManager
+	s.indexer = indexManager
 
 	// Search for a FeeEstimator state in the database. If none can be found
 	// or if it cannot be loaded, create a new one.
@@ -2788,7 +2760,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	// If no feeEstimator has been found, or if the one that has been found
 	// is behind somehow, create a new one and start over.
-	if s.feeEstimator == nil || s.feeEstimator.LastKnownHeight() != s.chain.BestSnapshot().Height {
+	if s.feeEstimator == nil || s.feeEstimator.LastKnownHeight() != s.indexer.BestSnapshot().Height {
 		s.feeEstimator = mempool.NewFeeEstimator(
 			mempool.DefaultEstimateFeeMaxRollback,
 			mempool.DefaultEstimateFeeMinRegisteredBlocks)
@@ -2807,13 +2779,13 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			RejectReplacement:    _cfg.RejectReplacement,
 		},
 		ChainParams:    chainParams,
-		FetchUtxoView:  s.chain.FetchUtxoView,
-		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
-		MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
+		FetchUtxoView:  s.indexer.FetchUtxoView,
+		BestHeight:     func() int32 { return s.indexer.BestSnapshot().Height },
+		MedianTimePast: func() time.Time { return s.indexer.BestSnapshot().MedianTime },
 		CalcSequenceLock: func(tx *btcutil.Tx, view *localCommon.UtxoViewpoint) (*localCommon.SequenceLock, error) {
-			return s.chain.CalcSequenceLock(tx, view, true)
+			return s.indexer.CalcSequenceLock(tx, view, true)
 		},
-		IsDeploymentActive: s.chain.IsDeploymentActive,
+		IsDeploymentActive: s.indexer.IsDeploymentActive,
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
 		//AddrIndex:          s.addrIndex,
@@ -2824,7 +2796,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	var err error
 	s.syncManager, err = netsync.New(&netsync.Config{
 		PeerNotifier:       &s,
-		Chain:              s.chain,
+		Chain:              s.indexer,
 		TxMemPool:          s.txMemPool,
 		ChainParams:        s.chainParams,
 		DisableCheckpoints: _cfg.DisableCheckpoints,
