@@ -18,10 +18,9 @@ import (
 	"github.com/btcsuite/btcd/wire"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
+	localCommon "github.com/sat20-labs/indexer/indexer/mpn/common"
 	"github.com/sat20-labs/indexer/indexer/mpn/mempool"
 	peerpkg "github.com/sat20-labs/indexer/indexer/mpn/peer"
-	utils "github.com/sat20-labs/indexer/indexer/mpn/utils"
 )
 
 const (
@@ -121,7 +120,7 @@ type processBlockResponse struct {
 // way to call ProcessBlock on the internal block chain instance.
 type processBlockMsg struct {
 	block *btcutil.Block
-	flags blockchain.BehaviorFlags
+	flags localCommon.BehaviorFlags
 	reply chan processBlockResponse
 }
 
@@ -184,7 +183,7 @@ type SyncManager struct {
 	peerNotifier   PeerNotifier
 	started        int32
 	shutdown       int32
-	chain          *blockchain.BlockChain
+	chain          localCommon.IndexManager
 	txMemPool      *mempool.TxPool
 	chainParams    *chaincfg.Params
 	progressLogger *blockProgressLogger
@@ -725,13 +724,13 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// since it is needed to verify the next round of headers links
 	// properly.
 	isCheckpointBlock := false
-	behaviorFlags := blockchain.BFNone
+	behaviorFlags := localCommon.BFNone
 	if sm.headersFirstMode {
 		firstNodeEl := sm.headerList.Front()
 		if firstNodeEl != nil {
 			firstNode := firstNodeEl.Value.(*headerNode)
 			if blockHash.IsEqual(firstNode.hash) {
-				behaviorFlags |= blockchain.BFFastAdd
+				behaviorFlags |= localCommon.BFFastAdd
 				if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
 					isCheckpointBlock = true
 				} else {
@@ -755,7 +754,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		// rejected as opposed to something actually going wrong, so common.Log
 		// it as such.  Otherwise, something really did go wrong, so common.Log
 		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
+		if _, ok := err.(localCommon.RuleError); ok {
 			common.Log.Infof("Rejected block %v from %s: %v", blockHash,
 				peer, err)
 		} else {
@@ -794,9 +793,9 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		// Extraction is only attempted if the block's version is
 		// high enough (ver 2+).
 		// header := &bmsg.block.MsgBlock().Header
-		// if blockchain.ShouldHaveSerializedBlockHeight(header) {
+		// if localCommon.ShouldHaveSerializedBlockHeight(header) {
 		// 	coinbaseTx := bmsg.block.Transactions()[0]
-		// 	cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+		// 	cbHeight, err := localCommon.ExtractCoinbaseHeight(coinbaseTx)
 		// 	if err != nil {
 		// 		common.Log.Warnf("Unable to extract height from "+
 		// 			"coinbase tx: %v", err)
@@ -851,7 +850,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// flush the blockchain cache because we don't expect new blocks immediately.
 	// After that, there is nothing more to do.
 	if !sm.headersFirstMode {
-		if err := sm.chain.FlushUtxoCache(blockchain.FlushPeriodic); err != nil {
+		if err := sm.chain.FlushUtxoCache(localCommon.FlushPeriodic); err != nil {
 			common.Log.Errorf("Error while flushing the blockchain cache: %v", err)
 		}
 		return
@@ -876,7 +875,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	prevHash := sm.nextCheckpoint.Hash
 	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
 	if sm.nextCheckpoint != nil {
-		locator := utils.BlockLocator([]*chainhash.Hash{prevHash})
+		locator := localCommon.BlockLocator([]*chainhash.Hash{prevHash})
 		err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
 		if err != nil {
 			common.Log.Warnf("Failed to send getheaders message to "+
@@ -895,7 +894,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	sm.headersFirstMode = false
 	sm.headerList.Init()
 	common.Log.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := utils.BlockLocator([]*chainhash.Hash{blockHash})
+	locator := localCommon.BlockLocator([]*chainhash.Hash{blockHash})
 	err = peer.PushGetBlocksMsg(locator, &zeroHash)
 	if err != nil {
 		common.Log.Warnf("Failed to send getblocks message to peer %s: %v",
@@ -1058,7 +1057,7 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	// This header is not a checkpoint, so request the next batch of
 	// headers starting from the latest known header and ending with the
 	// next checkpoint.
-	locator := utils.BlockLocator([]*chainhash.Hash{finalHash})
+	locator := localCommon.BlockLocator([]*chainhash.Hash{finalHash})
 	err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
 	if err != nil {
 		common.Log.Warnf("Failed to send getheaders message to "+
@@ -1431,7 +1430,7 @@ out:
 	}
 
 	common.Log.Debug("Block handler shutting down: flushing blockchain caches...")
-	if err := sm.chain.FlushUtxoCache(blockchain.FlushRequired); err != nil {
+	if err := sm.chain.FlushUtxoCache(localCommon.FlushRequired); err != nil {
 		common.Log.Errorf("Error while flushing blockchain caches: %v", err)
 	}
 
@@ -1439,14 +1438,14 @@ out:
 	common.Log.Trace("Block handler done")
 }
 
-// handleBlockchainNotification handles notifications from blockchain.  It does
+// handleBlockchainNotification handles notifications from localCommon.  It does
 // things such as request orphan block parents and relay accepted blocks to
 // connected peers.
-func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Notification) {
+func (sm *SyncManager) handleBlockchainNotification(notification *localCommon.Notification) {
 	switch notification.Type {
 	// A block has been accepted into the block chain.  Relay it to other
 	// peers.
-	case blockchain.NTBlockAccepted:
+	case localCommon.NTBlockAccepted:
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
 			common.Log.Warnf("Chain accepted notification is not a block.")
@@ -1460,14 +1459,12 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			return
 		}
 
-		
-
 		// Generate the inventory vector and relay it.
 		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
 		sm.peerNotifier.RelayInventory(iv, block.MsgBlock().Header)
 
 	// A block has been connected to the main block chain.
-	case blockchain.NTBlockConnected:
+	case localCommon.NTBlockConnected:
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
 			common.Log.Warnf("Chain connected notification is not a block.")
@@ -1481,8 +1478,6 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		if !sm.current() {
 			return
 		}
-
-		
 
 		// Remove all of the transactions (except the coinbase) in the
 		// connected block from the transaction pool.  Secondly, remove any
@@ -1515,7 +1510,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		}
 
 	// A block has been disconnected from the main block chain.
-	case blockchain.NTBlockDisconnected:
+	case localCommon.NTBlockDisconnected:
 		block, ok := notification.Data.(*btcutil.Block)
 		if !ok {
 			common.Log.Warnf("Chain disconnected notification is not a block.")
@@ -1660,7 +1655,7 @@ func (sm *SyncManager) SyncPeerID() int32 {
 
 // ProcessBlock makes use of ProcessBlock on an internal instance of a block
 // chain.
-func (sm *SyncManager) ProcessBlock(block *btcutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
+func (sm *SyncManager) ProcessBlock(block *btcutil.Block, flags localCommon.BehaviorFlags) (bool, error) {
 	reply := make(chan processBlockResponse, 1)
 	sm.msgChan <- processBlockMsg{block: block, flags: flags, reply: reply}
 	response := <-reply

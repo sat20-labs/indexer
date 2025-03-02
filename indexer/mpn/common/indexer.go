@@ -1,10 +1,10 @@
-package blockchain
+package common
 
 import (
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	utils "github.com/sat20-labs/indexer/indexer/mpn/utils"
 )
 
 // IndexManager provides a generic interface that the is called when blocks are
@@ -25,18 +25,23 @@ type IndexManager interface {
 	DisconnectBlock(*btcutil.Block, []SpentTxOut) error
 
 	HaveBlock(hash *chainhash.Hash) (bool, error)
-	CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint, mempool bool) (*utils.SequenceLock, error)
+	CalcSequenceLock(tx *btcutil.Tx, utxoView *UtxoViewpoint, mempool bool) (*SequenceLock, error)
 	IsCurrent() bool
-	BestSnapshot() *utils.BestState
-	BlockLocatorFromHash(hash *chainhash.Hash) utils.BlockLocator
-	LatestBlockLocator() (utils.BlockLocator, error)
+	BestSnapshot() *BestState
+	BlockLocatorFromHash(hash *chainhash.Hash) BlockLocator
+	LatestBlockLocator() (BlockLocator, error)
 	BlockHeightByHash(hash *chainhash.Hash) (int32, error)
 	BlockHashByHeight(blockHeight int32) (*chainhash.Hash, error)
-	LocateBlocks(locator utils.BlockLocator, hashStop *chainhash.Hash, 
+	LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash,
 		maxHashes uint32) []chainhash.Hash
-	LocateHeaders(locator utils.BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader
+	LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader
 	BlockByHash(hash *chainhash.Hash) (*btcutil.Block, error)
 	BlockByHeight(height int32) (*btcutil.Block, error)
 	ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bool, bool, error)
 	IsDeploymentActive(deploymentID uint32) (bool, error)
+	FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error)
+	FlushUtxoCache(mode FlushMode) error
+	FetchUtxoEntry(outpoint wire.OutPoint) (*UtxoEntry, error)
+	Checkpoints() []chaincfg.Checkpoint
+	Subscribe(callback NotificationCallback)
 }

@@ -22,8 +22,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
-	"github.com/sat20-labs/indexer/indexer/mpn/utils"
+	localCommon "github.com/sat20-labs/indexer/indexer/mpn/common"
 )
 
 const (
@@ -74,7 +73,7 @@ type Config struct {
 
 	// FetchUtxoView defines the function to use to fetch unspent
 	// transaction output information.
-	FetchUtxoView func(*btcutil.Tx) (*blockchain.UtxoViewpoint, error)
+	FetchUtxoView func(*btcutil.Tx) (*localCommon.UtxoViewpoint, error)
 
 	// BestHeight defines the function to use to access the block height of
 	// the current best chain.
@@ -88,7 +87,7 @@ type Config struct {
 	// CalcSequenceLock defines the function to use in order to generate
 	// the current sequence lock for the given transaction using the passed
 	// utxo view.
-	CalcSequenceLock func(*btcutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
+	CalcSequenceLock func(*btcutil.Tx, *localCommon.UtxoViewpoint) (*localCommon.SequenceLock, error)
 
 	// IsDeploymentActive returns true if the target deploymentID is
 	// active, and false otherwise. The mempool uses this function to gauge
@@ -299,7 +298,7 @@ func (mp *TxPool) limitNumOrphans() error {
 		numOrphans := len(mp.orphans)
 		if numExpired := origNumOrphans - numOrphans; numExpired > 0 {
 			common.Log.Debugf("Expired %d %s (remaining: %d)", numExpired,
-				utils.PickNoun(uint64(numExpired), "orphan", "orphans"),
+				localCommon.PickNoun(uint64(numExpired), "orphan", "orphans"),
 				numOrphans)
 		}
 	}
@@ -543,7 +542,7 @@ func (mp *TxPool) RemoveDoubleSpends(tx *btcutil.Tx) {
 // helper for maybeAcceptTransaction.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil.Tx, height int32, fee int64) *TxDesc {
+func (mp *TxPool) addTransaction(utxoView *localCommon.UtxoViewpoint, tx *btcutil.Tx, height int32, fee int64) *TxDesc {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDesc{
@@ -792,7 +791,7 @@ func (mp *TxPool) CheckSpend(op wire.OutPoint) *btcutil.Tx {
 // transaction pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (mp *TxPool) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
+func (mp *TxPool) fetchInputUtxos(tx *btcutil.Tx) (*localCommon.UtxoViewpoint, error) {
 	utxoView, err := mp.cfg.FetchUtxoView(tx)
 	if err != nil {
 		return nil, err
@@ -1251,7 +1250,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseRe
 		mpd := &btcjson.GetRawMempoolVerboseResult{
 			Size:             int32(tx.MsgTx().SerializeSize()),
 			Vsize:            int32(GetTxVirtualSize(tx)),
-			Weight:           int32(blockchain.GetTransactionWeight(tx)),
+			Weight:           int32(localCommon.GetTransactionWeight(tx)),
 			Fee:              btcutil.Amount(desc.Fee).ToBTC(),
 			Time:             desc.Added.Unix(),
 			Height:           int64(desc.Height),
@@ -1304,7 +1303,7 @@ type MempoolAcceptResult struct {
 
 	// utxoView is a set of the unspent transaction outputs referenced by
 	// the inputs to this transaction.
-	utxoView *blockchain.UtxoViewpoint
+	utxoView *localCommon.UtxoViewpoint
 
 	// bestHeight is the best known height by the mempool.
 	bestHeight int32
@@ -1370,9 +1369,9 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	// Perform preliminary sanity checks on the transaction. This makes use
 	// of blockchain which contains the invariant rules for what
 	// transactions are allowed into blocks.
-	err := blockchain.CheckTransactionSanity(tx)
+	err := localCommon.CheckTransactionSanity(tx)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(localCommon.RuleError); ok {
 			return nil, chainRuleError(cerr)
 		}
 
@@ -1380,7 +1379,7 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	}
 
 	// A standalone transaction must not be a coinbase transaction.
-	if blockchain.IsCoinBase(tx) {
+	if localCommon.IsCoinBase(tx) {
 		str := fmt.Sprintf("transaction is an individual coinbase %v",
 			txHash)
 
@@ -1415,7 +1414,7 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	// without needing to do a separate lookup.
 	utxoView, err := mp.fetchInputUtxos(tx)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(localCommon.RuleError); ok {
 			return nil, chainRuleError(cerr)
 		}
 
@@ -1470,11 +1469,11 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	//
 	// NOTE: this check must be performed before `validateStandardness` to
 	// make sure a nil entry is not returned from `utxoView.LookupEntry`.
-	txFee, err := blockchain.CheckTransactionInputs(
+	txFee, err := localCommon.CheckTransactionInputs(
 		tx, nextBlockHeight, utxoView, mp.cfg.ChainParams,
 	)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(localCommon.RuleError); ok {
 			return nil, chainRuleError(cerr)
 		}
 		return nil, err
@@ -1494,14 +1493,14 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	// with respect to its defined relative lock times.
 	sequenceLock, err := mp.cfg.CalcSequenceLock(tx, utxoView)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(localCommon.RuleError); ok {
 			return nil, chainRuleError(cerr)
 		}
 
 		return nil, err
 	}
 
-	if !blockchain.SequenceLockActive(
+	if !localCommon.SequenceLockActive(
 		sequenceLock, nextBlockHeight, medianTimePast,
 	) {
 
@@ -1538,11 +1537,11 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 
 	// Verify crypto signatures for each input and reject the transaction
 	// if any don't verify.
-	err = blockchain.ValidateTransactionScripts(tx, utxoView,
+	err = localCommon.ValidateTransactionScripts(tx, utxoView,
 		txscript.StandardVerifyFlags, mp.cfg.SigCache,
 		mp.cfg.HashCache)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(localCommon.RuleError); ok {
 			return nil, chainRuleError(cerr)
 		}
 		return nil, err
@@ -1597,7 +1596,7 @@ func (mp *TxPool) validateSegWitDeployment(tx *btcutil.Tx) error {
 // validateStandardness checks the transaction passes both transaction standard
 // and input standard.
 func (mp *TxPool) validateStandardness(tx *btcutil.Tx, nextBlockHeight int32,
-	medianTimePast time.Time, utxoView *blockchain.UtxoViewpoint) error {
+	medianTimePast time.Time, utxoView *localCommon.UtxoViewpoint) error {
 
 	// Exit early if we accept non-standard transactions.
 	//
@@ -1649,18 +1648,18 @@ func (mp *TxPool) validateStandardness(tx *btcutil.Tx, nextBlockHeight int32,
 // validateSigCost checks the cost to run the signature operations to make sure
 // the number of signatures are sane.
 func (mp *TxPool) validateSigCost(tx *btcutil.Tx,
-	utxoView *blockchain.UtxoViewpoint) error {
+	utxoView *localCommon.UtxoViewpoint) error {
 
 	// Since the coinbase address itself can contain signature operations,
 	// the maximum allowed signature operations per transaction is less
 	// than the maximum allowed signature operations per block.
 	//
 	// TODO(roasbeef): last bool should be conditional on segwit activation
-	sigOpCost, err := blockchain.GetSigOpCost(
+	sigOpCost, err := localCommon.GetSigOpCost(
 		tx, false, utxoView, true, true,
 	)
 	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
+		if cerr, ok := err.(localCommon.RuleError); ok {
 			return chainRuleError(cerr)
 		}
 
@@ -1681,7 +1680,7 @@ func (mp *TxPool) validateSigCost(tx *btcutil.Tx,
 // validateRelayFeeMet checks that the min relay fee is covered by this
 // transaction.
 func (mp *TxPool) validateRelayFeeMet(tx *btcutil.Tx, txFee, txSize int64,
-	utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
+	utxoView *localCommon.UtxoViewpoint, nextBlockHeight int32,
 	isNew, rateLimit bool) error {
 
 	txHash := tx.Hash()

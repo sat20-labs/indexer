@@ -7,7 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
+	localCommon "github.com/sat20-labs/indexer/indexer/mpn/common"
 )
 
 const (
@@ -26,7 +26,7 @@ var (
 // optional serverChan parameter is mainly used by the service code to be
 // notified with the MemPoolNode once it is setup so it can gracefully stop it when
 // requested from the service control manager.
-func StartMPN(yamlCfg *config.YamlConf, db *badger.DB, indexManager blockchain.IndexManager, 
+func StartMPN(yamlCfg *config.YamlConf, db *badger.DB, indexManager localCommon.IndexManager, 
 	interrupt <-chan struct{}) (*MemPoolNode, error) {
 	// Load configuration and parse command line.  This function also
 	// initializes logging and configures it accordingly.

@@ -13,14 +13,11 @@ import (
 	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/ft"
 	"github.com/sat20-labs/indexer/indexer/mpn"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/runes"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/btcutil"
-
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -452,43 +449,4 @@ func (p *IndexerMgr) dbStatistic() bool {
 	//return p.SearchPredefinedName()
 	//return p.searchName()
 	return false
-}
-
-// Ensure the Manager type implements the blockchain.IndexManager interface.
-var _ blockchain.IndexManager = (*IndexerMgr)(nil)
-
-
-// ConnectBlock must be invoked when a block is extending the main chain.  It
-// keeps track of the state of each index it is managing, performs some sanity
-// checks, and invokes each indexer.
-//
-// This is part of the blockchain.IndexManager interface.
-func (m *IndexerMgr) ConnectBlock( block *btcutil.Block,
-	stxos []blockchain.SpentTxOut) error {
-
-	// Call each of the currently active optional indexes with the block
-	// being connected so they can update accordingly.
-	common.Log.Infof("ConnectBlock %v", block)
-
-	return nil
-}
-
-// DisconnectBlock must be invoked when a block is being disconnected from the
-// end of the main chain.  It keeps track of the state of each index it is
-// managing, performs some sanity checks, and invokes each indexer to remove
-// the index entries associated with the block.
-//
-// This is part of the blockchain.IndexManager interface.
-func (m *IndexerMgr) DisconnectBlock( block *btcutil.Block,
-	stxo []blockchain.SpentTxOut) error {
-
-	// Call each of the currently active optional indexes with the block
-	// being disconnected so they can update accordingly.
-	common.Log.Infof("DisconnectBlock %v", block)
-	
-	return nil
-}
-
-func (m *IndexerMgr) GetBlockIndexer() *base_indexer.RpcIndexer {
-	return m.rpcService
 }

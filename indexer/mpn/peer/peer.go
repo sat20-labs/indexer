@@ -25,7 +25,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/lru"
 
-	utils "github.com/sat20-labs/indexer/indexer/mpn/utils"
+	utils "github.com/sat20-labs/indexer/indexer/mpn/common"
 )
 
 const (

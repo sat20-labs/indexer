@@ -2,12 +2,14 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package utils
+package common
 
 import (
+	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/txscript"
 )
 
 const (
@@ -70,4 +72,47 @@ func GetTransactionWeight(tx *btcutil.Tx) int64 {
 
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
+}
+
+
+// GetSigOpCost returns the unified sig op cost for the passed transaction
+// respecting current active soft-forks which modified sig op cost counting.
+// The unified sig op cost for a transaction is computed as the sum of: the
+// legacy sig op count scaled according to the WitnessScaleFactor, the sig op
+// count for all p2sh inputs scaled by the WitnessScaleFactor, and finally the
+// unscaled sig op count for any inputs spending witness programs.
+func GetSigOpCost(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint, bip16, segWit bool) (int, error) {
+	numSigOps := CountSigOps(tx) * WitnessScaleFactor
+	if bip16 {
+		numP2SHSigOps, err := CountP2SHSigOps(tx, isCoinBaseTx, utxoView)
+		if err != nil {
+			return 0, nil
+		}
+		numSigOps += (numP2SHSigOps * WitnessScaleFactor)
+	}
+
+	if segWit && !isCoinBaseTx {
+		msgTx := tx.MsgTx()
+		for txInIndex, txIn := range msgTx.TxIn {
+			// Ensure the referenced output is available and hasn't
+			// already been spent.
+			utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
+			if utxo == nil || utxo.IsSpent() {
+				str := fmt.Sprintf("output %v referenced from "+
+					"transaction %s:%d either does not "+
+					"exist or has already been spent",
+					txIn.PreviousOutPoint, tx.Hash(),
+					txInIndex)
+				return 0, MakeRuleError(ErrMissingTxOut, str)
+			}
+
+			witness := txIn.Witness
+			sigScript := txIn.SignatureScript
+			pkScript := utxo.PkScript()
+			numSigOps += txscript.GetWitnessSigOpCount(sigScript, pkScript, witness)
+		}
+
+	}
+
+	return numSigOps, nil
 }

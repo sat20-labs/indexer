@@ -30,10 +30,9 @@ import (
 	"github.com/sat20-labs/indexer/indexer/mpn/connmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/peer"
 
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
+	localCommon "github.com/sat20-labs/indexer/indexer/mpn/common"
 	"github.com/sat20-labs/indexer/indexer/mpn/mempool"
 	"github.com/sat20-labs/indexer/indexer/mpn/netsync"
-	"github.com/sat20-labs/indexer/indexer/mpn/utils"
 
 	"github.com/sat20-labs/indexer/common"
 )
@@ -211,7 +210,7 @@ type MemPoolNode struct {
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
 	syncManager          *netsync.SyncManager
-	chain                *blockchain.BlockChain
+	chain                localCommon.IndexManager
 	txMemPool            *mempool.TxPool
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
@@ -225,7 +224,7 @@ type MemPoolNode struct {
 	quit                 chan struct{}
 	nat                  NAT
 	db                   *badger.DB
-	timeSource           blockchain.MedianTimeSource
+	//timeSource           localCommon.MedianTimeSource
 	services             wire.ServiceFlag
 
 	// The following fields are used for optional indexes.  They will be nil
@@ -516,7 +515,7 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 
 	// Add the remote peer time as a sample for creating an offset against
 	// the local clock to keep the network time in sync.
-	sp.MemPoolNode.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
+	//sp.MemPoolNode.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
 
 	// Choose whether or not to relay transactions before a filter command
 	// is received.
@@ -1433,14 +1432,14 @@ func (sp *serverPeer) OnNotFound(p *peer.Peer, msg *wire.MsgNotFound) {
 		}
 	}
 	if numBlocks > 0 {
-		blockStr := utils.PickNoun(uint64(numBlocks), "block", "blocks")
+		blockStr := localCommon.PickNoun(uint64(numBlocks), "block", "blocks")
 		reason := fmt.Sprintf("%d %v not found", numBlocks, blockStr)
 		if sp.addBanScore(20*numBlocks, 0, reason) {
 			return
 		}
 	}
 	if numTxns > 0 {
-		txStr := utils.PickNoun(uint64(numTxns), "transaction", "transactions")
+		txStr := localCommon.PickNoun(uint64(numTxns), "transaction", "transactions")
 		reason := fmt.Sprintf("%d %v not found", numTxns, txStr)
 		if sp.addBanScore(0, 10*numTxns, reason) {
 			return
@@ -1860,7 +1859,7 @@ func (s *MemPoolNode) handleBanPeerMsg(state *peerState, sp *serverPeer) {
 		common.Log.Debugf("can't split ban peer %s %v", sp.Addr(), err)
 		return
 	}
-	direction := utils.DirectionString(sp.Inbound())
+	direction := localCommon.DirectionString(sp.Inbound())
 	common.Log.Infof("Banned peer %s (%s) for %v", host, direction,
 		_cfg.BanDuration)
 	state.banned[host] = time.Now().Add(_cfg.BanDuration)
@@ -2219,7 +2218,7 @@ func (s *MemPoolNode) peerDoneHandler(sp *serverPeer) {
 		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
 		if numEvicted > 0 {
 			common.Log.Debugf("Evicted %d %s from peer %v (id %d)",
-				numEvicted, utils.PickNoun(numEvicted, "orphan",
+				numEvicted, localCommon.PickNoun(numEvicted, "orphan",
 					"orphans"), sp, sp.ID())
 		}
 	}
@@ -2676,7 +2675,7 @@ out:
 // connections from peers.
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	db *badger.DB, chainParams *chaincfg.Params,
-	indexManager blockchain.IndexManager,
+	indexManager localCommon.IndexManager,
 	interrupt <-chan struct{}) (*MemPoolNode, error) {
 
 	services := defaultServices
@@ -2726,7 +2725,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		peerHeightsUpdate:    make(chan updatePeerHeightsMsg),
 		nat:                  nat,
 		db:                   db,
-		timeSource:           blockchain.NewMedianTime(),
+		//timeSource:           localCommon.NewMedianTime(),
 		services:             services,
 		sigCache:             txscript.NewSigCache(_cfg.SigCacheMaxSize),
 		hashCache:            txscript.NewHashCache(_cfg.SigCacheMaxSize),
@@ -2736,33 +2735,34 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	// Merge given checkpoints with the default ones unless they are disabled.
-	var checkpoints []chaincfg.Checkpoint
-	if !_cfg.DisableCheckpoints {
-		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, _cfg.addCheckpoints)
-	}
+	// var checkpoints []chaincfg.Checkpoint
+	// if !_cfg.DisableCheckpoints {
+	// 	checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, _cfg.addCheckpoints)
+	// }
 
-	// Log that the node is pruned.
-	if _cfg.Prune != 0 {
-		common.Log.Infof("Prune set to %d MiB", _cfg.Prune)
-	}
+	// // Log that the node is pruned.
+	// if _cfg.Prune != 0 {
+	// 	common.Log.Infof("Prune set to %d MiB", _cfg.Prune)
+	// }
 
 	// Create a new block chain instance with the appropriate configuration.
-	var err error
-	s.chain, err = blockchain.New(&blockchain.Config{
-		DB:               db,
-		Interrupt:        interrupt,
-		ChainParams:      s.chainParams,
-		Checkpoints:      checkpoints,
-		TimeSource:       s.timeSource,
-		SigCache:         s.sigCache,
-		IndexManager:     indexManager,
-		HashCache:        s.hashCache,
-		Prune:            _cfg.Prune * 1024 * 1024,
-		UtxoCacheMaxSize: uint64(_cfg.UtxoCacheMaxSizeMiB) * 1024 * 1024,
-	})
-	if err != nil {
-		return nil, err
-	}
+	// var err error
+	// s.chain, err = localCommon..New(&localCommon..Config{
+	// 	DB:               db,
+	// 	Interrupt:        interrupt,
+	// 	ChainParams:      s.chainParams,
+	// 	Checkpoints:      checkpoints,
+	// 	TimeSource:       s.timeSource,
+	// 	SigCache:         s.sigCache,
+	// 	IndexManager:     indexManager,
+	// 	HashCache:        s.hashCache,
+	// 	Prune:            _cfg.Prune * 1024 * 1024,
+	// 	UtxoCacheMaxSize: uint64(_cfg.UtxoCacheMaxSizeMiB) * 1024 * 1024,
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
+	s.chain = indexManager
 
 	// Search for a FeeEstimator state in the database. If none can be found
 	// or if it cannot be loaded, create a new one.
@@ -2801,7 +2801,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			FreeTxRelayLimit:     _cfg.FreeTxRelayLimit,
 			MaxOrphanTxs:         _cfg.MaxOrphanTxs,
 			MaxOrphanTxSize:      defaultMaxOrphanTxSize,
-			MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
+			MaxSigOpCostPerTx:    localCommon.MaxBlockSigOpsCost / 4,
 			MinRelayTxFee:        _cfg.minRelayTxFee,
 			MaxTxVersion:         2,
 			RejectReplacement:    _cfg.RejectReplacement,
@@ -2810,7 +2810,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		FetchUtxoView:  s.chain.FetchUtxoView,
 		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
 		MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
-		CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+		CalcSequenceLock: func(tx *btcutil.Tx, view *localCommon.UtxoViewpoint) (*localCommon.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
 		IsDeploymentActive: s.chain.IsDeploymentActive,
@@ -2821,6 +2821,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	s.txMemPool = mempool.New(&txC)
 
+	var err error
 	s.syncManager, err = netsync.New(&netsync.Config{
 		PeerNotifier:       &s,
 		Chain:              s.chain,

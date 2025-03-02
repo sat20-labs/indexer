@@ -2,7 +2,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package blockchain
+package common
 
 import (
 	"fmt"
@@ -360,6 +360,16 @@ func (view *UtxoViewpoint) fetchEntryByHash(db database.DB, hash *chainhash.Hash
 	return entry, nil
 }
 
+// countSpentOutputs returns the number of utxos the passed block spends.
+func countSpentOutputs(block *btcutil.Block) int {
+	// Exclude the coinbase transaction since it can't spend anything.
+	var numSpent int
+	for _, tx := range block.Transactions()[1:] {
+		numSpent += len(tx.MsgTx().TxIn)
+	}
+	return numSpent
+}
+
 // disconnectTransactions updates the view by removing all of the transactions
 // created by the passed block, restoring all utxos the transactions spent by
 // using the provided spent txo information, and setting the best hash for the
@@ -519,62 +529,7 @@ func (view *UtxoViewpoint) commit() {
 	}
 }
 
-// fetchUtxosFromCache fetches unspent transaction output data about the provided
-// set of outpoints from the point of view of the end of the main chain at the
-// time of the call.  It attempts to fetch them from the cache and whatever entries
-// that were not in the cache will be attempted to be fetched from the database and
-// it'll be cached.
-//
-// Upon completion of this function, the view will contain an entry for each
-// requested outpoint.  Spent outputs, or those which otherwise don't exist,
-// will result in a nil entry in the view.
-func (view *UtxoViewpoint) fetchUtxosFromCache(cache *utxoCache, outpoints []wire.OutPoint) error {
-	// Nothing to do if there are no requested outputs.
-	if len(outpoints) == 0 {
-		return nil
-	}
 
-	// Load the requested set of unspent transaction outputs from the point
-	// of view of the end of the main chain.  Any missing entries will be
-	// fetched from the database and be cached.
-	//
-	// NOTE: Missing entries are not considered an error here and instead
-	// will result in nil entries in the view.  This is intentionally done
-	// so other code can use the presence of an entry in the store as a way
-	// to unnecessarily avoid attempting to reload it from the database.
-	entries, err := cache.fetchEntries(outpoints)
-	if err != nil {
-		return err
-	}
-	for i, entry := range entries {
-		view.entries[outpoints[i]] = entry.Clone()
-	}
-	return nil
-}
-
-// fetchUtxos loads the unspent transaction outputs for the provided set of
-// outputs into the view from the database as needed unless they already exist
-// in the view in which case they are ignored.
-func (view *UtxoViewpoint) fetchUtxos(cache *utxoCache, outpoints []wire.OutPoint) error {
-	// Nothing to do if there are no requested outputs.
-	if len(outpoints) == 0 {
-		return nil
-	}
-
-	// Filter entries that are already in the view.
-	needed := make([]wire.OutPoint, 0, len(outpoints))
-	for i := range outpoints {
-		// Already loaded into the current view.
-		if _, ok := view.entries[outpoints[i]]; ok {
-			continue
-		}
-
-		needed = append(needed, outpoints[i])
-	}
-
-	// Request the input utxos from the database.
-	return view.fetchUtxosFromCache(cache, needed)
-}
 
 // findInputsToFetch goes through all the blocks and returns all the outpoints of
 // the entries that need to be fetched in order to validate the block.  Outpoints
@@ -629,14 +584,6 @@ func (view *UtxoViewpoint) findInputsToFetch(block *btcutil.Block) []wire.OutPoi
 	return needed
 }
 
-// fetchInputUtxos loads the unspent transaction outputs for the inputs
-// referenced by the transactions in the given block into the view from the
-// cache as needed.  In particular, referenced entries that are earlier in
-// the block are added to the view and entries that are already in the view
-// are not modified.
-func (view *UtxoViewpoint) fetchInputUtxos(cache *utxoCache, block *btcutil.Block) error {
-	return view.fetchUtxosFromCache(cache, view.findInputsToFetch(block))
-}
 
 // NewUtxoViewpoint returns a new empty unspent transaction output view.
 func NewUtxoViewpoint() *UtxoViewpoint {
@@ -645,59 +592,3 @@ func NewUtxoViewpoint() *UtxoViewpoint {
 	}
 }
 
-// FetchUtxoView loads unspent transaction outputs for the inputs referenced by
-// the passed transaction from the point of view of the end of the main chain.
-// It also attempts to fetch the utxos for the outputs of the transaction itself
-// so the returned view can be examined for duplicate transactions.
-//
-// This function is safe for concurrent access however the returned view is NOT.
-func (b *BlockChain) FetchUtxoView(tx *btcutil.Tx) (*UtxoViewpoint, error) {
-	// Create a set of needed outputs based on those referenced by the
-	// inputs of the passed transaction and the outputs of the transaction
-	// itself.
-	neededLen := len(tx.MsgTx().TxOut)
-	if !IsCoinBase(tx) {
-		neededLen += len(tx.MsgTx().TxIn)
-	}
-	needed := make([]wire.OutPoint, 0, neededLen)
-	prevOut := wire.OutPoint{Hash: *tx.Hash()}
-	for txOutIdx := range tx.MsgTx().TxOut {
-		prevOut.Index = uint32(txOutIdx)
-		needed = append(needed, prevOut)
-	}
-	if !IsCoinBase(tx) {
-		for _, txIn := range tx.MsgTx().TxIn {
-			needed = append(needed, txIn.PreviousOutPoint)
-		}
-	}
-
-	// Request the utxos from the point of view of the end of the main
-	// chain.
-	view := NewUtxoViewpoint()
-	b.chainLock.RLock()
-	err := view.fetchUtxosFromCache(b.utxoCache, needed)
-	b.chainLock.RUnlock()
-	return view, err
-}
-
-// FetchUtxoEntry loads and returns the requested unspent transaction output
-// from the point of view of the end of the main chain.
-//
-// NOTE: Requesting an output for which there is no data will NOT return an
-// error.  Instead both the entry and the error will be nil.  This is done to
-// allow pruning of spent transaction outputs.  In practice this means the
-// caller must check if the returned entry is nil before invoking methods on it.
-//
-// This function is safe for concurrent access however the returned entry (if
-// any) is NOT.
-func (b *BlockChain) FetchUtxoEntry(outpoint wire.OutPoint) (*UtxoEntry, error) {
-	b.chainLock.RLock()
-	defer b.chainLock.RUnlock()
-
-	entries, err := b.utxoCache.fetchEntries([]wire.OutPoint{outpoint})
-	if err != nil {
-		return nil, err
-	}
-
-	return entries[0], nil
-}

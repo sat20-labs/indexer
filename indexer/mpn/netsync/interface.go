@@ -13,7 +13,7 @@ import (
 
 	"github.com/sat20-labs/indexer/indexer/mpn/peer"
 	"github.com/sat20-labs/indexer/indexer/mpn/mempool"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
+	"github.com/sat20-labs/indexer/indexer/mpn/common"
 )
 
 // PeerNotifier exposes methods to notify peers of status changes to
@@ -32,7 +32,7 @@ type PeerNotifier interface {
 // Config is a configuration struct used to initialize a new SyncManager.
 type Config struct {
 	PeerNotifier PeerNotifier
-	Chain        *blockchain.BlockChain
+	Chain        common.IndexManager
 	TxMemPool    *mempool.TxPool
 	ChainParams  *chaincfg.Params
 

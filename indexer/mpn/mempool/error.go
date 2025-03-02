@@ -5,8 +5,8 @@
 package mempool
 
 import (
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/sat20-labs/indexer/indexer/mpn/common"
 )
 
 // RuleError identifies a rule violation.  It is used to indicate that
@@ -52,7 +52,7 @@ func txRuleError(c wire.RejectCode, desc string) RuleError {
 
 // chainRuleError returns a RuleError that encapsulates the given
 // blockchain.RuleError.
-func chainRuleError(chainErr blockchain.RuleError) RuleError {
+func chainRuleError(chainErr common.RuleError) RuleError {
 	return RuleError{
 		Err: chainErr,
 	}
@@ -68,26 +68,26 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 	}
 
 	switch err := err.(type) {
-	case blockchain.RuleError:
+	case common.RuleError:
 		// Convert the chain error to a reject code.
 		var code wire.RejectCode
 		switch err.ErrorCode {
 		// Rejected due to duplicate.
-		case blockchain.ErrDuplicateBlock:
+		case common.ErrDuplicateBlock:
 			code = wire.RejectDuplicate
 
 		// Rejected due to obsolete version.
-		case blockchain.ErrBlockVersionTooOld:
+		case common.ErrBlockVersionTooOld:
 			code = wire.RejectObsolete
 
 		// Rejected due to checkpoint.
-		case blockchain.ErrCheckpointTimeTooOld:
+		case common.ErrCheckpointTimeTooOld:
 			fallthrough
-		case blockchain.ErrDifficultyTooLow:
+		case common.ErrDifficultyTooLow:
 			fallthrough
-		case blockchain.ErrBadCheckpoint:
+		case common.ErrBadCheckpoint:
 			fallthrough
-		case blockchain.ErrForkTooOld:
+		case common.ErrForkTooOld:
 			code = wire.RejectCheckpoint
 
 		// Everything else is due to the block or transaction being invalid.

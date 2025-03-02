@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/mpn/blockchain"
-	"github.com/sat20-labs/indexer/indexer/mpn/utils"
+	mpnCommon "github.com/sat20-labs/indexer/indexer/mpn/common"
 )
 
 // HaveBlock returns whether or not the chain instance has the block represented
@@ -31,7 +31,8 @@ func (b *IndexerMgr) HaveBlock(hash *chainhash.Hash) (bool, error) {
 // the candidate transaction to be included in a block.
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) CalcSequenceLock(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint, mempool bool) (*utils.SequenceLock, error) {
+func (b *IndexerMgr) CalcSequenceLock(tx *btcutil.Tx,
+	utxoView *mpnCommon.UtxoViewpoint, mempool bool) (*mpnCommon.SequenceLock, error) {
 
 	return b.calcSequenceLock(nil, tx, utxoView, mempool)
 }
@@ -40,13 +41,14 @@ func (b *IndexerMgr) CalcSequenceLock(tx *btcutil.Tx, utxoView *blockchain.UtxoV
 // transaction. See the exported version, CalcSequenceLock for further details.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *IndexerMgr) calcSequenceLock(node *common.Block, tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint, mempool bool) (*utils.SequenceLock, error) {
+func (b *IndexerMgr) calcSequenceLock(node *common.Block, tx *btcutil.Tx,
+	utxoView *mpnCommon.UtxoViewpoint, mempool bool) (*mpnCommon.SequenceLock, error) {
 	// A value of -1 for each relative lock type represents a relative time
 	// lock value that will allow a transaction to be included in a block
 	// at any given height or time. This value is returned as the relative
 	// lock time in the case that BIP 68 is disabled, or has not yet been
 	// activated.
-	sequenceLock := &utils.SequenceLock{Seconds: -1, BlockHeight: -1}
+	sequenceLock := &mpnCommon.SequenceLock{Seconds: -1, BlockHeight: -1}
 
 	// The sequence locks semantics are always active for transactions
 	// within the mempool.
@@ -72,7 +74,7 @@ func (b *IndexerMgr) calcSequenceLock(node *common.Block, tx *btcutil.Tx, utxoVi
 	// can be included within a block at any given height or time.
 	mTx := tx.MsgTx()
 	sequenceLockActive := uint32(mTx.Version) >= 2 && csvSoftforkActive
-	if !sequenceLockActive || blockchain.IsCoinBase(tx) {
+	if !sequenceLockActive || mpnCommon.IsCoinBase(tx) {
 		return sequenceLock, nil
 	}
 
@@ -87,7 +89,7 @@ func (b *IndexerMgr) calcSequenceLock(node *common.Block, tx *btcutil.Tx, utxoVi
 				"transaction %s:%d either does not exist or "+
 				"has already been spent", txIn.PreviousOutPoint,
 				tx.Hash(), txInIndex)
-			return sequenceLock, blockchain.MakeRuleError(blockchain.ErrMissingTxOut, str)
+			return sequenceLock, mpnCommon.MakeRuleError(mpnCommon.ErrMissingTxOut, str)
 		}
 
 		// If the input height is set to the mempool height, then we
@@ -123,7 +125,7 @@ func (b *IndexerMgr) calcSequenceLock(node *common.Block, tx *btcutil.Tx, utxoVi
 			// TODO
 			// blockNode := node.Ancestor(prevInputHeight)
 			// blockNode := b.BlockByHeight(prevInputHeight)
-			medianTime := time.Time{} //blockchain.CalcPastMedianTime(blockNode)
+			medianTime := time.Time{} //mpnCommon.CalcPastMedianTime(blockNode)
 
 			// Time based relative time-locks as defined by BIP 68
 			// have a time granularity of RelativeLockSeconds, so
@@ -168,7 +170,7 @@ func (b *IndexerMgr) IsCurrent() bool {
 // treated as immutable since it is shared by all callers.
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) BestSnapshot() *utils.BestState {
+func (b *IndexerMgr) BestSnapshot() *mpnCommon.BestState {
 	return nil
 }
 
@@ -180,7 +182,7 @@ func (b *IndexerMgr) BestSnapshot() *utils.BestState {
 // the passed hash is not currently known.
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) BlockLocatorFromHash(hash *chainhash.Hash) utils.BlockLocator {
+func (b *IndexerMgr) BlockLocatorFromHash(hash *chainhash.Hash) mpnCommon.BlockLocator {
 	return nil
 }
 
@@ -188,7 +190,7 @@ func (b *IndexerMgr) BlockLocatorFromHash(hash *chainhash.Hash) utils.BlockLocat
 // main (best) chain.
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) LatestBlockLocator() (utils.BlockLocator, error) {
+func (b *IndexerMgr) LatestBlockLocator() (mpnCommon.BlockLocator, error) {
 	return nil, nil
 }
 
@@ -221,7 +223,7 @@ func (b *IndexerMgr) BlockHashByHeight(blockHeight int32) (*chainhash.Hash, erro
 //     after the genesis block will be returned
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) LocateBlocks(locator utils.BlockLocator, hashStop *chainhash.Hash, 
+func (b *IndexerMgr) LocateBlocks(locator mpnCommon.BlockLocator, hashStop *chainhash.Hash,
 	maxHashes uint32) []chainhash.Hash {
 	return nil
 }
@@ -239,7 +241,8 @@ func (b *IndexerMgr) LocateBlocks(locator utils.BlockLocator, hashStop *chainhas
 //     after the genesis block will be returned
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) LocateHeaders(locator utils.BlockLocator, hashStop *chainhash.Hash) []wire.BlockHeader {
+func (b *IndexerMgr) LocateHeaders(locator mpnCommon.BlockLocator,
+	hashStop *chainhash.Hash) []wire.BlockHeader {
 	return nil
 }
 
@@ -250,7 +253,6 @@ func (b *IndexerMgr) LocateHeaders(locator utils.BlockLocator, hashStop *chainha
 func (b *IndexerMgr) BlockByHash(hash *chainhash.Hash) (*btcutil.Block, error) {
 	// Lookup the block hash in block index and ensure it is in the best
 	// chain.
-	
 
 	// Load the block from the database and return it.
 	var block *btcutil.Block
@@ -265,7 +267,6 @@ func (b *IndexerMgr) BlockByHash(hash *chainhash.Hash) (*btcutil.Block, error) {
 func (b *IndexerMgr) BlockByHeight(height int32) (*btcutil.Block, error) {
 	// Lookup the block hash in block index and ensure it is in the best
 	// chain.
-	
 
 	// Load the block from the database and return it.
 	var block *btcutil.Block
@@ -287,7 +288,7 @@ func (b *IndexerMgr) BlockByHeight(height int32) (*btcutil.Block, error) {
 // whether or not the block is an orphan.
 //
 // This function is safe for concurrent access.
-func (b *IndexerMgr) ProcessBlock(block *btcutil.Block, flags blockchain.BehaviorFlags) (bool, bool, error) {
+func (b *IndexerMgr) ProcessBlock(block *btcutil.Block, flags mpnCommon.BehaviorFlags) (bool, bool, error) {
 	return true, true, nil
 	// b.chainLock.Lock()
 	// defer b.chainLock.Unlock()
@@ -408,3 +409,118 @@ func (b *IndexerMgr) IsDeploymentActive(deploymentID uint32) (bool, error) {
 
 	// return state == ThresholdActive, nil
 }
+
+// FetchUtxoView loads unspent transaction outputs for the inputs referenced by
+// the passed transaction from the point of view of the end of the main chain.
+// It also attempts to fetch the utxos for the outputs of the transaction itself
+// so the returned view can be examined for duplicate transactions.
+//
+// This function is safe for concurrent access however the returned view is NOT.
+func (b *IndexerMgr) FetchUtxoView(tx *btcutil.Tx) (*mpnCommon.UtxoViewpoint, error) {
+	return nil, nil
+	// Create a set of needed outputs based on those referenced by the
+	// inputs of the passed transaction and the outputs of the transaction
+	// itself.
+	// neededLen := len(tx.MsgTx().TxOut)
+	// if !IsCoinBase(tx) {
+	// 	neededLen += len(tx.MsgTx().TxIn)
+	// }
+	// needed := make([]wire.OutPoint, 0, neededLen)
+	// prevOut := wire.OutPoint{Hash: *tx.Hash()}
+	// for txOutIdx := range tx.MsgTx().TxOut {
+	// 	prevOut.Index = uint32(txOutIdx)
+	// 	needed = append(needed, prevOut)
+	// }
+	// if !IsCoinBase(tx) {
+	// 	for _, txIn := range tx.MsgTx().TxIn {
+	// 		needed = append(needed, txIn.PreviousOutPoint)
+	// 	}
+	// }
+
+	// // Request the utxos from the point of view of the end of the main
+	// // chain.
+	// view := NewUtxoViewpoint()
+	// b.chainLock.RLock()
+	// err := view.fetchUtxosFromCache(b.utxoCache, needed)
+	// b.chainLock.RUnlock()
+	// return view, err
+}
+
+// FlushUtxoCache flushes the UTXO state to the database if a flush is needed with the
+// given flush mode.
+//
+// This function is safe for concurrent access.
+func (b *IndexerMgr) FlushUtxoCache(mode mpnCommon.FlushMode) error {
+	// b.chainLock.Lock()
+	// defer b.chainLock.Unlock()
+
+	// return b.db.Update(func(dbTx database.Tx) error {
+	// 	return b.utxoCache.flush(dbTx, mode, b.BestSnapshot())
+	// })
+	return nil
+}
+
+// FetchUtxoEntry loads and returns the requested unspent transaction output
+// from the point of view of the end of the main chain.
+//
+// NOTE: Requesting an output for which there is no data will NOT return an
+// error.  Instead both the entry and the error will be nil.  This is done to
+// allow pruning of spent transaction outputs.  In practice this means the
+// caller must check if the returned entry is nil before invoking methods on it.
+//
+// This function is safe for concurrent access however the returned entry (if
+// any) is NOT.
+func (b *IndexerMgr) FetchUtxoEntry(outpoint wire.OutPoint) (*mpnCommon.UtxoEntry, error) {
+	return nil, nil
+}
+
+// Checkpoints returns a slice of checkpoints (regardless of whether they are
+// already known).  When there are no checkpoints for the chain, it will return
+// nil.
+//
+// This function is safe for concurrent access.
+func (b *IndexerMgr) Checkpoints() []chaincfg.Checkpoint {
+	return nil
+}
+
+// Subscribe to block chain notifications. Registers a callback to be executed
+// when various events take place. See the documentation on Notification and
+// NotificationType for details on the types and contents of notifications.
+func (b *IndexerMgr) Subscribe(callback mpnCommon.NotificationCallback) {
+
+}
+
+// ConnectBlock must be invoked when a block is extending the main chain.  It
+// keeps track of the state of each index it is managing, performs some sanity
+// checks, and invokes each indexer.
+//
+// This is part of the mpnCommon.IndexManager interface.
+func (m *IndexerMgr) ConnectBlock( block *btcutil.Block,
+	stxos []mpnCommon.SpentTxOut) error {
+
+	// Call each of the currently active optional indexes with the block
+	// being connected so they can update accordingly.
+	common.Log.Infof("ConnectBlock %v", block)
+
+	return nil
+}
+
+// DisconnectBlock must be invoked when a block is being disconnected from the
+// end of the main chain.  It keeps track of the state of each index it is
+// managing, performs some sanity checks, and invokes each indexer to remove
+// the index entries associated with the block.
+//
+// This is part of the mpnCommon.IndexManager interface.
+func (m *IndexerMgr) DisconnectBlock( block *btcutil.Block,
+	stxo []mpnCommon.SpentTxOut) error {
+
+	// Call each of the currently active optional indexes with the block
+	// being disconnected so they can update accordingly.
+	common.Log.Infof("DisconnectBlock %v", block)
+	
+	return nil
+}
+
+// Ensure the Manager type implements the mpnCommon.IndexManager interface.
+var _ mpnCommon.IndexManager = (*IndexerMgr)(nil)
+

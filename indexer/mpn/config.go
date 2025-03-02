@@ -22,14 +22,14 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	
+
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/sat20-labs/indexer/config"
 
+	"github.com/sat20-labs/indexer/indexer/mpn/common"
 	"github.com/sat20-labs/indexer/indexer/mpn/connmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/peer"
-	"github.com/sat20-labs/indexer/indexer/mpn/utils"
 )
 
 const (
@@ -53,9 +53,9 @@ const (
 	defaultBlockMinWeight        = 0
 	defaultBlockMaxWeight        = 3000000
 	blockMaxSizeMin              = 1000
-	blockMaxSizeMax              = utils.MaxBlockBaseSize - 1000
+	blockMaxSizeMax              = common.MaxBlockBaseSize - 1000
 	blockMaxWeightMin            = 4000
-	blockMaxWeightMax            = utils.MaxBlockWeight - 4000
+	blockMaxWeightMax            = common.MaxBlockWeight - 4000
 	defaultGenerate              = false
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
@@ -71,7 +71,7 @@ var (
 	defaultHomeDir    = "./" //btcutil.AppDataDir("./", false)
 	defaultConfigFile = filepath.Join(defaultHomeDir, defaultConfigFilename)
 	defaultDataDir    = filepath.Join(defaultHomeDir, defaultDataDirname)
-	knownDbTypes      = []string{"ffldb"}//database.SupportedDrivers()
+	knownDbTypes      = []string{"ffldb"} //database.SupportedDrivers()
 	defaultLogDir     = filepath.Join(defaultHomeDir, defaultLogDirname)
 )
 
@@ -475,14 +475,14 @@ func loadConfig(yamlCfg *config.YamlConf) (*mpnconfig, error) {
 	case cfg.BlockMaxSize == defaultBlockMaxSize &&
 		cfg.BlockMaxWeight != defaultBlockMaxWeight:
 
-		cfg.BlockMaxSize = utils.MaxBlockBaseSize - 1000
+		cfg.BlockMaxSize = common.MaxBlockBaseSize - 1000
 
 	// If the max block weight isn't set, but the block size is, then we'll
 	// scale the set weight accordingly based on the max block size value.
 	case cfg.BlockMaxSize != defaultBlockMaxSize &&
 		cfg.BlockMaxWeight == defaultBlockMaxWeight:
 
-		cfg.BlockMaxWeight = cfg.BlockMaxSize * utils.WitnessScaleFactor
+		cfg.BlockMaxWeight = cfg.BlockMaxSize * common.WitnessScaleFactor
 	}
 
 	// Look for illegal characters in the user agent comments.
