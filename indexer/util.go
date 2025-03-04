@@ -280,7 +280,7 @@ func GetP2TRAddressFromPubkey(pubKey []byte, chainParams *chaincfg.Params) (stri
 }
 
 func GetBootstrapPubKey() []byte {
-	pubkey, _ := hex.DecodeString(bootstrapnode.BootstrapCertificateIssuer)
+	pubkey, _ := hex.DecodeString(bootstrapnode.BootstrapPubKey)
 	return pubkey
 }
 
