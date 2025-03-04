@@ -62,17 +62,31 @@ func (s *DbWrite) FlushToDB() {
 		if err != nil {
 			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
 		}
-		s.Db.Update(func(txn *badger.Txn) error {
-			for log := range s.logs.IterBuffered() {
-				if log.Val.Type == DEL && log.Val.ExistInDb {
-					err := txn.Delete([]byte(log.Key))
-					if err != nil {
-						common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
+
+		isFinishUpdate := false
+		for {
+			if isFinishUpdate {
+				break
+			}
+			s.Db.Update(func(txn *badger.Txn) error {
+				for log := range s.logs.IterBuffered() {
+					if log.Val.Type == DEL && log.Val.ExistInDb {
+						err := txn.Delete([]byte(log.Key))
+						if err == badger.ErrTxnTooBig {
+							common.Log.Tracef("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
+							return nil
+						}
+						if err != nil {
+							common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
+						}
+						log.Val.ExistInDb = false
 					}
 				}
-			}
-			return nil
-		})
+				isFinishUpdate = true
+				return nil
+			})
+		}
+
 	}
 	s.clearLogs()
 
