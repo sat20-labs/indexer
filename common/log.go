@@ -1,43 +1,47 @@
 package common
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 )
 
-var Log = logrus.StandardLogger()
+var Log = NewLogger()
 
 func init() {
 	logrus.SetReportCaller(true)
 	Log.SetLevel(logrus.InfoLevel)
-	Log.SetFormatter(&CustomFormatter{
-		logrus.TextFormatter{
-			TimestampFormat: "01/02-15:04:05",
-			FullTimestamp:   true,
-			ForceColors:     true,
-			DisableColors:   false,
-			DisableQuote:    false,
-			ForceQuote:      true,
-			PadLevelText:    false,
-		},
-	})
 }
 
-type CustomFormatter struct {
-	logrus.TextFormatter
+func NewLogger() *logrus.Logger {
+	log := logrus.New()
+	log.SetLevel(logrus.TraceLevel)
+	log.SetFormatter(&CustomTextFormatter{})
+	return log
 }
 
-func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	switch entry.Level {
-	case logrus.TraceLevel:
-		fallthrough
-	case logrus.DebugLevel:
-		fallthrough
-	case logrus.InfoLevel:
-		entry.Caller = nil
-	case logrus.WarnLevel:
-	case logrus.ErrorLevel:
-	case logrus.FatalLevel:
-	case logrus.PanicLevel:
+// 创建一个带模块名的日志实例
+func GetLoggerEntry(module string) *logrus.Entry {
+	return Log.WithField("module", module)
+}
+
+type CustomTextFormatter struct{}
+
+func (f *CustomTextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	var b bytes.Buffer
+
+	timestamp := entry.Time.Format("2006-01-02 15:04:05")
+	b.WriteString(fmt.Sprintf("%s ", timestamp))
+	b.WriteString(fmt.Sprintf("[%s] ", entry.Level.String()))
+	moduleName, ok := entry.Data["module"].(string)
+	if !ok {
+		moduleName = "default"
 	}
-	return f.TextFormatter.Format(entry)
+	b.WriteString(fmt.Sprintf("%s: ", moduleName))
+	b.WriteString(entry.Message)
+	b.WriteByte('\n')
+
+	return b.Bytes(), nil
 }
+
