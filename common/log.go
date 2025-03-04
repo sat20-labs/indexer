@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/sirupsen/logrus"
 )
@@ -21,9 +22,19 @@ func NewLogger() *logrus.Logger {
 	return log
 }
 
+func DisabledLog() {
+	Log.SetOutput(io.Discard)
+}
+
 // 创建一个带模块名的日志实例
 func GetLoggerEntry(module string) *logrus.Entry {
 	return Log.WithField("module", module)
+}
+
+func GetDisabledLogEntry() *logrus.Entry {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	return logger.WithField("", "")
 }
 
 type CustomTextFormatter struct{}
