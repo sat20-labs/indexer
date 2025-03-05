@@ -6,7 +6,6 @@ import (
 
 	"github.com/sat20-labs/indexer/common/pb"
 
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 const (
@@ -68,7 +67,7 @@ const INVALID_ID = math.MaxUint64
 
 const ALL_TICKERS = "*"
 
-type TickerName = swire.AssetName
+type TickerName = AssetName
 
 type UtxoInfo struct {
 	UtxoId   uint64

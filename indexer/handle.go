@@ -1033,10 +1033,10 @@ func (s *IndexerMgr) getMintAmountByAddressId(ticker string, address uint64) int
 
 // 有资格的地址：跟引导节点建立了通道，而且该通道持有足够的资产
 func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
-	ticker := "pearl"
-	amt := int64(1000000)
+	assetName := common.NewAssetNameFromString(common.CORENODE_STAKING_ASSET_NAME)
+	amt := common.CORENODE_STAKING_ASSET_AMOUNT
 	if !s.IsMainnet() {
-		ticker = "dogcoin"
+		assetName.Ticker = "dogcoin"
 		amt = 1000
 	}
 
@@ -1062,7 +1062,7 @@ func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 		return false
 	}
 
-	addrmap := s.GetHoldersWithTick(ticker)
+	addrmap := s.GetHoldersWithTick(assetName.Ticker)
 	//addressId := s.compiling.GetAddressId(address3) address3 不是跑数据过程中交易相关地址，不能通过这个函数获取
 	addressId := s.rpcService.GetAddressId(address3)
 	value := addrmap[addressId]

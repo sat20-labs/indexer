@@ -6,12 +6,10 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/wire"
-
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 // 白聪
-var ASSET_PLAIN_SAT swire.AssetName = swire.AssetName{}
+var ASSET_PLAIN_SAT AssetName = AssetName{}
 
 // offset range in a UTXO, not satoshi ordinals
 type OffsetRange struct {
@@ -130,15 +128,13 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 }
 
 
-type TxAssets = swire.TxAssets
-
 type TxOutput struct {
 	UtxoId      uint64
 	OutPointStr string
 	OutValue    wire.TxOut
 	//Sats        TxRanges  废弃。需要时重新获取
 	Assets  TxAssets
-	Offsets map[swire.AssetName]AssetOffsets
+	Offsets map[AssetName]AssetOffsets
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }
@@ -149,7 +145,7 @@ func NewTxOutput(value int64) *TxOutput {
 		OutPointStr: "",
 		OutValue:    wire.TxOut{Value: value},
 		Assets:      nil,
-		Offsets:     make(map[swire.AssetName]AssetOffsets),
+		Offsets:     make(map[AssetName]AssetOffsets),
 	}
 }
 
@@ -161,7 +157,7 @@ func (p *TxOutput) Clone() *TxOutput {
 		Assets:      p.Assets.Clone(),
 	}
 
-	n.Offsets = make(map[swire.AssetName]AssetOffsets)
+	n.Offsets = make(map[AssetName]AssetOffsets)
 	for i, u := range p.Offsets {
 		n.Offsets[i] = u.Clone()
 	}
@@ -205,10 +201,6 @@ func (p *TxOutput) OutPoint() *wire.OutPoint {
 	return outpoint
 }
 
-func (p *TxOutput) OutPoint_SatsNet() *swire.OutPoint {
-	outpoint, _ := swire.NewOutPointFromString(p.OutPointStr)
-	return outpoint
-}
 
 func (p *TxOutput) TxOut() *wire.TxOut {
 	return &wire.TxOut{
@@ -217,13 +209,6 @@ func (p *TxOutput) TxOut() *wire.TxOut {
 	}
 }
 
-func (p *TxOutput) TxOut_SatsNet() *swire.TxOut {
-	return &swire.TxOut{
-		Value: p.Value(),
-		Assets: p.Assets,
-		PkScript: p.OutValue.PkScript,
-	}
-}
 
 func (p *TxOutput) TxID() string {
 	parts := strings.Split(p.OutPointStr, ":")
@@ -239,14 +224,6 @@ func (p *TxOutput) TxIn() *wire.TxIn {
 		return nil
 	}
 	return wire.NewTxIn(outpoint, nil, nil)
-}
-
-func (p *TxOutput) TxIn_SatsNet() *swire.TxIn {
-	outpoint, err := swire.NewOutPointFromString(p.OutPointStr)
-	if err != nil {
-		return nil
-	}
-	return swire.NewTxIn(outpoint, nil, nil)
 }
 
 func (p *TxOutput) SizeOfBindingSats() int64 {
@@ -292,7 +269,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 }
 
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
-func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *TxOutput, error) {
+func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutput, error) {
 
 	if p.Value() < value {
 		return nil, nil, fmt.Errorf("output value too small")
@@ -339,7 +316,7 @@ func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *T
 	assets2 := p.Assets.Clone()
 	assets2.Subtract(asset1)
 
-	part1.Assets = swire.TxAssets{*asset1}
+	part1.Assets = TxAssets{*asset1}
 	part2.Assets = assets2
 	
 	if !IsBindingSat(name) {
@@ -366,7 +343,7 @@ func (p *TxOutput) Split(name *swire.AssetName, value, amt int64) (*TxOutput, *T
 	return part1, part2, nil
 }
 
-func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, error) {
+func (p *TxOutput) GetAssetOffset(name *AssetName, amt int64) (int64, error) {
 
 	if !IsBindingSat(name) {
 		return 330, nil
@@ -411,7 +388,7 @@ func (p *TxOutput) GetAssetOffset(name *swire.AssetName, amt int64) (int64, erro
 	return 0, fmt.Errorf("offsets are wrong")
 }
 
-func (p *TxOutput) GetAsset(assetName *swire.AssetName) int64 {
+func (p *TxOutput) GetAsset(assetName *AssetName) int64 {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
 		return p.GetPlainSat()
 	}
@@ -428,7 +405,7 @@ func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 		UtxoId:      INVALID_ID,
 		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
 		OutValue:    *tx.TxOut[index],
-		Offsets:     make(map[swire.AssetName]AssetOffsets),
+		Offsets:     make(map[AssetName]AssetOffsets),
 	}
 }
 
@@ -436,14 +413,14 @@ func IsNft(assetType string) bool {
 	return assetType == ASSET_TYPE_NFT || assetType == ASSET_TYPE_NS
 }
 
-func IsPlainAsset(assetName *swire.AssetName) bool {
+func IsPlainAsset(assetName *AssetName) bool {
 	if assetName == nil {
 		return true
 	}
 	return ASSET_PLAIN_SAT == *assetName
 }
 
-func IsBindingSat(name *swire.AssetName) bool {
+func IsBindingSat(name *AssetName) bool {
 	if name == nil {
 		return true // ordx asset
 	}
@@ -456,7 +433,7 @@ func IsBindingSat(name *swire.AssetName) bool {
 }
 
 
-func IsFungibleToken(name *swire.AssetName) bool {
+func IsFungibleToken(name *AssetName) bool {
 	if name == nil {
 		return true
 	}
@@ -464,7 +441,7 @@ func IsFungibleToken(name *swire.AssetName) bool {
 	return name.Type == ASSET_TYPE_FT
 }
 
-func IsOrdx(name *swire.AssetName) bool {
+func IsOrdx(name *AssetName) bool {
 	if name == nil {
 		return false
 	}

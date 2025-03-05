@@ -8,7 +8,6 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 func (s *Model) GetSyncHeight() int {
@@ -21,7 +20,7 @@ func (s *Model) GetBlockInfo(height int) (*common.BlockInfo, error) {
 
 func (s *Model) IsDeployAllowed(ticker string) (bool, error) {
 	
-	name := swire.NewAssetNameFromString(ticker)
+	name := common.NewAssetNameFromString(ticker)
 	if name == nil {
 		return false, fmt.Errorf("invalid ticker name")
 	}

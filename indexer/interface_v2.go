@@ -5,12 +5,10 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
-
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 // return: utxoId->asset
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *swire.AssetName) (map[uint64]*common.TxOutput, error) {
+func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *common.AssetName) (map[uint64]*common.TxOutput, error) {
 	utxos, err := b.rpcService.GetUTXOs(address)
 	if err != nil {
 		return nil, err
@@ -46,7 +44,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *sw
 }
 
 // return: utxoId->asset
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *swire.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
+func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
 	utxos, err := b.rpcService.GetUTXOs(address)
 	if err != nil {
 		return nil, err
@@ -88,7 +86,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 	}
 
 	var assets common.TxAssets
-	offsetmap := make(map[swire.AssetName]common.AssetOffsets)
+	offsetmap := make(map[common.AssetName]common.AssetOffsets)
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
@@ -111,14 +109,14 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 			}
 		}
 
-		asset := swire.AssetInfo{
+		asset := common.AssetInfo{
 			Name:       k,
 			Amount:     value,
 			BindingSat: uint32(n),
 		}
 
 		if assets == nil {
-			assets = swire.TxAssets{asset}
+			assets = common.TxAssets{asset}
 		} else {
 			assets.Add(&asset)
 		}
@@ -128,14 +126,14 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 
 	assetmap2 := b.GetUnbindingAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap2 {
-		asset := swire.AssetInfo{
+		asset := common.AssetInfo{
 			Name:       k,
 			Amount:     v,
 			BindingSat: 0,
 		}
 
 		if assets == nil {
-			assets = swire.TxAssets{asset}
+			assets = common.TxAssets{asset}
 		} else {
 			assets.Add(&asset)
 		}

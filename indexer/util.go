@@ -18,8 +18,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/exotic"
-
-	"github.com/sat20-labs/satsnet_btcd/mining/posminer/bootstrapnode"
 )
 
 // memory util
@@ -280,7 +278,7 @@ func GetP2TRAddressFromPubkey(pubKey []byte, chainParams *chaincfg.Params) (stri
 }
 
 func GetBootstrapPubKey() []byte {
-	pubkey, _ := hex.DecodeString(bootstrapnode.BootstrapPubKey)
+	pubkey, _ := hex.DecodeString(common.BootstrapPubKey)
 	return pubkey
 }
 

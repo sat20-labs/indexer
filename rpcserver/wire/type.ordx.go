@@ -3,8 +3,6 @@ package wire
 import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
-
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 type TickersResp struct {
@@ -446,7 +444,7 @@ type NamesWithAddressResp struct {
 }
 
 type UtxoAssetInfo struct {
-	Asset   swire.AssetInfo     `json:"asset"`
+	Asset   common.AssetInfo     `json:"asset"`
 	Offsets common.AssetOffsets `json:"offsets"`
 }
 
@@ -461,7 +459,7 @@ type TxOutputInfo struct {
 
 type AssetSummary struct {
 	ListResp
-	Data []*swire.AssetInfo `json:"data"`
+	Data []*common.AssetInfo `json:"data"`
 }
 
 type AssetSummaryResp struct {
@@ -471,7 +469,7 @@ type AssetSummaryResp struct {
 
 type UtxosWithAssetResp struct {
 	BaseResp
-	Name swire.AssetName
+	Name common.AssetName
 	ListResp
 	Data []*TxOutputInfo `json:"data"`
 }
@@ -493,7 +491,7 @@ type AssetSummaryRespV3 struct {
 
 type UtxosWithAssetRespV3 struct {
 	BaseResp
-	Name swire.AssetName
+	Name common.AssetName
 	ListResp
 	Data []*common.AssetsInUtxo `json:"data"`
 }

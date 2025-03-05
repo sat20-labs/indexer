@@ -2,8 +2,6 @@ package common
 
 import (
 	"fmt"
-
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 const TickerSeparatedFromName = true
@@ -89,7 +87,7 @@ func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 // 用于展示统一的数据信息
 
 type TickerInfo struct {
-	swire.AssetName        `json:"name"`
+	AssetName        `json:"name"`
 	DisplayName     string `json:"displayname"`
 	Id 				int64  `json:"id"`
 	Divisibility 	int	   `json:"divisibility,omitempty"`
@@ -126,7 +124,7 @@ type MintInfo struct {
 }
 
 type MintHistory struct {
-	swire.AssetName        `json:"Name"`
+	AssetName        `json:"Name"`
 	Total    int           `json:"Total,omitempty"`
 	Start    int           `json:"Start,omitempty"`
 	Limit    int           `json:"Limit,omitempty"`
@@ -134,7 +132,7 @@ type MintHistory struct {
 }
 
 type DisplayAsset struct {
-	swire.AssetName        `json:"Name"`
+	AssetName        `json:"Name"`
 	Amount  string         `json:"Amount"`
 	BindingSat int        `json:"BindingSat"`
 	Offsets []*OffsetRange `json:"Offsets"`

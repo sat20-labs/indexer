@@ -7,8 +7,6 @@ replace github.com/btcsuite/btcd => github.com/sat20-labs/btcd v0.24.3
 
 replace github.com/btcsuite/btcwallet => github.com/sat20-labs/btcwallet v0.16.11
 
-replace github.com/sat20-lab/satsnet_btcd => ../satsnet_btcd
-
 require (
 	github.com/OLProtocol/go-bitcoind v0.0.0-20240716001842-eaea89a7c02d
 	github.com/andybalholm/brotli v1.1.0
@@ -29,7 +27,6 @@ require (
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
-	github.com/sat20-labs/satsnet_btcd v0.0.0-20250303105234-bed25fe24627
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/files v1.0.1

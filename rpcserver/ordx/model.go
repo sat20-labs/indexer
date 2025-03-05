@@ -7,7 +7,6 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
-	swire "github.com/sat20-labs/satsnet_btcd/wire"
 )
 
 type Model struct {
@@ -85,7 +84,7 @@ func (s *Model) getTicker(tickerName string) (*rpcwire.TickerStatus, error) {
 }
 
 func (s *Model) getTickerInfo(tickerName string) (*common.TickerInfo, error) {
-	ticker := s.indexer.GetTickerInfo(swire.NewAssetNameFromString(tickerName))
+	ticker := s.indexer.GetTickerInfo(common.NewAssetNameFromString(tickerName))
 	if ticker == nil {
 		return nil, fmt.Errorf("can't find ticker %s", tickerName)
 	}
@@ -98,7 +97,7 @@ func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.
 
 	result := rpcwire.AssetSummary{}
 	for tickName, balance := range tickerMap {
-		resp := &swire.AssetInfo{}
+		resp := &common.AssetInfo{}
 		resp.Name = tickName
 		resp.Amount = balance
 		resp.BindingSat = uint32(s.indexer.GetBindingSat(&tickName))
@@ -161,7 +160,7 @@ func (s *Model) GetUtxoInfoList(req *rpcwire.UtxosReq) ([]*rpcwire.TxOutputInfo,
 
 func (s *Model) GetUtxosWithAssetName(address, name string, start, limit int) ([]*rpcwire.TxOutputInfo, int, error) {
 	result := make([]*rpcwire.TxOutputInfo, 0)
-	assetName := swire.NewAssetNameFromString(name)
+	assetName := common.NewAssetNameFromString(name)
 	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV2(address, assetName)
 	if err != nil {
 		return nil, 0, err
@@ -240,7 +239,7 @@ func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo
 
 func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
 	result := make([]*common.AssetsInUtxo, 0)
-	assetName := swire.NewAssetNameFromString(name)
+	assetName := common.NewAssetNameFromString(name)
 	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV3(address, assetName)
 	if err != nil {
 		return nil, 0, err
