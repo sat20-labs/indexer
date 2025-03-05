@@ -75,6 +75,10 @@ func NewBaseIndexer(
 		maxIndexHeight:   maxIndexHeight,
 	}
 
+	if chaincfgParam.Name != "mainnet" {
+		indexer.keepBlockHistory = 24 // testnet4的分岔很多也很长
+	}
+
 	indexer.addressIdMap = make(map[string]*AddressStatus, 0)
 	indexer.prevBlockHashMap = make(map[int]string)
 
@@ -505,7 +509,7 @@ func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 	b.drainBlocksChan()
 
 	reorgHeight := currentBlock.Height
-	for i := b.lastHeight - 6; i <= b.lastHeight; i++ {
+	for i := b.lastHeight - b.keepBlockHistory + 1; i <= b.lastHeight; i++ {
 		blockHash, ok := b.prevBlockHashMap[i]
 		if ok {
 			hash, err := getBlockHash(uint64(i))
@@ -513,6 +517,10 @@ func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 				if hash != blockHash {
 					common.Log.Warnf("detected reorg at height %d, old hash %s, new hash %s", i, blockHash, hash)
 					reorgHeight = i
+					if i == b.lastHeight - b.keepBlockHistory + 1 {
+						common.Log.Panic("reorg may occur in previous block!")
+					}
+					break
 				}
 			}
 		}
