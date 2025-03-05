@@ -17,7 +17,7 @@ func init() {
 }
 
 func main() {
-	yamlcfg := config.InitConfig()
+	yamlcfg := config.InitConfig("")
 	config.InitLog(yamlcfg)
 
 	common.Log.Info("Starting...")

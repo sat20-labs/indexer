@@ -129,15 +129,18 @@ func GetBaseDir() string {
 	return execPath
 }
 
-func InitConfig() *YamlConf {
-
-	configFile := "./.env"
-	for i, item := range os.Args {
-		if item == "-env" {
-			if i < len(os.Args) {
-				configFile = os.Args[i+1]
-				break
+func InitConfig(configFile string) *YamlConf {
+	if configFile == "" {
+		for i, item := range os.Args {
+			if item == "-env" {
+				if i < len(os.Args) {
+					configFile = os.Args[i+1]
+					break
+				}
 			}
+		}
+		if configFile == "" {
+			configFile = "./.env"
 		}
 	}
 	if !strings.HasPrefix(configFile, "/") {
