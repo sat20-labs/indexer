@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"lukechampine.com/uint128"
@@ -84,27 +85,21 @@ var precisionFactor [64]*big.Int = [64]*big.Int{
 
 // Decimal represents a fixed-point decimal number with 18 decimal places
 type Decimal struct {
-	Precition int
+	Precision int
 	Value     *big.Int
 }
 
 func NewDefaultDecimal(v int64) *Decimal {
-	return &Decimal{Precition: DEFAULT_PRECISION, Value: new(big.Int).SetInt64(v)}
+	return &Decimal{Precision: DEFAULT_PRECISION, Value: new(big.Int).SetInt64(v)}
 }
 
 func NewDecimal(v int64, p int) *Decimal {
 	if p > MAX_PRECISION {
 		p = MAX_PRECISION
 	}
-	return &Decimal{Precition: p, Value: new(big.Int).SetInt64(v)}
+	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
 }
 
-func NewDecimalCopy(other *Decimal) *Decimal {
-	if other == nil {
-		return nil
-	}
-	return &Decimal{Precition: other.Precition, Value: new(big.Int).Set(other.Value)}
-}
 
 // NewDecimalFromString creates a Decimal instance from a string
 func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
@@ -156,7 +151,15 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 		value = value.Add(value, decimalPart)
 	}
 
-	return &Decimal{Precition: int(maxPrecision), Value: value}, nil
+	return &Decimal{Precision: int(maxPrecision), Value: value}, nil
+}
+
+
+func (d *Decimal) Clone() *Decimal {
+	if d == nil {
+		return nil
+	}
+	return &Decimal{Precision: d.Precision, Value: new(big.Int).Set(d.Value)}
 }
 
 // String returns the string representation of a Decimal instance
@@ -165,7 +168,7 @@ func (d *Decimal) String() string {
 		return "0"
 	}
 	value := new(big.Int).Abs(d.Value)
-	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
+	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
 	sign := ""
 	if d.Value.Sign() < 0 {
 		sign = "-"
@@ -173,67 +176,103 @@ func (d *Decimal) String() string {
 	if remainder.Sign() == 0 {
 		return fmt.Sprintf("%s%s", sign, quotient.String())
 	}
-	decimalPart := fmt.Sprintf("%0*d", d.Precition, remainder)
+	decimalPart := fmt.Sprintf("%0*d", d.Precision, remainder)
 	decimalPart = strings.TrimRight(decimalPart, "0")
 	return fmt.Sprintf("%s%s.%s", sign, quotient.String(), decimalPart)
 }
 
-// Add adds two Decimal instances and returns a new Decimal instance
+func NewDecimalFromFormatString(s string) (*Decimal, error) {
+	parts := strings.Split(s, ":")
+	switch len(parts) {
+	case 1:
+		return NewDecimalFromString(s, 0)
+	case 2:
+		precision, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		return NewDecimalFromString(parts[0], precision)
+	default:
+		return nil, fmt.Errorf("invalid format")
+	} 
+}
+
+func (d *Decimal) ToFormatString() string {
+	return fmt.Sprintf("%s:%d", d.String(), d.Precision)
+}
+
 func (d *Decimal) Add(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
 	}
-	if other == nil {
+	if other == nil || other.IsZero() {
 		value := new(big.Int).Set(d.Value)
-		return &Decimal{Precition: d.Precition, Value: value}
+		return &Decimal{Precision: d.Precision, Value: value}
 	}
-	if d == nil {
+	if d == nil || d.IsZero() {
 		value := new(big.Int).Set(other.Value)
-		return &Decimal{Precition: other.Precition, Value: value}
+		return &Decimal{Precision: other.Precision, Value: value}
 	}
-	if d.Precition != other.Precition {
+	if d.Precision != other.Precision {
 		Log.Panic("precition not match")
 	}
 	value := new(big.Int).Add(d.Value, other.Value)
-	return &Decimal{Precition: d.Precition, Value: value}
+	//return &Decimal{Precision: d.Precision, Value: value}
+	d.Value = value
+	return d
 }
 
-// Sub subtracts two Decimal instances and returns a new Decimal instance
+// Add adds two Decimal instances and returns a new Decimal instance
+func DecimalAdd(a, b *Decimal) *Decimal {
+	n := a.Clone()
+	return n.Add(b)
+}
+
 func (d *Decimal) Sub(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
 	}
-	if other == nil {
+	if other == nil || other.IsZero() {
 		value := new(big.Int).Set(d.Value)
-		return &Decimal{Precition: d.Precition, Value: value}
+		return &Decimal{Precision: d.Precision, Value: value}
 	}
-	if d == nil {
+	if d == nil || d.IsZero() {
 		value := new(big.Int).Neg(other.Value)
-		return &Decimal{Precition: other.Precition, Value: value}
+		return &Decimal{Precision: other.Precision, Value: value}
 	}
-	if d.Precition != other.Precition {
-		Log.Panicf("precition not match, (%d != %d)", d.Precition, other.Precition)
+	if d.Precision != other.Precision {
+		Log.Panicf("precition not match, (%d != %d)", d.Precision, other.Precision)
 	}
 	value := new(big.Int).Sub(d.Value, other.Value)
-	return &Decimal{Precition: d.Precition, Value: value}
+	//return &Decimal{Precision: d.Precision, Value: value}
+	d.Value = value
+	return d
 }
 
-// Mul muls two Decimal instances and returns a new Decimal instance
+// Sub subtracts two Decimal instances and returns a new Decimal instance
+func DecimalSub(a, b *Decimal) *Decimal {
+	n := a.Clone()
+	return n.Sub(b)
+}
+
 func (d *Decimal) Mul(other *big.Int) *Decimal {
 	if d == nil || other == nil {
 		return nil
 	}
 	value := new(big.Int).Mul(d.Value, other)
-	return &Decimal{Precition: d.Precition, Value: value}
+	//return &Decimal{Precision: d.Precision, Value: value}
+	d.Value = value
+	return d
 }
 
-// Div divs two Decimal instances and returns a new Decimal instance
 func (d *Decimal) Div(other *big.Int) *Decimal {
 	if d == nil || other == nil {
 		return nil
 	}
 	value := new(big.Int).Div(d.Value, other)
-	return &Decimal{Precition: d.Precition, Value: value}
+	//return &Decimal{Precision: d.Precision, Value: value}
+	d.Value = value
+	return d
 }
 
 func (d *Decimal) Cmp(other *Decimal) int {
@@ -246,21 +285,8 @@ func (d *Decimal) Cmp(other *Decimal) int {
 	if d == nil {
 		return -other.Value.Sign()
 	}
-	if d.Precition != other.Precition {
-		Log.Panicf("precition not match, (%d != %d)", d.Precition, other.Precition)
-	}
-	return d.Value.Cmp(other.Value)
-}
-
-func (d *Decimal) CmpAlign(other *Decimal) int {
-	if d == nil && other == nil {
-		return 0
-	}
-	if other == nil {
-		return d.Value.Sign()
-	}
-	if d == nil {
-		return -other.Value.Sign()
+	if d.Precision != other.Precision {
+		Log.Panicf("precition not match, (%d != %d)", d.Precision, other.Precision)
 	}
 	return d.Value.Cmp(other.Value)
 }
@@ -278,8 +304,19 @@ func (d *Decimal) IsOverflowInt64() bool {
 	}
 
 	integerPart := new(big.Int).SetInt64(math.MaxInt64)
-	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
+	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precision])
 	return d.Value.Cmp(value) > 0
+}
+
+func (d *Decimal) IsZero() bool {
+	return d.Sign() == 0
+}
+
+func (d *Decimal) SetValue(value int64) {
+	if d == nil {
+		return
+	}
+	d.Value = new(big.Int).SetInt64(value)
 }
 
 func (d *Decimal) GetMaxInt64() *Decimal {
@@ -287,8 +324,8 @@ func (d *Decimal) GetMaxInt64() *Decimal {
 		return nil
 	}
 	integerPart := new(big.Int).SetInt64(math.MaxInt64)
-	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precition])
-	return &Decimal{Precition: d.Precition, Value: value}
+	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precision])
+	return &Decimal{Precision: d.Precision, Value: value}
 }
 
 func (d *Decimal) Float64() float64 {
@@ -296,8 +333,8 @@ func (d *Decimal) Float64() float64 {
 		return 0
 	}
 	value := new(big.Int).Abs(d.Value)
-	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
-	decimalPart := float64(remainder.Int64()) / float64(precisionFactor[d.Precition].Int64())
+	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
+	decimalPart := float64(remainder.Int64()) / float64(precisionFactor[d.Precision].Int64())
 	result := float64(quotient.Int64()) + decimalPart
 	if d.Value.Sign() < 0 {
 		return -result
@@ -305,12 +342,25 @@ func (d *Decimal) Float64() float64 {
 	return result
 }
 
+func (d *Decimal) Int64() int64 {
+	if d == nil {
+		return 0
+	}
+	if d.Precision != 0 {
+		Log.Panic("only support the case of precision == 0")
+	}
+	if !d.Value.IsInt64() {
+		Log.Panic("only support the case of sat assets")
+	}
+	return d.Value.Int64()
+}
+
 func (d *Decimal) IntegerPart() int64 {
 	if d == nil {
 		return 0
 	}
 	value := new(big.Int).Abs(d.Value)
-	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precition], new(big.Int))
+	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
 	return quotient.Int64()
 }
 
@@ -334,23 +384,23 @@ func (d *Decimal) ToInt64WithMax(max *Decimal) int64 {
 	return d.Div(precisionFactor[scaleIndex]).Value.Int64()
 }
 
-func NewDecimalFromInt64WithMax(value int64, max *Decimal) (*Decimal) {
+func NewDecimalFromInt64WithMax(value int64, max *Decimal) *Decimal {
 
 	if !max.IsOverflowInt64() {
-		return NewDecimal(value, max.Precition)
+		return NewDecimal(value, max.Precision)
 	}
 
 	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
 	scaleIndex := decimalDigits(quotient.Uint64())
 
-	result := NewDecimal(value, max.Precition)
+	result := NewDecimal(value, max.Precision)
 	return result.Mul(precisionFactor[scaleIndex])
 }
 
 func NewDecimalFromUint128(n uint128.Uint128, precition int) *Decimal {
 	value := new(big.Int).SetUint64(n.Lo)
 	value = value.Add(value, new(big.Int).SetUint64(n.Hi).Lsh(new(big.Int).SetUint64(n.Hi), 64))
-	return &Decimal{Precition: precition, Value: value}
+	return &Decimal{Precision: precition, Value: value}
 }
 
 func (d *Decimal) ToUint128() uint128.Uint128 {
@@ -369,7 +419,7 @@ func decimalDigits(n uint64) int {
 func Uint128ToInt64(supply, amt uint128.Uint128) int64 {
 	if supply.Hi == 0 {
 		return amt.Big().Int64()
-	} 
+	}
 
 	q, _ := supply.QuoRem64(math.MaxInt64)
 	scaleIndex := decimalDigits(q.Lo)
@@ -380,7 +430,7 @@ func Uint128ToInt64(supply, amt uint128.Uint128) int64 {
 func Int64ToUint128(supply uint128.Uint128, amt int64) uint128.Uint128 {
 	if supply.Hi == 0 {
 		return uint128.From64(uint64(amt))
-	} 
+	}
 
 	q, _ := supply.QuoRem64(math.MaxInt64)
 	scaleIndex := decimalDigits(q.Lo)

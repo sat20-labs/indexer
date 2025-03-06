@@ -444,7 +444,7 @@ type NamesWithAddressResp struct {
 }
 
 type UtxoAssetInfo struct {
-	Asset   common.AssetInfo     `json:"asset"`
+	Asset   common.AssetInfo    `json:"asset"`
 	Offsets common.AssetOffsets `json:"offsets"`
 }
 

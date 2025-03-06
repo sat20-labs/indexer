@@ -175,7 +175,7 @@ func (p *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 
 	if !bValid {
 		// 异常路径：没有可用余额，先将transfer铭文保存起来，以后可能可以用（TODO 要看BRC20协议是否这样处理）
-		availableBalance := common.NewDecimal(0, nft.TransferNft.Amount.Precition)
+		availableBalance := common.NewDecimal(0, nft.TransferNft.Amount.Precision)
 		// 仅为了创建tickInfo
 		p.addHolderBalance(nft.Ticker, nft.AddressId, *availableBalance)
 

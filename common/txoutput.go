@@ -269,7 +269,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 }
 
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
-func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutput, error) {
+func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
 	if p.Value() < value {
 		return nil, nil, fmt.Errorf("output value too small")
@@ -285,7 +285,7 @@ func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutpu
 	part2 := NewTxOutput(value2)
 
 	if name == nil || *name == ASSET_PLAIN_SAT {
-		if p.Value() < amt {
+		if p.Value() < amt.Int64() {
 			return nil, nil, fmt.Errorf("amount too large")
 		}
 		part2.Assets = p.Assets
@@ -299,7 +299,7 @@ func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutpu
 	}
 	n := asset.BindingSat
 	if n != 0 {
-		if amt%int64(n) != 0 {
+		if amt.Int64()%int64(n) != 0 {
 			return nil, nil, fmt.Errorf("amt must be times of %d", n)
 		}
 		requiredValue := GetBindingSatNum(amt, asset.BindingSat)
@@ -308,11 +308,11 @@ func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutpu
 		}
 	}
 
-	if asset.Amount < amt {
+	if asset.Amount.Cmp(amt) < 0 {
 		return nil, nil, fmt.Errorf("amount too large")
 	}
 	asset1 := asset.Clone()
-	asset1.Amount = amt
+	asset1.Amount = *amt
 	assets2 := p.Assets.Clone()
 	assets2.Subtract(asset1)
 
@@ -329,7 +329,7 @@ func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutpu
 	if !ok {
 		return nil, nil, fmt.Errorf("can't find asset offset")
 	}
-	if asset.Amount == amt {
+	if asset.Amount.Cmp(amt) == 0 {
 		part1.Offsets[*name] = offsets.Clone()
 		if part2.Value() == 0 {
 			part2 = nil
@@ -343,17 +343,17 @@ func (p *TxOutput) Split(name *AssetName, value, amt int64) (*TxOutput, *TxOutpu
 	return part1, part2, nil
 }
 
-func (p *TxOutput) GetAssetOffset(name *AssetName, amt int64) (int64, error) {
+func (p *TxOutput) GetAssetOffset(name *AssetName, amt *Decimal) (int64, error) {
 
 	if !IsBindingSat(name) {
 		return 330, nil
 	}
 
 	if IsPlainAsset(name) {
-		if p.Value() < amt {
+		if p.Value() < amt.Int64() {
 			return 0, fmt.Errorf("amount too large")
 		}
-		return amt, nil
+		return amt.Int64(), nil
 	}
 
 	offsets, ok := p.Offsets[*name]
@@ -370,33 +370,34 @@ func (p *TxOutput) GetAssetOffset(name *AssetName, amt int64) (int64, error) {
 	}
 
 	total := asset.Amount
-	if amt > total {
+	cmp := amt.Cmp(&total)
+	if cmp > 0 {
 		return 0, fmt.Errorf("amt too large")
-	} else if amt == total {
+	} else if cmp == 0 {
 		return offsets[len(offsets)-1].End, nil
 	}
 
-	amt = GetBindingSatNum(amt, asset.BindingSat)
+	satsNum := GetBindingSatNum(amt, asset.BindingSat)
 	for _, off := range offsets {
-		if amt >= off.End-off.Start {
-			amt -= off.End - off.Start
+		if satsNum >= off.End-off.Start {
+			satsNum -= off.End - off.Start
 		} else {
-			return off.Start + amt, nil
+			return off.Start + satsNum, nil
 		}
 	}
 
 	return 0, fmt.Errorf("offsets are wrong")
 }
 
-func (p *TxOutput) GetAsset(assetName *AssetName) int64 {
+func (p *TxOutput) GetAsset(assetName *AssetName) *Decimal {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
-		return p.GetPlainSat()
+		return NewDecimal(p.GetPlainSat(), 0)
 	}
 	asset, err := p.Assets.Find(assetName)
 	if err != nil {
-		return 0
+		return nil
 	}
-	return asset.Amount
+	return &asset.Amount
 }
 
 // should fill out Assets parameters.
@@ -450,9 +451,9 @@ func IsOrdx(name *AssetName) bool {
 }
 
 // amt的资产需要多少聪
-func GetBindingSatNum(amt int64, n uint32) int64 {
+func GetBindingSatNum(amt *Decimal, n uint32) int64 {
 	if n == 0 {
 		return 0
 	}
-	return (amt + int64(n) - 1)/int64(n)
+	return (amt.Int64() + int64(n) - 1)/int64(n)
 }

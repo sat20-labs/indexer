@@ -33,7 +33,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *co
 			}
 		} else {
 			amt := info.GetAsset(ticker)
-			if amt == 0 {
+			if amt.Sign() == 0 {
 				continue
 			}
 			result[utxoId] = info
@@ -111,7 +111,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 
 		asset := common.AssetInfo{
 			Name:       k,
-			Amount:     value,
+			Amount:     *common.NewDecimal(value, 0),
 			BindingSat: uint32(n),
 		}
 
@@ -124,11 +124,11 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		offsetmap[k] = offsets
 	}
 
-	assetmap2 := b.GetUnbindingAssetsWithUtxo(info.UtxoId)
+	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	for k, v := range assetmap2 {
 		asset := common.AssetInfo{
 			Name:       k,
-			Amount:     v,
+			Amount:     *v,
 			BindingSat: 0,
 		}
 

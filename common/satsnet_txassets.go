@@ -33,16 +33,13 @@ func (p *AssetName) String() string {
 
 type AssetInfo struct {
 	Name       AssetName
-	Amount     int64  // 资产数量
+	Amount     Decimal  // 资产数量
 	BindingSat uint32 // 非0 -> 每一聪绑定的资产的数量, 0 -> 不绑定聪
 }
 
 func (p *AssetInfo) Add(another *AssetInfo) error {
 	if p.Name == another.Name {
-		if p.Amount+another.Amount < 0 {
-			return fmt.Errorf("out of bound")
-		}
-		p.Amount += another.Amount
+		p.Amount = *p.Amount.Add(&another.Amount)
 	} else {
 		return fmt.Errorf("not the same asset")
 	}
@@ -51,10 +48,10 @@ func (p *AssetInfo) Add(another *AssetInfo) error {
 
 func (p *AssetInfo) Subtract(another *AssetInfo) error {
 	if p.Name == another.Name {
-		if p.Amount < another.Amount {
+		if p.Amount.Cmp(&another.Amount) < 0 {
 			return fmt.Errorf("not enough asset to subtract")
 		}
-		p.Amount -= another.Amount
+		p.Amount = *p.Amount.Sub(&another.Amount)
 	} else {
 		return fmt.Errorf("not the same asset")
 	}
@@ -194,10 +191,7 @@ func (p *TxAssets) Add(asset *AssetInfo) error {
 	}
 	index, found := p.findIndex(&asset.Name)
 	if found {
-		if (*p)[index].Amount+asset.Amount < 0 {
-			return fmt.Errorf("out of bounds")
-		}
-		(*p)[index].Amount += asset.Amount
+		(*p)[index].Amount = *(*p)[index].Amount.Add(&asset.Amount)
 	} else {
 		*p = append(*p, AssetInfo{}) // Extend slice
 		copy((*p)[index+1:], (*p)[index:])
@@ -211,7 +205,7 @@ func (p *TxAssets) Subtract(asset *AssetInfo) error {
 	if asset == nil {
 		return nil
 	}
-	if asset.Amount == 0 {
+	if asset.Amount.IsZero() {
 		return nil
 	}
 
@@ -219,18 +213,18 @@ func (p *TxAssets) Subtract(asset *AssetInfo) error {
 	if !found {
 		return errors.New("asset not found")
 	}
-	if (*p)[index].Amount < asset.Amount {
+	if (*p)[index].Amount.Cmp(&asset.Amount) < 0 {
 		return errors.New("insufficient asset amount")
 	}
-	(*p)[index].Amount -= asset.Amount
-	if (*p)[index].Amount == 0 {
+	(*p)[index].Amount = *(*p)[index].Amount.Sub(&asset.Amount)
+	if (*p)[index].Amount.IsZero() {
 		*p = append((*p)[:index], (*p)[index+1:]...)
 	}
 	return nil
 }
 
 // PickUp 从资产列表中提取指定名称和数量的资产，原资产不改变
-func (p *TxAssets) PickUp(asset *AssetName, amt int64) (*AssetInfo, error) {
+func (p *TxAssets) PickUp(asset *AssetName, amt *Decimal) (*AssetInfo, error) {
 	if asset == nil {
 		return nil, fmt.Errorf("need a specific asset")
 	}
@@ -238,11 +232,11 @@ func (p *TxAssets) PickUp(asset *AssetName, amt int64) (*AssetInfo, error) {
 	if !found {
 		return nil, errors.New("asset not found")
 	}
-	if (*p)[index].Amount < amt {
+	if (*p)[index].Amount.Cmp(amt) < 0 {
 		return nil, errors.New("insufficient asset amount")
 	}
 	
-	picked := AssetInfo{Name: *asset, Amount: amt, BindingSat: (*p)[index].BindingSat}
+	picked := AssetInfo{Name: *asset, Amount: *amt, BindingSat: (*p)[index].BindingSat}
 	return &picked, nil
 }
 
@@ -258,7 +252,7 @@ func (p *TxAssets) GetBindingSatAmout() int64 {
 	amount := int64(0)
 	for _, asset := range *p {
 		if asset.BindingSat != 0 {
-			n := GetBindingSatNum(asset.Amount, asset.BindingSat)
+			n := GetBindingSatNum(&asset.Amount, asset.BindingSat)
 			if amount < n {
 				amount = n
 			}
