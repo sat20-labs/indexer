@@ -7,7 +7,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
-	"lukechampine.com/uint128"
 )
 
 // interface for RPC
@@ -260,30 +259,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 	for k, v := range ret {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
-	}
-
-	return result
-}
-
-func (b *IndexerMgr) U128ToInt64(runeId string, amt uint128.Uint128) int64 {
-	info := b.RunesIndexer.GetRuneInfoWithId(runeId)
-	if info == nil {
-		return amt.Big().Int64()
-	}
-
-	return common.Uint128ToInt64(info.MaxSupply, amt)
-}
-
-// return: ticker -> assets(amt)
-func (b *IndexerMgr) GetUnbindingAssetsWithUtxo(utxoId uint64) map[common.TickerName]int64 {
-	result := make(map[common.TickerName]int64)
-
-	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
-	if len(runesAssets) > 0 {
-		for _, v := range runesAssets {
-			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.RuneId}
-			result[tickName] = b.U128ToInt64(v.RuneId, v.Balance)
-		}
 	}
 
 	return result

@@ -107,7 +107,6 @@ type Indexer interface {
 	GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo
 	GetBindingSat(tickerName *common.TickerName) int
 
-	GetAssetSummaryInAddressV2(address string) map[common.TickerName]int64
 	GetAssetSummaryInAddressV3(address string) map[common.TickerName]*common.Decimal
 	// return: mint info sorted by inscribed time
 	GetMintHistoryWithAddressV2(address string, tickerName *common.TickerName, start, limit int) ([]*common.MintInfo, int)

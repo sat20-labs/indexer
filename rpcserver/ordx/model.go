@@ -93,25 +93,24 @@ func (s *Model) getTickerInfo(tickerName string) (*common.TickerInfo, error) {
 }
 
 func (s *Model) GetAssetSummary(address string, start int, limit int) (*rpcwire.AssetSummary, error) {
-	//tickerMap := s.indexer.GetAssetSummaryInAddressV2(address)
+	tickerMap := s.indexer.GetAssetSummaryInAddressV3(address)
 
-	// result := rpcwire.AssetSummary{}
-	// for tickName, balance := range tickerMap {
-	// 	resp := &common.AssetInfo{}
-	// 	resp.Name = tickName
-	// 	resp.Amount = balance
-	// 	resp.BindingSat = uint32(s.indexer.GetBindingSat(&tickName))
-	// 	result.Data = append(result.Data, resp)
-	// }
-	// result.Start = 0
-	// result.Total = uint64(len(result.Data))
+	result := rpcwire.AssetSummary{}
+	for tickName, balance := range tickerMap {
+		resp := &common.AssetInfo{}
+		resp.Name = tickName
+		resp.Amount = *balance
+		resp.BindingSat = uint32(s.indexer.GetBindingSat(&tickName))
+		result.Data = append(result.Data, resp)
+	}
+	result.Start = 0
+	result.Total = uint64(len(result.Data))
 
-	// sort.Slice(result.Data, func(i, j int) bool {
-	// 	return result.Data[i].Amount > result.Data[j].Amount
-	// })
+	sort.Slice(result.Data, func(i, j int) bool {
+		return result.Data[i].Amount.Cmp(&result.Data[j].Amount) > 0
+	})
 
-	//return &result, nil
-	return nil, fmt.Errorf("not support")
+	return &result, nil
 }
 
 func (s *Model) GetUtxoInfo(utxo string) (*rpcwire.TxOutputInfo, error) {
