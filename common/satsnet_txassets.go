@@ -64,7 +64,7 @@ func (p *AssetInfo) Clone() *AssetInfo {
 	}
 	return &AssetInfo{
 		Name:       p.Name,
-		Amount:     p.Amount,
+		Amount:     *p.Amount.Clone(),
 		BindingSat: p.BindingSat,
 	}
 }
@@ -195,7 +195,7 @@ func (p *TxAssets) Add(asset *AssetInfo) error {
 	} else {
 		*p = append(*p, AssetInfo{}) // Extend slice
 		copy((*p)[index+1:], (*p)[index:])
-		(*p)[index] = *asset
+		(*p)[index] = *asset.Clone()
 	}
 	return nil
 }

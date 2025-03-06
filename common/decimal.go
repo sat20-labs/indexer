@@ -346,13 +346,11 @@ func (d *Decimal) Int64() int64 {
 	if d == nil {
 		return 0
 	}
-	if d.Precision != 0 {
-		Log.Panic("only support the case of precision == 0")
+	if d.Precision == 0 {
+		return d.Value.Int64()
 	}
-	if !d.Value.IsInt64() {
-		Log.Panic("only support the case of sat assets")
-	}
-	return d.Value.Int64()
+
+	return d.IntegerPart()
 }
 
 func (d *Decimal) IntegerPart() int64 {
