@@ -1046,7 +1046,7 @@ func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 		return false
 	}
 
-	address2, err := GetP2TRAddressFromPubkey(pubkeyBytes, s.chaincfgParam)
+	address2, err := common.GetP2TRAddressFromPubkey(pubkeyBytes, s.chaincfgParam)
 	if err != nil {
 		common.Log.Errorf("GetP2TRAddressFromPubkey %s failed, %v", pubkey, err)
 		return false
@@ -1056,7 +1056,7 @@ func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 		return false
 	}
 
-	address3, err := GetCoreNodeChannelAddress(pubkeyBytes, s.chaincfgParam)
+	address3, err := common.GetCoreNodeChannelAddress(pubkeyBytes, s.chaincfgParam)
 	if err != nil {
 		common.Log.Errorf("GetCoreNodeChannelAddress %s failed, %v", pubkey, err)
 		return false
