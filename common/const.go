@@ -17,11 +17,13 @@ const MIN_BLOCK_INTERVAL = 1000
 
 
 const (
-	// BootstrapPubKey is the public key of the bootstrap Certificate Issuer.
+	// TODO 正式发布前需要修改pubkey，使用全新的pubkey
+	// tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua
 	BootstrapPubKey = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad" //
 	BootStrapNodeId = 1
 
-	CoreNodePubKey = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad" //
+	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
+	CoreNodePubKey = "025969619147342fc7d692ed4e9bec939ac4f9798056c79205b1cbd3bdc933d37c" //
 	CoreNodeId = 100
 
 	CORENODE_STAKING_ASSET_NAME string = "ordx:f:pearl"
