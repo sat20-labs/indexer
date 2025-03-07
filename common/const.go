@@ -23,7 +23,7 @@ const (
 	BootStrapNodeId = 1
 
 	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
-	CoreNodePubKey = "025969619147342fc7d692ed4e9bec939ac4f9798056c79205b1cbd3bdc933d37c" //
+	CoreNodePubKey = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e" //
 	CoreNodeId = 100
 
 	CORENODE_STAKING_ASSET_NAME string = "ordx:f:pearl"
