@@ -73,7 +73,7 @@ func (p *AssetInfo) Equal(another *AssetInfo) bool {
 	if another == nil {
 		return false
 	}
-	return p.Name == another.Name && p.Amount == another.Amount &&
+	return p.Name == another.Name && p.Amount.Cmp(&another.Amount) == 0 &&
 		p.BindingSat == another.BindingSat
 }
 
@@ -147,7 +147,7 @@ func (p *TxAssets) Equal(another *TxAssets) bool {
 	}
 	
 	for i, asset := range *p {
-		if asset != (*another)[i] {
+		if !asset.Equal(&(*another)[i]) {
 			return false
 		}
 	}
@@ -191,7 +191,7 @@ func (p *TxAssets) Add(asset *AssetInfo) error {
 	}
 	index, found := p.findIndex(&asset.Name)
 	if found {
-		(*p)[index].Amount = *(*p)[index].Amount.Add(&asset.Amount)
+		(*p)[index].Amount = *(*p)[index].Amount.Add(asset.Amount.Clone())
 	} else {
 		*p = append(*p, AssetInfo{}) // Extend slice
 		copy((*p)[index+1:], (*p)[index:])

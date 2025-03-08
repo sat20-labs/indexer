@@ -1,7 +1,5 @@
 package common
 
-import "fmt"
-
 type BRC20Mint struct {
 	Nft  *Nft
 	Id   int64
@@ -119,7 +117,7 @@ func (p *BRC20MintAbbrInfo) ToMintInfo() *MintInfo {
 	return &MintInfo{
 		Id: p.Id,
 		//Address: p.Address,
-		Amount: fmt.Sprintf("%d", p.Amount),
+		Amount: p.Amount.ToFormatString(),
 		Ordinals: nil,
 		Height: p.Height,
 		InscriptionId: p.InscriptionId,

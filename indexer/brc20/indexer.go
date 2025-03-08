@@ -200,7 +200,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		}
 
 		mintAmount, _ := s.GetMintAmount(name)
-		if holderAmount != *mintAmount {
+		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
 			return false
 		}
@@ -223,7 +223,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		}
 
 		mintAmount, _ := s.GetMintAmount(name)
-		if holderAmount != *mintAmount {
+		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
 			return false
 		}

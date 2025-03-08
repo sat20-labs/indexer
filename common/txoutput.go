@@ -312,7 +312,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 		return nil, nil, fmt.Errorf("amount too large")
 	}
 	asset1 := asset.Clone()
-	asset1.Amount = *amt
+	asset1.Amount = *amt.Clone()
 	assets2 := p.Assets.Clone()
 	assets2.Subtract(asset1)
 
@@ -397,7 +397,7 @@ func (p *TxOutput) GetAsset(assetName *AssetName) *Decimal {
 	if err != nil {
 		return nil
 	}
-	return &asset.Amount
+	return asset.Amount.Clone()
 }
 
 // should fill out Assets parameters.

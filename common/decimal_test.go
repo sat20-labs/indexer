@@ -20,6 +20,13 @@ func TestDecimal(t *testing.T) {
 	d00 := NewDecimalFromInt64WithMax(value, max)
 	fmt.Printf("Decimal 1 NewDecimalFromInt64WithMax: %s\n", d00.String()) // 12.345
 	fmt.Printf("%s\n", d0.GetMaxInt64().String())
+	d01 := *d0
+	d02 := d01
+	d01.Value.SetInt64(2)
+	fmt.Printf("Decimal d0 string: %s\n", d0.String())     
+	fmt.Printf("Decimal d01 string: %s\n", d01.String())     
+	fmt.Printf("Decimal d02 string: %s\n", d02.String())     
+
 
 	d1 := NewDecimal(12345000000, 6)
 	// 测试通过字符串创建 Decimal
