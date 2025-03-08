@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
@@ -9,7 +8,6 @@ import (
 	"github.com/sat20-labs/indexer/rpcserver"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -93,36 +91,13 @@ func InitRpc(conf *config.YamlConf) error {
 	var port int
 	var user string
 	var pass string
-	var dataDir string
-	var logLvl logrus.Level
-	var logPath string
-	var periodFlushToDB int
-	
+
 	host = conf.ShareRPC.Bitcoin.Host
 	port = conf.ShareRPC.Bitcoin.Port
 	user = conf.ShareRPC.Bitcoin.User
 	pass = conf.ShareRPC.Bitcoin.Password
-	dataDir = conf.DB.Path
-	var err error
-	logLvl, err = logrus.ParseLevel(conf.Log.Level)
-	if err != nil {
-		return fmt.Errorf("failed to parse log level: %s", err)
-	}
-	logPath = conf.Log.Path
 	
-	chain := conf.Chain
-	common.Log.WithFields(logrus.Fields{
-		"BitcoinChain":    chain,
-		"BitcoinRPCHost":  host,
-		"BitcoinRPCPort":  port,
-		"BitcoinRPCUser":  user,
-		"BitcoinRPCPass":  pass,
-		"DataDir":         dataDir,
-		"LogLevel":        logLvl,
-		"LogPath":         logPath,
-		"PeriodFlushToDB": periodFlushToDB,
-	}).Info("using configuration")
-	err = bitcoin_rpc.InitBitconRpc(
+	err := bitcoin_rpc.InitBitconRpc(
 		host,
 		port,
 		user,
