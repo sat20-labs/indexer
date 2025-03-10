@@ -8,9 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
@@ -79,16 +77,6 @@ func AddrToPkScript(addr string, chain string) ([]byte, error) {
 	}
 	return txscript.PayToAddrScript(address)
 }
-
-func SignalsReplacement(tx *wire.MsgTx) bool {
-	for _, txIn := range tx.TxIn {
-		if txIn.Sequence <= mempool.MaxRBFSequence {
-			return true
-		}
-	}
-	return false
-}
-
 
 func AddressToPkScript(address string, isMainnet bool) ([]byte, error) {
 	var params *chaincfg.Params

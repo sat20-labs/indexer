@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -166,4 +168,13 @@ func getInsctiptionList(utxo string) ([]*Inscription, error) {
 		}
 	}
 	return inscriptionList, nil
+}
+
+func SignalsReplacement(tx *wire.MsgTx) bool {
+	for _, txIn := range tx.TxIn {
+		if txIn.Sequence <= mempool.MaxRBFSequence {
+			return true
+		}
+	}
+	return false
 }

@@ -123,7 +123,7 @@ func (s *Service) tx_decodePsbt(c *gin.Context) {
 		InputInfos:  make([]InputInfo, 0),
 		OutputInfos: make([]OutputInfo, 0),
 		Features: &TxDecode2Features{
-			Rbf: common.SignalsReplacement(pb.UnsignedTx),
+			Rbf: SignalsReplacement(pb.UnsignedTx),
 		},
 		Inscriptions:       make(map[string]*Inscription),
 		FeeRate:            feeRateStr,
