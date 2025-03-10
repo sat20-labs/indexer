@@ -29,6 +29,9 @@ const (
 	CORENODE_STAKING_ASSET_NAME string = "ordx:f:pearl"
 	CORENODE_STAKING_ASSET_AMOUNT int64 = 1000000
 
+	TESTNET_CORENODE_STAKING_ASSET_NAME string = "ordx:f:dogcoin"
+	TESTNET_CORENODE_STAKING_ASSET_AMOUNT int64 = 1000
+
 	// 0 invalid
 	// 1-99 boostrap
 	// 100-999 core

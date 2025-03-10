@@ -1036,8 +1036,8 @@ func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 	assetName := common.NewAssetNameFromString(common.CORENODE_STAKING_ASSET_NAME)
 	amt := common.CORENODE_STAKING_ASSET_AMOUNT
 	if !s.IsMainnet() {
-		assetName.Ticker = "dogcoin"
-		amt = 1000
+		assetName = common.NewAssetNameFromString(common.TESTNET_CORENODE_STAKING_ASSET_NAME)
+		amt = common.TESTNET_CORENODE_STAKING_ASSET_AMOUNT
 	}
 
 	pubkeyBytes, err := hex.DecodeString(pubkey)
