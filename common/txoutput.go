@@ -18,6 +18,9 @@ type OffsetRange struct {
 }
 
 func (p *OffsetRange) Clone() *OffsetRange {
+	if p == nil {
+		return nil
+	}
 	n := *p
 	return &n
 }
@@ -25,6 +28,10 @@ func (p *OffsetRange) Clone() *OffsetRange {
 type AssetOffsets []*OffsetRange
 
 func (p *AssetOffsets) Clone() AssetOffsets {
+	if p == nil {
+		return nil
+	}
+
 	result := make([]*OffsetRange, len(*p))
 	for i, u := range *p {
 		result[i] = &OffsetRange{Start: u.Start, End: u.End}
@@ -32,8 +39,27 @@ func (p *AssetOffsets) Clone() AssetOffsets {
 	return result
 }
 
+func (p *AssetOffsets) Size() int64 {
+	if p == nil {
+		return 0
+	}
+	total := int64(0)
+	for _, rng := range *p {
+		total += rng.End - rng.Start
+	}
+	return total
+}
+
+// 按资产分割
 func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 	var left, right []*OffsetRange
+
+	if p == nil {
+		return nil, nil
+	}
+	if amt == 0 {
+		return nil, p.Clone()
+	}
 
 	remaining := amt
 	offset := int64(0)
@@ -54,6 +80,39 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 			n.Start -= offset
 			n.End -= offset
 			right = append(right, n)
+		}
+	}
+
+	return left, right
+}
+
+
+// 按聪数量分割, Append 的逆操作
+func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
+	var left, right []*OffsetRange
+
+	if p == nil {
+		return nil, nil
+	}
+	if value == 0 {
+		return nil, p.Clone()
+	}
+
+	offset := value
+	for _, r := range *p {
+		if r.Start >= offset {
+			// 完全在右边
+			n := r.Clone()
+			n.Start -= offset
+			n.End -= offset
+			right = append(right, n)
+		} else if r.End <= offset {
+			// 完全在左边
+			left = append(left, r)
+		} else {
+			// 跨越 offset，需要拆分
+			left = append(left, &OffsetRange{Start: r.Start, End: offset})
+			right = append(right, &OffsetRange{Start: 0, End: r.End - offset})
 		}
 	}
 
@@ -268,6 +327,58 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	return nil
 }
 
+
+// 按照offset将TxOut分割为两个，是Append的反操作
+func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
+
+	if p.Value() < offset {
+		return nil, nil, fmt.Errorf("offset too large")
+	}
+	if p.Value() == offset {
+		return p.Clone(), nil, nil
+	}
+	
+	var value1, value2 int64
+	value1 = offset
+	value2 = p.Value() - value1
+	part1 := NewTxOutput(value1)
+	part2 := NewTxOutput(value2)
+
+	for _, asset := range p.Assets {
+		if asset.BindingSat > 0 {
+			// cut
+			newOffsets := p.Offsets[asset.Name]
+			offset1, offset2 := newOffsets.Cut(offset)
+
+			amt1 := offset1.Size() * int64(asset.BindingSat)
+			if amt1 > 0 {
+				asset1 := AssetInfo{
+					Name: asset.Name,
+					Amount: *NewDecimal(amt1, 0),
+					BindingSat: asset.BindingSat,
+				}
+				part1.Assets.Add(&asset1)
+				part1.Offsets[asset.Name] = offset1
+			}
+			
+			amt2 := offset2.Size() * int64(asset.BindingSat)
+			if amt2 > 0 {
+				asset2 := AssetInfo{
+					Name: asset.Name,
+					Amount: *NewDecimal(amt2, 0),
+					BindingSat: asset.BindingSat,
+				}
+				part2.Assets.Add(&asset2)
+				part2.Offsets[asset.Name] = offset2
+			}
+		} else {
+			part1.Assets.Add(&asset)
+		}
+	}
+
+	return part1, part2, nil
+}
+
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
@@ -456,4 +567,12 @@ func GetBindingSatNum(amt *Decimal, n uint32) int64 {
 		return 0
 	}
 	return (amt.Int64() + int64(n) - 1)/int64(n)
+}
+
+// amt的资产需要多少聪
+func GetBindingSatNumV2(amt int64, n uint32) int64 {
+	if n == 0 {
+		return 0
+	}
+	return (amt + int64(n) - 1)/int64(n)
 }
