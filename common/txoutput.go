@@ -490,8 +490,10 @@ func (p *TxOutput) GetAssetOffset(name *AssetName, amt *Decimal) (int64, error) 
 
 	satsNum := GetBindingSatNum(amt, asset.BindingSat)
 	for _, off := range offsets {
-		if satsNum >= off.End-off.Start {
+		if satsNum > off.End-off.Start {
 			satsNum -= off.End - off.Start
+		} else if satsNum == off.End-off.Start {
+			return off.End, nil
 		} else {
 			return off.Start + satsNum, nil
 		}
