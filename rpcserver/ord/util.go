@@ -18,7 +18,7 @@ func genContentHeader(c *gin.Context, nft *common.Nft) (string, error) {
 		acceptEncodingList = make([]string, len(parts))
 		for i, part := range parts {
 			subparts := strings.Split(part, ";")
-			acceptEncodingList[i] = subparts[0]
+			acceptEncodingList[i] = strings.TrimSpace(subparts[0])
 		}
 	}
 
