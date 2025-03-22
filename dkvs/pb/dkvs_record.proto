@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package dkvs.v1.pb;
+
+option go_package = "dkvs_pb";
+
+message DkvsRecord {
+
+	enum ValidityType {	
+		// setting an EOL says "this record is valid until..."
+		EOL = 0;
+	}
+	enum ValueType {
+  		DEFAULT = 0;
+  		GUN_SIGNATURE = 1;   // 只有GUN签名的证书会被检查
+ 	}
+	uint32 version = 1 ;
+	uint32 valueType = 2 ;
+	bytes value = 3;         // 
+	bytes signature  = 4;
+	ValidityType validityType = 5;
+	uint64 validity = 6;     // 超时时间，当validityType=EOL, ms
+	uint64 seq = 7;          // 大致等于发行时间, ms
+	uint64 ttl = 8;          // 存活时间，超时时间-存活时间=发行时间, ms
+	bytes pubKey = 9;
+	bytes data = 10;
+
+}
+
+enum CertType {
+	Default = 0; // cert
+	Contract = 1;
+}
+
+// 证书，也就是某种意义上的NFT。如果指定userPubkey，就是跟该账户绑定；如果没有指定，就可以转让。
+message Cert {
+	uint32 version = 1;
+	string name = 2;       // 证书名称，如果有，必须是GUN申请过的名字，一般是""
+	uint32 type = 3;	   // CertType
+	uint32 subType = 4;	   // 自定义
+    bytes userPubkey = 5;  // 证书所有者
+    bytes data = 6;        // 证书内容，可以自定义
+    uint64 issueTime = 7;  // 发行时间
+    uint64 ttl = 8;        // 毫秒。如果是0，表示永久
+    bytes issuerPubkey = 10;// 发行者
+	bytes issuerSign = 11;
+}
+
+// DkvsRecord.value
+message CertsRecordValue {
+	string prevBundleAdrr = 1;
+	bytes userData = 2;
+    repeated Cert certVect = 3;
+}
+
+// Cert.data
+message CertDataTransferPrepare {
+	string key = 1;
+	uint64 fee = 2;
+}
+
+// Cert.data
+message CertDataTxCompleted {
+	string key = 1;
+	string tx = 2;
+	uint64 fee = 3;
+	bytes senderkey = 4;
+	bytes receiverkey = 5;
+}
+
+// Cert.Data
+message SimpleContractIssueToken {
+    string name = 1;        // token名称，GUN名字。如果是“”，从Cert.Name得到名字。
+    uint64 maxScore = 2;    // 最大58bits
+    bytes receiverKey = 4;  // 接收者公钥
+    bytes userData = 5; 
+}
