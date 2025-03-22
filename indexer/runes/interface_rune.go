@@ -2,12 +2,18 @@ package runes
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/cli"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"lukechampine.com/uint128"
+)
+
+var (
+	allRuneInfosCache         []*RuneInfo
+	lastAllRuneInfosCacheTime time.Time
 )
 
 func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
@@ -104,13 +110,20 @@ func (s *Indexer) GetAllRuneIds() []string {
 }
 
 func (s *Indexer) GetAllRuneInfos() (ret []*RuneInfo) {
-	runeEntrys := s.idToEntryTbl.GetList()
-	var i = 0
-	for _, runeEntry := range runeEntrys {
-		common.Log.Tracef("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
-		runeInfo := s.genRuneInfo(runeEntry)
-		ret = append(ret, runeInfo)
-		i++
+	const allRuneInfoCacheDuration = 6 * time.Minute
+	if time.Since(lastAllRuneInfosCacheTime) > allRuneInfoCacheDuration || allRuneInfosCache == nil {
+		runeEntrys := s.idToEntryTbl.GetList()
+		// var i = 0
+		for _, runeEntry := range runeEntrys {
+			// common.Log.Tracef("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
+			runeInfo := s.genRuneInfo(runeEntry)
+			ret = append(ret, runeInfo)
+			// i++
+		}
+		allRuneInfosCache = ret
+		lastAllRuneInfosCacheTime = time.Now()
+	} else {
+		ret = allRuneInfosCache
 	}
 	return
 }
