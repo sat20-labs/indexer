@@ -118,4 +118,12 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/v3/tick/all/:protocol", s.handle.getTickerList)
 	r.GET(proxy+"/v3/tick/info/:ticker", s.handle.getTickerInfo)
 
+	// ticker格式：wire.AssetName.String() protocol:f:name
+	// 持有者列表
+	// r.GET(proxy+"/v3/tick/holders/:ticker", s.handle.getHolderList)
+	// // 铸造历史
+	// r.GET(proxy+"/v3/tick/history/:ticker", s.handle.getMintHistory)
+	// // 某条铸造记录
+	// r.GET(proxy+"/v3/mint/details/:ticker/:id", s.handle.getMintDetailInfo)
+
 }
