@@ -273,3 +273,23 @@ func (s *Model) GetHolderListV3(tickName string, start, limit int) ([]*HolderV3,
 	})
 	return result, nil
 }
+
+func (s *Model) GetMintHistoryV3(tickName string, start, limit int) (*MintHistoryV3, error) {
+	assetName := common.NewAssetNameFromString(tickName)
+	result := MintHistoryV3{Ticker: tickName}
+	mintInfos := s.indexer.GetMintHistoryV2(assetName, start, limit)
+	for _, mintInfo := range mintInfos {
+		ordxMintInfo := &MintHistoryItemV3{
+			MintAddress:    mintInfo.Address,
+			HolderAddress:  s.indexer.GetHolderAddress(mintInfo.InscriptionId),
+			Balance:        mintInfo.Amount,
+			InscriptionID:  mintInfo.InscriptionId,
+			InscriptionNum: mintInfo.InscriptionNum,
+		}
+		result.Items = append(result.Items, ordxMintInfo)
+	}
+	_, times := s.indexer.GetMintAmount(tickName)
+	result.Total = int(times)
+
+	return &result, nil
+}

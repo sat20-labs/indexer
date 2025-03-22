@@ -6,6 +6,93 @@ definitions:
       start:
         type: integer
     type: object
+  ordx.HolderListDataV3:
+    properties:
+      detail:
+        items:
+          $ref: '#/definitions/ordx.HolderV3'
+        type: array
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  ordx.HolderListRespV3:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/ordx.HolderListDataV3'
+      msg:
+        example: ok
+        type: string
+    type: object
+  ordx.HolderV3:
+    properties:
+      total_balance:
+        type: string
+      wallet:
+        type: string
+    type: object
+  ordx.MintHistoryDataV3:
+    properties:
+      detail:
+        $ref: '#/definitions/ordx.MintHistoryV3'
+      start:
+        example: 0
+        type: integer
+      total:
+        example: 9992
+        type: integer
+    type: object
+  ordx.MintHistoryItemV3:
+    properties:
+      balance:
+        example: "546"
+        type: string
+      holderaddress:
+        type: string
+      inscriptionId:
+        example: bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0
+        type: string
+      inscriptionNumber:
+        example: 67269474
+        type: integer
+      mintaddress:
+        example: bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5
+        type: string
+    type: object
+  ordx.MintHistoryRespV3:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/ordx.MintHistoryDataV3'
+      msg:
+        example: ok
+        type: string
+    type: object
+  ordx.MintHistoryV3:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/ordx.MintHistoryItemV3'
+        type: array
+      limit:
+        type: integer
+      start:
+        type: integer
+      ticker:
+        type: string
+      total:
+        type: integer
+      type:
+        type: string
+    type: object
   wire.AssetAbbrInfo:
     properties:
       amount:
@@ -1596,4 +1683,50 @@ paths:
       summary: Get seed of sats in the UTXO
       tags:
       - ordx.utxo
+  /v3/tick/history/{ticker}:
+    get:
+      description: Get the mint history for a specific ticker
+      parameters:
+      - description: Ticker name
+        in: path
+        name: ticker
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/ordx.MintHistoryRespV3'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Mint History v3
+      tags:
+      - ordx.tick
+  /v3/tick/holders/{ticker}:
+    get:
+      description: Get a list of holders for a specific ticker
+      parameters:
+      - description: Ticker name
+        in: path
+        name: ticker
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/ordx.HolderListRespV3'
+        "401":
+          description: Invalid API Key
+      security:
+      - Bearer: []
+      summary: Get Holder List v3
+      tags:
+      - ordx.tick
 swagger: "2.0"

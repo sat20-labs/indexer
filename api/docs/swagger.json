@@ -1289,6 +1289,80 @@
                     }
                 }
             }
+        },
+        "/v3/tick/history/{ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get the mint history for a specific ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.tick"
+                ],
+                "summary": "Get Mint History v3",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticker name",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/ordx.MintHistoryRespV3"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
+        },
+        "/v3/tick/holders/{ticker}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get a list of holders for a specific ticker",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ordx.tick"
+                ],
+                "summary": "Get Holder List v3",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticker name",
+                        "name": "ticker",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/ordx.HolderListRespV3"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API Key"
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1300,6 +1374,134 @@
                 },
                 "start": {
                     "type": "integer"
+                }
+            }
+        },
+        "ordx.HolderListDataV3": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ordx.HolderV3"
+                    }
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "ordx.HolderListRespV3": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/ordx.HolderListDataV3"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "ordx.HolderV3": {
+            "type": "object",
+            "properties": {
+                "total_balance": {
+                    "type": "string"
+                },
+                "wallet": {
+                    "type": "string"
+                }
+            }
+        },
+        "ordx.MintHistoryDataV3": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "$ref": "#/definitions/ordx.MintHistoryV3"
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 9992
+                }
+            }
+        },
+        "ordx.MintHistoryItemV3": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "string",
+                    "example": "546"
+                },
+                "holderaddress": {
+                    "type": "string"
+                },
+                "inscriptionId": {
+                    "type": "string",
+                    "example": "bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0"
+                },
+                "inscriptionNumber": {
+                    "type": "integer",
+                    "example": 67269474
+                },
+                "mintaddress": {
+                    "type": "string",
+                    "example": "bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5"
+                }
+            }
+        },
+        "ordx.MintHistoryRespV3": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/ordx.MintHistoryDataV3"
+                },
+                "msg": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "ordx.MintHistoryV3": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ordx.MintHistoryItemV3"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "ticker": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },

@@ -11,29 +11,28 @@ desc: 根据runeid获取铸造历史 (新增数据表)
 数据: key = rm-%runeid.string()%-%txid% value = nil
 实现: 通过runeid得到所有mint的txid(一个txid即一个铸造历史)
 */
-func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHistory, uint64) {
+func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
 	id, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
-		return nil, 0
+		return nil
 	}
 	mintHistorys, err := s.runeIdToMintHistoryTbl.GetList(id)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetList(%s) err:%v", id.Hex(), err)
 	}
 	if len(mintHistorys) == 0 {
-		return nil, 0
+		return nil
 	}
 
 	r := s.idToEntryTbl.Get(id)
 	if r == nil {
 		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", id.Hex(), runeId)
-		return nil, 0
+		return nil
 	}
 
 	ret := make([]*MintHistory, len(mintHistorys))
 	for i, history := range mintHistorys {
-
 		ret[i] = &MintHistory{
 			UtxoId:    history.UtxoId,
 			Amount:    *r.Terms.Amount,
@@ -42,7 +41,11 @@ func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHis
 			Number:    r.Number,
 		}
 	}
+	return ret
+}
 
+func (s *Indexer) GetMintHistory(runeId string, start, limit uint64) ([]*MintHistory, uint64) {
+	ret := s.GetAllMintHistory(runeId)
 	total := uint64(len(ret))
 	end := total
 	if start >= end {
