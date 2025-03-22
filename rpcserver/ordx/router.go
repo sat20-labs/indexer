@@ -95,7 +95,7 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// version 2.0 interface for STP
 	// address
 	// 获取某个地址上所有资产和数量的列表
-	r.GET(proxy+"/v2/address/summary/:address", s.handle.getAssetSummary) 
+	r.GET(proxy+"/v2/address/summary/:address", s.handle.getAssetSummary)
 	// 获取某个地址上某个资产的utxo数据列表(utxo包含其他资产), ticker格式：wire.AssetName.String()
 	r.GET(proxy+"/v2/address/asset/:address/:ticker", s.handle.getUtxosWithTicker)
 	// 获取utxo的资产信息
@@ -104,11 +104,10 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// 以上几个接口的资产数量是根据规则修改过的，资产统一用int64表示，为聪网服务
 
 	r.POST(proxy+"/v2/utxos/existing", s.handle.getExistingUtxos)
-	
 
 	// 提供精确资产的数据接口，资产用string类型表示(主网索引器的接口)
 	// 获取某个地址上所有资产和数量的列表
-	r.GET(proxy+"/v3/address/summary/:address", s.handle.getAssetSummaryV3) 
+	r.GET(proxy+"/v3/address/summary/:address", s.handle.getAssetSummaryV3)
 	// 获取某个地址上某个资产的utxo数据列表(utxo包含其他资产), ticker格式：wire.AssetName.String()
 	r.GET(proxy+"/v3/address/asset/:address/:ticker", s.handle.getUtxosWithTickerV3)
 	// 获取utxo的资产信息
@@ -120,9 +119,9 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 
 	// ticker格式：wire.AssetName.String() protocol:f:name
 	// 持有者列表
-	// r.GET(proxy+"/v3/tick/holders/:ticker", s.handle.getHolderList)
+	r.GET(proxy+"/v3/tick/holders/:ticker", s.handle.getHolderListV3)
 	// // 铸造历史
-	// r.GET(proxy+"/v3/tick/history/:ticker", s.handle.getMintHistory)
+	r.GET(proxy+"/v3/tick/history/:ticker", s.handle.getMintHistoryV3)
 	// // 某条铸造记录
 	// r.GET(proxy+"/v3/mint/details/:ticker/:id", s.handle.getMintDetailInfo)
 

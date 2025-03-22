@@ -254,3 +254,22 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 
 	return result, len(result), nil
 }
+
+func (s *Model) GetHolderListV3(tickName string, start, limit int) ([]*HolderV3, error) {
+	assetName := common.NewAssetNameFromString(tickName)
+	holders := s.indexer.GetHoldersWithTickV2(assetName)
+	result := make([]*HolderV3, 0)
+	for address, amt := range holders {
+		ordxMintInfo := &HolderV3{
+			Wallet:       s.indexer.GetAddressById(address),
+			TotalBalance: amt.String(),
+		}
+		result = append(result, ordxMintInfo)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		a, _ := common.NewDecimalFromFormatString(result[i].TotalBalance)
+		b, _ := common.NewDecimalFromFormatString(result[j].TotalBalance)
+		return a.Cmp(b) > 0
+	})
+	return result, nil
+}
