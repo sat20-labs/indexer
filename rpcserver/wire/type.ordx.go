@@ -1,7 +1,6 @@
 package wire
 
 import (
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -444,18 +443,11 @@ type NamesWithAddressResp struct {
 }
 
 type UtxoAssetInfo struct {
-	Asset   common.AssetInfo    `json:"asset"`
+	Asset   common.DisplayAsset `json:"asset"`
 	Offsets common.AssetOffsets `json:"offsets"`
 }
 
-type TxOutputInfo struct {
-	UtxoId    uint64           `json:"utxoid"`
-	OutPoint  string           `json:"outpoint"`
-	OutValue  wire.TxOut       `json:"outvalue"`
-	AssetInfo []*UtxoAssetInfo `json:"assets"`
-}
-
-//type TxOutput2 = common.TxOutput
+type TxOutputInfo = common.AssetsInUtxo
 
 type AssetSummary struct {
 	ListResp

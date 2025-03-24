@@ -132,14 +132,30 @@ type MintHistory struct {
 }
 
 type DisplayAsset struct {
-	AssetName        `json:"Name"`
-	Amount  string         `json:"Amount"`
+	AssetName             `json:"Name"`
+	Amount  string        `json:"Amount"`
+	Precision int         `json:"Precision"`
 	BindingSat int        `json:"BindingSat"`
 	Offsets []*OffsetRange `json:"Offsets"`
 }
 
+func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
+	amount, err := NewDecimalFromString(p.Amount, p.Precision)
+	if err != nil {
+		// should not happen
+		return nil
+	}
+	return &AssetInfo{
+		Name: p.AssetName,
+		Amount: *amount,
+		BindingSat: uint32(p.BindingSat),
+	}
+}
+
 type AssetsInUtxo struct {
-	OutPoint    string     `json:"Outpoint"`
-	Value       int64      `json:"Value"`
+	UtxoId      uint64          `json:"UtxoId"`
+	OutPoint    string     		`json:"Outpoint"` // tx:vout
+	Value       int64      		`json:"Value"`
+	PkScript    []byte      	`json:"PkScript"`
 	Assets  	[]*DisplayAsset `json:"Assets"`
 }

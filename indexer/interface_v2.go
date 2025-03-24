@@ -158,8 +158,10 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	}
 
 	var assetsInUtxo common.AssetsInUtxo
+	assetsInUtxo.UtxoId = info.UtxoId
 	assetsInUtxo.OutPoint = utxo
 	assetsInUtxo.Value = info.Value
+	assetsInUtxo.PkScript = info.PkScript
 
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
 	for k, v := range assetmap {
@@ -185,6 +187,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     fmt.Sprintf("%d", value),
+			Precision:  0,
 			BindingSat: n,
 			Offsets:    offsets,
 		}
@@ -197,6 +200,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     v.String(),
+			Precision:  v.Precision,
 			BindingSat: 0,
 		}
 

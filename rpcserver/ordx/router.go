@@ -93,17 +93,8 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 
 	/////////////////////////////////////////
 	// version 2.0 interface for STP
-	// address
-	// 获取某个地址上所有资产和数量的列表
-	r.GET(proxy+"/v2/address/summary/:address", s.handle.getAssetSummary)
-	// 获取某个地址上某个资产的utxo数据列表(utxo包含其他资产), ticker格式：wire.AssetName.String()
-	r.GET(proxy+"/v2/address/asset/:address/:ticker", s.handle.getUtxosWithTicker)
-	// 获取utxo的资产信息
-	r.GET(proxy+"/v2/utxo/info/:utxo", s.handle.getUtxoInfo)
-	r.POST(proxy+"/v2/utxos/info", s.handle.getUtxoInfoList)
-	// 以上几个接口的资产数量是根据规则修改过的，资产统一用int64表示，为聪网服务
 
-	r.POST(proxy+"/v2/utxos/existing", s.handle.getExistingUtxos)
+	r.POST(proxy+"/v3/utxos/existing", s.handle.getExistingUtxos)
 
 	// 提供精确资产的数据接口，资产用string类型表示(主网索引器的接口)
 	// 获取某个地址上所有资产和数量的列表
