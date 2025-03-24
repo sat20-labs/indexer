@@ -116,9 +116,10 @@ func (b *BaseIndexer) Clone() *BaseIndexer {
 	for key, value := range b.utxoIndex.Index {
 		newInst.utxoIndex.Index[key] = value
 	}
-
-	newInst.delUTXOs = make([]*UtxoValue, len(b.delUTXOs))
-	copy(newInst.delUTXOs, b.delUTXOs)
+	for _, value := range b.delUTXOs {
+		delete(newInst.utxoIndex.Index, value.Utxo)
+	}
+	newInst.delUTXOs = make([]*UtxoValue, 0)
 
 	newInst.addressIdMap = make(map[string]*AddressStatus)
 	for k, v := range b.addressIdMap {

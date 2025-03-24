@@ -17,8 +17,18 @@ type AssetName struct {
 
 func NewAssetNameFromString(name string) *AssetName {
 	parts := strings.Split(name, ":")
+	if len(parts) == 0 {
+		return &AssetName{}
+	}
+	if len(parts) == 1 {
+		return &AssetName{
+			Protocol: PROTOCOL_NAME_ORDX,
+			Type: ASSET_TYPE_FT,
+			Ticker: parts[0],
+		}
+	}
 	if len(parts) != 3 {
-		return nil
+		return &AssetName{}
 	}
 	return &AssetName{
 		Protocol: parts[0],
