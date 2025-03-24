@@ -11,9 +11,11 @@ import (
 	"lukechampine.com/uint128"
 )
 
+const allRuneInfoCacheDuration = 6 * time.Minute
+
 var (
-	allRuneInfosCache         []*RuneInfo
-	lastAllRuneInfosCacheTime time.Time
+	runeInfosCache              []*RuneInfo
+	lastRuneInfosCacheTimeStamp int64
 )
 
 func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
@@ -110,8 +112,8 @@ func (s *Indexer) GetAllRuneIds() []string {
 }
 
 func (s *Indexer) GetAllRuneInfos() (ret []*RuneInfo) {
-	const allRuneInfoCacheDuration = 6 * time.Minute
-	if time.Since(lastAllRuneInfosCacheTime) > allRuneInfoCacheDuration || allRuneInfosCache == nil {
+	currentTime := time.Now().Unix()
+	if currentTime-lastRuneInfosCacheTimeStamp > int64(allRuneInfoCacheDuration.Seconds()) || runeInfosCache == nil {
 		runeEntrys := s.idToEntryTbl.GetList()
 		// var i = 0
 		for _, runeEntry := range runeEntrys {
@@ -120,10 +122,10 @@ func (s *Indexer) GetAllRuneInfos() (ret []*RuneInfo) {
 			ret = append(ret, runeInfo)
 			// i++
 		}
-		allRuneInfosCache = ret
-		lastAllRuneInfosCacheTime = time.Now()
+		runeInfosCache = ret
+		lastRuneInfosCacheTimeStamp = currentTime
 	} else {
-		ret = allRuneInfosCache
+		ret = runeInfosCache
 	}
 	return
 }

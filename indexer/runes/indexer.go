@@ -112,6 +112,10 @@ func (s *Indexer) Clone() *Indexer {
 	cloneIndex.Status.Number = s.Status.Number
 	cloneIndex.Status.ReservedRunes = s.Status.ReservedRunes
 	s.dbWrite.Clone(cloneIndex.dbWrite)
+	lastRuneInfosCacheTimeStamp = 0
+	runeInfosCache = nil
+	runeMintHistoryCache = cmap.New[*MintHistoryInfo]()
+
 	return cloneIndex
 }
 

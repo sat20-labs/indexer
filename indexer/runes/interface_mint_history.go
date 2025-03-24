@@ -1,9 +1,27 @@
 package runes
 
 import (
+	"time"
+
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 )
+
+type MintHistoryInfo struct {
+	LastTimestamp int64
+	MintHistory   []*MintHistory
+}
+
+const mintHistoryCacheDuration = 6 * time.Minute
+
+var (
+	runeMintHistoryCache cmap.ConcurrentMap[string, *MintHistoryInfo]
+)
+
+func init() {
+	runeMintHistoryCache = cmap.New[*MintHistoryInfo]()
+}
 
 /*
 *
@@ -12,6 +30,12 @@ desc: 根据runeid获取铸造历史 (新增数据表)
 实现: 通过runeid得到所有mint的txid(一个txid即一个铸造历史)
 */
 func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
+	if mintHistoryInfo, exist := runeMintHistoryCache.Get(runeId); exist {
+		if time.Since(time.Unix(mintHistoryInfo.LastTimestamp, 0)) < mintHistoryCacheDuration {
+			return mintHistoryInfo.MintHistory
+		}
+	}
+
 	id, err := runestone.RuneIdFromHex(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
@@ -41,6 +65,13 @@ func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
 			Number:    r.Number,
 		}
 	}
+
+	mintHistoryInfo := &MintHistoryInfo{
+		LastTimestamp: time.Now().Unix(),
+		MintHistory:   ret,
+	}
+	runeMintHistoryCache.Set(runeId, mintHistoryInfo)
+
 	return ret
 }
 
