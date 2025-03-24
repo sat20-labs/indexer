@@ -159,3 +159,11 @@ type AssetsInUtxo struct {
 	PkScript    []byte      	`json:"PkScript"`
 	Assets  	[]*DisplayAsset `json:"Assets"`
 }
+
+func (p *AssetsInUtxo) ToTxAssets() TxAssets {
+	assets := make(TxAssets, 0, len(p.Assets))
+	for _, asset := range p.Assets {
+		assets = append(assets, *asset.ToAssetInfo())
+	}
+	return assets
+}
