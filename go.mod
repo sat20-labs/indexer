@@ -1,8 +1,6 @@
 module github.com/sat20-labs/indexer
 
-go 1.23
-
-toolchain go1.23.7
+go 1.22.1
 
 // custom versions that add testnet4 support
 replace github.com/btcsuite/btcd => github.com/sat20-labs/btcd v0.24.3
@@ -28,8 +26,8 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/boxo v0.24.3
 	github.com/ipfs/go-cid v0.4.1
-	github.com/ipfs/go-datastore v0.8.2
-	github.com/ipfs/go-ds-badger2 v0.1.5
+	github.com/ipfs/go-datastore v0.6.0
+	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ds-leveldb v0.5.0
 	github.com/klauspost/compress v1.17.11
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
@@ -113,6 +111,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
+	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
