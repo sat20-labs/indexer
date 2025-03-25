@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	indexer "github.com/sat20-labs/indexer/share/base_indexer"
 )
@@ -141,7 +142,7 @@ func (s *Service) token_list(c *gin.Context) {
 		return
 	}
 
-	curTickerName := common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: req.Ticker}
+	curTickerName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: req.Ticker}
 	ftUtxoAssetMap, err := indexer.ShareBaseIndexer.GetAssetUTXOsInAddressWithTick(req.Address, &curTickerName)
 	if err != nil {
 		resp.Code = -1
@@ -153,7 +154,7 @@ func (s *Service) token_list(c *gin.Context) {
 	ftUtxoAssetSummaryArray := make([]*UtxoAssetSummary, 0)
 	for utxoId, amount := range ftUtxoAssetMap {
 		utxo := indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-		if rpcwire.IsExistUtxoInMemPool(utxo) {
+		if utils.IsExistingInMemPool(utxo) {
 			continue
 		}
 		ftUtxoAssetSummaryArray = append(ftUtxoAssetSummaryArray, &UtxoAssetSummary{utxoId, amount})

@@ -5,6 +5,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/exotic"
+	"github.com/sat20-labs/indexer/rpcserver/utils"
 	"github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
@@ -159,7 +160,7 @@ func (s *Model) getPlainUtxos(address string, value int64, start, limit int) ([]
 			continue
 		}
 
-		if !wire.IsAvailableUtxo(utxo) {
+		if !utils.IsAvailableUtxo(utxo) {
 			continue
 		}
 
@@ -222,7 +223,7 @@ func (s *Model) getAllUtxos(address string, start, limit int) ([]*wire.PlainUtxo
 		}
 
 		// 效率很低，需要内部实现内存池
-		if wire.IsExistUtxoInMemPool(utxo) {
+		if utils.IsExistingInMemPool(utxo) {
 			continue
 		}
 
@@ -290,7 +291,7 @@ func (s *Model) GetExoticUtxosWithType(address string, typ string, amount int64)
 			continue
 		}
 
-		if wire.IsExistUtxoInMemPool(utxo) {
+		if utils.IsExistingInMemPool(utxo) {
 			common.Log.Infof("IsExistUtxoInMemPool return true %s", utxo)
 			continue
 		}
