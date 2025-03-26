@@ -25,7 +25,7 @@ func (s *Model) GetNonce(req *rpcwire.GetNonceReq) ([]byte, error) {
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
-		if t > now && t - now < time.Hour.Microseconds() {
+		if t > now && t - now + 10 * time.Second.Microseconds() < time.Hour.Microseconds() {
 			return generateNonce(pkHex, t), nil
 		}
 	}
@@ -63,7 +63,7 @@ func (s *Model) PutKVs(req *rpcwire.PutKValueReq) (error) {
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
-		if t - now > time.Hour.Microseconds() * 24 {
+		if t - now > time.Hour.Microseconds() {
 			return fmt.Errorf("nonce expired")
 		}
 	}
