@@ -117,8 +117,8 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// r.GET(proxy+"/v3/mint/details/:ticker/:id", s.handle.getMintDetailInfo)
 
 	// kv记录
-	r.POST(proxy+"/v3/kv/nonce", s.handle.getNonce)
-	r.GET(proxy+"/v3/kv/get/:pubkey/:key", s.handle.getkv)
-	r.POST(proxy+"/v3/kv/put", s.handle.putKVs)
-	r.POST(proxy+"/v3/kv/del", s.handle.delKVs)
+	r.POST(proxy+"/kv/nonce", s.handle.getNonce)
+	r.GET(proxy+"/kv/get/:pubkey/:key", s.handle.getkv)
+	r.POST(proxy+"/kv/put", s.handle.putKVs)
+	r.POST(proxy+"/kv/del", s.handle.delKVs)
 }
