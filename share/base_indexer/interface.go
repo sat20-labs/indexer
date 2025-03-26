@@ -120,4 +120,10 @@ type Indexer interface {
 	GetMintAmountV2(tickerName *common.TickerName) (*common.Decimal, int64)
 	// return:  mint info sorted by inscribed time
 	GetMintHistoryV2(tickerName *common.TickerName, start, limit int) []*common.MintInfo
+
+
+	// kv
+	PutKVs(kvs []*common.KeyValue) ([]string, error)
+	DelKVs(keys []string) ([]string, error)
+	GetKVs(keys []string) ([]*common.KeyValue, error)
 }

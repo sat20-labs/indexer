@@ -3,6 +3,7 @@ package ordx
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/rpcserver/utils"
@@ -12,11 +13,14 @@ import (
 
 type Model struct {
 	indexer base_indexer.Indexer
+	nonceMap  map[string]int64
+	mutex    sync.RWMutex
 }
 
 func NewModel(indexer base_indexer.Indexer) *Model {
 	return &Model{
 		indexer: indexer,
+		nonceMap: make(map[string]int64),
 	}
 }
 

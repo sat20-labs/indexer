@@ -1,8 +1,37 @@
 package ordx
 
 import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 )
+
+func generateNonce(pubkey string, t int64) []byte {
+	data := fmt.Sprintf("%s%d", pubkey, t)
+	return chainhash.DoubleHashB([]byte(data))
+}
+
+func (s *Model) GetNonce(req *rpcwire.GetNonceReq) ([]byte, error) {
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	now := time.Now().UnixMicro()
+	pkHex := hex.EncodeToString(req.PubKey)
+	t, ok := s.nonceMap[pkHex]
+	if ok {
+		if t > now && t - now < time.Hour.Microseconds() {
+			return generateNonce(pkHex, t), nil
+		}
+	}
+	s.nonceMap[pkHex] = now
+	return generateNonce(pkHex, now), nil
+}
 
 func (s *Model) GetKV(key string) (*rpcwire.KeyValue, error) {
 
@@ -14,12 +43,55 @@ func (s *Model) GetKVs(keys []string) ([]*rpcwire.KeyValue, error) {
 	return nil, nil
 }
 
-func (s *Model) PutKVs(kvs []*rpcwire.KeyValue) ([]string, error) {
+func (s *Model) PutKVs(req *rpcwire.PutKValueReq) ([]string, error) {
 
-	return nil, nil
+	now := time.Now().UnixMicro()
+	pkHex := hex.EncodeToString(req.PubKey)
+	t, ok := s.nonceMap[pkHex]
+	if ok {
+		if t - now > time.Hour.Microseconds() * 24 {
+			return nil, fmt.Errorf("nonce expired")
+		}
+	}
+
+	sig := req.Signature
+	req.Signature = nil
+	msg, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
+	if err != nil {
+		common.Log.Errorf("verify signature failed")
+		return nil, fmt.Errorf("verify signature failed, %v", err)
+	}
+
+	return s.indexer.PutKVs(req.Values)
 }
 
-func (s *Model) DelKVs(keys []string) ([]string, error) {
+func (s *Model) DelKVs(req *rpcwire.DelKValueReq) ([]string, error) {
+	now := time.Now().UnixMicro()
+	pkHex := hex.EncodeToString(req.PubKey)
+	t, ok := s.nonceMap[pkHex]
+	if ok {
+		if t - now > time.Hour.Microseconds() * 24 {
+			return nil, fmt.Errorf("nonce expired")
+		}
+	}
 
-	return nil, nil
+	sig := req.Signature
+	req.Signature = nil
+	msg, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
+	if err != nil {
+		common.Log.Errorf("verify signature failed")
+		return nil, fmt.Errorf("verify signature failed, %v", err)
+	}
+
+	return s.indexer.DelKVs(req.Keys)
 }

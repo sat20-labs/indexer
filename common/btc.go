@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
 
 const (
@@ -246,3 +249,48 @@ func GetCoreNodeChannelAddress(pubkey []byte, chainParams *chaincfg.Params) (str
 }
 
 
+
+func BytesToPublicKey(pubKeyBytes []byte) (*secp256k1.PublicKey, error) {
+	// 检查公钥长度
+	if len(pubKeyBytes) != 33 && len(pubKeyBytes) != 65 {
+		return nil, fmt.Errorf("invalid public key length: %d", len(pubKeyBytes))
+	}
+
+	// 解析公钥
+	pubKey, err := secp256k1.ParsePubKey(pubKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %v", err)
+	}
+
+	return pubKey, nil
+}
+
+func VerifyMessage(pubKey *secp256k1.PublicKey, msg []byte, sig []byte) bool {
+	// Compute the hash of the message.
+	var msgDigest []byte
+	doubleHash := false
+	if doubleHash {
+		msgDigest = chainhash.DoubleHashB(msg)
+	} else {
+		msgDigest = chainhash.HashB(msg)
+	}
+
+	signature, err := ecdsa.ParseDERSignature(sig)
+	if err != nil {
+		return false
+	}
+
+	// Verify the signature using the public key.
+	return signature.Verify(msgDigest, pubKey)
+}
+
+func VerifySignOfMessage(msg, sig, pubkey []byte) error {
+	key, err := BytesToPublicKey(pubkey)
+	if err != nil {
+		return err
+	}
+	if !VerifyMessage(key, msg, sig) {
+		return fmt.Errorf("VerifyMessage failed")
+	}
+	return nil
+}
