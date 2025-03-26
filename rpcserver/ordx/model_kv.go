@@ -21,6 +21,11 @@ func (s *Model) GetNonce(req *rpcwire.GetNonceReq) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	// 这里检查是否是支持的pubkey，不是的话，早点返回失败
+	if !s.indexer.IsSupportedKey(req.PubKey) {
+		return nil, fmt.Errorf("unsupport pubkey")
+	}
+
 	now := time.Now().UnixMicro()
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
@@ -89,7 +94,7 @@ func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
-		if t - now > time.Hour.Microseconds() * 24 {
+		if t - now > time.Hour.Microseconds() {
 			return fmt.Errorf("nonce expired")
 		}
 	}

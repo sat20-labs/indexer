@@ -13,6 +13,17 @@ func getKvKey(pubkey string, key string) string {
 	return fmt.Sprintf("/%s/%s", pubkey, key)
 }
 
+
+func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
+	// TODO 以后可以配置增加更多的pubkey
+	pkStr := hex.EncodeToString(pubkey)
+	if pkStr != common.BootstrapPubKey && pkStr != common.CoreNodePubKey {
+		return false
+	}
+	return true
+}
+
+
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 
 	wb := b.kvDB.NewWriteBatch()
@@ -20,13 +31,13 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 
 	for _, value := range kvs {
 		
-
-		// 目前仅允许内置的pubkey
-		pkStr := hex.EncodeToString(value.PubKey)
-		if pkStr != common.BootstrapPubKey && pkStr != common.CoreNodePubKey {
+		if !b.IsSupportedKey(value.PubKey) {
 			common.Log.Errorf("unsupport pubkey")
 			return fmt.Errorf("unsupport pubkey")
 		}
+
+		// 目前仅允许内置的pubkey
+		pkStr := hex.EncodeToString(value.PubKey)
 
 		// verify the signature
 		err := common.VerifySignOfMessage(value.Value, value.Signature, value.PubKey)

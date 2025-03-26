@@ -123,6 +123,7 @@ type Indexer interface {
 
 
 	// kv
+	IsSupportedKey(pubkey []byte) bool
 	PutKVs(kvs []*common.KeyValue) (error)
 	DelKVs(pubkey []byte, keys []string) (error)
 	GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error)
