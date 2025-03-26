@@ -36,14 +36,14 @@ func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
 		}
 	}
 
-	id, err := runestone.RuneIdFromHex(runeId)
+	id, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
-		common.Log.Infof("RuneIndexer.GetMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
+		common.Log.Infof("RuneIndexer.GetAllMintHistory-> runestone.RuneIdFromString(%s) err:%s", runeId, err.Error())
 		return nil
 	}
 	mintHistorys, err := s.runeIdToMintHistoryTbl.GetList(id)
 	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetMintHistory-> runeIdToMintHistoryTbl.GetList(%s) err:%v", id.Hex(), err)
+		common.Log.Panicf("RuneIndexer.GetAllMintHistory-> runeIdToMintHistoryTbl.GetList(%s) err:%v", id.Hex(), err)
 	}
 	if len(mintHistorys) == 0 {
 		return nil
@@ -51,7 +51,7 @@ func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
 
 	r := s.idToEntryTbl.Get(id)
 	if r == nil {
-		common.Log.Errorf("RuneIndexer.GetMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", id.Hex(), runeId)
+		common.Log.Errorf("RuneIndexer.GetAllMintHistory-> idToEntryTbl.Get(%s) rune not found, ticker: %s", id.Hex(), runeId)
 		return nil
 	}
 
@@ -95,7 +95,7 @@ desc: 根据地址获取指定nuneid的铸造历史 (新增数据表)
 实现: 通过address和runeid得到所有utxo(一个txid(1/n个utxo)即一个铸造历史)
 */
 func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, limit uint64) ([]*MintHistory, uint64) {
-	id, err := runestone.RuneIdFromHex(runeId)
+	id, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
 	}
