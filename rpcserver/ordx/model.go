@@ -3,19 +3,24 @@ package ordx
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 type Model struct {
 	indexer base_indexer.Indexer
+	nonceMap  map[string]int64
+	mutex    sync.RWMutex
 }
 
 func NewModel(indexer base_indexer.Indexer) *Model {
 	return &Model{
 		indexer: indexer,
+		nonceMap: make(map[string]int64),
 	}
 }
 
@@ -113,15 +118,15 @@ func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*comm
 }
 
 func (s *Model) GetUtxoInfoV3(utxo string) (*common.AssetsInUtxo, error) {
+	if utils.IsExistingInMemPool(utxo) {
+		return nil, fmt.Errorf("utxo %s is in mempool", utxo)
+	}
 	return s.indexer.GetTxOutputWithUtxoV3(utxo), nil
 }
 
 func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo, error) {
 	result := make([]*common.AssetsInUtxo, 0)
 	for _, utxo := range req.Utxos {
-		if rpcwire.IsExistUtxoInMemPool(utxo) {
-			continue
-		}
 		txOutput, err := s.GetUtxoInfoV3(utxo)
 		if err != nil {
 			continue
@@ -141,6 +146,9 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 		return nil, 0, err
 	}
 	for _, txOut := range outputMap {
+		if utils.IsExistingInMemPool(txOut.OutPoint) {
+			continue
+		}
 		result = append(result, txOut)
 	}
 

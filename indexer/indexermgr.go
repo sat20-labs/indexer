@@ -33,6 +33,7 @@ type IndexerMgr struct {
 	runesDB *badger.DB
 	// data from market
 	localDB *badger.DB
+	kvDB    *badger.DB
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -282,6 +283,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 }
 
 func (b *IndexerMgr) dbgc() {
+	db.RunBadgerGC(b.kvDB)
 	db.RunBadgerGC(b.localDB)
 	db.RunBadgerGC(b.baseDB)
 	db.RunBadgerGC(b.nftDB)
@@ -302,6 +304,7 @@ func (b *IndexerMgr) closeDB() {
 	b.nftDB.Close()
 	b.baseDB.Close()
 	b.localDB.Close()
+	b.kvDB.Close()
 }
 
 func (b *IndexerMgr) checkSelf() {

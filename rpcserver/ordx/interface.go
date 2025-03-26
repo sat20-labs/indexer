@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 )
 
@@ -19,17 +20,17 @@ func (s *Model) GetBlockInfo(height int) (*common.BlockInfo, error) {
 }
 
 func (s *Model) IsDeployAllowed(ticker string) (bool, error) {
-	
+
 	name := common.NewAssetNameFromString(ticker)
 	if name == nil {
 		return false, fmt.Errorf("invalid ticker name")
 	}
-	
+
 	tickerInfo := s.indexer.GetTickerInfo(name)
 	if tickerInfo != nil {
 		return false, fmt.Errorf("ticker %s exists", ticker)
 	}
-	
+
 	return true, nil
 }
 
@@ -49,7 +50,6 @@ func (s *Model) GetTickerStatusList() ([]*rpcwire.TickerStatus, error) {
 	})
 	return ret, nil
 }
-
 
 func (s *Model) GetMintableTickerList(protocol string) ([]*rpcwire.TickerStatus, error) {
 	tickerStatusRespMap, err := s.getMintableTickStatusMap(protocol)
@@ -190,8 +190,8 @@ func (s *Model) GetMintPermissionInfo(ticker, address string) (*rpcwire.MintPerm
 }
 
 func (s *Model) GetFeeInfo(address string) (*rpcwire.FeeInfo, error) {
-	utxomap, err := s.indexer.GetAssetUTXOsInAddressWithTick(address, 
-		&common.TickerName{Protocol:common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: "pearl"})
+	utxomap, err := s.indexer.GetAssetUTXOsInAddressWithTick(address,
+		&common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: "pearl"})
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,6 @@ func (s *Model) GetAssetsWithUtxos_deprecated(req *rpcwire.UtxosReq) ([]*rpcwire
 	return result, nil
 }
 
-
 func (s *Model) GetExistingUtxos(req *rpcwire.UtxosReq) ([]string, error) {
 	result := make([]string, 0)
 	for _, utxo := range req.Utxos {
@@ -297,12 +296,15 @@ func (s *Model) GetExistingUtxos(req *rpcwire.UtxosReq) ([]string, error) {
 			continue
 		}
 
+		if utils.IsExistingInMemPool(utxo) {
+			continue
+		}
+
 		result = append(result, utxo)
 	}
 
 	return result, nil
 }
-
 
 func (s *Model) GetUtxoList(address string, tickerName string, start, limit int) ([]*rpcwire.TickerAsset, int, error) {
 
@@ -327,7 +329,7 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 	utxosort := make([]*UtxoAsset, 0)
 	for utxo, amout := range utxos {
 		utxostr := s.indexer.GetUtxoById(utxo)
-		if rpcwire.IsExistUtxoInMemPool(utxostr) {
+		if utils.IsExistingInMemPool(utxostr) {
 			common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
 			continue
 		}
@@ -418,7 +420,7 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 	utxosort := make([]*UtxoAsset, 0)
 	for utxo, amout := range utxos {
 		utxostr := s.indexer.GetUtxoById(utxo)
-		if rpcwire.IsExistUtxoInMemPool(utxostr) {
+		if utils.IsExistingInMemPool(utxostr) {
 			common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
 			continue
 		}
@@ -491,7 +493,7 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 	for key, value := range utxos {
 		for _, u := range value {
 			utxostr := s.indexer.GetUtxoById(u)
-			if rpcwire.IsExistUtxoInMemPool(utxostr) {
+			if utils.IsExistingInMemPool(utxostr) {
 				common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
 				continue
 			}

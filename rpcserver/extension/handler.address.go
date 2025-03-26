@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
@@ -31,7 +32,7 @@ func getAssetSummary(address string) (*AssetSummary, error) {
 	for utxoId, v := range utxoList {
 		ret.TotalSatoshis += uint64(v)
 		utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-		if rpcwire.IsExistUtxoInMemPool(utxo) {
+		if utils.IsExistingInMemPool(utxo) {
 			continue
 		}
 		//Find common utxo (that is, utxo with non-ordinal attributes)
@@ -173,7 +174,7 @@ func (s *Service) address_balance(c *gin.Context) {
 	}
 	for utxoId, v := range utxoList {
 		utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-		if rpcwire.IsExistUtxoInMemPool(utxo) {
+		if utils.IsExistingInMemPool(utxo) {
 			pendingAmount += uint64(v)
 			if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxo, false) {
 				pendingInscriptionAmount += uint64(v)
@@ -284,7 +285,7 @@ func (s *Service) address_BTCUtxoList(c *gin.Context) {
 	}
 
 	for utxoId := range utxoList {
-		if rpcwire.IsAvailableUtxoId(utxoId) {
+		if utils.IsAvailableUtxoId(utxoId) {
 			resp.Data = append(resp.Data, newUtxoDataWithId(utxoId, req.Address, true))
 		}
 	}

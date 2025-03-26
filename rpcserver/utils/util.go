@@ -1,4 +1,4 @@
-package wire
+package utils
 
 import (
 	"github.com/sat20-labs/indexer/common"
@@ -6,8 +6,7 @@ import (
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
-
-func IsExistUtxoInMemPool(utxo string) bool {
+func IsExistingInMemPool(utxo string) bool {
 	isExist, err := bitcoin_rpc.IsExistUtxoInMemPool(utxo)
 	if err != nil {
 		common.Log.Errorf("GetUnspendTxOutput %s failed. %v", utxo, err)
@@ -26,7 +25,7 @@ func IsAvailableUtxo(utxo string) bool {
 		return false
 	}
 
-	if IsExistUtxoInMemPool(utxo) {
+	if IsExistingInMemPool(utxo) {
 		return false
 	}
 
