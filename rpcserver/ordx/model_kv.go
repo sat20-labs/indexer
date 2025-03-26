@@ -34,8 +34,17 @@ func (s *Model) GetNonce(req *rpcwire.GetNonceReq) ([]byte, error) {
 }
 
 func (s *Model) GetKV(key string) (*rpcwire.KeyValue, error) {
+	// TODO 是否检查签名？
 
-	return nil, nil
+	result, err := s.indexer.GetKVs([]string{key})
+	if err != nil {
+		return nil, err
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("key not found")
+	}
+
+	return result[0], nil
 }
 
 func (s *Model) GetKVs(keys []string) ([]*rpcwire.KeyValue, error) {

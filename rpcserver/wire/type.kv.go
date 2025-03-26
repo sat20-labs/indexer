@@ -22,6 +22,11 @@ type GetValueReq struct {
 
 type GetValueResp struct {
 	BaseResp
+	Value  *KeyValue `json:"value"`
+}
+
+type GetValuesResp struct {
+	BaseResp
 	Values []*KeyValue `json:"values"`
 }
 

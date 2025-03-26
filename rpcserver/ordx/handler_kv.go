@@ -41,7 +41,6 @@ func (s *Handle) getkv(c *gin.Context) {
 			Code: 0,
 			Msg:  "ok",
 		},
-		Values: nil,
 	}
 
 	key := c.Param("key")
@@ -51,7 +50,7 @@ func (s *Handle) getkv(c *gin.Context) {
 		resp.Code = -1
 		resp.Msg = err.Error()
 	} else {
-		resp.Values = []*rpcwire.KeyValue{result}
+		resp.Value = result
 	}
 
 	c.JSON(http.StatusOK, resp)
