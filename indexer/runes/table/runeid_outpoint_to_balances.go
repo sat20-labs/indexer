@@ -113,7 +113,7 @@ func (s *RuneIdOutpointToBalanceTable) Insert(v *RuneIdOutpointToBalance) (ret *
 		var err error
 		ret, err = RuneIdOutpointToBalanceFromString(string(tblKey))
 		if err != nil {
-			common.Log.Panicf("RuneIdOutpointToBalanceTable.Insert-> GenRuneIdOutpointToBalance(%s) err:%v", string(tblKey), err)
+			common.Log.Panicf("RuneIdOutpointToBalanceTable.Insert-> RuneIdOutpointToBalanceFromString(%s) err:%v", string(tblKey), err)
 		}
 		ret.Balance = *balance
 	}
@@ -133,7 +133,7 @@ func (s *RuneIdOutpointToBalanceTable) Remove(key *RuneIdOutpointToBalance) (ret
 		var err error
 		ret, err = RuneIdOutpointToBalanceFromString(string(tblKey))
 		if err != nil {
-			common.Log.Panicf("RuneIdOutpointToBalanceTable.Insert-> GenRuneIdOutpointToBalance(%s) err:%v", string(tblKey), err)
+			common.Log.Panicf("RuneIdOutpointToBalanceTable.Remove-> RuneIdOutpointToBalanceFromString(%s) err:%v", string(tblKey), err)
 		}
 		ret.Balance = *balance
 	}
