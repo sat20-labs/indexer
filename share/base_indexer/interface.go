@@ -124,6 +124,6 @@ type Indexer interface {
 
 	// kv
 	PutKVs(kvs []*common.KeyValue) (error)
-	DelKVs(keys []string) (error)
-	GetKVs(keys []string) ([]*common.KeyValue, error)
+	DelKVs(pubkey []byte, keys []string) (error)
+	GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error)
 }

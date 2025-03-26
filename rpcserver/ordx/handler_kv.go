@@ -43,9 +43,10 @@ func (s *Handle) getkv(c *gin.Context) {
 		},
 	}
 
+	pubkey := c.Param("pubkey")
 	key := c.Param("key")
 
-	result, err := s.model.GetKV(key)
+	result, err := s.model.GetKV(pubkey, key)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

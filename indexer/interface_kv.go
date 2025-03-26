@@ -9,13 +9,17 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+func getKvKey(pubkey string, key string) string {
+	return fmt.Sprintf("/%s/%s", pubkey, key)
+}
+
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Cancel()
 
 	for _, value := range kvs {
-		key := value.Key
+		
 
 		// 目前仅允许内置的pubkey
 		pkStr := hex.EncodeToString(value.PubKey)
@@ -31,6 +35,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 			return fmt.Errorf("verify signature failed, %v", err)
 		}
 
+		key := getKvKey(pkStr, value.Key)
 		err = db.SetDB([]byte(key), value, wb)
 		if err != nil {
 			common.Log.Errorf("setting key %s failed, %v", key, err)
@@ -48,13 +53,15 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 }
 
 
-func (b *IndexerMgr) DelKVs(keys []string) (error) {
+func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) (error) {
 	
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Cancel()
 
-	for _, value := range keys {
-		key := value
+	pkStr := hex.EncodeToString(pubkey)
+
+	for _, k := range keys {
+		key := getKvKey(pkStr, k)
 		err := wb.Delete([]byte(key))
 		if err != nil {
 			common.Log.Errorf("deleting key %s failed, %v", key, err)
@@ -72,12 +79,13 @@ func (b *IndexerMgr) DelKVs(keys []string) (error) {
 }
 
 
-func (b *IndexerMgr) GetKVs(keys []string) ([]*common.KeyValue, error) {
+func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error) {
 	
+	pkStr := hex.EncodeToString(pubkey)
 	result := make([]*common.KeyValue, 0)
 	b.kvDB.View(func(txn *badger.Txn) error {
-		for _, value := range keys {
-			key := value
+		for _, k := range keys {
+			key := getKvKey(pkStr, k)
 	
 			item, err := txn.Get([]byte(key))
 			if err != nil {
@@ -87,6 +95,10 @@ func (b *IndexerMgr) GetKVs(keys []string) ([]*common.KeyValue, error) {
 			err = item.Value(func(v []byte) error {
 				return db.DecodeBytes(v, &value)
 			})
+			if err != nil {
+				common.Log.Errorf("decoding key %s failed, %v", key, err)
+				continue
+			}
 	
 			result = append(result, &value)
 		}

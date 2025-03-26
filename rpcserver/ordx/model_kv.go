@@ -33,10 +33,15 @@ func (s *Model) GetNonce(req *rpcwire.GetNonceReq) ([]byte, error) {
 	return generateNonce(pkHex, now), nil
 }
 
-func (s *Model) GetKV(key string) (*rpcwire.KeyValue, error) {
+func (s *Model) GetKV(pubkey, key string) (*rpcwire.KeyValue, error) {
 	// TODO 是否检查签名？
 
-	result, err := s.indexer.GetKVs([]string{key})
+	pk, err := hex.DecodeString(pubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.indexer.GetKVs(pk, []string{key})
 	if err != nil {
 		return nil, err
 	}
@@ -102,5 +107,5 @@ func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
 		return fmt.Errorf("verify signature failed, %v", err)
 	}
 
-	return s.indexer.DelKVs(req.Keys)
+	return s.indexer.DelKVs(req.PubKey, req.Keys)
 }

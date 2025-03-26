@@ -118,7 +118,7 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 
 	// kv记录
 	r.POST(proxy+"/v3/kv/nonce", s.handle.getNonce)
-	r.GET(proxy+"/v3/kv/get/:key", s.handle.getkv)
+	r.GET(proxy+"/v3/kv/get/:pubkey/:key", s.handle.getkv)
 	r.POST(proxy+"/v3/kv/put", s.handle.putKVs)
 	r.POST(proxy+"/v3/kv/del", s.handle.delKVs)
 }
