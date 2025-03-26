@@ -63,7 +63,7 @@ func NewRuneIdToMintHistoryTable(store *store.Cache[pb.RuneIdToMintHistory]) *Ru
 
 func (s *RuneToMintHistoryTable) GetList(runeId *runestone.RuneId) (ret []*RuneIdToMintHistory, err error) {
 	tblKey := []byte(store.RUNEID_TO_MINT_HISTORYS + runeId.Hex() + "-")
-	pbVal := s.Cache.GetList(tblKey, false)
+	pbVal := s.Cache.GetList(tblKey, true)
 
 	if pbVal != nil {
 		ret = make([]*RuneIdToMintHistory, len(pbVal))
