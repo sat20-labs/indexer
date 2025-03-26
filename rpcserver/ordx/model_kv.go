@@ -52,14 +52,14 @@ func (s *Model) GetKVs(keys []string) ([]*rpcwire.KeyValue, error) {
 	return nil, nil
 }
 
-func (s *Model) PutKVs(req *rpcwire.PutKValueReq) ([]string, error) {
+func (s *Model) PutKVs(req *rpcwire.PutKValueReq) (error) {
 
 	now := time.Now().UnixMicro()
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
 		if t - now > time.Hour.Microseconds() * 24 {
-			return nil, fmt.Errorf("nonce expired")
+			return fmt.Errorf("nonce expired")
 		}
 	}
 
@@ -67,25 +67,25 @@ func (s *Model) PutKVs(req *rpcwire.PutKValueReq) ([]string, error) {
 	req.Signature = nil
 	msg, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
 	if err != nil {
 		common.Log.Errorf("verify signature failed")
-		return nil, fmt.Errorf("verify signature failed, %v", err)
+		return fmt.Errorf("verify signature failed, %v", err)
 	}
 
 	return s.indexer.PutKVs(req.Values)
 }
 
-func (s *Model) DelKVs(req *rpcwire.DelKValueReq) ([]string, error) {
+func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
 	now := time.Now().UnixMicro()
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
 		if t - now > time.Hour.Microseconds() * 24 {
-			return nil, fmt.Errorf("nonce expired")
+			return fmt.Errorf("nonce expired")
 		}
 	}
 
@@ -93,13 +93,13 @@ func (s *Model) DelKVs(req *rpcwire.DelKValueReq) ([]string, error) {
 	req.Signature = nil
 	msg, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
 	if err != nil {
 		common.Log.Errorf("verify signature failed")
-		return nil, fmt.Errorf("verify signature failed, %v", err)
+		return fmt.Errorf("verify signature failed, %v", err)
 	}
 
 	return s.indexer.DelKVs(req.Keys)

@@ -9,66 +9,66 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) ([]string, error) {
+func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Cancel()
 
-	result := make([]string, 0)
 	for _, value := range kvs {
 		key := value.Key
 
 		// 目前仅允许内置的pubkey
 		pkStr := hex.EncodeToString(value.PubKey)
 		if pkStr != common.BootstrapPubKey && pkStr != common.CoreNodePubKey {
-			return nil, fmt.Errorf("unsupport pubkey")
+			common.Log.Errorf("unsupport pubkey")
+			return fmt.Errorf("unsupport pubkey")
 		}
 
 		// verify the signature
 		err := common.VerifySignOfMessage(value.Value, value.Signature, value.PubKey)
 		if err != nil {
 			common.Log.Errorf("verify signature failed")
-			return nil, fmt.Errorf("verify signature failed, %v", err)
+			return fmt.Errorf("verify signature failed, %v", err)
 		}
 
 		err = db.SetDB([]byte(key), value, wb)
 		if err != nil {
-			return nil, err
+			common.Log.Errorf("setting key %s failed, %v", key, err)
+			return err
 		}
 	}
 
 	err := wb.Flush()
 	if err != nil {
 		common.Log.Errorf("flushing writes to db %v", err)
-		return nil, err
+		return err
 	}
 
-	return result, nil
+	return nil
 }
 
 
-func (b *IndexerMgr) DelKVs(keys []string) ([]string, error) {
+func (b *IndexerMgr) DelKVs(keys []string) (error) {
 	
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Cancel()
 
-	result := make([]string, 0)
 	for _, value := range keys {
 		key := value
 		err := wb.Delete([]byte(key))
 		if err != nil {
-			continue
+			common.Log.Errorf("deleting key %s failed, %v", key, err)
+			return err
 		}
-		result = append(result, key)
 	}
 
 	err := wb.Flush()
 	if err != nil {
 		common.Log.Errorf("flushing writes to db %v", err)
-		return nil, err
+		return err
 	}
 
-	return result, nil
+	return nil
 }
 
 

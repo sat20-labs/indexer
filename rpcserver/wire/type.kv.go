@@ -39,7 +39,6 @@ type PutKValueReq struct {
 
 type PutKValueResp struct {
 	BaseResp
-	Succeeded []string `json:"succeeded"`
 }
 
 type DelKValueReq struct {
@@ -51,5 +50,4 @@ type DelKValueReq struct {
 
 type DelKValueResp struct {
 	BaseResp
-	Deleted []string `json:"deleted"`
 }

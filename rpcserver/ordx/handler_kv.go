@@ -72,12 +72,10 @@ func (s *Handle) putKVs(c *gin.Context) {
 		return
 	}
 
-	result, err := s.model.PutKVs(&req)
+	err := s.model.PutKVs(&req)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
-	} else {
-		resp.Succeeded = result
 	}
 
 	c.JSON(http.StatusOK, resp)
@@ -99,13 +97,11 @@ func (s *Handle) delKVs(c *gin.Context) {
 		return
 	}
 
-	result, err := s.model.DelKVs(&req)
+	err := s.model.DelKVs(&req)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
-	} else {
-		resp.Deleted = result
-	}
+	} 
 
 	c.JSON(http.StatusOK, resp)
 }
