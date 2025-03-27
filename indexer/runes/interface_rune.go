@@ -11,7 +11,7 @@ import (
 	"lukechampine.com/uint128"
 )
 
-const allRuneInfoCacheDuration = 6 * time.Minute
+const allRuneInfoCacheDuration = 10 * time.Minute
 
 var (
 	runeInfosCache              []*RuneInfo

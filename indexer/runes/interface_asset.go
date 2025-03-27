@@ -2,7 +2,9 @@ package runes
 
 import (
 	"sort"
+	"time"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/table"
@@ -15,8 +17,28 @@ type AddressLot struct {
 }
 type AddressIdToAddressLotMap map[uint64]*AddressLot
 
+type RuneHolders struct {
+	LastTimestamp        int64
+	HoldersAddressAmount map[uint64]*common.Decimal
+}
+
+const tickHoldersInfoCacheDuration = 10 * time.Minute
+
+var (
+	runeHoldersCache cmap.ConcurrentMap[string, *RuneHolders]
+)
+
+func init() {
+	runeHoldersCache = cmap.New[*RuneHolders]()
+}
+
 // key: addressId, value: amount
 func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
+	if runeHolders, exist := runeHoldersCache.Get(runeId); exist {
+		if time.Since(time.Unix(runeHolders.LastTimestamp, 0)) < tickHoldersInfoCacheDuration {
+			return runeHolders.HoldersAddressAmount
+		}
+	}
 	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
@@ -53,6 +75,12 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 		ret[addressId] = decimal
 		i++
 	}
+
+	runeHolders := &RuneHolders{
+		LastTimestamp:        time.Now().Unix(),
+		HoldersAddressAmount: ret,
+	}
+	runeHoldersCache.Set(runeId, runeHolders)
 	return
 }
 

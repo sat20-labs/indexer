@@ -13,7 +13,7 @@ type MintHistoryInfo struct {
 	MintHistory   []*MintHistory
 }
 
-const mintHistoryCacheDuration = 6 * time.Minute
+const mintHistoryCacheDuration = 10 * time.Minute
 
 var (
 	runeMintHistoryCache cmap.ConcurrentMap[string, *MintHistoryInfo]
