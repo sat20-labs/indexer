@@ -265,7 +265,7 @@ func BytesToPublicKey(pubKeyBytes []byte) (*secp256k1.PublicKey, error) {
 	return pubKey, nil
 }
 
-func VerifyMessage(pubKey *secp256k1.PublicKey, msg []byte, sig []byte) bool {
+func VerifyMessage(pubKey *secp256k1.PublicKey, msg []byte, sig []byte) error {
 	// Compute the hash of the message.
 	var msgDigest []byte
 	doubleHash := false
@@ -277,11 +277,15 @@ func VerifyMessage(pubKey *secp256k1.PublicKey, msg []byte, sig []byte) bool {
 
 	signature, err := ecdsa.ParseDERSignature(sig)
 	if err != nil {
-		return false
+		return err
 	}
 
 	// Verify the signature using the public key.
-	return signature.Verify(msgDigest, pubKey)
+	if signature.Verify(msgDigest, pubKey) {
+		return nil
+	} else {
+		return fmt.Errorf("signature.Verify failed")
+	}
 }
 
 func VerifySignOfMessage(msg, sig, pubkey []byte) error {
@@ -289,8 +293,5 @@ func VerifySignOfMessage(msg, sig, pubkey []byte) error {
 	if err != nil {
 		return err
 	}
-	if !VerifyMessage(key, msg, sig) {
-		return fmt.Errorf("VerifyMessage failed")
-	}
-	return nil
+	return VerifyMessage(key, msg, sig)
 }
