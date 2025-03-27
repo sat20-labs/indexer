@@ -82,8 +82,8 @@ func (s *Model) PutKVs(req *rpcwire.PutKValueReq) (error) {
 
 	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
 	if err != nil {
-		common.Log.Errorf("verify signature failed, %v", err)
-		return fmt.Errorf("verify signature failed, %v", err)
+		common.Log.Errorf("verify signature of msg %s failed, %v", hex.EncodeToString(req.PubKey), err)
+		return err
 	}
 
 	return s.indexer.PutKVs(req.Values)
