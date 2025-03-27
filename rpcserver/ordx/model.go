@@ -12,14 +12,14 @@ import (
 )
 
 type Model struct {
-	indexer base_indexer.Indexer
-	nonceMap  map[string]int64
+	indexer  base_indexer.Indexer
+	nonceMap map[string]int64
 	mutex    sync.RWMutex
 }
 
 func NewModel(indexer base_indexer.Indexer) *Model {
 	return &Model{
-		indexer: indexer,
+		indexer:  indexer,
 		nonceMap: make(map[string]int64),
 	}
 }
@@ -159,9 +159,9 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 	return result, len(result), nil
 }
 
-func (s *Model) GetHolderListV3(tickName string, start, limit int) ([]*HolderV3, error) {
+func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, error) {
 	assetName := common.NewAssetNameFromString(tickName)
-	holders := s.indexer.GetHoldersWithTickV2(assetName)
+	holders := s.indexer.GetHoldersWithTickV2(assetName, start, limit)
 	result := make([]*HolderV3, 0)
 	for address, amt := range holders {
 		ordxMintInfo := &HolderV3{

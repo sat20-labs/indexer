@@ -154,7 +154,7 @@ func (s *Handle) getHolderListV3(c *gin.Context) {
 	if err != nil {
 		limit = 100
 	}
-	holderlist, err := s.model.GetHolderListV3(tickerName, start, limit)
+	holderlist, err := s.model.GetHolderListV3(tickerName, uint64(start), uint64(limit))
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

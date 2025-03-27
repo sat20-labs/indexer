@@ -68,7 +68,7 @@ func TestGetHoldersWithTicks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
-	holders := runesIndexer.GetHoldersWithTick(runeId.String())
+	holders := runesIndexer.GetHoldersWithTick(runeId.String(), 0, 1000)
 	t.Logf("GetHoldersWithTicks return holders total count: %d\n", len(holders))
 	for i, v := range holders {
 		t.Logf("GetHoldersWithTicks return holders, addressId: %d, value: %s\n", i, v.String())
