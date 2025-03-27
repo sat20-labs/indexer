@@ -159,7 +159,7 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 	return result, len(result), nil
 }
 
-func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, error) {
+func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, uint64, error) {
 	assetName := common.NewAssetNameFromString(tickName)
 	holders := s.indexer.GetHoldersWithTickV2(assetName, start, limit)
 	result := make([]*HolderV3, 0)
@@ -175,7 +175,17 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*Holder
 		b, _ := common.NewDecimalFromFormatString(result[j].TotalBalance)
 		return a.Cmp(b) > 0
 	})
-	return result, nil
+
+	total := uint64(len(result))
+	end := total
+	if start >= end {
+		return nil, 0, nil
+	}
+	if start+limit < end {
+		end = start + limit
+	}
+	result = result[start:end]
+	return result, total, nil
 }
 
 func (s *Model) GetMintHistoryV3(tickName string, start, limit int) (*MintHistoryV3, error) {
