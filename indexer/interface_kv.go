@@ -47,6 +47,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 			common.Log.Errorf("json.Marshal failed. %v", err)
 			return err
 		}
+		value.Signature = sig
 		
 		// verify the signature
 		err = common.VerifySignOfMessage(msg, sig, value.PubKey)
