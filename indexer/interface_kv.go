@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v4"
@@ -39,11 +40,20 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 		// 目前仅允许内置的pubkey
 		pkStr := hex.EncodeToString(value.PubKey)
 
-		// verify the signature
-		err := common.VerifySignOfMessage(value.Value, value.Signature, value.PubKey)
+		sig := value.Signature
+		value.Signature = nil
+		msg, err := json.Marshal(value)
 		if err != nil {
-			common.Log.Errorf("verify signature failed, %v", err)
-			return fmt.Errorf("verify signature failed, %v", err)
+			common.Log.Errorf("json.Marshal failed. %v", err)
+			return err
+		}
+		value.Signature = sig
+		
+		// verify the signature
+		err = common.VerifySignOfMessage(msg, sig, value.PubKey)
+		if err != nil {
+			common.Log.Errorf("verify signature of key %s failed, %v", value.Key, err)
+			return fmt.Errorf("verify signature of key %s failed, %v", value.Key, err)
 		}
 
 		key := getKvKey(pkStr, value.Key)
