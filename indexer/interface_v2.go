@@ -392,7 +392,7 @@ func (b *IndexerMgr) GetTickerMapV2(protocol string) map[string]*common.TickerIn
 }
 
 // return: addressId -> asset amount
-func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName, start, limit uint64) map[uint64]*common.Decimal {
+func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName) map[uint64]*common.Decimal {
 	result := make(map[uint64]*common.Decimal)
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
@@ -403,7 +403,7 @@ func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName, start, 
 	case common.PROTOCOL_NAME_BRC20:
 		result = b.brc20Indexer.GetHoldersWithTick(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
-		result = b.RunesIndexer.GetHoldersWithTick(tickerName.Ticker, start, limit)
+		result = b.RunesIndexer.GetHoldersWithTick(tickerName.Ticker)
 	}
 
 	return result

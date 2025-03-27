@@ -161,7 +161,7 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, uint64, error) {
 	assetName := common.NewAssetNameFromString(tickName)
-	holders := s.indexer.GetHoldersWithTickV2(assetName, start, limit)
+	holders := s.indexer.GetHoldersWithTickV2(assetName)
 	result := make([]*HolderV3, 0)
 	for address, amt := range holders {
 		ordxMintInfo := &HolderV3{

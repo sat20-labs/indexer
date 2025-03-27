@@ -16,7 +16,7 @@ type AddressLot struct {
 type AddressIdToAddressLotMap map[uint64]*AddressLot
 
 // key: addressId, value: amount
-func (s *Indexer) GetHoldersWithTick(runeId string, start, limit uint64) (ret map[uint64]*common.Decimal) {
+func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
 	rid, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
@@ -32,21 +32,8 @@ func (s *Indexer) GetHoldersWithTick(runeId string, start, limit uint64) (ret ma
 		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())
 	}
 
-	sort.Slice(balances, func(i, j int) bool {
-		return balances[i].Balance.Value.Cmp(balances[j].Balance.Value) > 0
-	})
-
-	end := uint64(len(balances))
-	if start >= end {
-		return nil
-	}
-	if start+limit < end {
-		end = start + limit
-	}
-
-	balancesSlice := balances[start:end]
 	addressIdToAddressLotMap := make(AddressIdToAddressLotMap)
-	for _, balance := range balancesSlice {
+	for _, balance := range balances {
 		if addressIdToAddressLotMap[balance.AddressId] == nil {
 			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
 				Address: string(balance.Address),

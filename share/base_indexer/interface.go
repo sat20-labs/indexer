@@ -115,7 +115,7 @@ type Indexer interface {
 	// return: ticker's name -> ticker info
 	GetTickerMapV2(protcol string) map[string]*common.TickerInfo
 	// return: addressId -> asset amount
-	GetHoldersWithTickV2(tickerName *common.TickerName, start, limit uint64) map[uint64]*common.Decimal
+	GetHoldersWithTickV2(tickerName *common.TickerName) map[uint64]*common.Decimal
 	// return: asset amount, mint times
 	GetMintAmountV2(tickerName *common.TickerName) (*common.Decimal, int64)
 	// return:  mint info sorted by inscribed time
