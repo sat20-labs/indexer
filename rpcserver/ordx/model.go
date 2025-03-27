@@ -178,26 +178,36 @@ func init() {
 }
 
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, uint64, error) {
+	result := make([]*HolderV3, 0)
 	if runeHolders, exist := runeHoldersCache.Get(tickName); exist {
 		if time.Since(time.Unix(runeHolders.LastTimestamp, 0)) < tickHoldersCacheDuration {
-			return runeHolders.HoldersAddressAmount, runeHolders.Total, nil
+			result = runeHolders.HoldersAddressAmount
 		}
-	}
-	assetName := common.NewAssetNameFromString(tickName)
-	holders := s.indexer.GetHoldersWithTickV2(assetName)
-	result := make([]*HolderV3, 0)
-	for address, amt := range holders {
-		ordxMintInfo := &HolderV3{
-			Wallet:       s.indexer.GetAddressById(address),
-			TotalBalance: amt.String(),
+	} else {
+		assetName := common.NewAssetNameFromString(tickName)
+		holders := s.indexer.GetHoldersWithTickV2(assetName)
+
+		for address, amt := range holders {
+			ordxMintInfo := &HolderV3{
+				Wallet:       s.indexer.GetAddressById(address),
+				TotalBalance: amt.String(),
+			}
+			result = append(result, ordxMintInfo)
 		}
-		result = append(result, ordxMintInfo)
+		sort.Slice(result, func(i, j int) bool {
+			a, _ := common.NewDecimalFromFormatString(result[i].TotalBalance)
+			b, _ := common.NewDecimalFromFormatString(result[j].TotalBalance)
+			return a.Cmp(b) > 0
+		})
+
+		total := uint64(len(result))
+		runeHolders := &TickHolders{
+			LastTimestamp:        time.Now().Unix(),
+			Total:                total,
+			HoldersAddressAmount: result,
+		}
+		runeHoldersCache.Set(tickName, runeHolders)
 	}
-	sort.Slice(result, func(i, j int) bool {
-		a, _ := common.NewDecimalFromFormatString(result[i].TotalBalance)
-		b, _ := common.NewDecimalFromFormatString(result[j].TotalBalance)
-		return a.Cmp(b) > 0
-	})
 
 	total := uint64(len(result))
 	end := total
@@ -208,13 +218,6 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*Holder
 		end = start + limit
 	}
 	result = result[start:end]
-
-	runeHolders := &TickHolders{
-		LastTimestamp:        time.Now().Unix(),
-		Total:                total,
-		HoldersAddressAmount: result,
-	}
-	runeHoldersCache.Set(tickName, runeHolders)
 	return result, total, nil
 }
 
