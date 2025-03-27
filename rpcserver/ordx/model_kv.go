@@ -82,7 +82,7 @@ func (s *Model) PutKVs(req *rpcwire.PutKValueReq) (error) {
 
 	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
 	if err != nil {
-		common.Log.Errorf("verify signature failed")
+		common.Log.Errorf("verify signature failed, %v", err)
 		return fmt.Errorf("verify signature failed, %v", err)
 	}
 
@@ -108,7 +108,7 @@ func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
 
 	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
 	if err != nil {
-		common.Log.Errorf("verify signature failed")
+		common.Log.Errorf("verify signature failed, %v", err)
 		return fmt.Errorf("verify signature failed, %v", err)
 	}
 
