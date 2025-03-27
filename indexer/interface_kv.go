@@ -42,7 +42,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 		// verify the signature
 		err := common.VerifySignOfMessage(value.Value, value.Signature, value.PubKey)
 		if err != nil {
-			common.Log.Errorf("verify signature failed")
+			common.Log.Errorf("verify signature failed, %v", err)
 			return fmt.Errorf("verify signature failed, %v", err)
 		}
 
@@ -52,6 +52,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 			common.Log.Errorf("setting key %s failed, %v", key, err)
 			return err
 		}
+		common.Log.Infof("keyValue saved. %s", key)
 	}
 
 	err := wb.Flush()
@@ -78,6 +79,7 @@ func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) (error) {
 			common.Log.Errorf("deleting key %s failed, %v", key, err)
 			return err
 		}
+		common.Log.Infof("keyValue deleted. %s", key)
 	}
 
 	err := wb.Flush()
