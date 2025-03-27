@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
@@ -159,7 +161,28 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 	return result, len(result), nil
 }
 
+type TickHolders struct {
+	LastTimestamp        int64
+	Total                uint64
+	HoldersAddressAmount []*HolderV3
+}
+
+const tickHoldersCacheDuration = 10 * time.Minute
+
+var (
+	runeHoldersCache cmap.ConcurrentMap[string, *TickHolders]
+)
+
+func init() {
+	runeHoldersCache = cmap.New[*TickHolders]()
+}
+
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, uint64, error) {
+	if runeHolders, exist := runeHoldersCache.Get(tickName); exist {
+		if time.Since(time.Unix(runeHolders.LastTimestamp, 0)) < tickHoldersCacheDuration {
+			return runeHolders.HoldersAddressAmount, runeHolders.Total, nil
+		}
+	}
 	assetName := common.NewAssetNameFromString(tickName)
 	holders := s.indexer.GetHoldersWithTickV2(assetName)
 	result := make([]*HolderV3, 0)
@@ -185,6 +208,13 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*Holder
 		end = start + limit
 	}
 	result = result[start:end]
+
+	runeHolders := &TickHolders{
+		LastTimestamp:        time.Now().Unix(),
+		Total:                total,
+		HoldersAddressAmount: result,
+	}
+	runeHoldersCache.Set(tickName, runeHolders)
 	return result, total, nil
 }
 
