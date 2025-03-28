@@ -270,3 +270,15 @@ func (p *TxAssets) GetBindingSatAmout() int64 {
 	}
 	return amount
 }
+
+func (p *TxAssets) IsZero() bool {
+	if len(*p) == 0 {
+		return true
+	}
+	for _, asset := range *p {
+		if !asset.Amount.IsZero() {
+			return false
+		}
+	}
+	return true
+}
