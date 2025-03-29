@@ -179,14 +179,23 @@ func init() {
 
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, uint64, error) {
 	result := make([]*HolderV3, 0)
+	needUpdate := false
+
 	if runeHolders, exist := runeHoldersCache.Get(tickName); exist {
 		if time.Since(time.Unix(runeHolders.LastTimestamp, 0)) < tickHoldersCacheDuration {
 			result = runeHolders.HoldersAddressAmount
+		} else {
+			needUpdate = true
 		}
 	} else {
+		needUpdate = true
+	}
+
+	if needUpdate {
 		assetName := common.NewAssetNameFromString(tickName)
 		holders := s.indexer.GetHoldersWithTickV2(assetName)
 
+		result = make([]*HolderV3, 0, len(holders))
 		for address, amt := range holders {
 			ordxMintInfo := &HolderV3{
 				Wallet:       s.indexer.GetAddressById(address),
