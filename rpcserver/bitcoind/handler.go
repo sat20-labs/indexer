@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/gin-gonic/gin"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
@@ -232,14 +233,24 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 
 	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
 	if err != nil {
-		mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
-		if err != nil {
+		// mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
+		// if err != nil {
 			resp.Code = -1
 			resp.Msg = err.Error()
 			c.JSON(http.StatusOK, resp)
 			return
+		// }
+		// blockHeight = int64(mt.Height)
+	}
+
+	if tx.Confirmations == 1 {
+		// 需要确保这个tx已经被索引器解析，
+		if blockHeight > int64(base_indexer.ShareBaseIndexer.GetSyncHeight()) {
+			resp.Code = -1
+			resp.Msg = "tx is not be indexed yet"
+			c.JSON(http.StatusOK, resp)
+			return
 		}
-		blockHeight = int64(mt.Height)
 	}
 
 	txInfo := &rpcwire.TxSimpleInfo{
