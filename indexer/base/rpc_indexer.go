@@ -136,6 +136,7 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 			return nil, err
 		}
 	} else if addrType == uint32(txscript.NullDataTy) {
+		// TODO 这里没有获得原始的数据
 		pkScript, _ = txscript.NullDataScript(nil)
 	} else {
 		addr, err := b.GetAddressByID(output.AddressIds[0])
