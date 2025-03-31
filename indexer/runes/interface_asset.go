@@ -233,7 +233,7 @@ func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
 	for _, balance := range balances {
 		runeEntry := s.idToEntryTbl.Get(balance.RuneId)
 		sr := runeEntry.SpacedRune
-		common.Log.Infof("runeEntry.SpacedRune: %v", sr.String())
+		// common.Log.Tracef("runeEntry.SpacedRune: %v", sr.String())
 		if spaceRuneLotMap[sr] == nil {
 			spaceRuneLotMap[sr] = &RuneBalance{
 				Balance:   uint128.Uint128{Lo: 0, Hi: 0},
