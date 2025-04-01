@@ -473,6 +473,8 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 		} else {
 			return 1
 		}
+	} else if tickerName.Protocol == "" {
+		return 1
 	}
 	
 	return 0
