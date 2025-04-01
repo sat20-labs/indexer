@@ -65,13 +65,13 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 	offset := int64(0)
 	for _, r := range *p {
 		if remaining > 0 {
-			if r.End - r.Start <= remaining {
+			if r.End-r.Start <= remaining {
 				// 完全在左边
 				left = append(left, r)
 			} else {
 				// 跨越 offset，需要拆分
-				left = append(left, &OffsetRange{Start: r.Start, End: r.Start+remaining})
-				offset = r.Start+remaining
+				left = append(left, &OffsetRange{Start: r.Start, End: r.Start + remaining})
+				offset = r.Start + remaining
 				right = append(right, &OffsetRange{Start: 0, End: r.End - offset})
 			}
 			remaining -= r.End - r.Start
@@ -85,7 +85,6 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 
 	return left, right
 }
-
 
 // 按聪数量分割, Append 的逆操作
 func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
@@ -119,7 +118,6 @@ func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
 	return left, right
 }
 
-
 // 同一个utxo中的offset合并
 func (p *AssetOffsets) Cat(r2 *OffsetRange) {
 	if r2 == nil {
@@ -141,27 +139,27 @@ func (p *AssetOffsets) Cat(r2 *OffsetRange) {
 
 // Insert 将一个新的 OffsetRange 插入到 AssetOffsets 中，保持排序，并合并相邻的区间
 func (p *AssetOffsets) Insert(r2 *OffsetRange) {
-    // 找到插入的位置
-    i := 0
-    for i < len(*p) && (*p)[i].End <= r2.Start {
-        i++
-    }
+	// 找到插入的位置
+	i := 0
+	for i < len(*p) && (*p)[i].End <= r2.Start {
+		i++
+	}
 
-    // 将新范围插入到合适的位置
-    *p = append(*p, nil) // 扩展切片
-    copy((*p)[i+1:], (*p)[i:]) // 将插入位置后的元素向后移动
-    (*p)[i] = r2 // 插入新元素
+	// 将新范围插入到合适的位置
+	*p = append(*p, nil)       // 扩展切片
+	copy((*p)[i+1:], (*p)[i:]) // 将插入位置后的元素向后移动
+	(*p)[i] = r2               // 插入新元素
 
-    // 合并相邻的区间
-    if i > 0 && (*p)[i-1].End >= (*p)[i].Start { // 如果与前一个区间相邻，合并
-        (*p)[i-1].End = max((*p)[i-1].End, (*p)[i].End)
-        *p = append((*p)[:i], (*p)[i+1:]...) // 移除合并后的区间
-        i-- // 退回到合并后的区间
-    }
-    if i < len(*p)-1 && (*p)[i].End >= (*p)[i+1].Start { // 如果与后一个区间相邻，合并
-        (*p)[i].End = max((*p)[i].End, (*p)[i+1].End)
-        *p = append((*p)[:i+1], (*p)[i+2:]...) // 移除合并后的区间
-    }
+	// 合并相邻的区间
+	if i > 0 && (*p)[i-1].End >= (*p)[i].Start { // 如果与前一个区间相邻，合并
+		(*p)[i-1].End = max((*p)[i-1].End, (*p)[i].End)
+		*p = append((*p)[:i], (*p)[i+1:]...) // 移除合并后的区间
+		i--                                  // 退回到合并后的区间
+	}
+	if i < len(*p)-1 && (*p)[i].End >= (*p)[i+1].Start { // 如果与后一个区间相邻，合并
+		(*p)[i].End = max((*p)[i].End, (*p)[i+1].End)
+		*p = append((*p)[:i+1], (*p)[i+2:]...) // 移除合并后的区间
+	}
 }
 
 // another 已经调整过偏移值
@@ -185,7 +183,6 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 		*p = append(*p, another...)
 	}
 }
-
 
 type TxOutput struct {
 	UtxoId      uint64
@@ -260,14 +257,12 @@ func (p *TxOutput) OutPoint() *wire.OutPoint {
 	return outpoint
 }
 
-
 func (p *TxOutput) TxOut() *wire.TxOut {
 	return &wire.TxOut{
-		Value: p.Value(),
+		Value:    p.Value(),
 		PkScript: p.OutValue.PkScript,
 	}
 }
-
 
 func (p *TxOutput) TxID() string {
 	parts := strings.Split(p.OutPointStr, ":")
@@ -327,7 +322,6 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	return nil
 }
 
-
 // 按照offset将TxOut分割为两个，是Append的反操作
 func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 
@@ -337,7 +331,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	if p.Value() == offset {
 		return p.Clone(), nil, nil
 	}
-	
+
 	var value1, value2 int64
 	value1 = offset
 	value2 = p.Value() - value1
@@ -353,19 +347,19 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 			amt1 := offset1.Size() * int64(asset.BindingSat)
 			if amt1 > 0 {
 				asset1 := AssetInfo{
-					Name: asset.Name,
-					Amount: *NewDecimal(amt1, 0),
+					Name:       asset.Name,
+					Amount:     *NewDecimal(amt1, 0),
 					BindingSat: asset.BindingSat,
 				}
 				part1.Assets.Add(&asset1)
 				part1.Offsets[asset.Name] = offset1
 			}
-			
+
 			amt2 := offset2.Size() * int64(asset.BindingSat)
 			if amt2 > 0 {
 				asset2 := AssetInfo{
-					Name: asset.Name,
-					Amount: *NewDecimal(amt2, 0),
+					Name:       asset.Name,
+					Amount:     *NewDecimal(amt2, 0),
 					BindingSat: asset.BindingSat,
 				}
 				part2.Assets.Add(&asset2)
@@ -388,7 +382,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 	if len(p.Assets) > 1 {
 		return nil, nil, fmt.Errorf("only one asset can be processed in mainnet utxo")
 	}
-	
+
 	var value1, value2 int64
 	value1 = value
 	value2 = p.Value() - value1
@@ -429,7 +423,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 
 	part1.Assets = TxAssets{*asset1}
 	part2.Assets = assets2
-	
+
 	if !IsBindingSat(name) {
 		// runes：no offsets
 		part2.Offsets = p.Offsets
@@ -546,20 +540,19 @@ func IsBindingSat(name *AssetName) bool {
 	return false
 }
 
-
 func IsFungibleToken(name *AssetName) bool {
 	if name == nil {
 		return true
 	}
-	
+
 	return name.Type == ASSET_TYPE_FT
 }
 
-func IsOrdx(name *AssetName) bool {
+func IsOrdxFT(name *AssetName) bool {
 	if name == nil {
 		return false
 	}
-	
+
 	return name.Protocol == PROTOCOL_NAME_ORDX && name.Type == ASSET_TYPE_FT
 }
 
@@ -568,7 +561,7 @@ func GetBindingSatNum(amt *Decimal, n uint32) int64 {
 	if n == 0 {
 		return 0
 	}
-	return (amt.Int64() + int64(n) - 1)/int64(n)
+	return (amt.Int64() + int64(n) - 1) / int64(n)
 }
 
 // amt的资产需要多少聪
@@ -576,5 +569,5 @@ func GetBindingSatNumV2(amt int64, n uint32) int64 {
 	if n == 0 {
 		return 0
 	}
-	return (amt + int64(n) - 1)/int64(n)
+	return (amt + int64(n) - 1) / int64(n)
 }

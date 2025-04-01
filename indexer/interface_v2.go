@@ -101,7 +101,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 		}
 
 		n := 1
-		if common.IsOrdx(&k) {
+		if common.IsOrdxFT(&k) {
 			ticker := b.GetTicker(k.Ticker)
 			if ticker != nil {
 				n = ticker.N
@@ -176,7 +176,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 		}
 
 		n := 1
-		if common.IsOrdx(&k) {
+		if common.IsOrdxFT(&k) {
 			ticker := b.GetTicker(k.Ticker)
 			if ticker != nil {
 				value = value * int64(ticker.N)
@@ -459,11 +459,21 @@ func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 }
 
 func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
-	if common.IsOrdx(tickerName) {
-		ticker := b.GetTicker(tickerName.Ticker)
-		if ticker != nil {
-			return ticker.N
+	if tickerName == nil {
+		return 1
+	}
+	if tickerName.Protocol == common.PROTOCOL_NAME_ORDX {
+		if tickerName.Type == common.ASSET_TYPE_FT {
+			ticker := b.GetTicker(tickerName.Ticker)
+			if ticker != nil {
+				return ticker.N
+			} else {
+				return 1
+			}
+		} else {
+			return 1
 		}
 	}
+	
 	return 0
 }
