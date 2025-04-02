@@ -1153,14 +1153,21 @@ func (b *IndexerMgr) isLptTicker(name string) bool {
 			return false
 		}
 	case common.PROTOCOL_NAME_BRC20:
+		if !b.brc20Indexer.TickExisted(org) {
+			return false
+		}
 	default:
 		return false
 	}
 
-	num, has := strings.CutPrefix(lpt, "lpt")
-	if !has {
-		return false
-	}
-	_, err :=  strconv.Atoi(num)
-	return err == nil
+	return lpt == "lpt"
+	// TODO 暂时不支持各个核心通道部署自己的流动性质押代币，只统一使用lpt,
+
+	// num, has := strings.CutPrefix(lpt, "lpt")
+	// if !has {
+	// 	return false
+	// }
+	// _, err :=  strconv.Atoi(num)
+	// return err == nil
+	
 }
