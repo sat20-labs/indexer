@@ -45,6 +45,10 @@ func (p *MemPool) Stop() {
 }
 
 func (p *MemPool) Start() {
+	go p.run()
+}
+
+func (p *MemPool) run() {
 	// 定时删除已经确认的tx
 	// 同步mempool
 
