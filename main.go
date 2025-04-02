@@ -84,7 +84,8 @@ func InitRpcService(conf *config.YamlConf, indexerMgr *indexer.IndexerMgr, stopC
 		}
 		common.Log.Info("rpc started")
 	}
-	utils.NewMemPool(stopChan)
+	mp := utils.NewMemPool(stopChan)
+	mp.Start()
 	return rpc, nil
 }
 
