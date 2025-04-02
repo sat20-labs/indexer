@@ -59,9 +59,13 @@ func (p *MemPool) run() {
 		}
 
 		p.mutex.Lock()
+		allTxs := make(map[string]bool)
+		for _, v := range p.spentUtxoMap {
+			allTxs[v] = true
+		}
 		confirmed := make(map[string]bool)
-		for k,v := range p.spentUtxoMap {
-			if bitcoin_rpc.IsExistTxInMemPool(v) {
+		for k := range allTxs {
+			if bitcoin_rpc.IsExistTxInMemPool(k) {
 				continue
 			}
 			confirmed[k] = true
@@ -83,6 +87,7 @@ func (p *MemPool) run() {
 			}
 			p.AddTx(txHex)
 		}
+		common.Log.Infof("MemPool synced, total %d utxo in mempool", len(p.spentUtxoMap))
 	}
 
 	tick()
