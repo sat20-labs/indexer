@@ -1,11 +1,11 @@
 package main
 
 import (
-
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/rpcserver"
+	"github.com/sat20-labs/indexer/rpcserver/utils"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
@@ -34,17 +34,19 @@ func main() {
 	base_indexer.InitBaseIndexer(indexerMgr)
 	indexerMgr.Init()
 
-	_, err = InitRpcService(yamlcfg, indexerMgr)
-	if err != nil {
-		common.Log.Error(err)
-		return
-	}
-
 	stopChan := make(chan bool)
 	cb := func() {
 		common.Log.Info("handle SIGINT for close base indexer")
 		stopChan <- true
 	}
+
+	_, err = InitRpcService(yamlcfg, indexerMgr, stopChan)
+	if err != nil {
+		common.Log.Error(err)
+		return
+	}
+
+	
 	config.RegistSigIntFunc(cb)
 	common.Log.Info("base indexer start...")
 	indexerMgr.StartDaemon(stopChan)
@@ -53,7 +55,7 @@ func main() {
 }
 
 
-func InitRpcService(conf *config.YamlConf, indexerMgr *indexer.IndexerMgr) (*rpcserver.Rpc, error) {
+func InitRpcService(conf *config.YamlConf, indexerMgr *indexer.IndexerMgr, stopChan chan bool) (*rpcserver.Rpc, error) {
 	maxIndexHeight := int64(0)
 	addr := ""
 	host := ""
@@ -82,6 +84,7 @@ func InitRpcService(conf *config.YamlConf, indexerMgr *indexer.IndexerMgr) (*rpc
 		}
 		common.Log.Info("rpc started")
 	}
+	utils.NewMemPool(stopChan)
 	return rpc, nil
 }
 

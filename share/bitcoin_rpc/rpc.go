@@ -71,16 +71,9 @@ func GetBlockHeaderWithTx(txid string) (*bitcoind.BlockHeader, error) {
 	return blockHeader, nil
 }
 
-func IsExistTxInMemPool(txid string) (bool, error) {
+func IsExistTxInMemPool(txid string) bool {
 	_, err := ShareBitconRpc.GetMemPoolEntry(txid)
-	if err != nil {
-		errNo := strings.Split(err.Error(), ":")[0]
-		if errNo == "-5" {
-			return false, nil
-		}
-		return false, nil
-	}
-	return true, nil
+	return err == nil
 }
 
 // TODO 需要本地维护一个mempool，加快查询速度
@@ -167,6 +160,12 @@ func GetBatchUnspendTxOutput(utxoList []string, includeMempool bool, concurrentC
 		common.Log.Debugf("Indexer.GetBatchUnspendTxOutput-> totalTryCount: %d", totalTryCount)
 	}
 	return unspendTxOutputListChan
+}
+
+
+// TODO 需要本地维护一个mempool，加快查询速度
+func GetMemPool() ([]string, error) {
+	return ShareBitconRpc.GetRawMempool()
 }
 
 // 提供一些接口，可以快速同步mempool中的数据，并将数据保存在本地kv数据库
