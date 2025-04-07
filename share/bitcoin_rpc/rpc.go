@@ -1,15 +1,9 @@
 package bitcoin_rpc
 
 import (
-	"context"
 	"fmt"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
 
 	"github.com/OLProtocol/go-bitcoind"
-	"github.com/sat20-labs/indexer/common"
 )
 
 var ShareBitconRpc *bitcoind.Bitcoind
@@ -25,6 +19,10 @@ func InitBitconRpc(host string, port int, user, passwd string, useSSL bool) erro
 		3600, // server timeout is 1 hour for debug
 	)
 	return err
+}
+
+func SendTx(signedTxHex string) (string, error) {
+	return ShareBitconRpc.SendRawTransaction(signedTxHex, 0)
 }
 
 func GetTx(txid string) (*bitcoind.RawTransaction, error) {
@@ -59,6 +57,22 @@ func GetTxHeight(txid string) (int64, error) {
 	return blockHeader.Height, nil
 }
 
+func GetBestBlockHash() (string, error) {
+	return ShareBitconRpc.GetBestBlockhash()
+}
+
+func GetRawBlock(blockHash string) (string, error) {
+	return ShareBitconRpc.GetRawBlock(blockHash)
+}
+
+func GetBlockHash(height uint64) (string, error) {
+	return ShareBitconRpc.GetBlockHash(height)
+}
+
+func GetBlockHeader(blockhash string) (*bitcoind.BlockHeader, error) {
+	return ShareBitconRpc.GetBlockheader(blockhash)
+}
+
 func GetBlockHeaderWithTx(txid string) (*bitcoind.BlockHeader, error) {
 	rawTx, err := GetTx(txid)
 	if err != nil {
@@ -76,96 +90,14 @@ func IsExistTxInMemPool(txid string) bool {
 	return err == nil
 }
 
-// TODO 需要本地维护一个mempool，加快查询速度
-func IsExistUtxoInMemPool(utxo string) (bool, error) {
-	txid, vout, err := common.ParseUtxo(utxo)
-	if err != nil {
-		return false, err
-	}
-	entry, err := ShareBitconRpc.GetUnspendTxOutput(txid, vout, true)
-	if err != nil {
-		return false, err
-	}
-	return entry.Confirmations == 0, nil
-}
-
-func GetBatchUnspendTxOutput(utxoList []string, includeMempool bool, concurrentCount int, ctx context.Context) chan map[string]*bitcoind.UnspendTxOutput {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	unspendTxOutputList := make(map[string]*bitcoind.UnspendTxOutput)
-	unspendTxOutputListChan := make(chan map[string]*bitcoind.UnspendTxOutput)
-
-	index := 0
-	totalTryCount := 0
-	var unspendTxOutputMap sync.Map
-
-	work := func(utxo string) {
-		parts := strings.Split(utxo, ":")
-		if len(parts) != 2 {
-			common.Log.Errorf("GetBatchUnspendTxOutput-> invalid utxo: %s", utxoList[index])
-			return
-		}
-		txid := parts[0]
-		outIndex, err := strconv.Atoi(parts[1])
-		if err != nil {
-			common.Log.Errorf("GetBatchUnspendTxOutput-> invalid utxo: %s", utxoList[index])
-			return
-		}
-		unspendTxOutput, err := ShareBitconRpc.GetUnspendTxOutput(txid, outIndex, includeMempool)
-		tryCount := 0
-		for err != nil {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				tryCount++
-				totalTryCount++
-				common.Log.Debugf("GetBatchUnspendTxOutput-> GetUnspendTxOutput failed: %v, tryCount: %d", err, tryCount)
-				unspendTxOutput, err = ShareBitconRpc.GetUnspendTxOutput(txid, outIndex, includeMempool)
-			}
-		}
-		unspendTxOutputMap.Store(utxo, unspendTxOutput)
-	}
-
-	go func() {
-		utxoCount := len(utxoList)
-		var runningGoroutines int32
-		var wg sync.WaitGroup
-		for index < utxoCount {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if atomic.LoadInt32(&runningGoroutines) < int32(concurrentCount) {
-					atomic.AddInt32(&runningGoroutines, 1)
-					wg.Add(1)
-					go func(utxo string) {
-						defer wg.Done()
-						defer atomic.AddInt32(&runningGoroutines, -1)
-						work(utxo)
-					}(utxoList[index])
-					index++
-				}
-			}
-		}
-		wg.Wait()
-		unspendTxOutputMap.Range(func(key, value interface{}) bool {
-			unspendTxOutputList[key.(string)] = value.(*bitcoind.UnspendTxOutput)
-			return true
-		})
-		unspendTxOutputListChan <- unspendTxOutputList
-	}()
-	if totalTryCount > 0 {
-		common.Log.Debugf("Indexer.GetBatchUnspendTxOutput-> totalTryCount: %d", totalTryCount)
-	}
-	return unspendTxOutputListChan
-}
-
 
 // TODO 需要本地维护一个mempool，加快查询速度
 func GetMemPool() ([]string, error) {
 	return ShareBitconRpc.GetRawMempool()
+}
+
+func GetMemPoolEntry(txId string)  (*bitcoind.MemPoolEntry, error) {
+	return ShareBitconRpc.GetMemPoolEntry(txId)
 }
 
 // 提供一些接口，可以快速同步mempool中的数据，并将数据保存在本地kv数据库

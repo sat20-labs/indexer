@@ -5,53 +5,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
-	"time"
-
-	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
-	"github.com/stretchr/testify/assert"
 )
-
-func TestGetBatchUnspendTxOutput(t *testing.T) {
-	err := bitcoin_rpc.InitBitconRpc(
-		"192.168.1.102",
-		8332,
-		"jacky",
-		"_RZekaGRgKQJSIOYi6vq0_CkJtjoCootamy81J2cDn0",
-		false,
-	)
-	if err != nil {
-		common.Log.Fatalln(err)
-	}
-
-	utxoListTemplate := []string{
-		"90808ef396f76e433ec2fd40890e6c6de8a331688b1feb941c10b3fdbe0052a4:0",
-		"90808ef396f76e433ec2fd40890e6c6de8a331688b1feb941c10b3fdbe0052a4:3",
-		"9ef03ffde4b91744798cde0eb1f8ffe6c0e7607220dd9a87fb522578248cb081:0",
-		"dd31b57963d7a6289af83d47a59c78d437671158e6613bf1e5bc0f2241e8d0e1:0",
-		"84bdb0b407acde53c45eae02b86485c5a83de26af711aee3a4d421dea93c5d4a:0",
-		"84bdb0b407acde53c45eae02b86485c5a83de26af711aee3a4d421dea93c5d4a:1",
-		"84bdb0b407acde53c45eae02b86485c5a83de26af711aee3a4d421dea93c5d4a:2",
-		"84bdb0b407acde53c45eae02b86485c5a83de26af711aee3a4d421dea93c5d4a:3",
-		"84bdb0b407acde53c45eae02b86485c5a83de26af711aee3a4d421dea93c5d4a:4",
-		"84bdb0b407acde53c45eae02b86485c5a83de26af711aee3a4d421dea93c5d4a:5",
-	}
-	utxoList := []string{}
-	for i := 0; i < 100; i++ {
-		utxoList = append(utxoList, utxoListTemplate...)
-	}
-	start1Time := time.Now()
-	unspendTxOutputListChan := bitcoin_rpc.GetBatchUnspendTxOutput(utxoList, true, 100, nil)
-	unspendTxOutputList := <-unspendTxOutputListChan
-	endTime := time.Now()
-	t.Logf("GetBatchUnspendTxOutput count: %d, elapsed: %v", len(unspendTxOutputList), endTime.Sub(start1Time))
-	for utxo, unspendTxOutput := range unspendTxOutputList {
-		if unspendTxOutput.BestBlock == "" {
-			t.Logf("utxo:%s isn't exist in mempool", utxo)
-		}
-	}
-	assert.NotEmpty(t, unspendTxOutputList)
-}
 
 func TestParsePercentage(t *testing.T) {
 

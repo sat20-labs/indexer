@@ -40,7 +40,7 @@ func (s *Service) sendRawTx(c *gin.Context) {
 		return
 	}
 
-	txid, err := bitcoin_rpc.ShareBitconRpc.SendRawTransaction(req.SignedTxHex, req.Maxfeerate)
+	txid, err := bitcoin_rpc.SendTx(req.SignedTxHex)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -82,7 +82,7 @@ func (s *Service) getRawBlock(c *gin.Context) {
 		Data: "",
 	}
 	blockHash := c.Param("blockhash")
-	data, err := bitcoin_rpc.ShareBitconRpc.GetRawBlock(blockHash)
+	data, err := bitcoin_rpc.GetRawBlock(blockHash)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -119,7 +119,7 @@ func (s *Service) getBlockHash(c *gin.Context) {
 		return
 	}
 
-	data, err := bitcoin_rpc.ShareBitconRpc.GetBlockHash(height)
+	data, err := bitcoin_rpc.GetBlockHash(height)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -159,7 +159,7 @@ func (s *Service) getTxInfo(c *gin.Context) {
 
 	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
 	if err != nil {
-		mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
+		mt, err := bitcoin_rpc.GetMemPoolEntry(tx.Txid)
 		if err != nil {
 			resp.Code = -1
 			resp.Msg = err.Error()
@@ -246,7 +246,7 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 
 	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
 	if err != nil {
-		// mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
+		// mt, err := bitcoin_rpc.GetMemPoolEntry(tx.Txid)
 		// if err != nil {
 			resp.Code = -1
 			resp.Msg = err.Error()
@@ -325,7 +325,7 @@ func (s *Service) getBestBlockHeight(c *gin.Context) {
 		Data: -1,
 	}
 
-	blockhash, err := bitcoin_rpc.ShareBitconRpc.GetBestBlockhash()
+	blockhash, err := bitcoin_rpc.GetBestBlockHash()
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -333,7 +333,7 @@ func (s *Service) getBestBlockHeight(c *gin.Context) {
 		return
 	}
 
-	header, err := bitcoin_rpc.ShareBitconRpc.GetBlockheader(blockhash)
+	header, err := bitcoin_rpc.GetBlockHeader(blockhash)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
