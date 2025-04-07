@@ -123,7 +123,11 @@ func (s *Model) GetUtxoInfoV3(utxo string) (*common.AssetsInUtxo, error) {
 	if utils.IsExistingInMemPool(utxo) {
 		return nil, fmt.Errorf("utxo %s is in mempool", utxo)
 	}
-	return s.indexer.GetTxOutputWithUtxoV3(utxo), nil
+	ret := s.indexer.GetTxOutputWithUtxoV3(utxo)
+	if ret == nil {
+		return nil, fmt.Errorf("can't find utxo %s", utxo)
+	}
+	return ret, nil
 }
 
 func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo, error) {
