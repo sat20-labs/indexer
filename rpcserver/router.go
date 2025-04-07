@@ -19,7 +19,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/rpcserver/base"
 	"github.com/sat20-labs/indexer/rpcserver/bitcoind"
-	"github.com/sat20-labs/indexer/rpcserver/extension"
 	"github.com/sat20-labs/indexer/rpcserver/ord"
 	"github.com/sat20-labs/indexer/rpcserver/ordx"
 	swaggerFiles "github.com/swaggo/files"
@@ -51,7 +50,6 @@ type Rpc struct {
 	ordxService      *ordx.Service
 	ordService       *ord.Service
 	btcdService      *bitcoind.Service
-	extensionService *extension.Service
 	//apidoc           *APIDoc
 }
 
@@ -61,7 +59,6 @@ func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
 		ordxService:      ordx.NewService(baseIndexer),
 		ordService:       ord.NewService(),
 		btcdService:      bitcoind.NewService(),
-		extensionService: extension.NewService(chain),
 		//apidoc:           &APIDoc{},
 	}
 }
@@ -172,7 +169,6 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	s.ordxService.InitRouter(r, rpcProxy)
 	s.ordService.InitRouter(r, rpcProxy)
 	s.btcdService.InitRouter(r, rpcProxy)
-	s.extensionService.InitRouter(r, rpcProxy)
 
 	parts := strings.Split(rpcUrl, ":")
 	var port string

@@ -40,7 +40,7 @@ func (s *Service) sendRawTx(c *gin.Context) {
 		return
 	}
 
-	txid, err := bitcoin_rpc.SendTx(req.SignedTxHex)
+	txid, err := bitcoin_rpc.ShareBitconRpc.SendTx(req.SignedTxHex)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -82,7 +82,7 @@ func (s *Service) getRawBlock(c *gin.Context) {
 		Data: "",
 	}
 	blockHash := c.Param("blockhash")
-	data, err := bitcoin_rpc.GetRawBlock(blockHash)
+	data, err := bitcoin_rpc.ShareBitconRpc.GetRawBlock(blockHash)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -119,7 +119,7 @@ func (s *Service) getBlockHash(c *gin.Context) {
 		return
 	}
 
-	data, err := bitcoin_rpc.GetBlockHash(height)
+	data, err := bitcoin_rpc.ShareBitconRpc.GetBlockHash(height)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -149,7 +149,7 @@ func (s *Service) getTxInfo(c *gin.Context) {
 		Data: nil,
 	}
 	txid := c.Param("txid")
-	tx, err := bitcoin_rpc.GetTx(txid)
+	tx, err := bitcoin_rpc.ShareBitconRpc.GetTx(txid)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -159,7 +159,7 @@ func (s *Service) getTxInfo(c *gin.Context) {
 
 	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
 	if err != nil {
-		mt, err := bitcoin_rpc.GetMemPoolEntry(tx.Txid)
+		mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
 		if err != nil {
 			resp.Code = -1
 			resp.Msg = err.Error()
@@ -184,7 +184,7 @@ func (s *Service) getTxInfo(c *gin.Context) {
 		value := float64(0)
 		utxo := ""
 		if vin.Vout >= 0 {
-			rawTx, err := bitcoin_rpc.GetTx(vin.Txid)
+			rawTx, err := bitcoin_rpc.ShareBitconRpc.GetTx(vin.Txid)
 			if err != nil {
 				resp.Code = -1
 				resp.Msg = err.Error()
@@ -236,7 +236,7 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 		Data: nil,
 	}
 	txid := c.Param("txid")
-	tx, err := bitcoin_rpc.GetTx(txid)
+	tx, err := bitcoin_rpc.ShareBitconRpc.GetTx(txid)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -296,7 +296,7 @@ func (s *Service) getRawTx(c *gin.Context) {
 		Data: nil,
 	}
 	txid := c.Param("txid")
-	rawtx, err := bitcoin_rpc.GetRawTx(txid)
+	rawtx, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txid)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -325,7 +325,7 @@ func (s *Service) getBestBlockHeight(c *gin.Context) {
 		Data: -1,
 	}
 
-	blockhash, err := bitcoin_rpc.GetBestBlockHash()
+	blockhash, err := bitcoin_rpc.ShareBitconRpc.GetBestBlockHash()
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -333,7 +333,7 @@ func (s *Service) getBestBlockHeight(c *gin.Context) {
 		return
 	}
 
-	header, err := bitcoin_rpc.GetBlockHeader(blockhash)
+	header, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(blockhash)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
@@ -344,3 +344,62 @@ func (s *Service) getBestBlockHeight(c *gin.Context) {
 	resp.Data = header.Height
 	c.JSON(http.StatusOK, resp)
 }
+
+
+func (s *Service) feeSummary(c *gin.Context) {
+	resp := &rpcwire.FeeSummaryResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		Data: &rpcwire.FeeSummaryList{
+			List: []*rpcwire.FeeSummary{
+				{
+					Title:   "Slow",
+					Desc:    "About 1 hours",
+					FeeRate: "20",
+				},
+				{
+					Title:   "Normal",
+					Desc:    "About 30 minutes",
+					FeeRate: "50",
+				},
+				{
+					Title:   "Fast",
+					Desc:    "About 10 minutes",
+					FeeRate: "100",
+				},
+			},
+		},
+	}
+
+	ret, err := bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(6, "ECONOMICAL")
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	// BTC/kb -> sat/vb
+	resp.Data.List[0].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
+
+	ret, err = bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(3, "ECONOMICAL")
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	resp.Data.List[1].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
+
+	ret, err = bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(1, "CONSERVATIVE")
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	resp.Data.List[2].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
+	c.JSON(http.StatusOK, resp)
+}
+

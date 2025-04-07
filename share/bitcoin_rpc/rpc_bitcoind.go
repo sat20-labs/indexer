@@ -2,31 +2,45 @@ package bitcoin_rpc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/OLProtocol/go-bitcoind"
 )
 
-var ShareBitconRpc *bitcoind.Bitcoind
 
 func InitBitconRpc(host string, port int, user, passwd string, useSSL bool) error {
-	var err error
-	ShareBitconRpc, err = bitcoind.New(
-		host,
-		port,
-		user,
-		passwd,
-		useSSL,
-		3600, // server timeout is 1 hour for debug
-	)
-	return err
+	
+	if strings.Contains(host, "blockstream") {
+
+	} else {
+		rpc, err := bitcoind.New(
+			host,
+			port,
+			user,
+			passwd,
+			useSSL,
+			120, // server timeout is 1 hour for debug
+		)
+		if err != nil {
+			return err
+		}
+		ShareBitconRpc = &BitcoindRPC{
+			bitcoind: rpc,
+		}
+	}
+	return nil
 }
 
-func SendTx(signedTxHex string) (string, error) {
-	return ShareBitconRpc.SendRawTransaction(signedTxHex, 0)
+type BitcoindRPC struct {
+	bitcoind *bitcoind.Bitcoind
 }
 
-func GetTx(txid string) (*bitcoind.RawTransaction, error) {
-	resp, err := ShareBitconRpc.GetRawTransaction(txid, true)
+func (p *BitcoindRPC) SendTx(signedTxHex string) (string, error) {
+	return p.bitcoind.SendRawTransaction(signedTxHex, 0)
+}
+
+func (p *BitcoindRPC) GetTx(txid string) (*bitcoind.RawTransaction, error) {
+	resp, err := p.bitcoind.GetRawTransaction(txid, true)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +51,8 @@ func GetTx(txid string) (*bitcoind.RawTransaction, error) {
 	return &ret, nil
 }
 
-func GetRawTx(txid string) (string, error) {
-	resp, err := ShareBitconRpc.GetRawTransaction(txid, false)
+func (p *BitcoindRPC) GetRawTx(txid string) (string, error) {
+	resp, err := p.bitcoind.GetRawTransaction(txid, false)
 	if err != nil {
 		return "", err
 	}
@@ -57,28 +71,32 @@ func GetTxHeight(txid string) (int64, error) {
 	return blockHeader.Height, nil
 }
 
-func GetBestBlockHash() (string, error) {
-	return ShareBitconRpc.GetBestBlockhash()
+func (p *BitcoindRPC) GetBlockCount() (uint64, error) {
+	return p.bitcoind.GetBlockCount()
 }
 
-func GetRawBlock(blockHash string) (string, error) {
-	return ShareBitconRpc.GetRawBlock(blockHash)
+func (p *BitcoindRPC) GetBestBlockHash() (string, error) {
+	return p.bitcoind.GetBestBlockhash()
 }
 
-func GetBlockHash(height uint64) (string, error) {
-	return ShareBitconRpc.GetBlockHash(height)
+func (p *BitcoindRPC) GetRawBlock(blockHash string) (string, error) {
+	return p.bitcoind.GetRawBlock(blockHash)
 }
 
-func GetBlockHeader(blockhash string) (*bitcoind.BlockHeader, error) {
-	return ShareBitconRpc.GetBlockheader(blockhash)
+func (p *BitcoindRPC) GetBlockHash(height uint64) (string, error) {
+	return p.bitcoind.GetBlockHash(height)
+}
+
+func (p *BitcoindRPC) GetBlockHeader(blockhash string) (*bitcoind.BlockHeader, error) {
+	return p.bitcoind.GetBlockheader(blockhash)
 }
 
 func GetBlockHeaderWithTx(txid string) (*bitcoind.BlockHeader, error) {
-	rawTx, err := GetTx(txid)
+	rawTx, err := ShareBitconRpc.GetTx(txid)
 	if err != nil {
 		return nil, err
 	}
-	blockHeader, err := ShareBitconRpc.GetBlockheader(rawTx.BlockHash)
+	blockHeader, err := ShareBitconRpc.GetBlockHeader(rawTx.BlockHash)
 	if err != nil {
 		return nil, err
 	}
@@ -90,15 +108,23 @@ func IsExistTxInMemPool(txid string) bool {
 	return err == nil
 }
 
-
 // TODO 需要本地维护一个mempool，加快查询速度
-func GetMemPool() ([]string, error) {
-	return ShareBitconRpc.GetRawMempool()
+func (p *BitcoindRPC) GetMemPool() ([]string, error) {
+	return p.bitcoind.GetRawMempool()
 }
 
-func GetMemPoolEntry(txId string)  (*bitcoind.MemPoolEntry, error) {
-	return ShareBitconRpc.GetMemPoolEntry(txId)
+func (p *BitcoindRPC) GetMemPoolEntry(txId string)  (*bitcoind.MemPoolEntry, error) {
+	return p.bitcoind.GetMemPoolEntry(txId)
 }
+
+func (p *BitcoindRPC) EstimateSmartFeeWithMode(minconf int, mode string) (*bitcoind.EstimateSmartFeeResult, error) {
+	ret, err := p.bitcoind.EstimateSmartFeeWithMode(minconf, mode)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
 
 // 提供一些接口，可以快速同步mempool中的数据，并将数据保存在本地kv数据库
 // 1. 启动一个线程，或者一个被动的监听接口，监控内存池的新增tx的信息，

@@ -75,13 +75,13 @@ func (p *MemPool) run() {
 		}
 		p.mutex.Unlock()
 
-		txs, err := bitcoin_rpc.GetMemPool()
+		txs, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
 		if err != nil {
 			common.Log.Errorf("GetMemPool failed, %v", err)
 			return
 		}
 		for _, tx := range txs {
-			txHex, err := bitcoin_rpc.GetRawTx(tx)
+			txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(tx)
 			if err != nil {
 				continue
 			}

@@ -683,7 +683,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			var err error
 			var resp any
 			for {
-				resp, err = bitcoin_rpc.ShareBitconRpc.GetRawTransaction(input.Txid, true)
+				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.Txid)
 				if err == nil {
 					break
 				} else {
@@ -717,7 +717,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			if !taproot {
 				continue
 			}
-			blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockheader(txInfo.BlockHash)
+			blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(txInfo.BlockHash)
 			if err != nil {
 				return false
 			}

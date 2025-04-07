@@ -2,7 +2,6 @@ package bitcoin_rpc
 
 import (
 	"encoding/hex"
-	"fmt"
 
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/sat20-labs/indexer/common"
@@ -53,10 +52,15 @@ func NewBlockStreamClient(scheme, host, proxy string, http HttpClient) *BlockStr
 
 
 func (p *BlockStreamClient) SendTx(signedTxHex string) (string, error) {
-	return ShareBitconRpc.SendRawTransaction(signedTxHex, 0)
+	return "", nil
 }
 
-func (p *BlockStreamClient) GetTxHex(txId string) (string, error) {
+
+func (p *BlockStreamClient) GetTx(txid string) (*bitcoind.RawTransaction, error) {
+	return nil, nil
+}
+
+func (p *BlockStreamClient) GetRawTx(txId string) (string, error) {
 	url := p.GetUrl("/tx/" + txId + "/hex")
 	rsp, err := p.Http.SendGetRequest(url)
 	if err != nil {
@@ -69,91 +73,37 @@ func (p *BlockStreamClient) GetTxHex(txId string) (string, error) {
 	return hex.EncodeToString(rsp), nil
 }
 
-
-func (p *BlockStreamClient) GetTx(txid string) (*bitcoind.RawTransaction, error) {
-	resp, err := ShareBitconRpc.GetRawTransaction(txid, true)
-	if err != nil {
-		return nil, err
-	}
-	ret, ok := resp.(bitcoind.RawTransaction)
-	if !ok {
-		return nil, fmt.Errorf("invalid RawTransaction type")
-	}
-	return &ret, nil
+func (p *BlockStreamClient) GetBlockCount() (uint64, error) {
+	return 0, nil
 }
-
-func (p *BlockStreamClient) GetRawTx(txid string) (string, error) {
-	resp, err := ShareBitconRpc.GetRawTransaction(txid, false)
-	if err != nil {
-		return "", err
-	}
-	ret, ok := resp.(string)
-	if !ok {
-		return "", fmt.Errorf("invalid string type")
-	}
-	return ret, nil
-}
-
-func (p *BlockStreamClient) GetTxHeight(txid string) (int64, error) {
-	blockHeader, err := GetBlockHeaderWithTx(txid)
-	if err != nil {
-		return 0, err
-	}
-	return blockHeader.Height, nil
-}
-
 
 func (p *BlockStreamClient) GetBestBlockHash() (string, error) {
-	return ShareBitconRpc.GetBestBlockhash()
+	return "", nil
 }
 
 func (p *BlockStreamClient) GetRawBlock(blockHash string) (string, error) {
-	return ShareBitconRpc.GetRawBlock(blockHash)
+	return "", nil
 }
 
 func (p *BlockStreamClient) GetBlockHash(height uint64) (string, error) {
-	return ShareBitconRpc.GetBlockHash(height)
+	return "", nil
 }
 
 func (p *BlockStreamClient) GetBlockHeader(blockhash string) (*bitcoind.BlockHeader, error) {
-	return ShareBitconRpc.GetBlockheader(blockhash)
+	return nil, nil
 }
 
-func (p *BlockStreamClient) GetBlockHeaderWithTx(txid string) (*bitcoind.BlockHeader, error) {
-	rawTx, err := GetTx(txid)
-	if err != nil {
-		return nil, err
-	}
-	blockHeader, err := ShareBitconRpc.GetBlockheader(rawTx.BlockHash)
-	if err != nil {
-		return nil, err
-	}
-	return blockHeader, nil
-}
-
-func (p *BlockStreamClient) IsExistTxInMemPool(txid string) bool {
-	_, err := ShareBitconRpc.GetMemPoolEntry(txid)
-	return err == nil
-}
-
-// TODO 需要本地维护一个mempool，加快查询速度
-func (p *BlockStreamClient) IsExistUtxoInMemPool(utxo string) (bool, error) {
-	txid, vout, err := common.ParseUtxo(utxo)
-	if err != nil {
-		return false, err
-	}
-	entry, err := ShareBitconRpc.GetUnspendTxOutput(txid, vout, true)
-	if err != nil {
-		return false, err
-	}
-	return entry.Confirmations == 0, nil
-}
 
 // TODO 需要本地维护一个mempool，加快查询速度
 func (p *BlockStreamClient) GetMemPool() ([]string, error) {
-	return ShareBitconRpc.GetRawMempool()
+	return nil, nil
 }
 
 func (p *BlockStreamClient) GetMemPoolEntry(txId string)  (*bitcoind.MemPoolEntry, error) {
-	return ShareBitconRpc.GetMemPoolEntry(txId)
+	return nil, nil
+}
+
+func (p *BlockStreamClient) EstimateSmartFeeWithMode(minconf int, mode string) (*bitcoind.EstimateSmartFeeResult, error) {
+	
+	return nil, nil
 }
