@@ -693,7 +693,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 				}
 			}
 
-			txInfo, _ := resp.(bitcoind.RawTransaction)
+			txInfo, _ := resp.(*bitcoind.RawTransaction)
 			hexStr := txInfo.Vout[input.Vout].ScriptPubKey.Hex
 			// is_p2tr
 			taproot := false
