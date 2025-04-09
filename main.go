@@ -37,7 +37,7 @@ func main() {
 	stopChan := make(chan bool)
 	cb := func() {
 		common.Log.Info("handle SIGINT for close base indexer")
-		stopChan <- true
+		close(stopChan)
 	}
 
 	_, err = InitRpcService(yamlcfg, indexerMgr, stopChan)
