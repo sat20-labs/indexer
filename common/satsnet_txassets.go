@@ -16,6 +16,9 @@ type AssetName struct {
 }
 
 func NewAssetNameFromString(name string) *AssetName {
+	if name == "" {
+		return &AssetName{}
+	}
 	parts := strings.Split(name, ":")
 	if len(parts) == 0 {
 		return &AssetName{}
