@@ -2,7 +2,6 @@ package runes
 
 import (
 	"bytes"
-	"errors"
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -46,11 +45,12 @@ func parseTxVoutScriptAddress(transaction *common.Transaction, voutIndex int, pa
 		return
 	}
 	if len(addresses) == 0 {
-		return "", errors.New("no address")
+		return "UNKNOWN", nil
 	}
-	if len(addresses) > 1 {
-		return "", errors.New("multiple addresses")
-	}
+	// if len(addresses) > 1 {
+	// 	// assign to first address
+	// 	return "", errors.New("multiple addresses")
+	// }
 	address = runestone.Address(addresses[0].EncodeAddress())
 	return
 }
