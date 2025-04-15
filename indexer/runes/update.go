@@ -318,9 +318,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
 				tx.Txid, vout, s.chaincfgParam.Net, err)
 		}
-		if address == "UNKNOWN" {
-			continue
-		}
 		addressId := s.BaseIndexer.GetAddressId(string(address))
 		outpointToBalancesValue := &table.OutpointToBalancesValue{
 			Utxo:       fmt.Sprintf("%s:%d", tx.Txid, vout),
