@@ -395,6 +395,8 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.ftBackupDB.UpdateDB()
 	b.runesBackupDB.UpdateDB()
 	b.brc20BackupDB.UpdateDB()
+
+	b.compiling.SetSyncHeight(b.compilingBackupDB.GetSyncHeight())
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
