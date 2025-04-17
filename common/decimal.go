@@ -198,6 +198,9 @@ func NewDecimalFromFormatString(s string) (*Decimal, error) {
 }
 
 func (d *Decimal) ToFormatString() string {
+	if d == nil {
+		return "0:0"
+	}
 	return fmt.Sprintf("%s:%d", d.String(), d.Precision)
 }
 
