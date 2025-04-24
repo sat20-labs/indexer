@@ -25,7 +25,7 @@ func (b *IndexerMgr) GetOrdxTickerMapV2() (map[string]*common.TickerInfo) {
 	result := make(map[string]*common.TickerInfo)
 	tickers := b.ftIndexer.GetAllTickers()
 	for _, tickerName := range tickers {
-		t := b.GetTickerV2(tickerName)
+		t := b.GetTickerV2(tickerName, common.ASSET_TYPE_FT)
 		if t != nil {
 			assetName := common.TickerName{
 				Protocol: common.PROTOCOL_NAME_ORDX,
@@ -42,14 +42,21 @@ func (b *IndexerMgr) GetTicker(ticker string) *common.Ticker {
 	return b.ftIndexer.GetTicker(ticker)
 }
 
-func (p *IndexerMgr) GetTickerV2(tickerName string) *common.TickerInfo {
-	ticker := p.GetTicker(tickerName)
+func (p *IndexerMgr) GetTickerV2(tickerName string, typ string) *common.TickerInfo {
+	var ticker *common.Ticker
+	switch typ {
+	case common.ASSET_TYPE_FT:
+		ticker = p.ftIndexer.GetTicker(tickerName)
+	case common.ASSET_TYPE_EXOTIC:
+		ticker = p.exotic.GetTicker(tickerName)
+	}
 	if ticker == nil {
 		return nil
 	}
+
 	result := &common.TickerInfo{}
 	result.Protocol = common.PROTOCOL_NAME_ORDX
-	result.Type = common.ASSET_TYPE_FT
+	result.Type = typ
 	result.Ticker = strings.ToLower(ticker.Name)
 	result.DisplayName = ticker.Name
 	result.Id = ticker.Id

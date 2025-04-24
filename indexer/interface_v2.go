@@ -214,7 +214,7 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 	var result *common.TickerInfo
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
-		return b.GetTickerV2(tickerName.Ticker)
+		return b.GetTickerV2(tickerName.Ticker, tickerName.Type)
 	case common.PROTOCOL_NAME_BRC20:
 		return b.GetBRC20TickerV2(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:

@@ -2,6 +2,7 @@ package exotic
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sat20-labs/indexer/common"
 )
@@ -96,4 +97,20 @@ func (p *ExoticIndexer) GetExoticsWithType2(ranges []*common.Range, typ string) 
 
 	exoticRanges := p.GetExoticsWithRanges2(ranges)
 	return exoticRanges[typ]
+}
+
+
+func (p *ExoticIndexer) GetTicker(tickerName string) *common.Ticker {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	ret := p.exoticTickerMap[strings.ToLower(tickerName)]
+	if ret == nil {
+		return nil
+	}
+	if ret.Ticker != nil {
+		return ret.Ticker
+	}
+
+	return nil
 }
