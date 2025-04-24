@@ -8,6 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/gin-gonic/gin"
+	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
@@ -157,18 +158,35 @@ func (s *Service) getTxInfo(c *gin.Context) {
 		return
 	}
 
-	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
-	if err != nil {
-		mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
-		if err != nil {
-			resp.Code = -1
-			resp.Msg = err.Error()
-			c.JSON(http.StatusOK, resp)
-			return
+	var blockHeight int64
+	if tx.BlockHash == "" {
+		// try to read utxoId 
+		for _, txOut := range tx.Vout {
+			utxo := fmt.Sprintf("%s:%d", txid, txOut.N)
+			id := base_indexer.ShareBaseIndexer.GetUtxoId(utxo)
+			if id != common.INVALID_ID {
+				height, _, _ := common.FromUtxoId(id)
+				blockHeight = int64(height)
+				break
+			}
 		}
-		blockHeight = int64(mt.Height)
+	} else {
+		blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(tx.BlockHash)
+		if err != nil {
+			mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
+			if err != nil {
+				resp.Code = -1
+				resp.Msg = err.Error()
+				c.JSON(http.StatusOK, resp)
+				return
+			}
+			blockHeight = int64(mt.Height)
+		} else {
+			blockHeight = (blockHeader.Height)
+		}
 	}
 
+	
 	txInfo := &rpcwire.TxInfo{
 		TxID:          tx.Txid,
 		Version:       tx.Version,
@@ -244,16 +262,32 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 		return
 	}
 
-	blockHeight, err := bitcoin_rpc.GetTxHeight(tx.Txid)
-	if err != nil {
-		// mt, err := bitcoin_rpc.GetMemPoolEntry(tx.Txid)
-		// if err != nil {
-			resp.Code = -1
-			resp.Msg = err.Error()
-			c.JSON(http.StatusOK, resp)
-			return
-		// }
-		// blockHeight = int64(mt.Height)
+	var blockHeight int64
+	if tx.BlockHash == "" {
+		// try to read utxoId 
+		for _, txOut := range tx.Vout {
+			utxo := fmt.Sprintf("%s:%d", txid, txOut.N)
+			id := base_indexer.ShareBaseIndexer.GetUtxoId(utxo)
+			if id != common.INVALID_ID {
+				height, _, _ := common.FromUtxoId(id)
+				blockHeight = int64(height)
+				break
+			}
+		}
+	} else {
+		blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(tx.BlockHash)
+		if err != nil {
+			mt, err := bitcoin_rpc.ShareBitconRpc.GetMemPoolEntry(tx.Txid)
+			if err != nil {
+				resp.Code = -1
+				resp.Msg = err.Error()
+				c.JSON(http.StatusOK, resp)
+				return
+			}
+			blockHeight = int64(mt.Height)
+		} else {
+			blockHeight = (blockHeader.Height)
+		}
 	}
 
 	if tx.Confirmations == 1 {

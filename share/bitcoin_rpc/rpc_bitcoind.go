@@ -63,14 +63,6 @@ func (p *BitcoindRPC) GetRawTx(txid string) (string, error) {
 	return ret, nil
 }
 
-func GetTxHeight(txid string) (int64, error) {
-	blockHeader, err := GetBlockHeaderWithTx(txid)
-	if err != nil {
-		return 0, err
-	}
-	return blockHeader.Height, nil
-}
-
 func (p *BitcoindRPC) GetBlockCount() (uint64, error) {
 	return p.bitcoind.GetBlockCount()
 }
@@ -89,18 +81,6 @@ func (p *BitcoindRPC) GetBlockHash(height uint64) (string, error) {
 
 func (p *BitcoindRPC) GetBlockHeader(blockhash string) (*bitcoind.BlockHeader, error) {
 	return p.bitcoind.GetBlockheader(blockhash)
-}
-
-func GetBlockHeaderWithTx(txid string) (*bitcoind.BlockHeader, error) {
-	rawTx, err := ShareBitconRpc.GetTx(txid)
-	if err != nil {
-		return nil, err
-	}
-	blockHeader, err := ShareBitconRpc.GetBlockHeader(rawTx.BlockHash)
-	if err != nil {
-		return nil, err
-	}
-	return blockHeader, nil
 }
 
 func IsExistTxInMemPool(txid string) bool {
