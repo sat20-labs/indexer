@@ -3,10 +3,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
-github.com/OLProtocol/go-bitcoind v0.0.0-20240716001842-eaea89a7c02d h1:gN4YV1okzT+gslcJlAw69yN5mIEPkWf6DPu9JH6HKx8=
-github.com/OLProtocol/go-bitcoind v0.0.0-20240716001842-eaea89a7c02d/go.mod h1:3mPt/w3ZEBjqljKWzXOv2pVvHv+sxnhzeJE+Nac7Sp4=
-github.com/OLProtocol/go-bitcoind v0.0.0-20250426030917-42857480501c h1:CZ9KgdaaednPPbLiwnPFyjIm5WCUEGVm1r7GKCWBnGw=
-github.com/OLProtocol/go-bitcoind v0.0.0-20250426030917-42857480501c/go.mod h1:3mPt/w3ZEBjqljKWzXOv2pVvHv+sxnhzeJE+Nac7Sp4=
+github.com/OLProtocol/go-bitcoind v0.0.0-20250426075321-9b4dd47b435f h1:/n88Ai8/q1tnlbpnUZae7IxkUvRhqtksr6TjwcjpJ0A=
+github.com/OLProtocol/go-bitcoind v0.0.0-20250426075321-9b4dd47b435f/go.mod h1:3mPt/w3ZEBjqljKWzXOv2pVvHv+sxnhzeJE+Nac7Sp4=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/PuerkitoBio/purell v1.1.1 h1:WEQqlqaGbrPkxLJWfBwQmfEAE1Z7ONdDLqrN38tNFfI=

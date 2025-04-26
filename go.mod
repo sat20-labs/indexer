@@ -8,7 +8,7 @@ replace github.com/btcsuite/btcd => github.com/sat20-labs/btcd v0.24.3
 replace github.com/btcsuite/btcwallet => github.com/sat20-labs/btcwallet v0.16.11
 
 require (
-	github.com/OLProtocol/go-bitcoind v0.0.0-20250426030917-42857480501c
+	github.com/OLProtocol/go-bitcoind v0.0.0-20250426075321-9b4dd47b435f
 	github.com/andybalholm/brotli v1.1.0
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/btcsuite/btcd v0.24.2
@@ -62,7 +62,7 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/davecgh/go-spew v1.1.1
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/kkdai/bstream v1.0.0 // indirect
 	golang.org/x/crypto v0.33.0
 	golang.org/x/net v0.35.0 // indirect
