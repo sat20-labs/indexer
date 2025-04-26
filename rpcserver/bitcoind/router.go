@@ -14,6 +14,7 @@ func NewService() *Service {
 func (s *Service) InitRouter(r *gin.Engine, basePath string) {
 	//broadcast raw tx => blockstream api: POST /tx
 	r.POST(basePath+"/btc/tx", s.sendRawTx)
+	r.POST(basePath+"/btc/tx/test", s.testRawTx)
 	r.GET(basePath+"/btc/tx/:txid", s.getTxInfo)
 	r.GET(basePath+"/btc/tx/simpleinfo/:txid", s.getTxSimpleInfo)
 	r.GET(basePath+"/btc/rawtx/:txid", s.getRawTx)

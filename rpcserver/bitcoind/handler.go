@@ -65,6 +65,37 @@ func (s *Service) sendRawTx(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (s *Service) testRawTx(c *gin.Context) {
+	resp := &rpcwire.TestRawTxResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+	var req rpcwire.TestRawTxReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	result, err := bitcoin_rpc.ShareBitconRpc.TestTx(req.SignedTxHex)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	
+	resp.Data = &rpcwire.TxTestResult{
+		TxId: result.TxId,
+		Allowed: result.Allowed,
+		RejectReason: result.RejectReason,
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 // @Summary get raw block with blockhash
 // @Description get raw block with blockhash
 // @Tags ordx.btc

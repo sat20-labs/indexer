@@ -3,6 +3,7 @@ package bitcoin_rpc
 import "github.com/OLProtocol/go-bitcoind"
 
 type BitcoinRPC interface {
+	TestTx(signedTxHex string) (*bitcoind.TransactionTestResult, error)
 	SendTx(signedTxHex string) (string, error)
 
 	GetTx(txid string) (*bitcoind.RawTransaction, error)

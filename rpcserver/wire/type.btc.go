@@ -11,6 +11,21 @@ type SendRawTxResp struct {
 	Data string `json:"data"  example:"ae74538baa914f3799081ba78429d5d84f36a0127438e9f721dff584ac17b346"`
 }
 
+type TestRawTxReq struct {
+	SignedTxHex string  `json:"signedTxHex" binding:"required"`
+}
+
+type TxTestResult struct {
+	TxId   string `json:"txid"`
+	Allowed bool   `json:"allowed"`
+	RejectReason string `json:"reject-reason"`
+}
+
+type TestRawTxResp struct {
+	BaseResp
+	Data *TxTestResult `json:"data"`
+}
+
 type RawBlockResp struct {
 	BaseResp
 	Data string `json:"data" example:""`

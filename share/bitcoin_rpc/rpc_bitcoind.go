@@ -35,6 +35,20 @@ type BitcoindRPC struct {
 	bitcoind *bitcoind.Bitcoind
 }
 
+
+func (p *BitcoindRPC) TestTx(signedTxHex string) (*bitcoind.TransactionTestResult, error) {
+	resp, err := p.bitcoind.TestMempoolAccept(signedTxHex)
+	if err != nil {
+		return nil, err
+	}
+	ret, ok := resp.(bitcoind.TransactionTestResult)
+	if !ok {
+		return nil, fmt.Errorf("invalid TransactionTestResult type")
+	}
+	return &ret, nil
+}
+
+
 func (p *BitcoindRPC) SendTx(signedTxHex string) (string, error) {
 	return p.bitcoind.SendRawTransaction(signedTxHex, 0)
 }

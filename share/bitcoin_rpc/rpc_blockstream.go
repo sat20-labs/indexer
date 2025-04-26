@@ -51,10 +51,13 @@ func NewBlockStreamClient(scheme, host, proxy string, http HttpClient) *BlockStr
 }
 
 
+func (p *BlockStreamClient) TestTx(signedTxHex string) (*bitcoind.TransactionTestResult, error) {
+	return nil, nil
+}
+
 func (p *BlockStreamClient) SendTx(signedTxHex string) (string, error) {
 	return "", nil
 }
-
 
 func (p *BlockStreamClient) GetTx(txid string) (*bitcoind.RawTransaction, error) {
 	return nil, nil
