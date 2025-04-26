@@ -8,7 +8,7 @@ replace github.com/btcsuite/btcd => github.com/sat20-labs/btcd v0.24.3
 replace github.com/btcsuite/btcwallet => github.com/sat20-labs/btcwallet v0.16.11
 
 require (
-	github.com/OLProtocol/go-bitcoind v0.0.0-20240716001842-eaea89a7c02d
+	github.com/OLProtocol/go-bitcoind v0.0.0-20250426030917-42857480501c
 	github.com/andybalholm/brotli v1.1.0
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/btcsuite/btcd v0.24.2
