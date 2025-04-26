@@ -80,18 +80,19 @@ func (s *Service) testRawTx(c *gin.Context) {
 		return
 	}
 
-	result, err := bitcoin_rpc.ShareBitconRpc.TestTx(req.SignedTxHex)
+	result, err := bitcoin_rpc.ShareBitconRpc.TestTx(req.SignedTxs)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	
-	resp.Data = &rpcwire.TxTestResult{
-		TxId: result.TxId,
-		Allowed: result.Allowed,
-		RejectReason: result.RejectReason,
+	for _, r := range result {
+		resp.Data = append(resp.Data, &rpcwire.TxTestResult{
+			TxId: r.TxId,
+			Allowed: r.Allowed,
+			RejectReason: r.RejectReason,
+		})
 	}
 	c.JSON(http.StatusOK, resp)
 }

@@ -12,7 +12,7 @@ type SendRawTxResp struct {
 }
 
 type TestRawTxReq struct {
-	SignedTxHex string  `json:"signedTxHex" binding:"required"`
+	SignedTxs []string  `json:"signedTxs" binding:"required"`
 }
 
 type TxTestResult struct {
@@ -23,7 +23,7 @@ type TxTestResult struct {
 
 type TestRawTxResp struct {
 	BaseResp
-	Data *TxTestResult `json:"data"`
+	Data []*TxTestResult `json:"data"`
 }
 
 type RawBlockResp struct {
