@@ -19,12 +19,19 @@ const MIN_BLOCK_INTERVAL = 1000
 const (
 	// TODO 正式发布前需要修改pubkey，使用全新的pubkey
 	// tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua
-	BootstrapPubKey = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad" //
-	BootStrapNodeId = 1
+	_bootstrapPubKey = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad"
+	// tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua
+	_bootstrapPubKey_test = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad"
+	// tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua
+	_bootstrapPubKey_dev = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad"
 
 	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
-	CoreNodePubKey = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e" //
-	CoreNodeId = 100
+	_coreNodePubKey = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e"
+	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
+	_coreNodePubKey_test = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e"
+	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
+	_coreNodePubKey_dev = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e"
+	
 
 	CORENODE_STAKING_ASSET_NAME string = "ordx:f:pearl"
 	CORENODE_STAKING_ASSET_AMOUNT int64 = 1000000
@@ -43,3 +50,28 @@ const (
 	MIN_NORMAL_NODEID    = 100000
 )
 
+var ENV string = "prd"
+
+func GetBootstrapPubKey() string {
+	switch ENV {
+	case "prd":
+		return _bootstrapPubKey
+	case "test": 
+		return _bootstrapPubKey_test
+	case "dev": 
+		return _bootstrapPubKey_dev
+	}
+	return _bootstrapPubKey
+}
+
+func GetCoreNodePubKey() string {
+	switch ENV {
+	case "prd":
+		return _coreNodePubKey
+	case "test": 
+		return _coreNodePubKey_test
+	case "dev": 
+		return _coreNodePubKey_dev
+	}
+	return _coreNodePubKey
+}

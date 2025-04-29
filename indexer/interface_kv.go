@@ -18,7 +18,7 @@ func getKvKey(pubkey string, key string) string {
 func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	// TODO 以后可以配置增加更多的pubkey
 	pkStr := hex.EncodeToString(pubkey)
-	if pkStr != common.BootstrapPubKey && pkStr != common.CoreNodePubKey {
+	if pkStr != common.GetBootstrapPubKey() && pkStr != common.GetCoreNodePubKey() {
 		return false
 	}
 	return true
