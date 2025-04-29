@@ -93,21 +93,6 @@ func (p *AssetInfo) Equal(another *AssetInfo) bool {
 // 有序数组，根据名字排序
 type TxAssets []AssetInfo
 
-// TxAssetsAppend 合并两个资产列表，返回新的列表
-func TxAssetsAppend(a, b *TxAssets) TxAssets {
-	if a == nil {
-		if b == nil {
-			return nil
-		}
-		return b.Clone()
-	}
-	result := a.Clone()
-	err := result.Merge(b)
-	if err != nil {
-		return nil
-	}
-	return result
-}
 
 func (p *TxAssets) Clone() TxAssets {
 	if p == nil {
@@ -151,16 +136,16 @@ func (p *TxAssets) findIndex(name *AssetName) (int, bool) {
 	return index, false
 }
 
-func (p *TxAssets) Equal(another *TxAssets) bool {
+func (p *TxAssets) Equal(another TxAssets) bool {
 	if p == nil && another == nil{
 		return true
 	}
-	if len(*p) != len(*another) {
+	if len(*p) != len(another) {
 		return false
 	}
 	
 	for i, asset := range *p {
-		if !asset.Equal(&(*another)[i]) {
+		if !asset.Equal(&(another)[i]) {
 			return false
 		}
 	}
@@ -168,12 +153,12 @@ func (p *TxAssets) Equal(another *TxAssets) bool {
 }
 
 // 将另一个资产列表合并到当前列表中
-func (p *TxAssets) Merge(another *TxAssets) error {
+func (p *TxAssets) Merge(another TxAssets) error {
 	if another == nil {
 		return nil
 	}
 	cp := p.Clone()
-	for _, asset := range *another {
+	for _, asset := range another {
 		if err := cp.Add(&asset); err != nil {
 			return err
 		}
@@ -183,12 +168,12 @@ func (p *TxAssets) Merge(another *TxAssets) error {
 }
 
 // Subtract 从当前列表中减去另一个资产列表
-func (p *TxAssets) Split(another *TxAssets) error {
+func (p *TxAssets) Split(another TxAssets) error {
 	if another == nil {
 		return nil
 	}
 	cp := p.Clone()
-	for _, asset := range *another {
+	for _, asset := range another {
 		if err := cp.Subtract(&asset); err != nil {
 			return err
 		}
