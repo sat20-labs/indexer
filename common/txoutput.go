@@ -68,6 +68,7 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 			if r.End-r.Start <= remaining {
 				// 完全在左边
 				left = append(left, r)
+				offset = r.End
 			} else {
 				// 跨越 offset，需要拆分
 				left = append(left, &OffsetRange{Start: r.Start, End: r.Start + remaining})
