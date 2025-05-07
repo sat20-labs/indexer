@@ -378,7 +378,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
 	if value == 0 {
-		// 按照资产划分
+		// 按照资产数量确定value
 		if name == nil || *name == ASSET_PLAIN_SAT {
 			value = amt.Int64()
 		} else {

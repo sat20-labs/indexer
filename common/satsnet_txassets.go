@@ -3,6 +3,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -105,31 +106,21 @@ func (p *TxAssets) Clone() TxAssets {
 
 	return newAssets
 }
-
-
 // Binary search to find the index of an AssetName
-// func (p *TxAssets) findIndex(name *AssetName) (int, bool) {
-// 	index, found := sort.Find(len(*p), func(i int) int {
-// 		pname := &(*p)[i].Name
-// 		if pname.Protocol != name.Protocol {
-// 			return strings.Compare(pname.Protocol, name.Protocol)
-// 		}
-// 		if pname.Type != name.Type {
-// 			return strings.Compare(pname.Type, name.Type)
-// 		}
-// 		return strings.Compare(pname.Ticker, name.Ticker)
-// 	})
-// 	return index, found
-// }
-
 func (p *TxAssets) findIndex(name *AssetName) (int, bool) {
-	assetName := name.String()
-	for i, asset := range (*p) {
-		if asset.Name.String() == assetName {
-			return i, true
+	index := sort.Search(len(*p), func(i int) bool {
+		if (*p)[i].Name.Protocol != name.Protocol {
+			return (*p)[i].Name.Protocol >= name.Protocol
 		}
+		if (*p)[i].Name.Type != name.Type {
+			return (*p)[i].Name.Type >= name.Type
+		}
+		return (*p)[i].Name.Ticker >= name.Ticker
+	})
+	if index < len(*p) && (*p)[index].Name == *name {
+		return index, true
 	}
-	return len(*p), false
+	return index, false
 }
 
 func (p *TxAssets) Equal(another TxAssets) bool {
