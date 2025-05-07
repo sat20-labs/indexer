@@ -377,6 +377,28 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
+	if value == 0 {
+		// 按照资产划分
+		if name == nil || *name == ASSET_PLAIN_SAT {
+			value = amt.Int64()
+		} else {
+			asset, err := p.Assets.Find(name)
+			if err != nil {
+				return nil, nil, err
+			}
+			n := asset.BindingSat
+			if n != 0 {
+				if amt.Int64()%int64(n) != 0 {
+					return nil, nil, fmt.Errorf("amt must be times of %d", n)
+				}
+				value = GetBindingSatNum(amt, n)
+			}
+		}
+		if value < 330 {
+			value = 330
+		}
+	}
+
 	if p.Value() < value {
 		return nil, nil, fmt.Errorf("output value too small")
 	}
