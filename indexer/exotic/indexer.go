@@ -117,6 +117,7 @@ func (p *ExoticIndexer) getExoticDefaultTicker(name string) *common.Ticker {
 		Name:       name,
 		Type:       common.ASSET_TYPE_EXOTIC,
 		Limit:      100000000,
+		N:          1,
 		SelfMint:   0,
 		Max:        0,
 		BlockStart: 0,
