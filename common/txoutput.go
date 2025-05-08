@@ -391,7 +391,15 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 				if amt.Int64()%int64(n) != 0 {
 					return nil, nil, fmt.Errorf("amt must be times of %d", n)
 				}
-				value = GetBindingSatNum(amt, n)
+				
+				offsets := p.Offsets[asset.Name]
+				if offsets == nil {
+					return nil, nil, fmt.Errorf("can't find offset for asset %s", asset.Name.String())
+				}
+				tmp := offsets.Clone()
+				satsNum := GetBindingSatNum(amt, n)
+				offset1, _ := tmp.Split(satsNum)
+				value = offset1[len(offset1)-1].End
 			}
 		}
 		if value < 330 {
@@ -417,7 +425,9 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 			return nil, nil, fmt.Errorf("amount too large")
 		}
 		part2.Assets = p.Assets
-		part2.Offsets = p.Offsets
+		for k, v := range p.Offsets {
+			_, part2.Offsets[k] = v.Cut(value1)
+		}
 		return part1, part2, nil
 	}
 
