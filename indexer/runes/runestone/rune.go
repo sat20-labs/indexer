@@ -177,6 +177,31 @@ func RuneFromString(s string) (*Rune, error) {
 	return &Rune{Value: u}, nil
 }
 
+// ordinals, tag 13
+func ParseRunesName(input []byte) *Rune {
+	/*
+			To prevent front running an etching that has been broadcast but not mined, 
+			if a non-reserved rune name is being etched, the etching transaction must contain
+			a valid commitment to the name being etched.
+			A commitment consists of a data push of the rune name, encoded as a little-endian integer 
+			with trailing zero bytes elided, present in an input witness tapscript where the output 
+			being spent has at least six confirmations.
+			If a valid commitment is not present, the etching is ignored.
+	*/
+
+	// Reverse the byte slice
+	length := len(input)
+	
+	// runes name
+	reverseBytes := make([]byte, length)
+	for i := 0; i < length; i++ {
+		reverseBytes[i] = input[length-1-i]
+	}
+	u := uint128.FromBytes(reverseBytes)
+	return NewRune(u)
+}
+
+
 type Error struct {
 	Character rune
 	Range     bool

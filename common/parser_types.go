@@ -6,6 +6,7 @@ const (
 	PROTOCOL_NAME_BRC20 = "brc20"
 	PROTOCOL_NAME_RUNES = "runes"
 )
+
 const (
 	FIELD_CONTENT          = 0
 	FIELD_CONTENT_TYPE     = 1
@@ -15,6 +16,7 @@ const (
 	FIELD_META_PROTOCOL    = 7
 	FIELD_CONTENT_ENCODING = 9
 	FIELD_DELEGATE         = 11
+	FIELD_RUNES_NAME       = 13
 	FIELD_INVALID1         = 20
 	FIELD_INVALID2         = 21
 )
