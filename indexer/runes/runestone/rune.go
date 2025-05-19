@@ -178,6 +178,7 @@ func RuneFromString(s string) (*Rune, error) {
 }
 
 // ordinals, tag 13
+// 长度要确保小于16
 func ParseRunesName(input []byte) *Rune {
 	/*
 			To prevent front running an etching that has been broadcast but not mined, 
@@ -193,12 +194,14 @@ func ParseRunesName(input []byte) *Rune {
 	length := len(input)
 	
 	// runes name
-	reverseBytes := make([]byte, length)
-	for i := 0; i < length; i++ {
-		reverseBytes[i] = input[length-1-i]
-	}
-	u := uint128.FromBytes(reverseBytes)
-	return NewRune(u)
+	// reverseBytes := make([]byte, length)
+	// for i := 0; i < length; i++ {
+	// 	reverseBytes[i] = input[length-1-i]
+	// }
+	left := make([]byte, 16-length)
+	le128 := append(input, left...)
+	
+	return NewRune(uint128.FromBytes(le128))
 }
 
 

@@ -532,6 +532,7 @@ func ParseInscriptionId(input []byte) string {
 
 
 // ordinals, tag 13
+// 长度要确保小于16
 func ParseRunesName(input []byte) uint128.Uint128 {
 	/*
 			To prevent front running an etching that has been broadcast but not mined, 
@@ -547,11 +548,14 @@ func ParseRunesName(input []byte) uint128.Uint128 {
 	length := len(input)
 	
 	// runes name
-	reverseBytes := make([]byte, length)
-	for i := 0; i < length; i++ {
-		reverseBytes[i] = input[length-1-i]
-	}
-	return uint128.FromBytes(reverseBytes)
+	// reverseBytes := make([]byte, length)
+	// for i := 0; i < length; i++ {
+	// 	reverseBytes[i] = input[length-1-i]
+	// }
+	left := make([]byte, 16-length)
+	le128 := append(input, left...)
+	
+	return uint128.FromBytes(le128)
 }
 
 func IsValidName(name string) bool {
