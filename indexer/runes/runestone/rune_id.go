@@ -72,17 +72,20 @@ func (r RuneId) Next(block uint128.Uint128, tx uint128.Uint128) (*RuneId, error)
 }
 
 func (r RuneId) Hex() string {
-	return fmt.Sprintf("%x_%x", r.Block, r.Tx)
+	return fmt.Sprintf("%x:%x", r.Block, r.Tx)
 }
 
 func (r RuneId) String() string {
-	return fmt.Sprintf("%d_%d", r.Block, r.Tx)
+	return fmt.Sprintf("%d:%d", r.Block, r.Tx)
 }
 
 func RuneIdFromHex(s string) (*RuneId, error) {
-	parts := strings.Split(s, "_")
+	parts := strings.Split(s, ":")
 	if len(parts) != 2 {
-		return nil, ErrSeparator
+		parts = strings.Split(s, "_") // 暂时兼容下老版本，以后去掉
+		if len(parts) != 2 {
+			return nil, ErrSeparator
+		}
 	}
 	block, err := strconv.ParseUint(parts[0], 16, 64)
 	if err != nil {
@@ -96,9 +99,12 @@ func RuneIdFromHex(s string) (*RuneId, error) {
 }
 
 func RuneIdFromString(s string) (*RuneId, error) {
-	parts := strings.Split(s, "_")
+	parts := strings.Split(s, ":")
 	if len(parts) != 2 {
-		return nil, ErrSeparator
+		parts = strings.Split(s, "_") // 暂时兼容下老版本，以后去掉
+		if len(parts) != 2 {
+			return nil, ErrSeparator
+		}
 	}
 	block, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {

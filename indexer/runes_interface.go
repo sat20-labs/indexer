@@ -1,10 +1,7 @@
 package indexer
 
 import (
-	"strings"
-
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/runes"
 )
 
 func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
@@ -14,12 +11,12 @@ func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 		assetName := common.TickerName{
 			Protocol: common.PROTOCOL_NAME_RUNES,
 			Type:     common.ASSET_TYPE_FT,
-			Ticker:   runeInfo.Id,
+			Ticker:   runeInfo.Name,
 		}
 
 		tickerInfo := &common.TickerInfo{
 			AssetName:       assetName,
-			DisplayName:     runeInfo.Name,
+			DisplayName:     runeInfo.Id,
 			Id:              int64(runeInfo.Number),
 			Divisibility:    int(runeInfo.Divisibility),
 			StartBlock:      0,
@@ -67,21 +64,15 @@ func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 }
 
 func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {
-
-	var ticker *runes.RuneInfo
-	if strings.Contains(tickerName, "_") {
-		ticker = p.RunesIndexer.GetRuneInfoWithId(tickerName)
-	} else {
-		ticker = p.RunesIndexer.GetRuneInfoWithName(tickerName)
-	}
+	ticker := p.RunesIndexer.GetRuneInfo(tickerName)
 	if ticker == nil {
 		return nil
 	}
 	result := &common.TickerInfo{}
 	result.Protocol = common.PROTOCOL_NAME_RUNES
 	result.Type = common.ASSET_TYPE_FT
-	result.Ticker = ticker.Id
-	result.DisplayName = ticker.Name
+	result.Ticker = ticker.Name
+	result.DisplayName = ticker.Id
 	result.Id = int64(ticker.Number)
 	result.Divisibility = int(ticker.Divisibility)
 
@@ -113,7 +104,7 @@ func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {
 }
 
 func (b *IndexerMgr) GetRunesMintAmount(tickerName string) (*common.Decimal, int64) {
-	info := b.RunesIndexer.GetRuneInfoWithId(tickerName)
+	info := b.RunesIndexer.GetRuneInfo(tickerName)
 	if info == nil {
 		return nil, 0
 	}

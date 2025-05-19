@@ -1,7 +1,8 @@
 package common
 
 // 1.0.0  2025.02.03   支持STP
-const ORDX_INDEXER_VERSION = "1.0.0"
+// 1.0.1  2025.05.20   runes协议使用spacer name作为对外的索引
+const ORDX_INDEXER_VERSION = "1.0.1"
 
 
 // 1.1.0  2024.07.01-

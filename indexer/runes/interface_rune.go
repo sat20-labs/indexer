@@ -2,6 +2,7 @@ package runes
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -146,6 +147,16 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 		end = start + limit
 	}
 	return ret[start:end], total
+}
+
+func (s *Indexer) GetRuneInfo(tickerName string) *RuneInfo {
+	var ticker *RuneInfo
+	if strings.Contains(tickerName, ":") || strings.Contains(tickerName, "_") {
+		ticker = s.GetRuneInfoWithId(tickerName)
+	} else {
+		ticker = s.GetRuneInfoWithName(tickerName)
+	}
+	return ticker
 }
 
 /*
