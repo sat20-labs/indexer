@@ -39,7 +39,12 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 	// 		return runeHolders.HoldersAddressAmount
 	// 	}
 	// }
-	rid, err := runestone.RuneIdFromString(runeId)
+	runeInfo := s.GetRuneInfo(runeId)
+	if runeInfo == nil {
+		common.Log.Errorf("%s not found", runeId)
+		return nil
+	}
+	rid, err := runestone.RuneIdFromString(runeInfo.Id)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil
@@ -95,7 +100,12 @@ desc: 根据runeid获取所有持有者地址和持有数量 (新增数据表)
 4 对于相同的资产需要进行合并和汇总同一rune数量
 */
 func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*AddressBalance, uint64) {
-	rid, err := runestone.RuneIdFromString(runeId)
+	runeInfo := s.GetRuneInfo(runeId)
+	if runeInfo == nil {
+		common.Log.Errorf("%s not found", runeId)
+		return nil, 0
+	}
+	rid, err := runestone.RuneIdFromString(runeInfo.Id)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil, 0
@@ -157,7 +167,12 @@ desc: 根据runeId获取所有带有该rune的utxo和该utxo中的资产数量 (
 2 根据utxo获取资产和持有数量 get_rune_balances_for_output(utxo)
 */
 func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoBalances, uint64) {
-	rid, err := runestone.RuneIdFromString(runeId)
+	runeInfo := s.GetRuneInfo(runeId)
+	if runeInfo == nil {
+		common.Log.Errorf("%s not found", runeId)
+		return nil, 0
+	}
+	rid, err := runestone.RuneIdFromString(runeInfo.Id)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllUtxoBalances-> runestone.RuneIdFromHex(%s) err:%s", runeId, err.Error())
 		return nil, 0

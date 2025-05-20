@@ -30,6 +30,13 @@ desc: 根据runeid获取铸造历史 (新增数据表)
 实现: 通过runeid得到所有mint的txid(一个txid即一个铸造历史)
 */
 func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
+	runeInfo := s.GetRuneInfo(runeId)
+	if runeInfo == nil {
+		common.Log.Errorf("%s not found", runeId)
+		return nil
+	}
+	runeId = runeInfo.Id
+
 	if mintHistoryInfo, exist := runeMintHistoryCache.Get(runeId); exist {
 		if time.Since(time.Unix(mintHistoryInfo.LastTimestamp, 0)) < mintHistoryCacheDuration {
 			return mintHistoryInfo.MintHistory
@@ -95,6 +102,13 @@ desc: 根据地址获取指定nuneid的铸造历史 (新增数据表)
 实现: 通过address和runeid得到所有utxo(一个txid(1/n个utxo)即一个铸造历史)
 */
 func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, limit uint64) ([]*MintHistory, uint64) {
+	runeInfo := s.GetRuneInfo(runeId)
+	if runeInfo == nil {
+		common.Log.Errorf("%s not found", runeId)
+		return nil, 0
+	}
+	runeId = runeInfo.Id
+
 	id, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
