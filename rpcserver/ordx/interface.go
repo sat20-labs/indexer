@@ -26,9 +26,9 @@ func (s *Model) IsDeployAllowed(ticker string) (bool, error) {
 		return false, fmt.Errorf("invalid ticker name")
 	}
 
-	tickerInfo := s.indexer.GetTickerInfo(name)
-	if tickerInfo != nil {
-		return false, fmt.Errorf("ticker %s exists", ticker)
+	err := s.indexer.IsAllowDeploy(name)
+	if err != nil {
+		return false, err
 	}
 
 	return true, nil

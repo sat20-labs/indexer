@@ -479,3 +479,27 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 	
 	return 0
 }
+
+
+
+func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
+
+	if tickerName.Type != common.ASSET_TYPE_FT {
+		return fmt.Errorf("invalid asset type")
+	}
+
+	var err error
+	switch tickerName.Protocol {
+	case common.PROTOCOL_NAME_ORDX:
+		if b.ftIndexer.TickExisted(tickerName.Ticker) {
+			err = fmt.Errorf("existing")
+		}
+	case common.PROTOCOL_NAME_BRC20:
+		if b.brc20Indexer.TickExisted(tickerName.Ticker) {
+			err = fmt.Errorf("existing")
+		}
+	case common.PROTOCOL_NAME_RUNES:
+		err = b.RunesIndexer.IsAllowEtching(tickerName.Ticker)
+	}
+	return err
+}

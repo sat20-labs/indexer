@@ -1,6 +1,7 @@
 package runes
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -219,6 +220,34 @@ desc: 判断一个rune是否已经被部署
 func (s *Indexer) IsExistRuneWithId(runeId string) bool {
 	ret := s.GetRuneInfoWithId(runeId)
 	return ret != nil
+}
+
+func (s *Indexer) IsRuneExisting(rune string) bool {
+	// 不确定是名字还是id，尝试下
+	runeInfo := s.GetRuneInfo(rune)
+	return runeInfo != nil
+}
+
+
+func (s *Indexer) IsAllowEtching(runeName string) error {
+	spaceRune, err := runestone.SpacedRuneFromString(runeName)
+	if err != nil {
+		return fmt.Errorf("invalid rune name")
+	}
+
+	if spaceRune.Rune.IsReserved() {
+		return fmt.Errorf("is reserved")
+	}
+
+	if spaceRune.Rune.Value.Cmp(s.minimumRune.Value) < 0 {
+		return fmt.Errorf("not allowed in current height")
+	}
+
+	if s.runeToIdTbl.Get(&spaceRune.Rune) != nil {
+		return fmt.Errorf("existing")
+	}
+
+	return nil
 }
 
 /*
