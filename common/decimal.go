@@ -268,6 +268,30 @@ func (d *Decimal) Mul(other *big.Int) *Decimal {
 	return d
 }
 
+// 精度跟a对齐
+func (a *Decimal) MulDecimal(other *Decimal) *Decimal {
+    if a == nil || other == nil {
+        return nil
+    }
+    // 先相乘
+    value := new(big.Int).Mul(a.Value, other.Value)
+    // 缩放回a的精度
+    if other.Precision > 0 {
+        value = value.Div(value, precisionFactor[other.Precision])
+    }
+    return &Decimal{Precision: a.Precision, Value: value}
+}
+
+// 精度为a+b
+func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
+    if d == nil || other == nil {
+        return nil
+    }
+    value := new(big.Int).Mul(d.Value, other.Value)
+    precision := d.Precision + other.Precision
+    return &Decimal{Precision: precision, Value: value}
+}
+
 func (d *Decimal) Div(other *big.Int) *Decimal {
 	if d == nil || other == nil {
 		return nil
@@ -276,6 +300,17 @@ func (d *Decimal) Div(other *big.Int) *Decimal {
 	//return &Decimal{Precision: d.Precision, Value: value}
 	d.Value = value
 	return d
+}
+
+// 除法，结果精度与a一致
+func (a *Decimal) DivDecimal(other *Decimal) *Decimal {
+    if a == nil || other == nil || other.IsZero() {
+        return nil
+    }
+    // 先将a的Value放大other.Precision倍，避免精度丢失
+    scaledA := new(big.Int).Mul(a.Value, precisionFactor[other.Precision])
+    value := new(big.Int).Div(scaledA, other.Value)
+    return &Decimal{Precision: a.Precision, Value: value}
 }
 
 func (d *Decimal) Cmp(other *Decimal) int {
