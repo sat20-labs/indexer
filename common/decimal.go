@@ -279,7 +279,9 @@ func (a *Decimal) MulDecimal(other *Decimal) *Decimal {
     if other.Precision > 0 {
         value = value.Div(value, precisionFactor[other.Precision])
     }
-    return &Decimal{Precision: a.Precision, Value: value}
+    //return &Decimal{Precision: a.Precision, Value: value}
+	a.Value = value
+	return a
 }
 
 // 精度为a+b
@@ -289,7 +291,10 @@ func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
     }
     value := new(big.Int).Mul(d.Value, other.Value)
     precision := d.Precision + other.Precision
-    return &Decimal{Precision: precision, Value: value}
+    //return &Decimal{Precision: precision, Value: value}
+	d.Value = value
+	d.Precision = precision
+	return d
 }
 
 func (d *Decimal) Div(other *big.Int) *Decimal {
@@ -310,7 +315,9 @@ func (a *Decimal) DivDecimal(other *Decimal) *Decimal {
     // 先将a的Value放大other.Precision倍，避免精度丢失
     scaledA := new(big.Int).Mul(a.Value, precisionFactor[other.Precision])
     value := new(big.Int).Div(scaledA, other.Value)
-    return &Decimal{Precision: a.Precision, Value: value}
+    //return &Decimal{Precision: a.Precision, Value: value}
+	a.Value = value
+	return a
 }
 
 func (d *Decimal) Cmp(other *Decimal) int {
