@@ -208,11 +208,11 @@ func (d *Decimal) Add(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
 	}
-	if other == nil || other.IsZero() {
+	if other == nil {
 		value := new(big.Int).Set(d.Value)
 		return &Decimal{Precision: d.Precision, Value: value}
 	}
-	if d == nil || d.IsZero() {
+	if d == nil {
 		value := new(big.Int).Set(other.Value)
 		return &Decimal{Precision: other.Precision, Value: value}
 	}
@@ -235,11 +235,11 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
 	}
-	if other == nil || other.IsZero() {
+	if other == nil {
 		value := new(big.Int).Set(d.Value)
 		return &Decimal{Precision: d.Precision, Value: value}
 	}
-	if d == nil || d.IsZero() {
+	if d == nil {
 		value := new(big.Int).Neg(other.Value)
 		return &Decimal{Precision: other.Precision, Value: value}
 	}
@@ -304,7 +304,7 @@ func (d *Decimal) Div(other *big.Int) *Decimal {
 
 // 除法，结果精度与a一致
 func (a *Decimal) DivDecimal(other *Decimal) *Decimal {
-    if a == nil || other == nil || other.IsZero() {
+    if a == nil || other == nil {
         return nil
     }
     // 先将a的Value放大other.Precision倍，避免精度丢失
