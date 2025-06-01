@@ -284,6 +284,12 @@ func (a *Decimal) MulDecimal(other *Decimal) *Decimal {
 	return a
 }
 
+// 精度为a
+func DecimalMul(a, b *Decimal) *Decimal {
+	n := a.Clone()
+	return n.MulDecimal(b)
+}
+
 // 精度为a+b
 func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
     if d == nil || other == nil {
@@ -318,6 +324,12 @@ func (a *Decimal) DivDecimal(other *Decimal) *Decimal {
     //return &Decimal{Precision: a.Precision, Value: value}
 	a.Value = value
 	return a
+}
+
+// 精度为a
+func DecimalDiv(a, b *Decimal) *Decimal {
+	n := a.Clone()
+	return n.DivDecimal(b)
 }
 
 func (d *Decimal) Cmp(other *Decimal) int {
