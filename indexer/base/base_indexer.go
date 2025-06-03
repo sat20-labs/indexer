@@ -1309,6 +1309,9 @@ func (b *BaseIndexer) GetChainTip() int {
 
 func (b *BaseIndexer) SetReorgHeight(height int) {
 	b.stats.ReorgsDetected = append(b.stats.ReorgsDetected, height)
+	if len(b.stats.ReorgsDetected) > 100 {
+		b.stats.ReorgsDetected = b.stats.ReorgsDetected[len(b.stats.ReorgsDetected)-50:]
+	}
 	err := db.GobSetDB1([]byte(SyncStatsKey), b.stats, b.db)
 	if err != nil {
 		common.Log.Panicf("Error setting in db %v", err)
