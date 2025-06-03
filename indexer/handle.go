@@ -71,11 +71,12 @@ func findOutputWithSat(tx *common.Transaction, sat int64) *common.Output {
 func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int, out *common.Output,
 	content *common.OrdxDeployContent, nft *common.Nft) *common.Ticker {
 	height := nft.Base.BlockHeight
-	if len(content.Ticker) == 4 {
-		common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid ticker",
-			nft.Base.InscriptionId, content.Ticker)
-		return nil
-	}
+	// 去掉这个限制
+	// if len(content.Ticker) == 4 {
+	// 	common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid ticker",
+	// 		nft.Base.InscriptionId, content.Ticker)
+	// 	return nil
+	// }
 	if !common.IsValidSat20Name(content.Ticker) {
 		if !s.isLptTicker(content.Ticker) {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid ticker",
