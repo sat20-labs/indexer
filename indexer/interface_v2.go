@@ -491,10 +491,16 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 	var err error
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
+		if !common.IsValidSat20Name(tickerName.Ticker) {
+			return fmt.Errorf("invalid ordx ticker name")
+		}
 		if b.ftIndexer.TickExisted(tickerName.Ticker) {
 			err = fmt.Errorf("existing")
 		}
 	case common.PROTOCOL_NAME_BRC20:
+		if len(tickerName.Ticker) != 4 || !common.IsValidName(tickerName.Ticker) {
+			return fmt.Errorf("invalid brc20 ticker name")
+		}
 		if b.brc20Indexer.TickExisted(tickerName.Ticker) {
 			err = fmt.Errorf("existing")
 		}
