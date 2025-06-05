@@ -29,16 +29,26 @@ func TestDecimal(t *testing.T) {
 
 
 	d1 := NewDecimal(12345000000, 6)
+	fmt.Printf("Decimal 1: %s\n", d1.String()) // 123456
 	// 测试通过字符串创建 Decimal
-	d2, err := NewDecimalFromString("-123.456", 6)
+	d2, err := NewDecimalFromString("123.456", 6)
 	if err != nil {
 		t.Fatalf("Failed to create decimal from string: %v", err)
 	}
 	fmt.Printf("Decimal 2: %s\n", d2.String()) // 123.456
 
 	// 测试加法
-	sum := d1.Add(d2)
+	sum := DecimalAdd(d1, d2)
 	fmt.Printf("Sum: %s\n", sum.String()) // 12468.456
+
+	d3 := NewDecimalWithPrecision(123, 2)
+	fmt.Printf("Decimal 3: %s\n", d3.String()) // 123
+
+	mul := DecimalMul(d3, d2)
+	fmt.Printf("mul: %s\n", mul.String()) // 12468.456
+
+	div := DecimalDiv(d3, d2)
+	fmt.Printf("div: %s\n", div.String()) // 12468.456
 
 	// 测试减法
 	diff := d1.Sub(d2)

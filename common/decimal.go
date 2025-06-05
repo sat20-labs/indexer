@@ -93,11 +93,25 @@ func NewDefaultDecimal(v int64) *Decimal {
 	return &Decimal{Precision: DEFAULT_PRECISION, Value: new(big.Int).SetInt64(v)}
 }
 
+// v 是乘10的p次方后的值，也就是需要往前点p个小数点才是真正的值
 func NewDecimal(v int64, p int) *Decimal {
 	if p > MAX_PRECISION {
 		p = MAX_PRECISION
 	}
 	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
+}
+
+// v是整数部分的值，小数点不动
+func NewDecimalWithPrecision(v int64, p int) *Decimal {
+	if p > MAX_PRECISION {
+		Log.Panic("too big precision")
+	}
+	value := big.NewInt(v)
+	if p != 0 {
+		value = new(big.Int).Mul(value, precisionFactor[p])
+	}
+	
+	return &Decimal{Precision: p, Value: value}
 }
 
 
@@ -313,7 +327,7 @@ func (d *Decimal) Div(other *big.Int) *Decimal {
 	return d
 }
 
-// 除法，结果精度与a一致
+// 除法，精度为a
 func (a *Decimal) DivDecimal(other *Decimal) *Decimal {
     if a == nil || other == nil {
         return nil
