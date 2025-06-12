@@ -356,10 +356,19 @@ func (d *Decimal) Cmp(other *Decimal) int {
 	if d == nil {
 		return -other.Value.Sign()
 	}
-	if d.Precision != other.Precision {
-		Log.Panicf("precition not match, (%d != %d)", d.Precision, other.Precision)
-	}
-	return d.Value.Cmp(other.Value)
+	if d.Precision == other.Precision {
+        return d.Value.Cmp(other.Value)
+    }
+    // 精度不一致，调整到相同精度再比较
+    if d.Precision > other.Precision {
+        factor := precisionFactor[d.Precision-other.Precision]
+        otherVal := new(big.Int).Mul(other.Value, factor)
+        return d.Value.Cmp(otherVal)
+    } else {
+        factor := precisionFactor[other.Precision-d.Precision]
+        dVal := new(big.Int).Mul(d.Value, factor)
+        return dVal.Cmp(other.Value)
+    }
 }
 
 func (d *Decimal) Sign() int {
