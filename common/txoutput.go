@@ -349,7 +349,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 			if amt1 > 0 {
 				asset1 := AssetInfo{
 					Name:       asset.Name,
-					Amount:     *NewDecimal(amt1, 0),
+					Amount:     *NewDefaultDecimal(amt1),
 					BindingSat: asset.BindingSat,
 				}
 				part1.Assets.Add(&asset1)
@@ -360,7 +360,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 			if amt2 > 0 {
 				asset2 := AssetInfo{
 					Name:       asset.Name,
-					Amount:     *NewDecimal(amt2, 0),
+					Amount:     *NewDefaultDecimal(amt2),
 					BindingSat: asset.BindingSat,
 				}
 				part2.Assets.Add(&asset2)
@@ -531,7 +531,7 @@ func (p *TxOutput) GetAssetOffset(name *AssetName, amt *Decimal) (int64, error) 
 
 func (p *TxOutput) GetAsset(assetName *AssetName) *Decimal {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
-		return NewDecimal(p.GetPlainSat(), 0)
+		return NewDefaultDecimal(p.GetPlainSat())
 	}
 	asset, err := p.Assets.Find(assetName)
 	if err != nil {

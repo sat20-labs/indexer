@@ -10,15 +10,11 @@ import (
 func TestDecimal(t *testing.T) {
 	// 测试通过整数创建 Decimal
 	precision := int(3)
-	max := NewDecimal(21000000, precision)
 	d0 := NewDecimal(12345, precision)
 	fmt.Printf("Decimal 1 string: %s\n", d0.String())     // 12.345
 	fmt.Printf("Decimal 1 Int64: %d\n", d0.IntegerPart()) // 12
 	fmt.Printf("Decimal 1 Float64: %f\n", d0.Float64())   // 12.345
-	value := d0.ToInt64WithMax(max)
-	fmt.Printf("Decimal 1 ToInt64WithMax: %d\n", value) // 1234500000000
-	d00 := NewDecimalFromInt64WithMax(value, max)
-	fmt.Printf("Decimal 1 NewDecimalFromInt64WithMax: %s\n", d00.String()) // 12.345
+	
 	fmt.Printf("%s\n", d0.GetMaxInt64().String())
 	d01 := *d0
 	d02 := d01
@@ -41,7 +37,7 @@ func TestDecimal(t *testing.T) {
 	sum := DecimalAdd(d1, d2)
 	fmt.Printf("Sum: %s\n", sum.String()) // 12468.456
 
-	d3 := NewDecimalWithPrecision(123, 2)
+	d3 := NewDecimal(123, 2)
 	fmt.Printf("Decimal 3: %s\n", d3.String()) // 123
 
 	mul := DecimalMul(d3, d2)
@@ -111,13 +107,6 @@ func TestDecimal_Runes1(t *testing.T) {
 		}
 		fmt.Printf("Decimal 0: %s\n", d0.String())
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
-		amt, _ := NewDecimalFromString("990010000000000", int(precision))
-		
-		value := amt.ToInt64WithMax(d0)
-		fmt.Printf("value %d\n", value)
-		amt2 := NewDecimalFromInt64WithMax(value, d0)
-		fmt.Printf("amt1 %s\n", amt.String())
-		fmt.Printf("amt2 %s\n", amt2.String())
 	}
 
 	{
@@ -129,13 +118,8 @@ func TestDecimal_Runes1(t *testing.T) {
 		}
 		fmt.Printf("Decimal 0: %s\n", d0.String())
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
-		amt, _ := NewDecimalFromString("1.1", int(precision))
 		
-		value := amt.ToInt64WithMax(d0)
-		fmt.Printf("value %d\n", value)
-		amt2 := NewDecimalFromInt64WithMax(value, d0)
-		fmt.Printf("amt1 %s\n", amt.String())
-		fmt.Printf("amt2 %s\n", amt2.String())
+	
 	}
 
 	{
@@ -147,13 +131,7 @@ func TestDecimal_Runes1(t *testing.T) {
 		}
 		fmt.Printf("Decimal 0: %s\n", d0.String())
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
-		amt, _ := NewDecimalFromString("1000", int(precision))
-		
-		value := amt.ToInt64WithMax(d0)
-		fmt.Printf("value %d\n", value)
-		amt2 := NewDecimalFromInt64WithMax(value, d0)
-		fmt.Printf("amt1 %s\n", amt.String())
-		fmt.Printf("amt2 %s\n", amt2.String())
+
 	}
 
 	{
@@ -164,14 +142,8 @@ func TestDecimal_Runes1(t *testing.T) {
 		}
 		fmt.Printf("Decimal 0: %s\n", d0.String())
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
-		amt, _ := NewDecimalFromString("990010000000000", int(precision))
 		
-		value := amt.ToInt64WithMax(d0)
-		fmt.Printf("value %d\n", value)
-		amt2 := NewDecimalFromInt64WithMax(value, d0)
-		fmt.Printf("amt1 %s\n", amt.String())
-		fmt.Printf("amt2 %s\n", amt2.String())
-
+		
 		shift := 0
 		d := NewDecimal(10, 0)
 		for d0.IsOverflowInt64() {
@@ -197,7 +169,6 @@ func TestDecimal_Runes1(t *testing.T) {
 func TestDecimal_Runes2(t *testing.T) {
 	{
 		precision := int(10)
-		max, _:= NewDecimalFromString("100000000000000000000", precision)
 		d0, err := NewDecimalFromString("10000000000", int(precision)) // max
 		if err != nil {
 			t.Fatalf("Failed to create decimal from string: %v", err)
@@ -223,13 +194,6 @@ func TestDecimal_Runes2(t *testing.T) {
 			t.Fatalf("limit should be less than max")
 		}
 
-		// 对于max没有溢出，并且precision不等于0的数值，按照下面方法折算为int64
-		value := d1.ToInt64WithMax(max)
-		fmt.Printf("Decimal 1 value: %d\n", value)
-
-		d2 := NewDecimalFromInt64WithMax(value, max)
-		fmt.Printf("Decimal 2: %s\n", d2.String())
-
 		// 不需要再shift
 		// bigValue := new(big.Int).Mul(d2.Value, precisionFactor[shift])
 		// //quotient, _ := new(big.Int).QuoRem(bigValue, precisionFactor[d.Precition], new(big.Int))
@@ -237,8 +201,6 @@ func TestDecimal_Runes2(t *testing.T) {
 		// fmt.Printf("Decimal 3: %s\n", d3.String())
 
 		d0, _ = NewDecimalFromString("1234567890", precision)
-		d4 := d0.Sub(d2)
-		fmt.Printf("Decimal 4: %s\n", d4.String())
 	}
 
 	// 对符文来说，如果max超出int64，就先移位，最终将资产数量表示为int64

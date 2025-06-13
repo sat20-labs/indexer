@@ -11,8 +11,7 @@ import (
 	"lukechampine.com/uint128"
 )
 
-const MAX_PRECISION = 18
-const DEFAULT_PRECISION = 0
+const MAX_PRECISION = 18  // brc20
 
 var MAX_PRECISION_STRING = "18"
 
@@ -90,19 +89,19 @@ type Decimal struct {
 }
 
 func NewDefaultDecimal(v int64) *Decimal {
-	return &Decimal{Precision: DEFAULT_PRECISION, Value: new(big.Int).SetInt64(v)}
+	return &Decimal{Precision: 0, Value: new(big.Int).SetInt64(v)}
 }
 
 // v 是乘10的p次方后的值，也就是需要往前点p个小数点才是真正的值
-func NewDecimal(v int64, p int) *Decimal {
-	if p > MAX_PRECISION {
-		p = MAX_PRECISION
-	}
-	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
-}
+// func NewDecimal(v int64, p int) *Decimal {
+// 	if p > MAX_PRECISION {
+// 		p = MAX_PRECISION
+// 	}
+// 	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
+// }
 
-// v是整数部分的值，小数点不动
-func NewDecimalWithPrecision(v int64, p int) *Decimal {
+// v是整数部分的值，小数点不动 （跟NewDecimalFromString类似）
+func NewDecimal(v int64, p int) *Decimal {
 	if p > MAX_PRECISION {
 		Log.Panic("too big precision")
 	}
@@ -234,9 +233,9 @@ func (d *Decimal) Add(other *Decimal) *Decimal {
 		Log.Panic("precition not match")
 	}
 	value := new(big.Int).Add(d.Value, other.Value)
-	//return &Decimal{Precision: d.Precision, Value: value}
-	d.Value = value
-	return d
+	return &Decimal{Precision: d.Precision, Value: value}
+	//d.Value = value
+	//return d
 }
 
 // Add adds two Decimal instances and returns a new Decimal instance
@@ -261,9 +260,9 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 		Log.Panicf("precition not match, (%d != %d)", d.Precision, other.Precision)
 	}
 	value := new(big.Int).Sub(d.Value, other.Value)
-	//return &Decimal{Precision: d.Precision, Value: value}
-	d.Value = value
-	return d
+	return &Decimal{Precision: d.Precision, Value: value}
+	//d.Value = value
+	//return d
 }
 
 // Sub subtracts two Decimal instances and returns a new Decimal instance
@@ -277,9 +276,9 @@ func (d *Decimal) Mul(other *big.Int) *Decimal {
 		return nil
 	}
 	value := new(big.Int).Mul(d.Value, other)
-	//return &Decimal{Precision: d.Precision, Value: value}
-	d.Value = value
-	return d
+	return &Decimal{Precision: d.Precision, Value: value}
+	//d.Value = value
+	//return d
 }
 
 // 精度跟a对齐
@@ -293,9 +292,9 @@ func (a *Decimal) MulDecimal(other *Decimal) *Decimal {
     if other.Precision > 0 {
         value = value.Div(value, precisionFactor[other.Precision])
     }
-    //return &Decimal{Precision: a.Precision, Value: value}
-	a.Value = value
-	return a
+    return &Decimal{Precision: a.Precision, Value: value}
+	//a.Value = value
+	//return a
 }
 
 // 精度为a
@@ -311,10 +310,10 @@ func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
     }
     value := new(big.Int).Mul(d.Value, other.Value)
     precision := d.Precision + other.Precision
-    //return &Decimal{Precision: precision, Value: value}
-	d.Value = value
-	d.Precision = precision
-	return d
+    return &Decimal{Precision: precision, Value: value}
+	//d.Value = value
+	//d.Precision = precision
+	//return d
 }
 
 func (d *Decimal) Div(other *big.Int) *Decimal {
@@ -322,9 +321,9 @@ func (d *Decimal) Div(other *big.Int) *Decimal {
 		return nil
 	}
 	value := new(big.Int).Div(d.Value, other)
-	//return &Decimal{Precision: d.Precision, Value: value}
-	d.Value = value
-	return d
+	return &Decimal{Precision: d.Precision, Value: value}
+	//d.Value = value
+	//return d
 }
 
 // 除法，精度为a
@@ -335,9 +334,9 @@ func (a *Decimal) DivDecimal(other *Decimal) *Decimal {
     // 先将a的Value放大other.Precision倍，避免精度丢失
     scaledA := new(big.Int).Mul(a.Value, precisionFactor[other.Precision])
     value := new(big.Int).Div(scaledA, other.Value)
-    //return &Decimal{Precision: a.Precision, Value: value}
-	a.Value = value
-	return a
+    return &Decimal{Precision: a.Precision, Value: value}
+	//a.Value = value
+	//return a
 }
 
 // 精度为a
@@ -440,39 +439,6 @@ func (d *Decimal) IntegerPart() int64 {
 	value := new(big.Int).Abs(d.Value)
 	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
 	return quotient.Int64()
-}
-
-// 不考虑精度
-func (d *Decimal) ToInt64WithMax(max *Decimal) int64 {
-	if d == nil {
-		return 0
-	}
-
-	if d.Cmp(max) > 0 {
-		Log.Panic("ToInt64WithMax overflow")
-	}
-
-	if !max.IsOverflowInt64() {
-		return d.Value.Int64()
-	}
-
-	// 十进制移位
-	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
-	scaleIndex := decimalDigits(quotient.Uint64())
-	return d.Div(precisionFactor[scaleIndex]).Value.Int64()
-}
-
-func NewDecimalFromInt64WithMax(value int64, max *Decimal) *Decimal {
-
-	if !max.IsOverflowInt64() {
-		return NewDecimal(value, max.Precision)
-	}
-
-	quotient, _ := new(big.Int).QuoRem(max.Value, big.NewInt(math.MaxInt64), new(big.Int))
-	scaleIndex := decimalDigits(quotient.Uint64())
-
-	result := NewDecimal(value, max.Precision)
-	return result.Mul(precisionFactor[scaleIndex])
 }
 
 func NewDecimalFromUint128(n uint128.Uint128, precition int) *Decimal {

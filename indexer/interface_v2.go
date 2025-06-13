@@ -111,7 +111,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 
 		asset := common.AssetInfo{
 			Name:       k,
-			Amount:     *common.NewDecimal(value, 0),
+			Amount:     *common.NewDefaultDecimal(value),
 			BindingSat: uint32(n),
 		}
 
@@ -234,20 +234,20 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	nsAsset := b.GetSubNameSummaryWithAddress(address)
 	for k, v := range nsAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
-		result[tickName] = common.NewDecimal(v, 0)
+		result[tickName] = common.NewDefaultDecimal(v)
 	}
 
 	// 合集
 	nftAsset := b.GetNftAmountWithAddress(address)
 	for k, v := range nftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
-		result[tickName] = common.NewDecimal(v, 0)
+		result[tickName] = common.NewDefaultDecimal(v)
 	}
 
 	ftAsset := b.ftIndexer.GetAssetSummaryByAddress(utxos)
 	for k, v := range ftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
-		result[tickName] = common.NewDecimal(v, 0)
+		result[tickName] = common.NewDefaultDecimal(v)
 	}
 
 	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
@@ -279,7 +279,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	for k, v := range exAssets {
 		// 如果该range有其他铸造出来的资产，过滤掉（直接使用utxoId过滤）
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
-		result[tickName] = common.NewDecimal(v, 0)
+		result[tickName] = common.NewDefaultDecimal(v)
 	}
 
 	var value int64
@@ -287,7 +287,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		value += utxos[u]
 	}
 	if value != 0 {
-		result[common.ASSET_PLAIN_SAT] = common.NewDecimal(value, 0)
+		result[common.ASSET_PLAIN_SAT] = common.NewDefaultDecimal(value)
 	}
 
 	return result
@@ -329,7 +329,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	if len(ftAssets) > 0 {
 		for k, v := range ftAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
-			result[tickName] = common.NewDecimal(v, 0)
+			result[tickName] = common.NewDefaultDecimal(v)
 		}
 	}
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
@@ -342,7 +342,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: ""}
-		result[tickName] = common.NewDecimal(int64(len(nfts)), 0)
+		result[tickName] = common.NewDefaultDecimal(int64(len(nfts)))
 	}
 	names := b.getNamesWithUtxo(utxoId)
 	if len(names) > 0 {
@@ -352,7 +352,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 			for _, rngs := range v {
 				amt += common.GetOrdinalsSize(rngs)
 			}
-			result[tickName] = common.NewDecimal(amt, 0)
+			result[tickName] = common.NewDefaultDecimal(amt)
 		}
 	}
 	exo := b.getExoticsWithUtxo(utxoId)
@@ -370,7 +370,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 			for _, rngs := range v {
 				amt += common.GetOrdinalsSize(rngs)
 			}
-			result[tickName] = common.NewDecimal(amt, 0)
+			result[tickName] = common.NewDefaultDecimal(amt)
 		}
 	}
 
@@ -398,7 +398,7 @@ func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName) map[uin
 	case common.PROTOCOL_NAME_ORDX:
 		holders := b.ftIndexer.GetHolderAndAmountWithTick(tickerName.Ticker)
 		for k, v := range holders {
-			result[k] = common.NewDecimal(v, 0)
+			result[k] = common.NewDefaultDecimal(v)
 		}
 	case common.PROTOCOL_NAME_BRC20:
 		result = b.brc20Indexer.GetHoldersWithTick(tickerName.Ticker)
@@ -414,7 +414,7 @@ func (b *IndexerMgr) GetMintAmountV2(tickerName *common.TickerName) (*common.Dec
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
 		amt, times := b.ftIndexer.GetMintAmount(tickerName.Ticker)
-		return common.NewDecimal(amt, 0), times
+		return common.NewDefaultDecimal(amt), times
 	case common.PROTOCOL_NAME_BRC20:
 		return b.brc20Indexer.GetMintAmount(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
