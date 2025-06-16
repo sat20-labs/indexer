@@ -358,7 +358,7 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 	for _, utxoAsset := range utxoresult {
 		_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoAsset.Utxo)
 		if err != nil {
-			common.Log.Errorf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
+			common.Log.Warningf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
 			continue
 		}
 
@@ -449,7 +449,7 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 	for _, utxoAsset := range utxoresult {
 		_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoAsset.Utxo)
 		if err != nil {
-			common.Log.Errorf("GetOrdinalsForUTXO %d failedm, %v", utxoAsset.Utxo, err)
+			common.Log.Warningf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
 			continue
 		}
 
@@ -520,7 +520,7 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 	for _, utxoAsset := range utxoresult {
 		_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoAsset.Utxo)
 		if err != nil {
-			common.Log.Errorf("GetOrdinalsForUTXO %d failedm, %v", utxoAsset.Utxo, err)
+			common.Log.Warningf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
 			continue
 		}
 
