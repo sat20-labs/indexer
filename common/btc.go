@@ -22,16 +22,7 @@ const (
 	ChainMainnet  = "mainnet"
 )
 
-func PkScriptToAddr(pkScript []byte, chain string) (string, error) {
-	chainParams := &chaincfg.TestNet4Params
-	switch chain {
-	case ChainTestnet:
-		chainParams = &chaincfg.TestNet4Params
-	case ChainTestnet4:
-		chainParams = &chaincfg.TestNet4Params
-	case ChainMainnet:
-		chainParams = &chaincfg.MainNetParams
-	}
+func PkScriptToAddr(pkScript []byte, chainParams *chaincfg.Params) (string, error) {
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(pkScript, chainParams)
 	if err != nil {
 		return "", err
@@ -290,4 +281,20 @@ func VerifySignOfMessage(msg, sig, pubkey []byte) error {
 		return err
 	}
 	return VerifyMessage(key, msg, sig)
+}
+
+func IsOpReturn(pkScript []byte) bool {
+	if len(pkScript) < 1 || pkScript[0] != txscript.OP_RETURN {
+		return false
+	}
+
+	// Single OP_RETURN.
+	if len(pkScript) == 1 {
+		return true
+	}
+	if len(pkScript) > txscript.MaxDataCarrierSize {
+		return false
+	}
+
+	return true
 }

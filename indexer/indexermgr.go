@@ -43,6 +43,7 @@ type IndexerMgr struct {
 	periodFlushToDB int
 
 	mpn *mpn.MemPoolNode
+	miniMempool *MiniMemPool
 
 	brc20Indexer *brc20.BRC20Indexer
 	RunesIndexer *runes.Indexer
@@ -108,6 +109,7 @@ func NewIndexerMgr(
 		chaincfgParam:   chainParam,
 		maxIndexHeight:  int(yamlcfg.BasicIndex.MaxIndexHeight),
 		periodFlushToDB: yamlcfg.BasicIndex.PeriodFlushToDB,
+		miniMempool:     NewMiniMemPool(),
 	}
 
 	instance = mgr
@@ -161,6 +163,7 @@ func (b *IndexerMgr) Init() {
 	b.brc20Indexer.InitIndexer(b.nft)
 	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling, b.rpcService)
 	b.RunesIndexer.Init()
+	b.miniMempool.init()
 
 	b.compilingBackupDB = nil
 	b.exoticBackupDB = nil
@@ -194,6 +197,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	// 	common.Log.Errorf("StartMPN failed, %v", err)
 	// 	return
 	// }
+	b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 
 	bWantExit := false
 	isRunning := false
@@ -336,6 +340,7 @@ func (b *IndexerMgr) forceUpdateDB() {
 func (b *IndexerMgr) handleReorg(height int) {
 	b.closeDB()
 	b.Init()
+	b.miniMempool.ProcessReorg()
 	b.compiling.SetReorgHeight(height)
 	common.Log.Infof("IndexerMgr handleReorg completed.")
 }
