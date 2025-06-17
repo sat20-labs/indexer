@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"net"
 
 	"sync"
@@ -29,6 +28,7 @@ type MiniMemPool struct {
     spentUtxoMap  map[string]string          // utxo->address，内存池中所有tx的输入utxo
     unConfirmedUtxoMap  map[string]string    // utxo->address，内存池中所有tx的输出utxo
     addrUtxoMap  map[string]*UserUtxoInMempool   // key:address，内存池中所有tx的输入和输出的所属地址
+    running  bool
 
     mutex   sync.RWMutex
 }
@@ -46,7 +46,12 @@ func (p *MiniMemPool) init() {
     p.addrUtxoMap = make(map[string]*UserUtxoInMempool)
 }
 
+// indexer同步到最高区块，再启动
 func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
+    if p.running {
+        return
+    }
+    p.running = true
     // 1. 启动时通过RPC拉取所有mempool已有数据
     //for _, rpcAddr := range rpcNodes {
         go p.fetchMempoolFromRPC()
@@ -62,9 +67,11 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
 func (p *MiniMemPool) fetchMempoolFromRPC() {
     p.mutex.Lock()
     defer p.mutex.RLock()
+    start := time.Now()
+    common.Log.Infof("start to fetch all tx from mempool")
     txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
     if err != nil {
-        log.Printf("GetMemPool error: %v", err)
+        common.Log.Infof("GetMemPool error: %v", err)
         return
     }
     for _, txId := range txIds {
@@ -80,7 +87,7 @@ func (p *MiniMemPool) fetchMempoolFromRPC() {
         }
         p.txBroadcasted(tx)
     }
-    common.Log.Infof("fetchMempoolFromRPC fetch %d tx", len(txIds))
+    common.Log.Infof("fetchMempoolFromRPC fetch %d tx, %v", len(txIds), time.Since(start).String())
 }
 
 
@@ -206,8 +213,6 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
     }
 }
 
-
-
 // 接受p2p的消息
 func (p *MiniMemPool) listenP2PTx(addr string) {
     for {
@@ -219,33 +224,36 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 				OnTx: func(_ *peer.Peer, msg *wire.MsgTx) {
                     p.mutex.Lock()
                     defer p.mutex.Unlock()
+                    common.Log.Infof("OnTx %s", msg.TxID())
 					p.txBroadcasted(msg)
 				},
                 OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
+                    common.Log.Infof("OnBlock %s", msg.BlockHash().String())
+                    // 需要检查当前区块是不是tip
                     p.ProcessBlock(msg)
                 },
 			},
 		}
         p, err := peer.NewOutboundPeer(cfg, addr)
         if err != nil {
-            log.Printf("NewOutboundPeer error: %v", err)
+            common.Log.Infof("NewOutboundPeer error: %v", err)
             time.Sleep(time.Second * 5)
             continue
         }
         conn, err := net.Dial("tcp", addr)
         if err != nil {
-            log.Printf("Dial P2P error: %v", err)
+            common.Log.Infof("Dial P2P error: %v", err)
             time.Sleep(time.Second * 5)
             continue
         }
         p.AssociateConnection(conn)
-        log.Printf("Connected to P2P node: %s", addr)
+        common.Log.Infof("Connected to P2P node: %s", addr)
 
         // 等待断开
         for p.Connected() {
             time.Sleep(3*time.Second)
         }
-        log.Printf("Disconnected from P2P node: %s, will reconnect...", addr)
+        common.Log.Infof("Disconnected from P2P node: %s, will reconnect...", addr)
         time.Sleep(time.Second * 5)
     }
 }
