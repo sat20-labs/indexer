@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+    "github.com/pebbe/zmq4"
+
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
@@ -44,6 +46,7 @@ func (p *MiniMemPool) init() {
     p.spentUtxoMap = make(map[string]string)
     p.unConfirmedUtxoMap = make(map[string]string)
     p.addrUtxoMap = make(map[string]*UserUtxoInMempool)
+     p.running = false
 }
 
 // indexer同步到最高区块，再启动
@@ -51,19 +54,33 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
     if p.running {
         return
     }
+
+    if instance.GetSyncHeight() != instance.GetChainTip() {
+        return
+    }
+
     p.running = true
     // 1. 启动时通过RPC拉取所有mempool已有数据
     //for _, rpcAddr := range rpcNodes {
         go p.fetchMempoolFromRPC()
     //}
 
-    netParam := instance.GetChainParam()
-    addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
+    //netParam := instance.GetChainParam()
+    // addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
+    // go p.listenP2PTx(addr)
 
-    // 2. 监听多个P2P节点，实时同步新交易
-    //for _, p2pAddr := range p2pNodes {
-        go p.listenP2PTx(addr)
-    //}
+    zmqTxPort := "38333"
+    zmqBlockPort := "38332"
+    if !instance.IsMainnet() {
+        zmqTxPort = "58333"
+        zmqBlockPort = "58332"
+    }
+
+    zmqTxAddr := fmt.Sprintf("tcp://%s:%s", cfg.Host, zmqTxPort)
+    zmqBlockAddr := fmt.Sprintf("tcp://%s:%s", cfg.Host, zmqBlockPort)
+
+    go p.listenZMQTx(zmqTxAddr)
+    go p.listenZMQBlock(zmqBlockAddr)
 }
 
 // 通过RPC拉取mempool
@@ -127,9 +144,9 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             continue // coinbase
         }
         spentUtxo := txIn.PreviousOutPoint.String()
-        info, err := instance.rpcService.GetUtxoInfo(txIn.PreviousOutPoint.String())
+        info, err := instance.rpcService.GetUtxoInfo(spentUtxo)
         if err != nil {
-            common.Log.Errorf("GetUtxoInfo %s failed, %v", txIn.PreviousOutPoint.String(), err)
+            common.Log.Errorf("GetUtxoInfo %s failed, %v", spentUtxo, err)
             continue
         }
         addr, err := common.PkScriptToAddr(info.PkScript, netParam)
@@ -216,6 +233,106 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
     }
 }
 
+
+// 通过ZMQ监听交易广播，代替P2P监听
+func (p *MiniMemPool) listenZMQTx(zmqAddr string) {
+    subscriber, err := zmq4.NewSocket(zmq4.SUB)
+    if err != nil {
+        common.Log.Errorf("ZMQ NewSocket error: %v", err)
+        return
+    }
+    defer subscriber.Close()
+
+    err = subscriber.Connect(zmqAddr)
+    if err != nil {
+        common.Log.Errorf("ZMQ Connect error: %v", err)
+        return
+    }
+    // 订阅所有消息
+    err = subscriber.SetSubscribe("")
+    if err != nil {
+        common.Log.Errorf("ZMQ SetSubscribe error: %v", err)
+        return
+    }
+
+    common.Log.Infof("ZMQ listening for raw tx at %s", zmqAddr)
+    for {
+        msg, err := subscriber.RecvMessage(0)
+        if err != nil {
+            common.Log.Errorf("ZMQ RecvMessage error: %v", err)
+            time.Sleep(time.Second)
+            continue
+        }
+        if len(msg) < 2 {
+            continue
+        }
+        topic := msg[0]
+        raw := msg[1]
+        if topic != "rawtx" {
+            continue
+        }
+        txBytes := []byte(raw)
+        // ZMQ 传递的是二进制，需要解码
+        tx := wire.NewMsgTx(wire.TxVersion)
+        err = tx.Deserialize(bytes.NewReader(txBytes))
+        if err != nil {
+            common.Log.Errorf("ZMQ tx Deserialize error: %v", err)
+            continue
+        }
+        p.mutex.Lock()
+        common.Log.Infof("ZMQ OnTx %s", tx.TxID())
+        p.txBroadcasted(tx)
+        p.mutex.Unlock()
+    }
+}
+
+func (p *MiniMemPool) listenZMQBlock(zmqAddr string) {
+    subscriber, err := zmq4.NewSocket(zmq4.SUB)
+    if err != nil {
+        common.Log.Errorf("ZMQ NewSocket error: %v", err)
+        return
+    }
+    defer subscriber.Close()
+
+    err = subscriber.Connect(zmqAddr)
+    if err != nil {
+        common.Log.Errorf("ZMQ Connect error: %v", err)
+        return
+    }
+    err = subscriber.SetSubscribe("")
+    if err != nil {
+        common.Log.Errorf("ZMQ SetSubscribe error: %v", err)
+        return
+    }
+
+    common.Log.Infof("ZMQ listening for raw block at %s", zmqAddr)
+    for {
+        msg, err := subscriber.RecvMessage(0)
+        if err != nil {
+            common.Log.Errorf("ZMQ RecvMessage error: %v", err)
+            time.Sleep(time.Second)
+            continue
+        }
+        if len(msg) < 2 {
+            continue
+        }
+        topic := msg[0]
+        raw := msg[1]
+        if topic != "rawblock" {
+            continue
+        }
+        blockBytes := []byte(raw)
+        block := wire.NewMsgBlock(&wire.BlockHeader{})
+        err = block.Deserialize(bytes.NewReader(blockBytes))
+        if err != nil {
+            common.Log.Errorf("ZMQ block Deserialize error: %v", err)
+            continue
+        }
+        common.Log.Infof("ZMQ OnBlock %s", block.BlockHash().String())
+        p.ProcessBlock(block)
+    }
+}
+
 // 接受p2p的消息
 func (p *MiniMemPool) listenP2PTx(addr string) {
     for {
@@ -234,6 +351,18 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
                     common.Log.Infof("OnBlock %s", msg.BlockHash().String())
                     // 需要检查当前区块是不是tip
                     p.ProcessBlock(msg)
+                },
+                OnInv: func(peer *peer.Peer, msg *wire.MsgInv) {
+                    common.Log.Infof("OnInv: %v", msg.InvList)
+                    var getDataMsg wire.MsgGetData
+                    for _, inv := range msg.InvList {
+                        if inv.Type == wire.InvTypeTx || inv.Type == wire.InvTypeBlock {
+                            getDataMsg.AddInvVect(inv)
+                        }
+                    }
+                    if len(getDataMsg.InvList) > 0 {
+                        peer.QueueMessage(&getDataMsg, nil)
+                    }
                 },
 			},
 		}

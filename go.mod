@@ -40,6 +40,7 @@ require (
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/orcaman/concurrent-map/v2 v2.0.1
+	github.com/pebbe/zmq4 v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/sirupsen/logrus v1.9.3
