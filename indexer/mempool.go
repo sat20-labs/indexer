@@ -57,9 +57,12 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
         go p.fetchMempoolFromRPC()
     //}
 
+    netParam := instance.GetChainParam()
+    addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
+
     // 2. 监听多个P2P节点，实时同步新交易
     //for _, p2pAddr := range p2pNodes {
-        go p.listenP2PTx(cfg.Host)
+        go p.listenP2PTx(addr)
     //}
 }
 
