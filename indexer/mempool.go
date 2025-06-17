@@ -60,12 +60,15 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
     }
 
     p.running = true
-    // 1. 启动时通过RPC拉取所有mempool已有数据
-    //for _, rpcAddr := range rpcNodes {
-        go p.fetchMempoolFromRPC()
-    //}
+    // 定时每10小时同步一次mempool
+    go func() {
+        for {
+            p.fetchMempoolFromRPC()
+            time.Sleep(10 * time.Hour)
+        }
+    }()
 
-    //netParam := instance.GetChainParam()
+    // netParam := instance.GetChainParam()
     // addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
     // go p.listenP2PTx(addr)
 
@@ -86,7 +89,7 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
 // 通过RPC拉取mempool
 func (p *MiniMemPool) fetchMempoolFromRPC() {
     p.mutex.Lock()
-    defer p.mutex.RLock()
+    defer p.mutex.Unlock()
     start := time.Now()
     common.Log.Infof("start to fetch all tx from mempool")
     txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
@@ -136,9 +139,11 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     txId := tx.TxID()
     _, ok := p.txMap[txId]
     if ok {
+        common.Log.Infof("tx %s already in mempool", txId)
         return 
     }
     p.txMap[txId] = tx
+    common.Log.Infof("add tx %s to mempool %d", txId, len(p.txMap))
     for _, txIn := range tx.TxIn {
         if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
             continue // coinbase
@@ -155,6 +160,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             continue
         }
         p.spentUtxoMap[spentUtxo] = addr
+        common.Log.Infof("add utxo %s to spentUtxoMap with %s", spentUtxo, addr)
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
@@ -164,6 +170,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             p.addrUtxoMap[addr] = user
         }
         user.SpentUtxo[spentUtxo] = true
+
     }
 
     for i, txOut := range tx.TxOut {
@@ -177,6 +184,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             continue
         }
         p.unConfirmedUtxoMap[unconfirmedUtxo] = addr
+        common.Log.Infof("add utxo %s to unConfirmedUtxoMap with %s", unconfirmedUtxo, addr)
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
@@ -193,10 +201,11 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
 func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
     txId := tx.TxID()
     _, ok := p.txMap[txId]
-    if !ok {
-        return 
+    if ok {
+        delete(p.txMap, txId)
+        common.Log.Infof("tx %s removed from mempool %d", txId, len(p.txMap))
     }
-    delete(p.txMap, txId)
+    
     for _, txIn := range tx.TxIn {
         if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
             continue // coinbase
@@ -204,12 +213,15 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
         spentUtxo := txIn.PreviousOutPoint.String()
         addr, ok := p.spentUtxoMap[spentUtxo]
         delete(p.spentUtxoMap, spentUtxo)
+        common.Log.Infof("delete utxo %s from spentUtxoMap", spentUtxo)
         if !ok {
+            common.Log.Infof("can't find utxo %s in spentMap", spentUtxo)
             continue
         }
 
         user, ok := p.addrUtxoMap[addr]
         if ok {
+            common.Log.Infof("delete utxo %s from address %s SpentUtxo", spentUtxo, addr)
             delete(user.SpentUtxo, spentUtxo)
         }
     }
@@ -222,12 +234,15 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
         p.unConfirmedUtxoMap[unconfirmedUtxo] = txId
         addr, ok := p.unConfirmedUtxoMap[unconfirmedUtxo]
         delete(p.unConfirmedUtxoMap, unconfirmedUtxo)
+        common.Log.Infof("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
         if !ok {
+            common.Log.Infof("can't find utxo %s in unConfirmedUtxoMap", unconfirmedUtxo)
             continue
         }
 
         user, ok := p.addrUtxoMap[addr]
-        if !ok {
+        if ok {
+            common.Log.Infof("delete utxo %s from address %s unConfirmedUtxoMap", unconfirmedUtxo, addr)
             delete(user.UnconfirmedUtxoMap, unconfirmedUtxo)
         }
     }
