@@ -26,6 +26,7 @@ type RpcIndexer struct {
 	mutex              sync.RWMutex
 	addressValueMap    map[string]*common.AddressValueInDB
 	addressIdMap       map[uint64]string
+	deletedUtxoMap     map[uint64]bool
 	bSearching         bool
 	satSearchingStatus map[int64]*SatSearchingStatus
 }
@@ -36,6 +37,7 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 		bSearching:         false,
 		addressValueMap:    make(map[string]*common.AddressValueInDB),
 		addressIdMap:       make(map[uint64]string),
+		deletedUtxoMap:     make(map[uint64]bool),
 		satSearchingStatus: make(map[int64]*SatSearchingStatus),
 	}
 
@@ -48,6 +50,9 @@ func (b *RpcIndexer) UpdateServiceInstance() {
 	b.addressIdMap = make(map[uint64]string)
 	for k, v := range b.addressValueMap {
 		b.addressIdMap[v.AddressId] = k
+	}
+	for _, v := range b.delUTXOs {
+		b.deletedUtxoMap[v.UtxoId] = true
 	}
 }
 
@@ -79,6 +84,11 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 
 	if err != nil {
 		return common.INVALID_ID, nil, err
+	}
+
+	_, ok = b.deletedUtxoMap[output.UtxoId]
+	if ok {
+		return 0, nil, fmt.Errorf("utxo %s is spent", utxo)
 	}
 
 	return output.UtxoId, output.Ordinals, nil
@@ -116,6 +126,11 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	_, ok = b.deletedUtxoMap[output.UtxoId]
+	if ok {
+		return nil, fmt.Errorf("utxo %s is spent", utxo)
 	}
 
 	info := common.UtxoInfo{}
@@ -204,6 +219,7 @@ func (b *RpcIndexer) getAddressValue2(address string, txn *badger.Txn) *common.A
 		if result.Utxos == nil {
 			result.Utxos = make(map[uint64]*common.UtxoValue)
 		}
+		// 过滤已经删除的utxo
 		for k, v := range value.Utxos {
 			if v.Op > 0 {
 				result.Utxos[k] = v
