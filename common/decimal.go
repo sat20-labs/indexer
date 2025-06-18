@@ -451,8 +451,9 @@ func (d *Decimal) ToUint128() uint128.Uint128 {
 	if d == nil {
 		return uint128.Uint128{}
 	}
-	lo := d.Value.Uint64()
-	hi := d.Value.Rsh(d.Value, 64).Uint64()
+	n := d.Clone()
+	lo := n.Value.Uint64()
+	hi := n.Value.Rsh(d.Value, 64).Uint64()
 	return uint128.Uint128{Lo: lo, Hi: hi}
 }
 
