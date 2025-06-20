@@ -381,6 +381,9 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 		// 按照资产数量确定value
 		if name == nil || *name == ASSET_PLAIN_SAT {
 			value = amt.Int64()
+			if value < 330 {
+				return nil, nil, fmt.Errorf("not allow send %d sats", value)
+			}
 		} else {
 			asset, err := p.Assets.Find(name)
 			if err != nil {
@@ -398,12 +401,22 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 				}
 				tmp := offsets.Clone()
 				satsNum := GetBindingSatNum(amt, n)
-				offset1, _ := tmp.Split(satsNum)
+				offset1, offset2 := tmp.Split(satsNum)
 				value = offset1[len(offset1)-1].End
+				if value < 330 {
+					if len(offset2) == 0 {
+						value = 330
+					} else {
+						if offset2[0].Start + value < 330 {
+							return nil, nil, fmt.Errorf("no 330 plain sat, %d", offset2[0].Start + value)
+						} else {
+							value = 330
+						}
+					}
+				}
+			} else {
+				value = 330
 			}
-		}
-		if value < 330 {
-			value = 330
 		}
 	}
 

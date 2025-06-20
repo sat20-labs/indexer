@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 	"strings"
-	"time"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/dgraph-io/badger/v4"
@@ -19,6 +19,8 @@ const (
 	PUT  ActionType = 1
 	DEL  ActionType = 2
 )
+
+var counter int64
 
 type DbLog struct {
 	Val       []byte
@@ -117,7 +119,7 @@ func (s *DbWrite) Clone(clone *DbWrite) *DbWrite {
 		clone.logs.Set(log.Key, newLog)
 	}
 
-	clone.cloneTimeStamp = time.Now().UnixNano()
+	clone.cloneTimeStamp = atomic.AddInt64(&counter, 1)
 	return clone
 }
 
@@ -181,7 +183,7 @@ func (s *Cache[T]) Delete(key []byte) (ret *T) {
 	log, ok := s.dbWrite.logs.Get(string(key))
 	if ok {
 		log.Type = DEL
-		log.TimeStamp = time.Now().UnixNano()
+		log.TimeStamp = atomic.AddInt64(&counter, 1)
 	} else {
 		// must be in cache
 		common.Log.Panicf("Cache.Delete-> key: %s, not found in logs", string(key))
@@ -202,7 +204,7 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 	}
 	log.Type = PUT
 	log.Val = val
-	log.TimeStamp = time.Now().UnixNano()
+	log.TimeStamp = atomic.AddInt64(&counter, 1)
 	return
 }
 
@@ -306,7 +308,7 @@ func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[st
 	})
 
 	if err != nil {
-		common.Log.Panicf("Cache.GetListFromDB-> err:%s", err.Error())
+		common.Log.Errorf("Cache.GetListFromDB-> err:%s", err.Error())
 	}
 	return
 }
@@ -343,7 +345,8 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 	})
 
 	if err != nil {
-		common.Log.Panicf("Cache.GetListFromDB-> err:%s", err.Error())
+		common.Log.Errorf("Cache.GetListFromDB-> err:%s", err.Error())
+		ret = false
 	}
 	return
 }
@@ -383,7 +386,7 @@ func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 	})
 
 	if err != nil {
-		common.Log.Panicf("Cache.GetFromDB-> err: %v", err)
+		common.Log.Errorf("Cache.GetFromDB-> err: %v", err)
 	}
 
 	return
