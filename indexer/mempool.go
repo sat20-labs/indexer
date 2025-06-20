@@ -420,9 +420,9 @@ func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
 func (p *MiniMemPool) ProcessReorg() {
     // 清空所有数据
     p.mutex.Lock()
-    defer p.mutex.Unlock()
-    
     p.init()
+    p.mutex.Unlock()
+    
     p.fetchMempoolFromRPC()
     
     // 重新读内存池数据
