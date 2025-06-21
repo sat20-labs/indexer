@@ -53,7 +53,8 @@ func (s *Service) sendRawTx(c *gin.Context) {
 		e := err.Error()
 		if strings.Contains(e, "transaction already exists in blockchain") ||
 			strings.Contains(e, "database contains entry for spent tx output") ||
-			strings.Contains(e, "already have transaction in mempool") {
+			strings.Contains(e, "already have transaction in mempool") ||
+			strings.Contains(e, "Transaction outputs already in utxo set") {
 				sent = true
 		} 
 	}
