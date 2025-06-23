@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 )
 
@@ -296,7 +295,7 @@ func (s *Model) GetExistingUtxos(req *rpcwire.UtxosReq) ([]string, error) {
 			continue
 		}
 
-		if utils.IsExistingInMemPool(utxo) {
+		if s.indexer.IsUtxoSpent(utxo) {
 			continue
 		}
 
@@ -329,8 +328,8 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 	utxosort := make([]*UtxoAsset, 0)
 	for utxo, amout := range utxos {
 		utxostr := s.indexer.GetUtxoById(utxo)
-		if utils.IsExistingInMemPool(utxostr) {
-			common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
+		if s.indexer.IsUtxoSpent(utxostr) {
+			common.Log.Infof("utxo %s spent", utxostr)
 			continue
 		}
 		utxosort = append(utxosort, &UtxoAsset{utxo, amout})
@@ -420,8 +419,8 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 	utxosort := make([]*UtxoAsset, 0)
 	for utxo, amout := range utxos {
 		utxostr := s.indexer.GetUtxoById(utxo)
-		if utils.IsExistingInMemPool(utxostr) {
-			common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
+		if s.indexer.IsUtxoSpent(utxostr) {
+			common.Log.Infof("utxo %s spent", utxostr)
 			continue
 		}
 		utxosort = append(utxosort, &UtxoAsset{utxo, amout})
@@ -493,8 +492,8 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 	for key, value := range utxos {
 		for _, u := range value {
 			utxostr := s.indexer.GetUtxoById(u)
-			if utils.IsExistingInMemPool(utxostr) {
-				common.Log.Infof("IsExistUtxoInMemPool return true %s", utxostr)
+			if s.indexer.IsUtxoSpent(utxostr) {
+				common.Log.Infof("utxo %s spent", utxostr)
 				continue
 			}
 			a := &UtxoAsset{Utxo: u, Ticker: &key}

@@ -10,7 +10,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
@@ -136,24 +135,8 @@ func IsExistingInMemPool(utxo string) bool {
 	// 	return false
 	// }
 	// return isExist
+
 	return GetMemPool().IsExisting(utxo)
-}
-
-func IsAvailableUtxoId(utxoId uint64) bool {
-	return IsAvailableUtxo(base_indexer.ShareBaseIndexer.GetUtxoById(utxoId))
-}
-
-func IsAvailableUtxo(utxo string) bool {
-	//Find common utxo (that is, utxo with non-ordinal attributes)
-	if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxo, false) {
-		return false
-	}
-
-	if IsExistingInMemPool(utxo) {
-		return false
-	}
-
-	return true
 }
 
 

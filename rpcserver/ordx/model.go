@@ -8,7 +8,6 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
@@ -120,8 +119,8 @@ func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*comm
 }
 
 func (s *Model) GetUtxoInfoV3(utxo string) (*common.AssetsInUtxo, error) {
-	if utils.IsExistingInMemPool(utxo) {
-		return nil, fmt.Errorf("utxo %s is in mempool", utxo)
+	if s.indexer.IsUtxoSpent(utxo) {
+		return nil, fmt.Errorf("utxo %s is spent", utxo)
 	}
 	ret := s.indexer.GetTxOutputWithUtxoV3(utxo)
 	if ret == nil {
@@ -152,7 +151,7 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 		return nil, 0, err
 	}
 	for _, txOut := range outputMap {
-		if utils.IsExistingInMemPool(txOut.OutPoint) {
+		if s.indexer.IsUtxoSpent(txOut.OutPoint) {
 			continue
 		}
 		result = append(result, txOut)

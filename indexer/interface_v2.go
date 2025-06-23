@@ -509,3 +509,8 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 	}
 	return err
 }
+
+
+func (b *IndexerMgr) IsUtxoSpent(utxo string) bool {
+	return b.miniMempool.IsSpent(utxo)
+}

@@ -264,7 +264,6 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
             continue
         }
         unconfirmedUtxo := fmt.Sprintf("%s:%d", txId, i)
-        p.unConfirmedUtxoMap[unconfirmedUtxo] = txId
         addr, ok := p.unConfirmedUtxoMap[unconfirmedUtxo]
         delete(p.unConfirmedUtxoMap, unconfirmedUtxo)
         common.Log.Debugf("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
@@ -476,6 +475,15 @@ func (p *MiniMemPool) RemoveSpentUtxo(utxos []string) []string {
         result = append(result, utxo)
     }
     return result
+}
+
+// 返回没有被花费的utxo
+func (p *MiniMemPool) IsSpent(utxo string) bool {
+    p.mutex.RLock()
+    defer p.mutex.RUnlock()
+
+    _, ok := p.spentUtxoMap[utxo]
+    return ok
 }
 
 // 返回内存池中的该地址的被花费的utxo
