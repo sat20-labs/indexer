@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 
 	"sync"
 	"time"
 
-    //"github.com/pebbe/zmq4"
+	//"github.com/pebbe/zmq4"
 
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
@@ -134,6 +136,33 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 }
 
 
+func (p *MiniMemPool) GetTxOutFromRawTx(utxo string) (*common.UtxoInfo, error) {
+	parts := strings.Split(utxo, ":")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid utxo %s", utxo)
+	}
+	vout, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, err
+	}
+	txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(parts[0])
+	if err != nil {
+		common.Log.Errorf("GetRawTx %s failed, %v", parts[0], err)
+		return nil, err
+	}
+	tx, err := DecodeMsgTx(txHex)
+	if err != nil {
+		return nil, err
+	}
+	if vout >= len(tx.TxOut) {
+		return nil, fmt.Errorf("invalid index of utxo %s", utxo)
+	}
+	return &common.UtxoInfo{
+		Value: tx.TxOut[vout].Value,
+		PkScript: tx.TxOut[vout].PkScript,
+	}, nil
+}
+
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
@@ -151,8 +180,12 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         spentUtxo := txIn.PreviousOutPoint.String()
         info, err := instance.rpcService.GetUtxoInfo(spentUtxo)
         if err != nil {
-            common.Log.Errorf("GetUtxoInfo %s failed, %v", spentUtxo, err)
-            continue
+            // 可能上个TX也在内存池中
+            info, err = p.GetTxOutFromRawTx(spentUtxo)
+            if err != nil {
+                common.Log.Errorf("GetTxOutFromRawTx %s failed, %v", spentUtxo, err)
+                continue
+            }
         }
         addr, err := common.PkScriptToAddr(info.PkScript, netParam)
         if err != nil {
