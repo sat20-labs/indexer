@@ -136,7 +136,7 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 }
 
 
-func (p *MiniMemPool) GetTxOutFromRawTx(utxo string) (*common.UtxoInfo, error) {
+func getTxOutFromRawTx(utxo string) (*common.UtxoInfo, error) {
 	parts := strings.Split(utxo, ":")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid utxo %s", utxo)
@@ -181,7 +181,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         info, err := instance.rpcService.GetUtxoInfo(spentUtxo)
         if err != nil {
             // 可能上个TX也在内存池中
-            info, err = p.GetTxOutFromRawTx(spentUtxo)
+            info, err = getTxOutFromRawTx(spentUtxo)
             if err != nil {
                 common.Log.Errorf("GetTxOutFromRawTx %s failed, %v", spentUtxo, err)
                 continue
@@ -193,7 +193,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             continue
         }
         p.spentUtxoMap[spentUtxo] = addr
-        common.Log.Infof("add utxo %s to spentUtxoMap with %s", spentUtxo, addr)
+        common.Log.Debugf("add utxo %s to spentUtxoMap with %s", spentUtxo, addr)
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
@@ -217,7 +217,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             continue
         }
         p.unConfirmedUtxoMap[unconfirmedUtxo] = addr
-        common.Log.Infof("add utxo %s to unConfirmedUtxoMap with %s", unconfirmedUtxo, addr)
+        common.Log.Debugf("add utxo %s to unConfirmedUtxoMap with %s", unconfirmedUtxo, addr)
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
@@ -246,15 +246,15 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
         spentUtxo := txIn.PreviousOutPoint.String()
         addr, ok := p.spentUtxoMap[spentUtxo]
         delete(p.spentUtxoMap, spentUtxo)
-        common.Log.Infof("delete utxo %s from spentUtxoMap", spentUtxo)
+        common.Log.Debugf("delete utxo %s from spentUtxoMap", spentUtxo)
         if !ok {
-            common.Log.Infof("can't find utxo %s in spentMap", spentUtxo)
+            common.Log.Errorf("can't find utxo %s in spentMap", spentUtxo)
             continue
         }
 
         user, ok := p.addrUtxoMap[addr]
         if ok {
-            common.Log.Infof("delete utxo %s from address %s SpentUtxo", spentUtxo, addr)
+            common.Log.Debugf("delete utxo %s from address %s SpentUtxo", spentUtxo, addr)
             delete(user.SpentUtxo, spentUtxo)
         }
     }
@@ -267,15 +267,15 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
         p.unConfirmedUtxoMap[unconfirmedUtxo] = txId
         addr, ok := p.unConfirmedUtxoMap[unconfirmedUtxo]
         delete(p.unConfirmedUtxoMap, unconfirmedUtxo)
-        common.Log.Infof("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
+        common.Log.Debugf("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
         if !ok {
-            common.Log.Infof("can't find utxo %s in unConfirmedUtxoMap", unconfirmedUtxo)
+            common.Log.Errorf("can't find utxo %s in unConfirmedUtxoMap", unconfirmedUtxo)
             continue
         }
 
         user, ok := p.addrUtxoMap[addr]
         if ok {
-            common.Log.Infof("delete utxo %s from address %s unConfirmedUtxoMap", unconfirmedUtxo, addr)
+            common.Log.Debugf("delete utxo %s from address %s unConfirmedUtxoMap", unconfirmedUtxo, addr)
             delete(user.UnconfirmedUtxoMap, unconfirmedUtxo)
         }
     }
@@ -416,13 +416,13 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 		}
         p, err := peer.NewOutboundPeer(cfg, addr)
         if err != nil {
-            common.Log.Infof("NewOutboundPeer error: %v", err)
+            common.Log.Errorf("NewOutboundPeer error: %v", err)
             time.Sleep(time.Second * 5)
             continue
         }
         conn, err := net.Dial("tcp", addr)
         if err != nil {
-            common.Log.Infof("Dial P2P error: %v", err)
+            common.Log.Errorf("Dial P2P error: %v", err)
             time.Sleep(time.Second * 5)
             continue
         }
@@ -433,7 +433,7 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
         for p.Connected() {
             time.Sleep(3*time.Second)
         }
-        common.Log.Infof("Disconnected from P2P node: %s, will reconnect...", addr)
+        common.Log.Warningf("Disconnected from P2P node: %s, will reconnect...", addr)
         time.Sleep(time.Second * 5)
     }
 }
@@ -457,11 +457,13 @@ func (p *MiniMemPool) ProcessReorg() {
     p.mutex.Unlock()
     
     p.fetchMempoolFromRPC()
+    common.Log.Infof("ProcessReorg, reset mempool")
     
     // 重新读内存池数据
 }
 
-func (p *MiniMemPool) CheckUtxoSpent(utxos []string) []string {
+// 返回没有被花费的utxo
+func (p *MiniMemPool) RemoveSpentUtxo(utxos []string) []string {
     p.mutex.RLock()
     defer p.mutex.RUnlock()
 
@@ -476,7 +478,7 @@ func (p *MiniMemPool) CheckUtxoSpent(utxos []string) []string {
     return result
 }
 
-
+// 返回内存池中的该地址的被花费的utxo
 func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
     p.mutex.RLock()
     defer p.mutex.RUnlock()
@@ -493,7 +495,7 @@ func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
     return result
 }
 
-
+// 返回内存池中属于该地址的还没确认的utxo
 func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []string {
     p.mutex.RLock()
     defer p.mutex.RUnlock()
