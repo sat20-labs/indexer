@@ -108,7 +108,7 @@ func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
 			right = append(right, n)
 		} else if r.End <= offset {
 			// 完全在左边
-			left = append(left, r)
+			left = append(left, r.Clone())
 		} else {
 			// 跨越 offset，需要拆分
 			left = append(left, &OffsetRange{Start: r.Start, End: offset})
