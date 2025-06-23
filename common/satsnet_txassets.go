@@ -30,8 +30,13 @@ func NewAssetNameFromString(name string) *AssetName {
 			Ticker: parts[0],
 		}
 	}
-	if len(parts) != 3 {
-		return &AssetName{}
+	if len(parts) == 4 {
+		// runes
+		return &AssetName{
+			Protocol: parts[0],
+			Type: parts[1],
+			Ticker: parts[2]+":"+parts[3],
+		}
 	}
 	return &AssetName{
 		Protocol: parts[0],
