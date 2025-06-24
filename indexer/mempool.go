@@ -139,7 +139,7 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
     common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
     common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
 
-    if len(txIds) < len(add) + len(del) {
+    if len(txIds) <= len(add) {
         p.init()
         for _, txId := range txIds {
             txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
@@ -157,17 +157,10 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
         
     } else {
         for _, txId := range del {
-            txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
-            if err != nil {
-                common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
-                continue
+            tx, ok := p.txMap[txId]
+            if ok {
+                p.txConfirmed(tx)
             }
-            tx, err := DecodeMsgTx(txHex)
-            if err != nil {
-                common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
-                continue
-            }
-            p.txConfirmed(tx)
         }
 
         for _, txId := range add {
@@ -276,7 +269,6 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             p.addrUtxoMap[addr] = user
         }
         user.SpentUtxo[spentUtxo] = true
-
     }
 
     for i, txOut := range tx.TxOut {
@@ -286,7 +278,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         unconfirmedUtxo := fmt.Sprintf("%s:%d", txId, i)
         addr, err := common.PkScriptToAddr(txOut.PkScript, netParam)
         if err != nil {
-            common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
+            //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
             continue
         }
         p.unConfirmedUtxoMap[unconfirmedUtxo] = addr
@@ -312,12 +304,24 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
         common.Log.Infof("tx %s removed from mempool %d", txId, len(p.txMap))
     }
     
+    netParam := instance.GetChainParam()
     for _, txIn := range tx.TxIn {
         if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
             continue // coinbase
         }
         spentUtxo := txIn.PreviousOutPoint.String()
         addr, ok := p.spentUtxoMap[spentUtxo]
+        if !ok {
+            // 理论上应该能找到，找不到就努力补救
+            info, err := getTxOutFromRawTx(spentUtxo)
+            if err == nil {
+                addr, err = common.PkScriptToAddr(info.PkScript, netParam)
+                if err == nil {
+                    ok = true
+                }
+            }
+        }
+
         delete(p.spentUtxoMap, spentUtxo)
         common.Log.Debugf("delete utxo %s from spentUtxoMap", spentUtxo)
         if !ok {
@@ -337,14 +341,13 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
             continue
         }
         unconfirmedUtxo := fmt.Sprintf("%s:%d", txId, i)
-        addr, ok := p.unConfirmedUtxoMap[unconfirmedUtxo]
-        delete(p.unConfirmedUtxoMap, unconfirmedUtxo)
-        common.Log.Debugf("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
-        if !ok {
-            common.Log.Errorf("can't find utxo %s in unConfirmedUtxoMap", unconfirmedUtxo)
+        addr, err := common.PkScriptToAddr(txOut.PkScript, netParam)
+        if err != nil {
+            //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
             continue
         }
-
+        delete(p.unConfirmedUtxoMap, unconfirmedUtxo)
+        common.Log.Debugf("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
         user, ok := p.addrUtxoMap[addr]
         if ok {
             common.Log.Debugf("delete utxo %s from address %s unConfirmedUtxoMap", unconfirmedUtxo, addr)
