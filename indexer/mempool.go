@@ -33,6 +33,7 @@ type MiniMemPool struct {
     unConfirmedUtxoMap  map[string]string    // utxo->address，内存池中所有tx的输出utxo
     addrUtxoMap  map[string]*UserUtxoInMempool   // key:address，内存池中所有tx的输入和输出的所属地址
     running  bool
+    lastSyncTime int64
 
     mutex   sync.RWMutex
 }
@@ -48,7 +49,6 @@ func (p *MiniMemPool) init() {
     p.spentUtxoMap = make(map[string]string)
     p.unConfirmedUtxoMap = make(map[string]string)
     p.addrUtxoMap = make(map[string]*UserUtxoInMempool)
-     p.running = false
 }
 
 // indexer同步到最高区块，再启动
@@ -57,18 +57,8 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
         return
     }
 
-    if instance.GetSyncHeight() != instance.GetChainTip() {
-        return
-    }
-
     p.running = true
-    // 定时每10小时同步一次mempool
-    go func() {
-        for {
-            p.fetchMempoolFromRPC()
-            time.Sleep(10 * time.Hour)
-        }
-    }()
+    go p.fetchMempoolFromRPC()
 
     netParam := instance.GetChainParam()
     addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
@@ -112,9 +102,92 @@ func (p *MiniMemPool) fetchMempoolFromRPC() {
         }
         p.txBroadcasted(tx)
     }
+    p.lastSyncTime = time.Now().Unix()
     common.Log.Infof("fetchMempoolFromRPC fetch %d tx, %v", len(txIds), time.Since(start).String())
 }
 
+// 重新同步池子
+func (p *MiniMemPool) resyncMempoolFromRPC() {
+    p.mutex.Lock()
+    defer p.mutex.Unlock()
+    start := time.Now()
+    common.Log.Infof("start to fetch all tx from mempool")
+    txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
+    if err != nil {
+        common.Log.Infof("GetMemPool error: %v", err)
+        return
+    }
+    newMap := make(map[string]bool)
+    add := make([]string, 0)
+    for _, txId := range txIds {
+        newMap[txId] = true
+        _, ok := p.txMap[txId]
+        if ok {
+            continue
+        }
+        add = append(add, txId)
+    }
+    del := make([]string, 0)
+    for k := range p.txMap {
+        _, ok := newMap[k]
+        if ok {
+            continue
+        }
+        del = append(del, k)
+    }
+
+    common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
+    common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
+
+    if len(txIds) < len(add) + len(del) {
+        p.init()
+        for _, txId := range txIds {
+            txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
+            if err != nil {
+                common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
+                continue
+            }
+            tx, err := DecodeMsgTx(txHex)
+            if err != nil {
+                common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
+                continue
+            }
+            p.txBroadcasted(tx)
+        }
+        
+    } else {
+        for _, txId := range del {
+            txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
+            if err != nil {
+                common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
+                continue
+            }
+            tx, err := DecodeMsgTx(txHex)
+            if err != nil {
+                common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
+                continue
+            }
+            p.txConfirmed(tx)
+        }
+
+        for _, txId := range add {
+            txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
+            if err != nil {
+                common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
+                continue
+            }
+            tx, err := DecodeMsgTx(txHex)
+            if err != nil {
+                common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
+                continue
+            }
+            p.txBroadcasted(tx)
+        }
+    }
+
+    p.lastSyncTime = time.Now().Unix()
+    common.Log.Infof("resyncMempoolFromRPC completed, new size %d. %v", len(p.txMap), time.Since(start).String())
+}
 
 func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 	// 1. 将十六进制字符串解码为字节切片
@@ -445,6 +518,10 @@ func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
 
     for _, tx := range msg.Transactions {
         p.txConfirmed(tx)
+    }
+
+    if time.Now().Unix() - p.lastSyncTime >= 36000 {
+        go p.resyncMempoolFromRPC()
     }
 }
 
