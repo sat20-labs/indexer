@@ -160,6 +160,10 @@ func (s *Model) getPlainUtxos(address string, value int64, start, limit int) ([]
 			continue
 		}
 
+		if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxo, false) {
+			continue
+		}
+
 		if s.indexer.IsUtxoSpent(utxo) {
 			continue
 		}
