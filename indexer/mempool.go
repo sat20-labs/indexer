@@ -34,6 +34,7 @@ type MiniMemPool struct {
     addrUtxoMap  map[string]*UserUtxoInMempool   // key:address，内存池中所有tx的输入和输出的所属地址
     running  bool
     lastSyncTime int64
+    peer *peer.Peer
 
     mutex   sync.RWMutex
 }
@@ -458,6 +459,9 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
 
 // 接受p2p的消息
 func (p *MiniMemPool) listenP2PTx(addr string) {
+    if p.peer != nil && p.peer.Connected() {
+        return
+    }
     for {
         cfg := &peer.Config{
 			UserAgentName:    "MempoolSync",
@@ -467,15 +471,24 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 				OnTx: func(_ *peer.Peer, msg *wire.MsgTx) {
                     p.mutex.Lock()
                     defer p.mutex.Unlock()
+                    if !p.running {
+                        return
+                    }
                     common.Log.Infof("OnTx %s", msg.TxID())
 					p.txBroadcasted(msg)
 				},
                 OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
+                    if !p.running {
+                        return
+                    }
                     common.Log.Infof("OnBlock %s", msg.BlockHash().String())
                     // 需要检查当前区块是不是tip
                     p.ProcessBlock(msg)
                 },
                 OnInv: func(peer *peer.Peer, msg *wire.MsgInv) {
+                    if !p.running {
+                        return
+                    }
                     common.Log.Infof("OnInv: %v", msg.InvList)
                     var getDataMsg wire.MsgGetData
                     for _, inv := range msg.InvList {
@@ -489,7 +502,7 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
                 },
 			},
 		}
-        p, err := peer.NewOutboundPeer(cfg, addr)
+        outBoundPeer, err := peer.NewOutboundPeer(cfg, addr)
         if err != nil {
             common.Log.Errorf("NewOutboundPeer error: %v", err)
             time.Sleep(time.Second * 5)
@@ -501,11 +514,13 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
             time.Sleep(time.Second * 5)
             continue
         }
-        p.AssociateConnection(conn)
+        outBoundPeer.AssociateConnection(conn)
         common.Log.Infof("Connected to P2P node: %s", addr)
 
+        p.peer = outBoundPeer
+
         // 等待断开
-        for p.Connected() {
+        for outBoundPeer.Connected() {
             time.Sleep(3*time.Second)
         }
         common.Log.Warningf("Disconnected from P2P node: %s, will reconnect...", addr)
@@ -533,9 +548,10 @@ func (p *MiniMemPool) ProcessReorg() {
     // 清空所有数据
     p.mutex.Lock()
     p.init()
+    p.running = false
     p.mutex.Unlock()
-    
-    p.fetchMempoolFromRPC()
+    // 等主线程通过Start()重新启动
+    //p.fetchMempoolFromRPC()
     common.Log.Infof("ProcessReorg, reset mempool")
     
     // 重新读内存池数据
