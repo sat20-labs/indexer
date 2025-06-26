@@ -235,11 +235,11 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     txId := tx.TxID()
     _, ok := p.txMap[txId]
     if ok {
-        common.Log.Infof("tx %s already in mempool", txId)
+        common.Log.Debugf("tx %s already in mempool", txId)
         return 
     }
     p.txMap[txId] = tx
-    common.Log.Infof("add tx %s to mempool %d", txId, len(p.txMap))
+    common.Log.Debugf("add tx %s to mempool %d", txId, len(p.txMap))
     for _, txIn := range tx.TxIn {
         if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
             continue // coinbase
@@ -302,7 +302,7 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
     _, ok := p.txMap[txId]
     if ok {
         delete(p.txMap, txId)
-        common.Log.Infof("tx %s removed from mempool %d", txId, len(p.txMap))
+        common.Log.Debugf("tx %s removed from mempool %d", txId, len(p.txMap))
     }
     
     netParam := instance.GetChainParam()
@@ -489,7 +489,7 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
                     if !p.running {
                         return
                     }
-                    common.Log.Infof("OnInv: %v", msg.InvList)
+                    common.Log.Debugf("OnInv: %v", msg.InvList)
                     var getDataMsg wire.MsgGetData
                     for _, inv := range msg.InvList {
                         if inv.Type == wire.InvTypeTx || inv.Type == wire.InvTypeBlock {
