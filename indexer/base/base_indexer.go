@@ -282,12 +282,24 @@ func (b *BaseIndexer) UpdateDB() {
 	// 拿到所有的addressId
 	addressValueMap := b.prefechAddress()
 
+	//////
+	// 测试一个异常问题：blockVector 区块丢失，导致exotic索引失败
+	if len(b.blockVector) > 0 {
+		key := db.GetBlockDBKey(b.blockVector[0].Height-1)
+		_, err := db.GetRawValueFromDB(key, b.db)
+		if err != nil {
+			common.Log.Panicf("can't find the previous block %d", b.blockVector[0].Height-1)
+		}
+	}
+	/////
+
 	wb := b.db.NewWriteBatch()
 	defer wb.Cancel()
 
 	totalSubsidySats := int64(0)
 	AllUtxoAdded := uint64(0)
 	for _, value := range b.blockVector {
+		common.Log.Infof("blockVector %d", value.Height)
 		key := db.GetBlockDBKey(value.Height)
 		err := db.SetDB(key, value, wb)
 		if err != nil {

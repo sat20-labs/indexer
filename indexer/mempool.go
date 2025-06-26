@@ -474,7 +474,7 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
                     if !p.running {
                         return
                     }
-                    common.Log.Infof("OnTx %s", msg.TxID())
+                    common.Log.Debugf("OnTx %s", msg.TxID())
 					p.txBroadcasted(msg)
 				},
                 OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
