@@ -209,7 +209,6 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 			isRunning = true
 			go func() {
 				ret := b.compiling.SyncToChainTip(stopIndexerChan)
-				b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 				if ret == 0 {
 					if b.maxIndexHeight > 0 {
 						if b.maxIndexHeight <= b.compiling.GetHeight() {
@@ -231,6 +230,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						if b.dbStatistic() {
 							bWantExit = true
 						}
+						b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 					}
 				} else if ret > 0 {
 					// handle reorg

@@ -75,7 +75,7 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 		//err := db.GetValueFromDB(key, txn, output)
 		err := db.GetValueFromDBWithProto3(key, txn, output)
 		if err != nil {
-			common.Log.Warningf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
+			//common.Log.Warningf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
 			return err
 		}
 
@@ -118,7 +118,7 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 		//err := db.GetValueFromDB(key, txn, output)
 		err := db.GetValueFromDBWithProto3(key, txn, output)
 		if err != nil {
-			common.Log.Warningf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
+			//common.Log.Warningf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
 			return err
 		}
 		return nil
