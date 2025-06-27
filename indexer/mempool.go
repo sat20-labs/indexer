@@ -534,9 +534,11 @@ func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
     p.mutex.Lock()
     defer p.mutex.Unlock()
 
+    start := time.Now()
     for _, tx := range msg.Transactions {
         p.txConfirmed(tx)
     }
+     common.Log.Infof("ProcessBlock completed, new size %d. %v", len(p.txMap), time.Since(start).String())
 
     if time.Now().Unix() - p.lastSyncTime >= 36000 {
         go p.resyncMempoolFromRPC()
