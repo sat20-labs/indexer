@@ -421,6 +421,7 @@ func (d *Decimal) Float64() float64 {
 	return result
 }
 
+// 等同于Floor
 func (d *Decimal) Int64() int64 {
 	if d == nil {
 		return 0
@@ -430,6 +431,41 @@ func (d *Decimal) Int64() int64 {
 	}
 
 	return d.IntegerPart()
+}
+
+// 向上取整
+func (d *Decimal) Ceil() int64 {
+	if d == nil {
+		return 0
+	}
+	if d.Precision == 0 {
+		return d.Value.Int64()
+	}
+
+	return int64(math.Ceil(d.Float64()))
+}
+
+// 向下取整
+func (d *Decimal) Floor() int64 {
+	if d == nil {
+		return 0
+	}
+	if d.Precision == 0 {
+		return d.Value.Int64()
+	}
+
+	return int64(math.Floor(d.Float64()))
+}
+// 4舍5入
+func (d *Decimal) Round() int64 {
+	if d == nil {
+		return 0
+	}
+	if d.Precision == 0 {
+		return d.Value.Int64()
+	}
+
+	return int64(math.Round(d.Float64()))
 }
 
 func (d *Decimal) IntegerPart() int64 {

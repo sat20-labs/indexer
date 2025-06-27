@@ -9,6 +9,20 @@ import (
 
 func TestDecimal(t *testing.T) {
 	// 测试通过整数创建 Decimal
+	{
+		// d1, _ := NewDecimalFromString("1999997", 2)
+		// d2, _ := NewDecimalFromString("0.00015", 10)
+		// d3 := DecimalMul(d1, d2)
+		d3,_ := NewDecimalFromString("0.49", 10)
+		fmt.Printf("d3  string: %s\n", d3.String())  
+		fmt.Printf("d3  float64: %v\n", d3.Float64())  
+		fmt.Printf("d3  Int64: %v\n", d3.Int64())  
+		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())  
+		fmt.Printf("d3  Floor: %v\n", d3.Floor())
+		fmt.Printf("d3  Round: %v\n", d3.Round())
+	}
+	
+
 	precision := int(3)
 	d0 := NewDecimal(12345, precision)
 	fmt.Printf("Decimal 1 string: %s\n", d0.String())     // 12.345
