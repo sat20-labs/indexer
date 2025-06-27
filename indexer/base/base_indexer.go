@@ -284,7 +284,7 @@ func (b *BaseIndexer) UpdateDB() {
 
 	//////
 	// 测试一个异常问题：blockVector 区块丢失，导致exotic索引失败
-	if len(b.blockVector) > 0 {
+	if len(b.blockVector) > 0 && b.blockVector[0].Height > 1 {
 		key := db.GetBlockDBKey(b.blockVector[0].Height-1)
 		_, err := db.GetRawValueFromDB(key, b.db)
 		if err != nil {
