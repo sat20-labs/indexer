@@ -78,16 +78,16 @@ func FirstRuneHeight(network wire.BitcoinNet) uint32 {
 	}
 	return SUBSIDY_HALVING_INTERVAL * multiplier
 }
-func MinimumAtHeight(chain wire.BitcoinNet, height uint64) Rune {
+func MinimumAtHeight(chain wire.BitcoinNet, height uint64) *Rune {
 	offset := height + 1
 	const interval uint32 = SUBSIDY_HALVING_INTERVAL / 12
 	start := FirstRuneHeight(chain)
 	end := start + SUBSIDY_HALVING_INTERVAL
 	if offset < uint64(start) {
-		return Rune{STEPS[12]}
+		return &Rune{STEPS[12]}
 	}
 	if offset >= uint64(end) {
-		return Rune{}
+		return &Rune{}
 	}
 	progress := saturatingSub(offset, uint64(start))
 	length := saturatingSub(12, progress/uint64(interval))
@@ -97,7 +97,7 @@ func MinimumAtHeight(chain wire.BitcoinNet, height uint64) Rune {
 
 	//val := startStep - ((startStep - endStep) * remainder / uint64(interval))
 	val := startStep.Sub(startStep.Sub(endStep).Mul(uint128.From64(remainder)).Div(uint128.From64(uint64(interval))))
-	return Rune{val}
+	return &Rune{val}
 
 }
 

@@ -102,6 +102,7 @@ func (s *Indexer) Init() {
 			Turbo:      true,
 		})
 	}
+	s.minimumRune = runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(s.Status.Height))
 }
 
 func (s *Indexer) Clone() *Indexer {

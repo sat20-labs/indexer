@@ -60,8 +60,7 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	s.HolderRemoveCount = 0
 
 	s.burnedMap = make(table.RuneIdLotMap)
-	minimum := runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
-	s.minimumRune = &minimum
+	s.minimumRune = runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(block.Height))
 	s.blockTime = uint64(block.Timestamp.Unix())
 	common.Log.Tracef("RuneIndexer.UpdateTransfer->prepare block height:%d, minimumRune:%s(%s)",
 		block.Height, s.minimumRune.String(), s.minimumRune.Value.String())
