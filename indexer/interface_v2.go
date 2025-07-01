@@ -262,8 +262,10 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
 	}
 
+	totalSats := int64(0)
 	plainUtxoMap := make(map[uint64]int64)
 	for utxoId, v := range utxos {
+		totalSats += v
 		if b.ftIndexer.HasAssetInUtxo(utxoId) {
 			continue
 		}
@@ -275,6 +277,8 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		}
 		plainUtxoMap[utxoId] = v
 	}
+	result[common.ASSET_ALL_SAT] = common.NewDefaultDecimal(totalSats)
+
 	exAssets, plainUtxos := b.getExoticSummaryByAddress(plainUtxoMap)
 	for k, v := range exAssets {
 		// 如果该range有其他铸造出来的资产，过滤掉（直接使用utxoId过滤）

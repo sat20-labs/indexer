@@ -8,6 +8,13 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// 所有聪
+var ASSET_ALL_SAT AssetName = AssetName{
+	Protocol: "",
+	Type: "*",
+	Ticker: "",
+}
+
 // 白聪
 var ASSET_PLAIN_SAT AssetName = AssetName{}
 
