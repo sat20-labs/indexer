@@ -495,20 +495,21 @@ func (d *Decimal) IntegerPart() int64 {
 	return quotient.Int64()
 }
 
-func NewDecimalFromUint128(n uint128.Uint128, precition int) *Decimal {
+func NewDecimalFromUint128(n uint128.Uint128, precision int) *Decimal {
+	hi := new(big.Int).SetUint64(n.Hi)
+	hi.Lsh(hi, 64)
 	value := new(big.Int).SetUint64(n.Lo)
-	value = value.Add(value, new(big.Int).SetUint64(n.Hi).Lsh(new(big.Int).SetUint64(n.Hi), 64))
-	return &Decimal{Precision: precition, Value: value}
+	value.Add(value, hi)
+	return &Decimal{Precision: precision, Value: value}
 }
 
 func (d *Decimal) ToUint128() uint128.Uint128 {
 	if d == nil {
-		return uint128.Uint128{}
-	}
-	n := d.Clone()
-	lo := n.Value.Uint64()
-	hi := n.Value.Rsh(d.Value, 64).Uint64()
-	return uint128.Uint128{Lo: lo, Hi: hi}
+        return uint128.Uint128{}
+    }
+    lo := d.Value.Uint64()
+    hi := new(big.Int).Rsh(d.Value, 64).Uint64()
+    return uint128.Uint128{Lo: lo, Hi: hi}
 }
 
 func decimalDigits(n uint64) int {

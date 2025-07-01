@@ -226,16 +226,24 @@ func convertTest(t *testing.T, supply, amt uint128.Uint128) {
 
 func TestDecimal_Runes3(t *testing.T) {
 
+	{
+		amt, _ := NewDecimalFromString("123456789012345678901234567890", 1)
+		fmt.Printf("amt %s\n", amt.String())
+		u128 := amt.ToUint128()
+		fmt.Printf("u128 %s\n", u128.String())
+
+		amt2 := NewDecimalFromUint128(u128, 1)
+		fmt.Printf("amt2 %s\n", amt2.String())
+
+	}
+	
+
+	
 	supply, _ := uint128.FromString("10000000")
 	amt, _ := uint128.FromString("60")
 	convertTest(t, supply, amt)
 	decimal := NewDecimalFromUint128(amt, 1)
 	fmt.Printf("amt %s\n", decimal.String())
-
-	amt2, _ := NewDecimalFromString("60", 1)
-	fmt.Printf("amt2 %s\n", amt2.String())
-	fmt.Printf("amt2 integer %d\n", amt2.IntegerPart())
-	
 
 	supply, _ = uint128.FromString("2000000")
 	amt, _ = uint128.FromString("11")
