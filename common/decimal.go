@@ -235,24 +235,25 @@ func (d *Decimal) Add(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
 	}
-	if other == nil {
-		value := new(big.Int).Set(d.Value)
-		return &Decimal{Precision: d.Precision, Value: value}
-	}
 	if d == nil {
-		value := new(big.Int).Set(other.Value)
-		return &Decimal{Precision: other.Precision, Value: value}
-	}
-	var value *big.Int
-	if d.Precision != other.Precision {
-		// 精度调整
-		aVal, bVal, _ := alignPrecision(d, other)
-    	value = new(big.Int).Add(aVal, bVal)
-	} else {
-		value = new(big.Int).Add(d.Value, other.Value)
-	}
-	
-	return &Decimal{Precision: d.Precision, Value: value}
+        // 缩放 other 到 d 的精度（d==nil时直接返回other的拷贝）
+        return other.Clone()
+    }
+    if other == nil {
+        return d.Clone()
+    }
+    // 对齐 other 到 d 的精度
+    aVal := new(big.Int).Set(d.Value)
+    bVal := new(big.Int).Set(other.Value)
+    if d.Precision > other.Precision {
+        factor := precisionFactor[d.Precision-other.Precision]
+        bVal = bVal.Mul(bVal, factor)
+    } else if d.Precision < other.Precision {
+        factor := precisionFactor[other.Precision-d.Precision]
+        bVal = bVal.Div(bVal, factor)
+    }
+    value := new(big.Int).Add(aVal, bVal)
+    return &Decimal{Precision: d.Precision, Value: value}
 }
 
 // Add adds two Decimal instances and returns a new Decimal instance
@@ -265,24 +266,26 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
 	}
-	if other == nil {
-		value := new(big.Int).Set(d.Value)
-		return &Decimal{Precision: d.Precision, Value: value}
-	}
 	if d == nil {
-		value := new(big.Int).Neg(other.Value)
-		return &Decimal{Precision: other.Precision, Value: value}
-	}
-	var value *big.Int
-	if d.Precision != other.Precision {
-		// 精度调整
-		aVal, bVal, _ := alignPrecision(d, other)
-    	value = new(big.Int).Sub(aVal, bVal)
-	} else {
-		value = new(big.Int).Sub(d.Value, other.Value)
-	}
-	
-	return &Decimal{Precision: d.Precision, Value: value}
+        neg := other.Clone()
+        neg.Value.Neg(neg.Value)
+        return neg
+    }
+    if other == nil {
+        return d.Clone()
+    }
+    // 对齐 other 到 d 的精度
+    aVal := new(big.Int).Set(d.Value)
+    bVal := new(big.Int).Set(other.Value)
+    if d.Precision > other.Precision {
+        factor := precisionFactor[d.Precision-other.Precision]
+        bVal = bVal.Mul(bVal, factor)
+    } else if d.Precision < other.Precision {
+        factor := precisionFactor[other.Precision-d.Precision]
+        bVal = bVal.Div(bVal, factor)
+    }
+    value := new(big.Int).Sub(aVal, bVal)
+    return &Decimal{Precision: d.Precision, Value: value}
 }
 
 // Sub subtracts two Decimal instances and returns a new Decimal instance
