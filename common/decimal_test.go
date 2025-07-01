@@ -162,7 +162,7 @@ func TestDecimal_Runes1(t *testing.T) {
 		d := NewDecimal(10, 0)
 		for d0.IsOverflowInt64() {
 			shift++
-			d0 = d0.Div(d.Value)
+			d0 = d0.Div(d)
 			fmt.Printf("Decimal 0: %s\n", d0.String())
 		}
 		fmt.Printf("shift %d\n", shift)
@@ -171,12 +171,6 @@ func TestDecimal_Runes1(t *testing.T) {
 
 		d1, _ := NewDecimalFromString("12345678901234567890", int(precision))
 		fmt.Printf("Decimal 1: %s\n", d1.String())
-		d2 := d1.Div(precisionFactor[shift])
-		fmt.Printf("Decimal 2: %s\n", d2.String())
-		d3 := d2.Mul(precisionFactor[shift])
-		fmt.Printf("Decimal 3: %s\n", d3.String())
-		d4 := d1.Sub(d3)
-		fmt.Printf("Decimal 4: %s\n", d4.String())
 	}
 }
 
@@ -193,7 +187,7 @@ func TestDecimal_Runes2(t *testing.T) {
 		d := NewDecimal(10, 0)
 		for d0.IsOverflowInt64() {
 			shift++
-			d0 = d0.Div(d.Value)
+			d0 = d0.Div(d)
 			fmt.Printf("Decimal 0: %s\n", d0.String())
 		}
 		if shift > 0 {
