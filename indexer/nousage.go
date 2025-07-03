@@ -188,29 +188,30 @@ func (p *IndexerMgr) searchName() bool {
 	//	p.searchName3("3letters.txt", "")
 	//	p.searchName3("3letters-btc.txt", ".btc")
 
-	p.searchZ3("3b-btc.txt", ".btc")
+	// p.searchZ3("3b-btc.txt", ".btc") // completed
 
-	p.searchL4("4l.txt", "")
-	p.searchL4("4l-btc.txt", ".btc")
+	p.searchL4("4l.txt", "") // some
+	//p.searchL4("4l-btc.txt", ".btc") // completed
 	//p.searchcvcv(".btc")
 	//p.searchcvvc(".btc")
 
-	p.searchD5("5d.txt", "")
+	p.searchD5("5d.txt", "") // some
 	//p.searchL5("5l-btc.txt", ".btc")
 
 	//p.searchL6("6l.txt", "")
-	p.searchD6("6d-btc.txt", ".btc")
+	//p.searchD6("6d-btc.txt", ".btc") // completed
+	p.searchD7("7d-btc.txt", ".btc")
 
 	//	p.searchValue5D("")
 	//	p.searchValue6D(".btc")
-	//	p.searchValue8D(".btc")
+	//p.searchValue8D(".btc")
 
 	//	p.searcBIP39()
 
-	//	p.searcD8()
+	p.searcD8()
 
-	p.subNameStatistic(".btc")
-	p.subNameStatistic("")
+	//p.subNameStatistic(".btc")
+	//p.subNameStatistic("")
 
 	return true
 }
@@ -965,6 +966,35 @@ func (p *IndexerMgr) searchD6(filepath, suffix string) bool {
 	}
 
 	common.Log.Infof("search 6 digits takes %v", time.Since(startTime))
+	common.Log.Infof("get records %d", len(names))
+	p.writeToFile(filepath, names)
+	return true
+}
+
+
+func (p *IndexerMgr) searchD7(filepath, suffix string) bool {
+	startTime := time.Now()
+	names := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			for k := 0; k < 10; k++ {
+				for l := 0; l < 10; l++ {
+					for m := 0; m < 10; m++ {
+						for n := 0; n < 10; n++ {
+							for o := 0; o < 10; o++ {
+								name := fmt.Sprintf("%d%d%d%d%d%d%d%s", i, j, k, l, m, n, o, suffix)
+								if !p.ns.IsNameExist(name) {
+									names = append(names, name)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	common.Log.Infof("search 7 digits takes %v", time.Since(startTime))
 	common.Log.Infof("get records %d", len(names))
 	p.writeToFile(filepath, names)
 	return true

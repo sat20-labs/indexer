@@ -454,9 +454,9 @@ func (p *IndexerMgr) dbStatistic() bool {
 	// 	p.prepareDBBuffer()
 	// }
 	// p.performUpdateDBInBuffer()
-
 	//common.Log.Infof("start searching...")
 	//return p.SearchPredefinedName()
 	//return p.searchName()
+	
 	return false
 }
