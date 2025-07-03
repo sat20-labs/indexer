@@ -337,7 +337,7 @@ func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
 
 // 除法，精度为a
 func (d *Decimal) Div(other *Decimal) *Decimal {
-    if d == nil || other == nil {
+    if d == nil || other == nil || other.Sign() == 0 {
         return nil
     }
     // 先将a的Value放大other.Precision倍，避免精度丢失
@@ -347,7 +347,7 @@ func (d *Decimal) Div(other *Decimal) *Decimal {
 }
 
 func (d *Decimal) DivBigInt(other *big.Int) *Decimal {
-	if d == nil || other == nil {
+	if d == nil || other == nil || other.Sign() == 0 {
 		return nil
 	}
 	value := new(big.Int).Div(d.Value, other)
