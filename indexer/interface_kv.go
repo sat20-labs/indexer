@@ -153,11 +153,14 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 	// 暂时保留该pubkey，但是如果在一定时间内没有挖矿所得进入该地址，就可能删除
 	// 暂时只支持保留100个地址
 
-	if b.cfg.PubKey == "" {
-		return "", fmt.Errorf("not open to register pubkey")
+	var indexerPubkey string
+	if b.cfg.PubKey != "" {
+		indexerPubkey = b.cfg.PubKey
+	} else {
+		indexerPubkey = common.GetCoreNodePubKey()
 	}
 
-	pk1, err := hex.DecodeString(b.cfg.PubKey)
+	pk1, err := hex.DecodeString(indexerPubkey)
 	if err != nil {
 		return "", err
 	}
