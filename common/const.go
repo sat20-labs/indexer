@@ -21,16 +21,12 @@ const (
 	// bc1pr0fst3mzyvdkpzatx2cs2cahqwsrnr4nm403kfnv2ec4nys6h5qqt77vxn
 	_bootstrapPubKey = "03ab606f4dffd65965b4a9db957361800f8b03ed16acac11d5a4672801554596d0"
 	// tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua
-	_bootstrapPubKey_test = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad"
-	// tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua
-	_bootstrapPubKey_dev = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad"
+	_bootstrapPubKey_testnet = "025fb789035bc2f0c74384503401222e53f72eefdebf0886517ff26ac7985f52ad"
 
 	// bc1pv7cceqgdz8303mpaaaz8a8zxc773chakqzwyrjuq7xyvvmyqsgzq0j92gc
 	_coreNodePubKey = "03da2321f4500d7bc7075cb04c3105fda024379fa66ebb4cba9a15af91d88ca54f"
 	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
-	_coreNodePubKey_test = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e"
-	// tb1pdw8xjqphyntnvgl3w0vmzkzd7dx266jwcprzwt0qen62pyzpdqhsdvr26h
-	_coreNodePubKey_dev = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e"
+	_coreNodePubKey_testnet = "0367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e"
 	
 
 	CORENODE_STAKING_ASSET_NAME string = "ordx:f:pearl"
@@ -50,28 +46,24 @@ const (
 	MIN_NORMAL_NODEID    = 100000
 )
 
-var ENV string = "prd"
+var CHAIN string = "mainnet"
 
 func GetBootstrapPubKey() string {
-	switch ENV {
-	case "prd":
+	switch CHAIN {
+	case "mainnet":
 		return _bootstrapPubKey
-	case "test": 
-		return _bootstrapPubKey_test
-	case "dev": 
-		return _bootstrapPubKey_dev
+	case "testnet": 
+		return _bootstrapPubKey_testnet
 	}
 	return _bootstrapPubKey
 }
 
 func GetCoreNodePubKey() string {
-	switch ENV {
-	case "prd":
+	switch CHAIN {
+	case "mainnet":
 		return _coreNodePubKey
-	case "test": 
-		return _coreNodePubKey_test
-	case "dev": 
-		return _coreNodePubKey_dev
+	case "testnet": 
+		return _coreNodePubKey_testnet
 	}
 	return _coreNodePubKey
 }

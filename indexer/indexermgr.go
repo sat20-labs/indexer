@@ -91,8 +91,10 @@ func NewIndexerMgr(
 	chainParam := &chaincfg.MainNetParams
 	switch yamlcfg.Chain {
 	case common.ChainTestnet:
+		common.CHAIN = "testnet"
 		chainParam = &chaincfg.TestNet4Params
 	case common.ChainTestnet4:
+		common.CHAIN = "testnet"
 		chainParam = &chaincfg.TestNet4Params
 	case common.ChainMainnet:
 		chainParam = &chaincfg.MainNetParams
