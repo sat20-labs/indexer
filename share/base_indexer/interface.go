@@ -128,6 +128,8 @@ type Indexer interface {
 	DelKVs(pubkey []byte, keys []string) error
 	GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error)
 
+	RegisterPubKey(string) (string, error)
+
 	// mempool
 	IsUtxoSpent(utxo string) bool
 }

@@ -218,10 +218,10 @@ func GetP2TRAddressFromPubkey(pubKey []byte, chainParams *chaincfg.Params) (stri
 	return addr.EncodeAddress(), nil
 }
 
-func GetCoreNodeChannelAddress(pubkey []byte, chainParams *chaincfg.Params) (string, error) {
+
+func GetChannelAddress(pubkeyA, pubkeyB []byte, chainParams *chaincfg.Params) (string, error) {
 	// 生成P2WSH地址
-	bootstrappubkey, _ := hex.DecodeString(GetBootstrapPubKey())
-	_, pkScript, err := GetP2WSHscript(bootstrappubkey, pubkey)
+	_, pkScript, err := GetP2WSHscript(pubkeyA, pubkeyB)
 	if err != nil {
 		return "", err
 	}
@@ -235,6 +235,12 @@ func GetCoreNodeChannelAddress(pubkey []byte, chainParams *chaincfg.Params) (str
 	return address, nil
 }
 
+
+func GetCoreNodeChannelAddress(pubkey []byte, chainParams *chaincfg.Params) (string, error) {
+	// 生成P2WSH地址
+	bootstrappubkey, _ := hex.DecodeString(GetBootstrapPubKey())
+	return GetChannelAddress(bootstrappubkey, pubkey, chainParams)
+}
 
 
 func BytesToPublicKey(pubKeyBytes []byte) (*secp256k1.PublicKey, error) {

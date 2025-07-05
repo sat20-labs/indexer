@@ -114,3 +114,8 @@ func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
 
 	return s.indexer.DelKVs(req.PubKey, req.Keys)
 }
+
+
+func (s *Model) RegisterPubKey(req *rpcwire.RegisterPubKeyReq) (string, error) {
+	return s.indexer.RegisterPubKey(req.PubKey)
+}

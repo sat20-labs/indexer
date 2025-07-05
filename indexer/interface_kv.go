@@ -4,24 +4,39 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+type RegisterPubKeyInfo struct {
+	PubKey      []byte
+	ChannelAddr string
+	RefreshTime int64
+}
+
 func getKvKey(pubkey string, key string) string {
 	return fmt.Sprintf("/%s/%s", pubkey, key)
 }
 
 
+func getRegisterKey(pubkey string) string {
+	return fmt.Sprintf("/register/%s", pubkey)
+}
+
+
 func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
-	// TODO 以后可以配置增加更多的pubkey
+	// TODO 以后可以配置增加更多的pubkey，或者注册的地址
 	pkStr := hex.EncodeToString(pubkey)
-	if pkStr != common.GetBootstrapPubKey() && pkStr != common.GetCoreNodePubKey() {
-		return false
+	if pkStr == common.GetBootstrapPubKey() && pkStr == common.GetCoreNodePubKey() {
+		return true
 	}
-	return true
+
+	// TODO 如果是注册的矿机，检查通道地址上的资产，和刷新时间
+
+	return false
 }
 
 
@@ -131,3 +146,40 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 	return result, nil
 }
 
+// 为矿机提供L1索引服务，返回本地公钥，以便矿机生成挖矿地址
+func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
+
+	// TODO
+	// 暂时保留该pubkey，但是如果在一定时间内没有挖矿所得进入该地址，就可能删除
+	// 暂时只支持保留100个地址
+
+	if b.cfg.PubKey == "" {
+		return "", fmt.Errorf("not open to register pubkey")
+	}
+
+	pk1, err := hex.DecodeString(b.cfg.PubKey)
+	if err != nil {
+		return "", err
+	}
+	pk2, err := hex.DecodeString(minerPubKey)
+	if err != nil {
+		return "", err
+	}
+	channelAddr, err := common.GetChannelAddress(pk1, pk2, b.chaincfgParam)
+	if err != nil {
+		return "", err
+	}
+
+	key := getRegisterKey(minerPubKey)
+	value := RegisterPubKeyInfo{
+		PubKey: []byte(minerPubKey),
+		ChannelAddr: channelAddr,
+		RefreshTime: time.Now().Unix(),
+	}
+	err = db.GobSetDB1([]byte(key), &value, b.kvDB)
+	if err != nil {
+		return "", err
+	}
+
+	return b.cfg.PubKey, nil
+}

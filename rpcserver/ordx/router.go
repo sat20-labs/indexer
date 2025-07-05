@@ -121,4 +121,6 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/kv/get/:pubkey/:key", s.handle.getkv)
 	r.POST(proxy+"/kv/put", s.handle.putKVs)
 	r.POST(proxy+"/kv/del", s.handle.delKVs)
+	// 注册公钥，并返回索引器公钥
+	r.POST(proxy+"/kv/register", s.handle.registerPubKey)
 }

@@ -19,7 +19,7 @@ type YamlConf struct {
 	Log        Log        `yaml:"log"`
 	BasicIndex BasicIndex `yaml:"basic_index"`
 	RPCService RPCService `yaml:"rpc_service"`
-	MPNCfg     *MPNConfig  `yaml:"mpn"`
+	PubKey	   string     `yaml:"pubkey"`
 }
 
 type DB struct {
@@ -223,11 +223,7 @@ func LoadYamlConf(cfgPath string) (*YamlConf, error) {
 		rpcService.Swagger.Schemes = []string{"http"}
 	}
 
-	ret.MPNCfg = getDefaultMPNConfig()
-	
-	if ret.Chain != "mainnet" {
-		ret.MPNCfg.TestNet4 = true
-	}
+
 	
 	return ret, nil
 }

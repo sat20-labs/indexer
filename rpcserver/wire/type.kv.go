@@ -51,3 +51,13 @@ type DelKValueReq struct {
 type DelKValueResp struct {
 	BaseResp
 }
+
+
+type RegisterPubKeyReq struct {
+	PubKey  string `json:"pubkey"`
+}
+
+type RegisterPubKeyResp struct {
+	BaseResp
+	PubKey  string `json:"pubkey"`
+}

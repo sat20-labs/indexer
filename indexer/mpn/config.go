@@ -253,7 +253,6 @@ func fileExists(name string) bool {
 func loadConfig(yamlCfg *config.YamlConf) (*mpnconfig, error) {
 	// Default config.
 	cfg := mpnconfig{
-		MPNConfig: *yamlCfg.MPNCfg,
 	}
 
 	// Pre-parse the command line options to see if an alternative config

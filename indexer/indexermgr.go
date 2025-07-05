@@ -52,6 +52,7 @@ type IndexerMgr struct {
 	ns           *ns.NameService
 	nft          *nft.NftIndexer
 	clmap        map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
+	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
 
 	mutex sync.RWMutex
 	// 跑数据
