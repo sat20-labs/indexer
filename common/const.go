@@ -67,3 +67,23 @@ func GetCoreNodePubKey() string {
 	}
 	return _coreNodePubKey
 }
+
+func GetStakeAssetName() string {
+	switch CHAIN {
+	case "mainnet":
+		return CORENODE_STAKING_ASSET_NAME
+	case "testnet": 
+		return TESTNET_CORENODE_STAKING_ASSET_NAME
+	}
+	return CORENODE_STAKING_ASSET_NAME
+}
+
+func GetStakeAssetAmt() int64 {
+	switch CHAIN {
+	case "mainnet":
+		return CORENODE_STAKING_ASSET_AMOUNT
+	case "testnet": 
+		return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+	}
+	return CORENODE_STAKING_ASSET_AMOUNT
+}
