@@ -184,5 +184,5 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 		return "", err
 	}
 
-	return b.cfg.PubKey, nil
+	return indexerPubkey, nil
 }
