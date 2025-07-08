@@ -141,6 +141,10 @@ func GetAddressDBKey(address string) []byte {
 	return []byte(common.DB_KEY_ADDRESS + address)
 }
 
+func GetAddressDBKeyV2(address string) []byte {
+	return []byte(common.DB_KEY_ADDRESSV2 + address)
+}
+
 func GetAddressValueDBKey(addressid uint64, utxoid uint64, typ, i int) []byte {
 	if i == 0 {
 		return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x", addressid, utxoid, typ))
@@ -281,6 +285,21 @@ func GetAddressIdFromDBTxn(txn *badger.Txn, address string) (uint64, error) {
 	})
 
 	return common.BytesToUint64(key), err
+}
+
+func GetAddressDataFromDBTxn(txn *badger.Txn, address string) (*common.AddressValueInDBV2, error) {
+	var result common.AddressValueInDBV2
+
+	item, err := txn.Get(GetAddressDBKeyV2(address))
+	if err != nil {
+		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
+		return nil, err
+	}
+	err = item.Value(func(val []byte) error {
+		return DecodeBytes(val, &result)
+	})
+
+	return &result, err
 }
 
 func CheckKeyExists(db *badger.DB, key []byte) bool {

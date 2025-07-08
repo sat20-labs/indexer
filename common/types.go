@@ -11,6 +11,7 @@ import (
 const (
 	DB_KEY_UTXO         = "u-"  // utxo -> UtxoValueInDB
 	DB_KEY_ADDRESS      = "a-"  // address -> addressId
+	DB_KEY_ADDRESSV2    = "a2-" // address -> AddressValueInDBV2
 	DB_KEY_ADDRESSVALUE = "av-" // addressId-utxoId -> value
 	DB_KEY_UTXOID       = "ui-" // utxoId -> utxo
 	DB_KEY_ADDRESSID    = "ai-" // addressId -> address
@@ -36,6 +37,12 @@ type AddressValueInDB struct {
 	AddressId   uint64
 	Op          int                   // -1 deleted; 0 read from db; 1 added
 	Utxos       map[uint64]*UtxoValue // utxoid -> value
+}
+
+type AddressValueInDBV2 struct {
+	AddressType uint32
+	AddressId   uint64
+	Utxos       []uint64  // all utxo
 }
 
 type AddressValue struct {
