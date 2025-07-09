@@ -207,8 +207,8 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*rpcwir
 			result = append(result, ordxMintInfo)
 		}
 		sort.Slice(result, func(i, j int) bool {
-			a, _ := common.NewDecimalFromFormatString(result[i].TotalBalance)
-			b, _ := common.NewDecimalFromFormatString(result[j].TotalBalance)
+			a, _ := common.NewDecimalFromString(result[i].TotalBalance, 20)
+			b, _ := common.NewDecimalFromString(result[j].TotalBalance, 20)
 			return a.Cmp(b) > 0
 		})
 
