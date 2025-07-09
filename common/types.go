@@ -39,16 +39,48 @@ type AddressValueInDB struct {
 	Utxos       map[uint64]*UtxoValue // utxoid -> value
 }
 
+type AddressValue struct {
+	AddressType uint32
+	AddressId   uint64
+	Utxos       map[uint64]int64 // utxoid -> value
+}
+
 type AddressValueInDBV2 struct {
 	AddressType uint32
 	AddressId   uint64
 	Utxos       []uint64  // all utxo
 }
 
-type AddressValue struct {
+func (p *AddressValueInDBV2) ToAddressValueV2() *AddressValueV2{
+	r := &AddressValueV2{
+		AddressType: p.AddressType,
+		AddressId: p.AddressId,
+		Op: 0,
+		Utxos: make(map[uint64]bool),
+	}
+	for _, id := range p.Utxos {
+		r.Utxos[id] = true
+	}
+	return r
+}
+
+type AddressValueV2 struct {
 	AddressType uint32
 	AddressId   uint64
-	Utxos       map[uint64]int64 // utxoid -> value
+	Op          int                   // -1 deleted; 0 read from db; 1 added
+	Utxos       map[uint64]bool // utxoid
+}
+
+func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
+	n := &AddressValueInDBV2 {
+		AddressType: p.AddressType,
+		AddressId: p.AddressId,
+		Utxos: make([]uint64, 0),
+	}
+	for id := range p.Utxos {
+		n.Utxos = append(n.Utxos, id)
+	}
+	return n
 }
 
 type BlockValueInDB struct {
