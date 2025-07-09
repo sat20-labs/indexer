@@ -133,11 +133,11 @@ func (s *Handle) getUtxoInfoListV3(c *gin.Context) {
 // @Query start query int false "Start index for pagination"
 // @Query limit query int false "Limit for pagination"
 // @Security Bearer
-// @Success 200 {object} HolderListRespV3 "Successful response"
+// @Success 200 {object} rpcwire.HolderListRespV3 "Successful response"
 // @Failure 401 "Invalid API Key"
 // @Router /v3/tick/holders/{ticker} [get]
 func (s *Handle) getHolderListV3(c *gin.Context) {
-	resp := &HolderListRespV3{
+	resp := &rpcwire.HolderListRespV3{
 		BaseResp: rpcwire.BaseResp{
 			Code: 0,
 			Msg:  "ok",
@@ -161,7 +161,7 @@ func (s *Handle) getHolderListV3(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	resp.Data = &HolderListDataV3{
+	resp.Data = &rpcwire.HolderListDataV3{
 		ListResp: rpcwire.ListResp{
 			Total: total,
 			Start: int64(start),
@@ -183,12 +183,12 @@ func (s *Handle) getHolderListV3(c *gin.Context) {
 // @Failure 401 "Invalid API Key"
 // @Router /v3/tick/history/{ticker} [get]
 func (s *Handle) getMintHistoryV3(c *gin.Context) {
-	resp := &MintHistoryRespV3{
+	resp := &rpcwire.MintHistoryRespV3{
 		BaseResp: rpcwire.BaseResp{
 			Code: 0,
 			Msg:  "ok",
 		},
-		Data: &MintHistoryDataV3{
+		Data: &rpcwire.MintHistoryDataV3{
 			ListResp: rpcwire.ListResp{
 				Total: 0,
 				Start: 0,
@@ -213,7 +213,7 @@ func (s *Handle) getMintHistoryV3(c *gin.Context) {
 		return
 	}
 
-	resp.Data = &MintHistoryDataV3{
+	resp.Data = &rpcwire.MintHistoryDataV3{
 		ListResp: rpcwire.ListResp{
 			Total: uint64(mintHistory.Total),
 			Start: int64(start),

@@ -167,7 +167,7 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 type TickHolders struct {
 	LastTimestamp        int64
 	Total                uint64
-	HoldersAddressAmount []*HolderV3
+	HoldersAddressAmount []*rpcwire.HolderV3
 }
 
 const tickHoldersCacheDuration = 10 * time.Minute
@@ -180,8 +180,8 @@ func init() {
 	runeHoldersCache = cmap.New[*TickHolders]()
 }
 
-func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*HolderV3, uint64, error) {
-	result := make([]*HolderV3, 0)
+func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*rpcwire.HolderV3, uint64, error) {
+	result := make([]*rpcwire.HolderV3, 0)
 	needUpdate := false
 
 	if runeHolders, exist := runeHoldersCache.Get(tickName); exist {
@@ -198,9 +198,9 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*Holder
 		assetName := common.NewAssetNameFromString(tickName)
 		holders := s.indexer.GetHoldersWithTickV2(assetName)
 
-		result = make([]*HolderV3, 0, len(holders))
+		result = make([]*rpcwire.HolderV3, 0, len(holders))
 		for address, amt := range holders {
-			ordxMintInfo := &HolderV3{
+			ordxMintInfo := &rpcwire.HolderV3{
 				Wallet:       s.indexer.GetAddressById(address),
 				TotalBalance: amt.String(),
 			}
@@ -233,12 +233,12 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*Holder
 	return result, total, nil
 }
 
-func (s *Model) GetMintHistoryV3(tickName string, start, limit int) (*MintHistoryV3, error) {
+func (s *Model) GetMintHistoryV3(tickName string, start, limit int) (*rpcwire.MintHistoryV3, error) {
 	assetName := common.NewAssetNameFromString(tickName)
-	result := MintHistoryV3{Ticker: tickName}
+	result := rpcwire.MintHistoryV3{Ticker: tickName}
 	mintInfos := s.indexer.GetMintHistoryV2(assetName, start, limit)
 	for _, mintInfo := range mintInfos {
-		ordxMintInfo := &MintHistoryItemV3{
+		ordxMintInfo := &rpcwire.MintHistoryItemV3{
 			MintAddress:    mintInfo.Address,
 			HolderAddress:  s.indexer.GetHolderAddress(mintInfo.InscriptionId),
 			Balance:        mintInfo.Amount,

@@ -48,7 +48,7 @@ type AddressValue struct {
 type AddressValueInDBV2 struct {
 	AddressType uint32
 	AddressId   uint64
-	Utxos       []uint64  // all utxo
+	Utxos       []uint64  // all utxos
 }
 
 func (p *AddressValueInDBV2) ToAddressValueV2() *AddressValueV2{
@@ -68,7 +68,7 @@ type AddressValueV2 struct {
 	AddressType uint32
 	AddressId   uint64
 	Op          int                   // -1 deleted; 0 read from db; 1 added
-	Utxos       map[uint64]bool // utxoid
+	Utxos       map[uint64]bool // utxoid，全量数据
 }
 
 func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
