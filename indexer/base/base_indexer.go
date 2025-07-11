@@ -1307,8 +1307,17 @@ func (b *BaseIndexer) GetSyncHeight() int {
 	return b.stats.SyncHeight
 }
 
-func (b *BaseIndexer) SetSyncHeight(height int) {
-	b.stats.SyncHeight = height
+func (b *BaseIndexer) GetSyncStats() *SyncStats {
+	return b.stats
+}
+
+// 这里需要小心同步状态。设置回来的状态，是已经备份到数据库中的数据的状态(UpdateDB中修改的状态)。不要覆盖其他状态。
+func (b *BaseIndexer) SetSyncStats(s *SyncStats) {
+	b.stats.SyncHeight = s.SyncHeight
+	b.stats.SyncBlockHash = s.SyncBlockHash
+	b.stats.AllUtxoCount = s.AllUtxoCount
+	b.stats.TotalSats = s.TotalSats
+	b.stats.UtxoCount = s.UtxoCount
 }
 
 func (b *BaseIndexer) GetHeight() int {
