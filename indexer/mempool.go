@@ -617,3 +617,96 @@ func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []string {
     }
     return result
 }
+
+// 直接从p2p协议同步数据，但比较慢
+// syncedBlocks map[chainhash.Hash]int // 已同步区块
+// lastBlockHash *chainhash.Hash        // 最新同步到的区块hash
+// syncMutex sync.Mutex                 // 区块同步相关锁
+//  OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
+//     if !p.running {
+//         return
+//     }
+//     // common.Log.Infof("OnBlock %s", msg.BlockHash().String())
+//     // p.ProcessBlock(msg)
+
+//     blockHash := msg.BlockHash()
+//     prevHash := msg.Header.PrevBlock
+//     p.syncMutex.Lock()
+//     prevHeight, ok := p.syncedBlocks[prevHash]
+//     var height int
+//     if ok {
+//         height = prevHeight + 1
+//     } else {
+//         // 如果找不到，可能是断点同步或重组，可以特殊处理
+//         height = -1 // 或者查找其他来源
+//     }
+//     p.syncedBlocks[blockHash] = height
+//     common.Log.Infof("OnBlock %s, height=%d", blockHash.String(), height)
+//     p.syncMutex.Unlock()
+    
+//     p.lastBlockHash = &blockHash
+//     p.ProcessBlock(msg)
+//     common.Log.Infof("Synced block %s", blockHash.String())
+//     // 主动请求下一个区块
+//     p.sendGetBlocks(&chainhash.Hash{})
+    
+    
+// },
+// OnInv: func(peer *peer.Peer, msg *wire.MsgInv) {
+//     if !p.running {
+//         return
+//     }
+//     //common.Log.Debugf("OnInv: %v", msg.InvList)
+//     var getDataMsg wire.MsgGetData
+//     for _, inv := range msg.InvList {
+//         if inv.Type == wire.InvTypeTx {
+//             getDataMsg.AddInvVect(inv)
+//         }
+
+//         if inv.Type == wire.InvTypeBlock {
+//             // 只请求未同步过的区块
+//             _, ok := p.syncedBlocks[inv.Hash]
+//             if !ok {
+//                 getDataMsg.AddInvVect(inv)
+//             }
+//         }
+//     }
+//     if len(getDataMsg.InvList) > 0 {
+//         peer.QueueMessage(&getDataMsg, nil)
+//     }
+// },
+
+// func (p *MiniMemPool) StartBlockSyncFromGenesis() {
+//     genesisHash := instance.GetChainParam().GenesisHash
+//     go p.syncBlocksFromHash(genesisHash)
+// }
+
+// func (p *MiniMemPool) StartBlockSyncFromHash(startHash *chainhash.Hash) {
+//     go p.syncBlocksFromHash(startHash)
+// }
+
+// func (p *MiniMemPool) syncBlocksFromHash(startHash *chainhash.Hash) {
+//     p.syncMutex.Lock()
+//     p.lastBlockHash = startHash
+//     p.syncMutex.Unlock()
+//     p.sendGetBlocks(&chainhash.Hash{}) // hashStop为零，表示同步到tip
+// }
+
+// func (p *MiniMemPool) sendGetBlocks(hashStop *chainhash.Hash) {
+//     if p.peer == nil || !p.peer.Connected() {
+//         common.Log.Errorf("P2P peer not connected")
+//         return
+//     }
+//     getBlocksMsg := wire.NewMsgGetBlocks(hashStop)
+//     // 你还需要设置 BlockLocatorHashes（区块定位器），否则对方不知道你从哪里开始同步
+//     // 例如只同步从某个起点hash开始：
+//     if p.lastBlockHash != nil {
+//         getBlocksMsg.BlockLocatorHashes = append(getBlocksMsg.BlockLocatorHashes, p.lastBlockHash)
+//     } else {
+//         // 创世区块
+//         genesisHash := instance.GetChainParam().GenesisHash
+//         getBlocksMsg.BlockLocatorHashes = append(getBlocksMsg.BlockLocatorHashes, genesisHash)
+//     }
+//     p.peer.QueueMessage(getBlocksMsg, nil)
+//     common.Log.Infof("Sent getblocks, locator=%s, stop=%s", getBlocksMsg.BlockLocatorHashes[0].String(), hashStop.String())
+// }
