@@ -409,7 +409,6 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 
 func (b *IndexerMgr) prepareDBBuffer() {
 	b.compilingBackupDB = b.compiling.Clone()
-	b.compiling.ResetBlockVector()
 
 	b.exoticBackupDB = b.exotic.Clone()
 	b.ftBackupDB = b.ftIndexer.Clone()
