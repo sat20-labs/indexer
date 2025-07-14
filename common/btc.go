@@ -242,6 +242,12 @@ func GetCoreNodeChannelAddress(pubkey []byte, chainParams *chaincfg.Params) (str
 	return GetChannelAddress(bootstrappubkey, pubkey, chainParams)
 }
 
+func GetDefaultChannelAddress(chainParams *chaincfg.Params) (string, error) {
+	// 生成P2WSH地址
+	bootstrappubkey, _ := hex.DecodeString(GetBootstrapPubKey())
+	corenodepubkey, _ := hex.DecodeString(GetCoreNodePubKey())
+	return GetChannelAddress(bootstrappubkey, corenodepubkey, chainParams)
+}
 
 func BytesToPublicKey(pubKeyBytes []byte) (*secp256k1.PublicKey, error) {
 	// 检查公钥长度
