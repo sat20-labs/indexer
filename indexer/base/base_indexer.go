@@ -302,7 +302,7 @@ func (b *BaseIndexer) UpdateDB() {
 	totalSubsidySats := int64(0)
 	AllUtxoAdded := uint64(0)
 	for _, value := range b.blockVector {
-		common.Log.Infof("blockVector %d", value.Height)
+		//common.Log.Infof("blockVector %d", value.Height)
 		key := db.GetBlockDBKey(value.Height)
 		err := db.SetDB(key, value, wb)
 		if err != nil {
