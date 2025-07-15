@@ -221,7 +221,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						}
 					}
 
-					if !bWantExit {
+					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
 						b.updateDB()
 						b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 					}
