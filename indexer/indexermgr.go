@@ -219,22 +219,26 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 							common.Log.Infof("reach expected height, set exit flag")
 							bWantExit = true
 						}
-					} else {
+					}
+
+					if !bWantExit {
 						b.updateDB()
-						b.dbgc()
-						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
-						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
-						// 	period := 1000
-						// 	if b.compiling.GetSyncHeight()%period == 0 {
-						// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
-						// 		b.checkSelf()
-						// 	}
-						// }
-						if b.dbStatistic() {
-							bWantExit = true
-						}
 						b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 					}
+					
+					b.dbgc()
+					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
+					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
+					// 	period := 1000
+					// 	if b.compiling.GetSyncHeight()%period == 0 {
+					// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
+					// 		b.checkSelf()
+					// 	}
+					// }
+					if b.dbStatistic() {
+						bWantExit = true
+					}
+					
 				} else if ret > 0 {
 					// handle reorg
 					b.handleReorg(ret)

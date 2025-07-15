@@ -790,12 +790,19 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 		return -2
 	}
 
-	bRunInStepMode := false
+	// 每跑足够的区块，回到返回进行数据库的清理，防止数据库膨胀过大
+	bRunInStepMode := true
 	if bRunInStepMode {
 		if count == uint64(b.lastHeight) {
 			return 0
 		}
-		count = uint64(b.lastHeight) + 1
+		step := 10000
+		if b.lastHeight >= 800000 {
+			step = 1000
+		}
+		if uint64(b.lastHeight + step) <= count {
+			count = uint64(b.lastHeight + step)
+		}
 	}
 
 	return b.syncToBlock(int(count), stopChan)
