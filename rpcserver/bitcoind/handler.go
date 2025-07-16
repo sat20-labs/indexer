@@ -9,7 +9,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/rpcserver/utils"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -47,19 +46,6 @@ func (s *Service) sendRawTx(c *gin.Context) {
 		resp.Msg = err.Error()
 		c.JSON(http.StatusOK, resp)
 		return
-	}
-	sent := err == nil
-	if err != nil {
-		e := err.Error()
-		if strings.Contains(e, "transaction already exists in blockchain") ||
-			strings.Contains(e, "database contains entry for spent tx output") ||
-			strings.Contains(e, "already have transaction in mempool") ||
-			strings.Contains(e, "Transaction outputs already in utxo set") {
-				sent = true
-		} 
-	}
-	if sent {
-		utils.GetMemPool().AddTx(req.SignedTxHex)
 	}
 
 	resp.Data = strings.Trim(txid, "\"")

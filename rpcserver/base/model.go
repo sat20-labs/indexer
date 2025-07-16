@@ -226,8 +226,7 @@ func (s *Model) getAllUtxos(address string, start, limit int) ([]*wire.PlainUtxo
 			continue
 		}
 
-		// 效率很低，需要内部实现内存池
-		if utils.IsExistingInMemPool(utxo) {
+		if utils.IsUtxoSpent(utxo) {
 			continue
 		}
 
@@ -295,8 +294,8 @@ func (s *Model) GetExoticUtxosWithType(address string, typ string, amount int64)
 			continue
 		}
 
-		if utils.IsExistingInMemPool(utxo) {
-			common.Log.Infof("IsExistUtxoInMemPool return true %s", utxo)
+		if utils.IsUtxoSpent(utxo) {
+			common.Log.Infof("IsUtxoSpent return true %s", utxo)
 			continue
 		}
 

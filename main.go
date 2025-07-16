@@ -5,7 +5,6 @@ import (
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/rpcserver"
-	"github.com/sat20-labs/indexer/rpcserver/utils"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
@@ -84,8 +83,6 @@ func InitRpcService(conf *config.YamlConf, indexerMgr *indexer.IndexerMgr, stopC
 		}
 		common.Log.Info("rpc started")
 	}
-	mp := utils.NewMemPool(stopChan)
-	mp.Start()
 	return rpc, nil
 }
 
