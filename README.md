@@ -1,6 +1,6 @@
 # sat20 Protocol Indexer 
 
-A sat20 indexer written in Go， forked from BitGemTech/exotic-indexer.
+A sat20 indexer written in Go
 
 ## Requirements
 - Bitcoind node
