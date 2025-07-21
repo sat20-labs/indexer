@@ -868,8 +868,9 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		}
 		if domain != nil {
 			switch domain.Op {
-			case "reg":
-				s.handleSnsName(domain.Name, nft)
+			case "reg": // https://docs.btcname.id/docs/overview/chapter-4-thinking-about-.btc-domain-name/calibration-rules
+			// 不支持该方式注册名字	
+			//s.handleSnsName(domain.Name, nft)
 			case "update":
 				var updateInfo *common.OrdxUpdateContentV2
 				// 如果有metadata，那么不处理FIELD_CONTENT的内容
@@ -952,7 +953,6 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 }
 
 func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
-	name = common.PreprocessName(name)
 	if common.IsValidSNSName(name) {
 		info := s.ns.GetNameRegisterInfo(name)
 		if info != nil {

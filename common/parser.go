@@ -581,14 +581,20 @@ func PreprocessName(name string) string {
 }
 
 func IsValidSNSName(name string) bool {
+	// 参考标准：https://docs.btcname.id/docs/overview/chapter-4-thinking-about-.btc-domain-name/calibration-rules
 	if len(name) > MAX_NAME_LEN {
 		return false
 	}
+
+	if strings.Contains(name, "\n") || strings.Contains(name, " ") {
+		return false
+	}
+
 	parts := strings.Split(name, ".")
 	l := len(parts)
 	bReg := false
 	if l == 1 {
-		bReg = IsValidSat20Name(parts[0])
+		bReg = IsValidName(parts[0]) // 无后缀名字
 	} else if l == 2 {
 		bReg = IsValidName(parts[0]) && IsValidName(parts[1])
 	}
