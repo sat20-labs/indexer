@@ -224,6 +224,38 @@ func (b *IndexerMgr) GetSubNamesWithFilters(address, sub, filters string, start,
 	return result, total
 }
 
+
+func (b *IndexerMgr) GetNamesWithKey(address, key string, start, limit int) ([]*common.NameInfo, int) {
+	nfts := b.getNamesWithAddressInBuffer(address)
+
+	subSet := make([]*common.NameInfo, 0)
+	for _, nft := range nfts {
+		// name := string(nft.Base.UserData)
+		// _, subName := getSubName(name)
+		// if sub != "" && subName != sub {
+		// 	continue
+		// }
+		info := b.GetNameWithInscriptionId(nft.Base.InscriptionId)
+		if info == nil {
+			continue
+		}
+		if _, ok := info.KVs[key]; ok {
+			subSet = append(subSet, info)
+		}
+	}
+
+	total := len(subSet)
+	if start >= total {
+		return nil, total
+	}
+	end := total
+	if limit > 0 && start+limit < total {
+		end = start + limit
+	}
+
+	return subSet[start:end], total
+}
+
 func (b *IndexerMgr) GetSubNameAmountWithAddress(address, sub string) int {
 	nfts := b.getNamesWithAddressInBuffer(address)
 

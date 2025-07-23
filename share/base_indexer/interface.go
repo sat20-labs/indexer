@@ -83,6 +83,7 @@ type Indexer interface {
 	GetSubNamesWithAddress(address, sub string, start, limit int) ([]*common.NameInfo, int)
 	GetSubNamesWithFilters(address, sub, filters string, start, limit int) ([]*common.NameInfo, int)
 	GetNamesWithAddress(address string, start, limit int) ([]*common.NameInfo, int)
+	GetNamesWithKey(address, key string, start, limit int) ([]*common.NameInfo, int)
 	GetNameAmountWithAddress(address string) int
 	GetNamesWithSat(sat int64) []*common.NameInfo
 

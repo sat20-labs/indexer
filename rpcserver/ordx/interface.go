@@ -839,6 +839,27 @@ func (s *Model) GetNamesWithAddress(address, sub string, start, limit int) (*rpc
 	return &ret, nil
 }
 
+func (s *Model) GetNamesWithKey(address, key string, start, limit int) (*rpcwire.NamesWithAddressData, error) {
+	ret := rpcwire.NamesWithAddressData{Address: address}
+	var names []*common.NameInfo
+	var total int
+	
+	names, total = s.indexer.GetNamesWithKey(address, key, start, limit)
+	
+	for _, info := range names {
+		data := rpcwire.OrdinalsName{NftItem: *s.nameToItem(info)}
+		kv, ok := info.KVs[key]
+		if ok {
+			item := rpcwire.KVItem{Key: key, Value: kv.Value, InscriptionId: kv.InscriptionId}
+			data.KVItemList = append(data.KVItemList, &item)
+		}
+		ret.Names = append(ret.Names, &data)
+	}
+	ret.Total = total
+
+	return &ret, nil
+}
+
 func (s *Model) GetNamesWithFilters(address, sub, filters string, start, limit int) (*rpcwire.NamesWithAddressData, error) {
 	ret := rpcwire.NamesWithAddressData{Address: address}
 	var names []*common.NameInfo

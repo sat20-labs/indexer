@@ -1134,7 +1134,14 @@ func (s *Handle) getNamesWithAddress(c *gin.Context) {
 	if err != nil {
 		limit = 0
 	}
-	result, err := s.model.GetNamesWithAddress(address, sub, start, limit)
+
+	key := c.DefaultQuery("key", "")
+	var result *rpcwire.NamesWithAddressData
+	if key != "" {
+		result, err = s.model.GetNamesWithKey(address, key, start, limit)
+	} else {
+		result, err = s.model.GetNamesWithAddress(address, sub, start, limit)
+	}
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
