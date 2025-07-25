@@ -1,0 +1,21 @@
+
+#testnet4
+chain: testnet4
+db:
+  path: ./db/testnet
+share_rpc:
+  bitcoin:
+    host: 127.0.0.1
+    port: 28332
+    user: your_rpc_name
+    password: your_rpc_password
+log:
+  level: info # default info
+  path: ./log/testnet # default log
+basic_index:
+  max_index_height: 0 # default 0, set 90000 and backup db, then 0
+  period_flush_to_db: 100 # default 100
+rpc_service:
+  addr: 0.0.0.0:8009
+  proxy: testnet
+  log_path: ./log/testnet
