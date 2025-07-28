@@ -147,6 +147,7 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 }
 
 // 为矿机提供L1索引服务，返回本地公钥，以便矿机生成挖矿地址
+// 默认以引导节点为服务节点，如果不是，需要修改索引器配置
 func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 
 	// TODO
@@ -157,7 +158,7 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 	if b.cfg.PubKey != "" {
 		indexerPubkey = b.cfg.PubKey
 	} else {
-		indexerPubkey = common.GetCoreNodePubKey()
+		indexerPubkey = common.GetBootstrapPubKey()
 	}
 
 	pk1, err := hex.DecodeString(indexerPubkey)
