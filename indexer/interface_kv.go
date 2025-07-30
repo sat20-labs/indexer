@@ -35,25 +35,47 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	}
 
 	// TODO 如果是注册的矿机，检查通道地址上的资产，和刷新时间
+	key := getRegisterKey(pkStr)
+	var value RegisterPubKeyInfo
+		
+	err := db.GobGetDB([]byte(key), &value, b.kvDB)
+	if err != nil {
+		common.Log.Infof("GobGetDB %s failed, %v", key, err)
+		return false
+	}
+	// 是否检查超时时，或者检查通道地址上是否有资产？
+	assets := b.GetAssetSummaryInAddress(value.ChannelAddr)
+	if len(assets) != 0 {
+		return true
+	}
 
-	return false
+	// 如果没有资产，是否超时？
+	return value.RefreshTime - time.Now().Unix() < 7 * 24 * int64(time.Hour.Seconds())
 }
 
-
+// TODO 每个地址限制多少条记录，每条记录限制多大？
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Cancel()
 
+	checkedPubKey := make(map[string]bool)
 	for _, value := range kvs {
-		
-		if !b.IsSupportedKey(value.PubKey) {
-			common.Log.Errorf("unsupport pubkey")
-			return fmt.Errorf("unsupport pubkey")
+		pkStr := hex.EncodeToString(value.PubKey)
+		_, ok := checkedPubKey[pkStr]
+		if !ok {
+			if !b.IsSupportedKey(value.PubKey) {
+				common.Log.Errorf("unsupport pubkey")
+				return fmt.Errorf("unsupport pubkey")
+			}
+			checkedPubKey[pkStr] = true
 		}
 
-		// 目前仅允许内置的pubkey
-		pkStr := hex.EncodeToString(value.PubKey)
+		if len(value.Value) > 100 * 1024 {
+			return fmt.Errorf("too large data %d", len(value.Value))
+		}
+
+		
 
 		sig := value.Signature
 		value.Signature = nil
@@ -161,6 +183,13 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 		indexerPubkey = common.GetBootstrapPubKey()
 	}
 
+	key := getRegisterKey(minerPubKey)
+	var value RegisterPubKeyInfo
+	err := db.GobGetDB([]byte(key), &value, b.kvDB)
+	if err == nil && string(value.PubKey) == minerPubKey {
+		return indexerPubkey, nil
+	}
+
 	pk1, err := hex.DecodeString(indexerPubkey)
 	if err != nil {
 		return "", err
@@ -174,8 +203,7 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 		return "", err
 	}
 
-	key := getRegisterKey(minerPubKey)
-	value := RegisterPubKeyInfo{
+	value = RegisterPubKeyInfo{
 		PubKey: []byte(minerPubKey),
 		ChannelAddr: channelAddr,
 		RefreshTime: time.Now().Unix(),

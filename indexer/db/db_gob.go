@@ -25,6 +25,14 @@ func GobSetDB1(key []byte, value interface{}, db *badger.DB) error {
 	return err
 }
 
+func GobGetDB(key []byte, value interface{}, db *badger.DB) error {
+	buf, err := GetRawValueFromDB(key, db)
+	if err != nil {
+		return err
+	}
+	return DecodeBytes(buf, value)
+}
+
 func SetDB(key []byte, data interface{}, wb *badger.WriteBatch) error {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
