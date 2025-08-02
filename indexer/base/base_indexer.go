@@ -797,7 +797,9 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 			return 0
 		}
 		step := 10000
-		if b.lastHeight >= 800000 {
+		if b.lastHeight >= 900000 {
+			step = 100
+		} else if b.lastHeight >= 800000 {
 			step = 1000
 		}
 		if uint64(b.lastHeight + step) <= count {
