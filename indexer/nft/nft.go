@@ -23,6 +23,7 @@ type NftIndexer struct {
 	db       *badger.DB
 	status   *common.NftStatus
 	bEnabled bool
+	reCheck  bool
 
 	baseIndexer *base.BaseIndexer
 	mutex       sync.RWMutex
@@ -450,7 +451,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 
 	addressesInT1 := make(map[uint64]bool, 0)
 	utxosInT1 := make(map[uint64]bool, 0)
-	satsInT1 := make(map[uint64]bool, 0)
+	satsInT1 := make(map[uint64]uint64, 0)
 	nftsInT1 := make(map[int64]bool, 0)
 	p.db.View(func(txn *badger.Txn) error {
 		//defer wg.Done()
@@ -479,7 +480,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 
 			addressesInT1[value.OwnerAddressId] = true
 			utxosInT1[value.UtxoId] = true
-			satsInT1[uint64(value.Sat)] = true
+			satsInT1[uint64(value.Sat)] = value.UtxoId
 			for _, nft := range value.Nfts {
 				nftsInT1[nft.Id] = true
 			}
@@ -492,7 +493,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 
 	// utxo的数据涉及到delete操作，但是badger的delete操作有隐藏的bug，需要检查下该utxo是否存在
 	utxosInT2 := make(map[uint64]bool)
-	satsInT2 := make(map[uint64]bool)
+	satsInT2 := make(map[uint64]uint64)
 	p.db.View(func(txn *badger.Txn) error {
 		//defer wg.Done()
 
@@ -525,7 +526,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 
 			utxosInT2[utxoId] = true
 			for _, sat := range value.Sats {
-				satsInT2[uint64(sat)] = true
+				satsInT2[uint64(sat)] = utxoId
 			}
 		}
 
@@ -648,7 +649,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
 		p.printfUtxos(utxos1, baseDB)
-		common.Log.Errorf("utxo1 wrong %d", len(utxos1))
+		common.Log.Errorf("utxo1 wrong %d %v", len(utxos1), utxos1)
 		result = false
 	}
 
@@ -660,18 +661,56 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		result = false
 	}
 
+	needReCheck := false
 	common.Log.Infof("sats not in table %s", DB_PREFIX_NFT)
-	sats1 := findDifferentItems(satsInT1, satsInT2)
+	sats1 := findDifferentItemsV2(satsInT1, satsInT2)
 	if len(sats1) > 0 {
-		common.Log.Errorf("sat1 wrong %d", len(sats1))
-		result = false
+		common.Log.Errorf("sat1 wrong %d %v", len(sats1), sats1)
+		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
+		deleteSats := make(map[uint64]uint64)
+		baseDB.View(func(txn *badger.Txn) error {
+			for sat, utxoId := range sats1 {
+				_, err := txn.Get(db.GetUtxoIdKey(utxoId))
+				if err != nil {
+					deleteSats[sat] = utxoId
+				}
+			}
+			return nil
+		})
+		if len(deleteSats) == len(sats1) {
+			p.deleteSats(deleteSats)
+			needReCheck = true
+		} else {
+			result = false
+		}
 	}
 
 	common.Log.Infof("sats not in table %s", DB_PREFIX_UTXO)
-	sats2 := findDifferentItems(satsInT2, satsInT1)
+	sats2 := findDifferentItemsV2(satsInT2, satsInT1)
 	if len(sats2) > 0 {
 		common.Log.Errorf("sats2 wrong %d", len(sats2))
-		result = false
+		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
+		deleteSats := make(map[uint64]uint64)
+		baseDB.View(func(txn *badger.Txn) error {
+			for sat, utxoId := range sats2 {
+				_, err := txn.Get(db.GetUtxoIdKey(utxoId))
+				if err != nil {
+					deleteSats[sat] = utxoId
+				}
+			}
+			return nil
+		})
+		if len(deleteSats) == len(sats2) {
+			p.deleteSats(deleteSats)
+			needReCheck = true
+		} else {
+			result = false
+		}
+	}
+
+	if needReCheck && !p.reCheck {
+		p.reCheck = true
+		return p.CheckSelf(baseDB)
 	}
 
 	// 1. 每个utxoId都存在baseDB中
@@ -682,6 +721,17 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 	}
 
 	return result
+}
+
+func findDifferentItemsV2(map1, map2 map[uint64]uint64) map[uint64]uint64 {
+	differentItems := make(map[uint64]uint64)
+	for key, v := range map1 {
+		if _, exists := map2[key]; !exists {
+			differentItems[key] = v
+		}
+	}
+
+	return differentItems
 }
 
 func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
@@ -738,4 +788,25 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb *badger.DB) map[uint
 	})
 
 	return result
+}
+
+// only for test
+func (b *NftIndexer) deleteSats(sats map[uint64]uint64) {
+	wb := b.db.NewWriteBatch()
+	defer wb.Cancel()
+
+	for sat := range sats {
+		key := GetSatKey(int64(sat))
+		err := wb.Delete([]byte(key))
+		if err != nil {
+			common.Log.Errorf("NftIndexer.deleteSats-> Error deleting db: %v\n", err)
+		} else {
+			common.Log.Infof("sat deled: %d", sat)
+		}
+	}
+
+	err := wb.Flush()
+	if err != nil {
+		common.Log.Panicf("NftIndexer.deleteSats-> Error satwb flushing writes to db %v", err)
+	}
 }
