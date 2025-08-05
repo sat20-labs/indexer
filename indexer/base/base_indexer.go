@@ -1,7 +1,6 @@
 package base
 
 import (
-	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -955,11 +954,11 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("expected total sats %d", totalSats)
 	common.Log.Infof("total leak sats %d", totalSats-b.stats.TotalSats)
 
-	var wg sync.WaitGroup
-	wg.Add(3)
+	// var wg sync.WaitGroup
+	// wg.Add(3)
 
-	go b.db.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	b.db.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 
 		startTime2 := time.Now()
 		common.Log.Infof("calculating in %s table ...", common.DB_KEY_BLOCK)
@@ -997,8 +996,8 @@ func (b *BaseIndexer) CheckSelf() bool {
 	addressInUtxo := 0
 	addressesInT1 := make(map[uint64]bool, 0)
 	utxosInT1 := make(map[uint64]bool, 0)
-	go b.db.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	b.db.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 
 		var err error
 		prefix := []byte(common.DB_KEY_UTXO)
@@ -1057,8 +1056,8 @@ func (b *BaseIndexer) CheckSelf() bool {
 	nonZeroUtxoInAddress := 0
 	addressesInT2 := make(map[uint64]bool, 0)
 	utxosInT2 := make(map[uint64]bool, 0)
-	go b.db.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	b.db.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 
 		startTime2 := time.Now()
 		common.Log.Infof("calculating in %s table ...", common.DB_KEY_ADDRESSVALUE)
@@ -1101,7 +1100,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 		return nil
 	})
 
-	wg.Wait()
+	//wg.Wait()
 
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_ADDRESSVALUE)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)

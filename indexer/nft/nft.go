@@ -445,15 +445,15 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 	startTime := time.Now()
 	common.Log.Infof("stats: %v", p.status)
 
-	var wg sync.WaitGroup
-	wg.Add(3)
+	// var wg sync.WaitGroup
+	// wg.Add(3)
 
 	addressesInT1 := make(map[uint64]bool, 0)
 	utxosInT1 := make(map[uint64]bool, 0)
 	satsInT1 := make(map[uint64]bool, 0)
 	nftsInT1 := make(map[int64]bool, 0)
-	go p.db.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	p.db.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 
 		var err error
 		prefix := []byte(DB_PREFIX_NFT)
@@ -493,8 +493,8 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 	// utxo的数据涉及到delete操作，但是badger的delete操作有隐藏的bug，需要检查下该utxo是否存在
 	utxosInT2 := make(map[uint64]bool)
 	satsInT2 := make(map[uint64]bool)
-	go p.db.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	p.db.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 
 		var err error
 		prefix := []byte(DB_PREFIX_UTXO)
@@ -538,24 +538,24 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 	lastkey := bs.GetLastKey()
 	var buckmap map[int64]*BuckValue
 	getbuck := func() {
-		defer wg.Done()
+		//defer wg.Done()
 		startTime2 := time.Now()
 		buckmap = bs.GetAll()
 		common.Log.Infof("%s table takes %v", DB_PREFIX_BUCK, time.Since(startTime2))
 		common.Log.Infof("3: nfts %d", len(buckmap))
 	}
-	go getbuck()
+	getbuck()
 
-	wg.Wait()
+	//wg.Wait()
 	common.Log.Infof("nft count: %d %d %d", p.status.Count, len(nftsInT1), lastkey+1)
 
 	wrongAddress := make([]uint64, 0)
 	wrongUtxo1 := make([]uint64, 0)
 	wrongUtxo2 := make([]uint64, 0)
 
-	wg.Add(2)
-	go baseDB.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	//wg.Add(2)
+	baseDB.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 		startTime2 := time.Now()
 		for address := range addressesInT1 {
 			key := db.GetAddressIdKey(address)
@@ -567,8 +567,8 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		common.Log.Infof("check addressesInT1 in baseDB takes %v", time.Since(startTime2))
 		return nil
 	})
-	go baseDB.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	baseDB.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 		startTime2 := time.Now()
 		// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
 		for utxo := range utxosInT2 {
@@ -581,7 +581,7 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
 		return nil
 	})
-	wg.Wait()
+	//wg.Wait()
 	common.Log.Infof("check in baseDB completed")
 
 	wrongIds := make([]int64, 0)

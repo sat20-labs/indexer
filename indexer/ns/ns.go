@@ -173,14 +173,14 @@ func (p *NameService) CheckSelf(baseDB *badger.DB) bool {
 	startTime := time.Now()
 	common.Log.Infof("stats: %v", p.status)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	// var wg sync.WaitGroup
+	// wg.Add(2)
 
 	nftIdInT1 := make(map[int64]bool, 0)
 	namesInT1 := make(map[string]bool, 0)
 	satsInT1 := make(map[int64]bool, 0)
-	go p.db.View(func(txn *badger.Txn) error {
-		defer wg.Done()
+	p.db.View(func(txn *badger.Txn) error {
+		//defer wg.Done()
 
 		var err error
 		prefix := []byte(DB_PREFIX_NAME)
@@ -217,12 +217,12 @@ func (p *NameService) CheckSelf(baseDB *badger.DB) bool {
 	lastkey := bs.GetLastKey()
 	var buckmap map[int]*BuckValue
 	getbuck := func() {
-		defer wg.Done()
+		//defer wg.Done()
 		buckmap = bs.GetAll()
 	}
-	go getbuck()
+	getbuck()
 
-	wg.Wait()
+	//wg.Wait()
 
 	wrongName := make([]string, 0)
 	wrongSats := make([]*BuckValue, 0)
