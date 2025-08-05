@@ -1,6 +1,8 @@
 package wire
 
 type PlainUtxo struct {
+	Height int	 `json:"height"`
+	Index  int	 `json:"index"`
 	Txid  string `json:"txid"`
 	Vout  int    `json:"vout"`
 	Value int64  `json:"value"`

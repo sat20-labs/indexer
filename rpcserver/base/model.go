@@ -173,9 +173,12 @@ func (s *Model) getPlainUtxos(address string, value int64, start, limit int) ([]
 			continue
 		}
 
+		height, index, _ := common.FromUtxoId(utxoId.UtxoId)
 		//Find utxo with value
 		if utxoId.Value >= value {
 			avaibableUtxoList = append(avaibableUtxoList, &wire.PlainUtxo{
+				Height: height,
+				Index: index,
 				Txid:  txid,
 				Vout:  vout,
 				Value: utxoId.Value,
@@ -235,15 +238,20 @@ func (s *Model) getAllUtxos(address string, start, limit int) ([]*wire.PlainUtxo
 			continue
 		}
 
+		height, index, _ := common.FromUtxoId(utxoId.UtxoId)
 		//Find common utxo (that is, utxo with non-ordinal attributes)
 		if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxo, false) {
 			otherUtxos = append(otherUtxos, &wire.PlainUtxo{
+				Height: height,
+				Index: index,
 				Txid:  txid,
 				Vout:  vout,
 				Value: utxoId.Value,
 			})
 		} else {
 			plainUtxos = append(plainUtxos, &wire.PlainUtxo{
+				Height: height,
+				Index: index,
 				Txid:  txid,
 				Vout:  vout,
 				Value: utxoId.Value,
