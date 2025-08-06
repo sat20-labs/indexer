@@ -260,6 +260,22 @@ func GetAddressByIDFromDBTxn(txn *badger.Txn, id uint64) (string, error) {
 	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), err
 }
 
+func GetAddressByIDFromDBTxnV2(txn *badger.Txn, id uint64) (string, error) {
+	var key []byte
+
+	item, err := txn.Get(GetAddressIdKey(id))
+	if err != nil {
+		common.Log.Errorf("GetAddressByIDFromDBTxn %x error: %v", id, err)
+		return "", err
+	}
+	err = item.Value(func(val []byte) error {
+		key = append([]byte{}, val...)
+		return nil
+	})
+
+	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), err
+}
+
 func GetAddressIdFromDB(db *badger.DB, address string) (uint64, error) {
 	var key []byte
 	err := db.View(func(txn *badger.Txn) error {
@@ -295,7 +311,8 @@ func GetAddressIdFromDBTxn(txn *badger.Txn, address string) (uint64, error) {
 	return common.BytesToUint64(key), err
 }
 
-func GetAddressDataFromDBTxn(txn *badger.Txn, address string) (*common.AddressValueInDBV2, error) {
+
+func GetAddressDataFromDBTxnV2(txn *badger.Txn, address string) (*common.AddressValueInDBV2, error) {
 	var result common.AddressValueInDBV2
 
 	item, err := txn.Get(GetAddressDBKeyV2(address))
