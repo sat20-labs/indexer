@@ -372,10 +372,7 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 				continue
 			}
 
-			tickerInfo := s.indexer.GetTickerInfo(&k)
-			if tickerInfo == nil {
-				return nil, 0, fmt.Errorf("can't find ticker %s", k.String())
-			}
+			n := s.getBindingSatFromOrdxTicker(&ticker)
 
 			resp := &rpcwire.TickerAsset{
 				TypeName: ticker.Type,
@@ -386,7 +383,7 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 
 			for inscriptionId, ranges := range mintinfo {
 				asset := rpcwire.InscriptionAsset{}
-				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(tickerInfo.N)
+				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(n)
 				asset.Ranges = ranges
 				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
 				asset.InscriptionID = inscriptionId
@@ -472,15 +469,12 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 		resp.AssetAmount += 0
 
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
-			tickerInfo := s.indexer.GetTickerInfo(&ticker)
-			if tickerInfo == nil {
-				return nil, 0, fmt.Errorf("can't find ticker %s", ticker.String())
-			}
+			n := s.getBindingSatFromOrdxTicker(&ticker)
 			for inscId, ranges := range tickAbbrInfo {
 				asset := rpcwire.InscriptionAsset{}
 				asset.TypeName = ticker.Type
 				asset.Ticker = ticker.Ticker
-				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(tickerInfo.N)
+				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(n)
 				asset.Ranges = ranges
 				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
 				asset.InscriptionID = inscId
@@ -546,15 +540,12 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 		resp.Amount = common.GetOrdinalsSize(rngs)
 		resp.AssetAmount = 0
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
-			tickerInfo := s.indexer.GetTickerInfo(&ticker)
-			if tickerInfo == nil {
-				return nil, 0, fmt.Errorf("can't find ticker %s", ticker.String())
-			}
+			n := s.getBindingSatFromOrdxTicker(&ticker)
 			for inscId, ranges := range tickAbbrInfo {
 				asset := rpcwire.InscriptionAsset{}
 				asset.TypeName = ticker.Type
 				asset.Ticker = ticker.Ticker
-				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(tickerInfo.N)
+				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(n)
 				asset.Ranges = ranges
 				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
 				asset.InscriptionID = inscId
@@ -586,10 +577,7 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*rpcwire.AssetDetailInfo, e
 
 	assets := s.indexer.GetAssetsWithUtxo(utxoId)
 	for ticker, mintinfo := range assets {
-		tickerInfo := s.indexer.GetTickerInfo(&ticker)
-		if tickerInfo == nil {
-			return nil, fmt.Errorf("can't find ticker %s", ticker.String())
-		}
+		n := s.getBindingSatFromOrdxTicker(&ticker)
 
 		var tickinfo rpcwire.TickerAsset
 		tickinfo.TypeName = ticker.Type
@@ -606,7 +594,7 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*rpcwire.AssetDetailInfo, e
 			// }
 
 			asset := rpcwire.InscriptionAsset{}
-			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(tickerInfo.N)
+			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(n)
 			asset.Ranges = mintranges
 			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
 			asset.InscriptionID = inscriptionId
@@ -648,10 +636,7 @@ func (s *Model) GetDetailAssetWithRanges(req *rpcwire.RangesReq) (*rpcwire.Asset
 
 	assets := s.indexer.GetAssetsWithRanges(req.Ranges)
 	for tickerName, info := range assets {
-		tickerInfo := s.indexer.GetTickerInfo(common.NewAssetNameFromString(tickerName))
-		if tickerInfo == nil {
-			return nil, fmt.Errorf("can't find ticker %s", tickerName)
-		}
+		n := s.getBindingSatFromOrdxTicker(common.NewAssetNameFromString(tickerName))
 
 		var tickinfo rpcwire.TickerAsset
 		tickinfo.Ticker = tickerName
@@ -660,7 +645,7 @@ func (s *Model) GetDetailAssetWithRanges(req *rpcwire.RangesReq) (*rpcwire.Asset
 
 		for mintutxo, mintranges := range info {
 			asset := rpcwire.InscriptionAsset{}
-			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(tickerInfo.N)
+			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(n)
 			asset.Ranges = mintranges
 			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
 			asset.InscriptionID = mintutxo

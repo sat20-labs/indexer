@@ -98,6 +98,15 @@ func (s *Model) getTickerInfo(tickerName string) (*common.TickerInfo, error) {
 	return ticker, nil
 }
 
+func (s *Model) getBindingSatFromOrdxTicker(tickerName *common.AssetName) int {
+	ticker := s.indexer.GetTickerInfo(tickerName)
+	if ticker == nil {
+		return 1
+	}
+
+	return ticker.N
+}
+
 func (s *Model) GetAssetSummaryV3(address string, start int, limit int) ([]*common.DisplayAsset, error) {
 	tickerMap := s.indexer.GetAssetSummaryInAddressV3(address)
 
