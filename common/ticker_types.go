@@ -152,6 +152,10 @@ func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
 	}
 }
 
+func (p *DisplayAsset) GetBindingSatNum() int64 {
+	return p.ToAssetInfo().GetBindingSatNum()
+}
+
 type AssetsInUtxo struct {
 	UtxoId      uint64          `json:"UtxoId"`
 	OutPoint    string     		`json:"Outpoint"` // tx:vout
@@ -168,12 +172,18 @@ func (p *AssetsInUtxo) ToTxAssets() TxAssets {
 	return assets
 }
 
+// 需要考虑一个聪多种资产的情况
 func (p* AssetsInUtxo) GetBindingSatAmout() int64 {
 	if p.Assets == nil {
 		return 0
 	}
-	assets := p.ToTxAssets()
-	return assets.GetBindingSatAmout()
+	offset := make(AssetOffsets, 0)
+	for _, asset := range p.Assets {
+		for _, off := range asset.Offsets {
+			offset.Insert(off)
+		}
+	}
+	return offset.Size()
 }
 
 func (p* AssetsInUtxo) HasPlainSat() bool {

@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"math"
+	"sort"
 )
 
 func NewUTXOIndex() *UTXOIndex {
@@ -163,4 +164,44 @@ func IsSatInRanges(sat int64, rng []*Range) bool {
 		}
 	}
 	return false
+}
+
+// 合并Range
+func MergeRange(dest []*Range, rng *Range) []*Range {
+	// 将新 Range 添加到列表中
+	dest = append(dest, &Range{Start: rng.Start, Size: rng.Size})
+
+	// 如果为空，直接返回
+	if len(dest) == 0 {
+		return nil
+	}
+
+	// 排序：按照 Start 升序
+	sort.Slice(dest, func(i, j int) bool {
+		return dest[i].Start < dest[j].Start
+	})
+
+	result := []*Range{}
+	current := &Range{Start: dest[0].Start, Size: dest[0].Size}
+
+	for i := 1; i < len(dest); i++ {
+		next := dest[i]
+		currentEnd := current.Start + current.Size
+		nextEnd := next.Start + next.Size
+
+		if next.Start <= currentEnd { // 重叠或相邻
+			// 合并
+			currentEnd = max(currentEnd, nextEnd)
+			current.Size = currentEnd - current.Start
+		} else {
+			// 没有重叠，添加 current
+			result = append(result, &Range{Start: current.Start, Size: current.Size})
+			current = &Range{Start: next.Start, Size: next.Size}
+		}
+	}
+
+	// 添加最后一个
+	result = append(result, &Range{Start: current.Start, Size: current.Size})
+
+	return result
 }

@@ -95,6 +95,10 @@ func (p *AssetInfo) Equal(another *AssetInfo) bool {
 		p.BindingSat == another.BindingSat
 }
 
+func (p *AssetInfo) GetBindingSatNum() int64 {
+	return GetBindingSatNum(&p.Amount, p.BindingSat)
+}
+
 // 有序数组，根据名字排序
 type TxAssets []AssetInfo
 
@@ -238,14 +242,12 @@ func (p *TxAssets) Find(asset *AssetName) (*AssetInfo, error) {
 	return &(*p)[index], nil
 }
 
+// 这里必须假定每个聪都是单独染色，这个计算只适合聪网，聪网确保每一个聪只代表一种资产，跟btc主网不同
 func (p *TxAssets) GetBindingSatAmout() int64 {
 	amount := int64(0)
 	for _, asset := range *p {
 		if asset.BindingSat != 0 {
-			n := GetBindingSatNum(&asset.Amount, asset.BindingSat)
-			if amount < n {
-				amount = n
-			}
+			amount += GetBindingSatNum(&asset.Amount, asset.BindingSat)
 		}
 	}
 	return amount

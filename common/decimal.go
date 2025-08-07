@@ -429,13 +429,9 @@ func (d *Decimal) Float64() float64 {
 	if d == nil {
 		return 0
 	}
-	value := new(big.Int).Abs(d.Value)
-	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
-	decimalPart := float64(remainder.Int64()) / float64(precisionFactor[d.Precision].Int64())
-	result := float64(quotient.Int64()) + decimalPart
-	if d.Value.Sign() < 0 {
-		return -result
-	}
+	fVal := new(big.Float).SetInt(d.Value)
+	scale := new(big.Float).SetInt(precisionFactor[d.Precision])
+	result, _ := new(big.Float).Quo(fVal, scale).Float64()
 	return result
 }
 

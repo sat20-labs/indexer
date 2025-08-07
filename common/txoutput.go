@@ -248,15 +248,16 @@ func (p *TxOutput) HasPlainSat() bool {
 	if len(p.Assets) == 0 {
 		return true
 	}
-	assetAmt := p.Assets.GetBindingSatAmout()
+	assetAmt := p.SizeOfBindingSats()
 	return p.OutValue.Value > assetAmt
 }
 
+// 考虑同一个聪绑定多种资产的情况
 func (p *TxOutput) GetPlainSat() int64 {
 	if len(p.Assets) == 0 {
 		return p.OutValue.Value
 	}
-	assetAmt := p.Assets.GetBindingSatAmout()
+	assetAmt := p.SizeOfBindingSats()
 	return p.OutValue.Value - assetAmt
 }
 
@@ -288,8 +289,15 @@ func (p *TxOutput) TxIn() *wire.TxIn {
 	return wire.NewTxIn(outpoint, nil, nil)
 }
 
+// 考虑同一个聪绑定多种资产的情况
 func (p *TxOutput) SizeOfBindingSats() int64 {
-	return p.Assets.GetBindingSatAmout()
+	offset := make(AssetOffsets, 0)
+	for _, assetOffset := range p.Offsets {
+		for _, off := range assetOffset {
+			offset.Insert(off)
+		}
+	}
+	return offset.Size()
 }
 
 func (p *TxOutput) Append(another *TxOutput) error {
