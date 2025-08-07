@@ -242,6 +242,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 				} else if ret > 0 {
 					// handle reorg
 					b.handleReorg(ret)
+					b.compiling.SyncToChainTip(stopIndexerChan)
 				} else {
 					if ret == -1 {
 						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
