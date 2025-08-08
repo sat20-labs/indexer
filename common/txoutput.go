@@ -291,6 +291,10 @@ func (p *TxOutput) TxIn() *wire.TxIn {
 
 // 考虑同一个聪绑定多种资产的情况
 func (p *TxOutput) SizeOfBindingSats() int64 {
+	// 如果是聪网转换过来的，其offset为零，这个时候需要采用assets的结果
+	if len(p.Offsets) == 0 {
+		return p.Assets.GetBindingSatAmout()
+	}
 	offset := make(AssetOffsets, 0)
 	for _, assetOffset := range p.Offsets {
 		for _, off := range assetOffset {
