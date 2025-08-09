@@ -20,7 +20,7 @@ type SatInfo struct {
 // 所有nft的记录
 // 以后ns和ordx模块，数据变大，导致加载、跑数据等太慢，需要按照这个模块的方式来修改优化。
 type NftIndexer struct {
-	db       *badger.DB
+	db       db.KVDB
 	status   *common.NftStatus
 	bEnabled bool
 	reCheck  bool
@@ -38,7 +38,7 @@ type NftIndexer struct {
 	utxoDeled []uint64
 }
 
-func NewNftIndexer(db *badger.DB) *NftIndexer {
+func NewNftIndexer(db db.KVDB) *NftIndexer {
 	ns := &NftIndexer{
 		db:        db,
 		bEnabled:  true,
@@ -439,7 +439,7 @@ func (p *NftIndexer) UpdateDB() {
 }
 
 // 耗时很长。仅用于在数据编译完成时验证数据，或者测试时验证数据。
-func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
+func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 
 	common.Log.Info("NftIndexer->checkSelf ... ")
 
@@ -746,7 +746,7 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 }
 
 // only for test
-func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb *badger.DB) map[uint64]string {
+func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb db.KVDB) map[uint64]string {
 	result := make(map[uint64]string)
 	ldb.View(func(txn *badger.Txn) error {
 		var err error

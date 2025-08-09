@@ -501,7 +501,7 @@ func (b *IndexerMgr) AddCollection(ntype, ticker string, ids []string) error {
 	key := getCollectionKey(ntype, ticker)
 	switch ntype {
 	case common.ASSET_TYPE_NFT:
-		err := db.GobSetDB1(key, ids, b.localDB)
+		err := db.GobSetDB(key, ids, b.localDB)
 		if err != nil {
 			common.Log.Errorf("AddCollection %s %s failed: %v", ntype, ticker, err)
 		} else {

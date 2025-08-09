@@ -12,7 +12,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func initStatusFromDB(ldb *badger.DB) *common.NameServiceStatus {
+func initStatusFromDB(ldb db.KVDB) *common.NameServiceStatus {
 	stats := &common.NameServiceStatus{}
 	ldb.View(func(txn *badger.Txn) error {
 		err := db.GetValueFromDB([]byte(NS_STATUS_KEY), txn, stats)
@@ -35,7 +35,7 @@ func initStatusFromDB(ldb *badger.DB) *common.NameServiceStatus {
 	return stats
 }
 
-func initNameTreeFromDB(tree *indexer.SatRBTree, ldb *badger.DB) {
+func initNameTreeFromDB(tree *indexer.SatRBTree, ldb db.KVDB) {
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("initNameTreeFromDB ...")
@@ -82,7 +82,7 @@ func initNameTreeFromDB(tree *indexer.SatRBTree, ldb *badger.DB) {
 }
 
 // 没有utxo数据，utxo是变动的数据，不适合保持在buck中，避免动态数据多处保持，容易出问题。
-func initNameTreeFromDB2(tree *indexer.SatRBTree, db *badger.DB) {
+func initNameTreeFromDB2(tree *indexer.SatRBTree, db db.KVDB) {
 	startTime := time.Now()
 	common.Log.Info("initNameTreeFromDB2 ...")
 
@@ -105,7 +105,7 @@ func loadNameFromDB(name string, value *NameValueInDB, txn *badger.Txn) error {
 	return db.GetValueFromDBWithProto3([]byte(key), txn, value)
 }
 
-func loadNameProperties(name string, ldb *badger.DB) map[string]*common.KeyValueInDB {
+func loadNameProperties(name string, ldb db.KVDB) map[string]*common.KeyValueInDB {
 	KVs := make(map[string]*common.KeyValueInDB)
 
 	err := ldb.View(func(txn *badger.Txn) error {
@@ -147,7 +147,7 @@ func loadNameProperties(name string, ldb *badger.DB) map[string]*common.KeyValue
 	return KVs
 }
 
-func loadValueWithKey(name, key string, ldb *badger.DB) *common.KeyValueInDB {
+func loadValueWithKey(name, key string, ldb db.KVDB) *common.KeyValueInDB {
 	kv := common.KeyValueInDB{}
 
 	err := ldb.View(func(txn *badger.Txn) error {

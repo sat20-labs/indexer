@@ -9,7 +9,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func openDB(filepath string, opts badger.Options) (ldb *badger.DB, err error) {
+func openDB(filepath string, opts badger.Options) (ldb db.KVDB, err error) {
 	opts = opts.WithDir(filepath).WithValueDir(filepath).WithLoggingLevel(badger.WARNING)
 	ldb, err = badger.Open(opts)
 	if err != nil {

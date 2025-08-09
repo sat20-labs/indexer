@@ -23,8 +23,8 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/lru"
-	"github.com/dgraph-io/badger/v4"
 
+	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/mpn/addrmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/connmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/peer"
@@ -209,7 +209,7 @@ type MemPoolNode struct {
 	sigCache             *txscript.SigCache
 	hashCache            *txscript.HashCache
 	syncManager          *netsync.SyncManager
-	indexer                localCommon.IndexManager
+	indexer              localCommon.IndexManager
 	txMemPool            *mempool.TxPool
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
@@ -222,9 +222,9 @@ type MemPoolNode struct {
 	wg                   sync.WaitGroup
 	quit                 chan struct{}
 	nat                  NAT
-	db                   *badger.DB
+	db                   db.KVDB
 	//timeSource           localCommon.MedianTimeSource
-	services             wire.ServiceFlag
+	services wire.ServiceFlag
 
 	// The following fields are used for optional indexes.  They will be nil
 	// if the associated index is not enabled.  These fields are set during
@@ -2676,7 +2676,7 @@ out:
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
-	db *badger.DB, chainParams *chaincfg.Params,
+	db db.KVDB, chainParams *chaincfg.Params,
 	indexManager localCommon.IndexManager,
 	interrupt <-chan struct{}) (*MemPoolNode, error) {
 
@@ -2728,12 +2728,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		nat:                  nat,
 		db:                   db,
 		//timeSource:           localCommon.NewMedianTime(),
-		services:             services,
-		sigCache:             txscript.NewSigCache(_cfg.SigCacheMaxSize),
-		hashCache:            txscript.NewHashCache(_cfg.SigCacheMaxSize),
-		cfCheckptCaches:      make(map[wire.FilterType][]cfHeaderKV),
-		agentBlacklist:       agentBlacklist,
-		agentWhitelist:       agentWhitelist,
+		services:        services,
+		sigCache:        txscript.NewSigCache(_cfg.SigCacheMaxSize),
+		hashCache:       txscript.NewHashCache(_cfg.SigCacheMaxSize),
+		cfCheckptCaches: make(map[wire.FilterType][]cfHeaderKV),
+		agentBlacklist:  agentBlacklist,
+		agentWhitelist:  agentWhitelist,
 	}
 
 	s.indexer = indexManager

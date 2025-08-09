@@ -10,7 +10,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func initStatusFromDB(ldb *badger.DB) *common.NftStatus {
+func initStatusFromDB(ldb db.KVDB) *common.NftStatus {
 	stats := &common.NftStatus{}
 	ldb.View(func(txn *badger.Txn) error {
 		err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), txn, stats)
@@ -33,7 +33,7 @@ func initStatusFromDB(ldb *badger.DB) *common.NftStatus {
 	return stats
 }
 
-func getNftsWithAddressFromDB(addressId uint64, db *badger.DB) []int64 {
+func getNftsWithAddressFromDB(addressId uint64, db db.KVDB) []int64 {
 	result := make([]int64, 0)
 	err := db.View(func(txn *badger.Txn) error {
 		prefixBytes := []byte(fmt.Sprintf("%s%d-", DB_PREFIX_INSCADDR, addressId))

@@ -8,8 +8,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer/base"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
-
-	"github.com/dgraph-io/badger/v4"
 )
 
 type ExoticTickInfo struct {
@@ -22,7 +20,7 @@ type ExoticTickInfo struct {
 }
 
 type ExoticIndexer struct {
-	db          *badger.DB
+	db          db.KVDB
 	baseIndexer *base.BaseIndexer
 
 	mutex sync.RWMutex // 只保护这几个结构
@@ -173,16 +171,16 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 	}
 
 	var result map[string][]*common.Range
-	p.db.View(func(txn *badger.Txn) error {
-		result = p.getMoreRodarmorRarityRangesToHeight(startHeight, endHeight, txn)
+	
+		result = p.getMoreRodarmorRarityRangesToHeight(startHeight, endHeight)
 		// TODO
-		//result[Alpha] = p.GetRangesForAlpha(startHeight, endHeight, txn)
-		//result[Omega] = p.GetRangesForOmega(startHeight, endHeight, txn)
+		//result[Alpha] = p.GetRangesForAlpha(startHeight, endHeight)
+		//result[Omega] = p.GetRangesForOmega(startHeight, endHeight)
 		if endHeight >= 9 {
-			result[Block9] = p.getRangeForBlock(9, txn)
+			result[Block9] = p.getRangeForBlock(9)
 		}
 		if endHeight >= 78 {
-			result[Block78] = p.getRangeForBlock(78, txn)
+			result[Block78] = p.getRangeForBlock(78)
 		}
 		validBlock := make([]int, 0)
 		for h := range NakamotoBlocks {
@@ -190,47 +188,42 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 				validBlock = append(validBlock, h)
 			}
 		}
-		result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
+		result[Nakamoto] = p.getRangesForBlocks(validBlock)
 
 		result[FirstTransaction] = FirstTransactionRanges
 		if endHeight >= 1000 {
-			result[Vintage] = p.getRangeToBlock(1000, txn)
+			result[Vintage] = p.getRangeToBlock(1000)
 		}
-		return nil
-	})
+
 
 	return result
 }
 
-func initEpochSat(ldb *badger.DB, height int) {
+func initEpochSat(ldb db.KVDB, height int) {
 
-	ldb.View(func(txn *badger.Txn) error {
 
-		currentEpoch := height / HalvingInterval
-		underpays := int64(0)
+	currentEpoch := height / HalvingInterval
+	underpays := int64(0)
 
-		for epoch := (height / HalvingInterval); epoch > 0; epoch-- {
+	for epoch := (height / HalvingInterval); epoch > 0; epoch-- {
 
-			value := &common.BlockValueInDB{}
-			key := db.GetBlockDBKey(210000 * epoch)
-			err := db.GetValueFromDB(key, txn, value)
-			if err != nil {
-				common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
-			}
-
-			if epoch == currentEpoch {
-				underpays = int64(Epoch(int64(epoch)).GetStartingSat()) - value.Ordinals.Start
-			}
-			SetEpochStartingSat(int64(epoch), value.Ordinals.Start)
+		value := &common.BlockValueInDB{}
+		key := db.GetBlockDBKey(210000 * epoch)
+		err := db.GetValueFromDB(key, value, ldb)
+		if err != nil {
+			common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
 		}
 
-		for epoch := currentEpoch + 1; epoch < MAX_EPOCH; epoch++ {
-			SetEpochStartingSat(int64(epoch), int64(Epoch(int64(epoch)).GetStartingSat())-underpays)
+		if epoch == currentEpoch {
+			underpays = int64(Epoch(int64(epoch)).GetStartingSat()) - value.Ordinals.Start
 		}
+		SetEpochStartingSat(int64(epoch), value.Ordinals.Start)
+	}
 
-		return nil
+	for epoch := currentEpoch + 1; epoch < MAX_EPOCH; epoch++ {
+		SetEpochStartingSat(int64(epoch), int64(Epoch(int64(epoch)).GetStartingSat())-underpays)
+	}
 
-	})
 }
 
 // 跟base数据库同步

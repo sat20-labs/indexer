@@ -18,22 +18,21 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/dgraph-io/badger/v4"
 )
 
 type IndexerMgr struct {
 	cfg   *config.YamlConf
 	dbDir string
 	// data from blockchain
-	baseDB  *badger.DB
-	ftDB    *badger.DB
-	nsDB    *badger.DB
-	nftDB   *badger.DB
-	brc20DB *badger.DB
-	runesDB *badger.DB
+	baseDB  db.KVDB
+	ftDB    db.KVDB
+	nsDB    db.KVDB
+	nftDB   db.KVDB
+	brc20DB db.KVDB
+	runesDB db.KVDB
 	// data from market
-	localDB *badger.DB
-	kvDB    *badger.DB
+	localDB db.KVDB
+	kvDB    db.KVDB
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -42,7 +41,7 @@ type IndexerMgr struct {
 	maxIndexHeight  int
 	periodFlushToDB int
 
-	mpn *mpn.MemPoolNode
+	mpn         *mpn.MemPoolNode
 	miniMempool *MiniMemPool
 
 	brc20Indexer *brc20.BRC20Indexer
@@ -180,7 +179,7 @@ func (b *IndexerMgr) Init() {
 	b.addressToNameMap = nil
 }
 
-func (b *IndexerMgr) GetBaseDB() *badger.DB {
+func (b *IndexerMgr) GetBaseDB() db.KVDB {
 	return b.baseDB
 }
 
@@ -225,7 +224,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						b.updateDB()
 						b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 					}
-					
+
 					b.dbgc()
 					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
 					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
@@ -238,7 +237,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 					if b.dbStatistic() {
 						bWantExit = true
 					}
-					
+
 				} else if ret > 0 {
 					// handle reorg
 					b.handleReorg(ret)
@@ -464,6 +463,6 @@ func (p *IndexerMgr) dbStatistic() bool {
 	//common.Log.Infof("start searching...")
 	//return p.SearchPredefinedName()
 	//return p.searchName()
-	
+
 	return false
 }

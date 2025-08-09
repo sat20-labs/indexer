@@ -189,7 +189,7 @@ func (p *FTIndexer) UpdateDB() {
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	for _, v := range p.tickerAdded {
 		key := GetTickerKey(v.Name)

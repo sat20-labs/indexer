@@ -26,7 +26,7 @@ type BlockProcCallback func(*common.Block)
 type UpdateDBCallback func()
 
 type BaseIndexer struct {
-	db      *badger.DB
+	db      db.KVDB
 	stats   *SyncStats // 数据库状态
 	reCheck bool
 
@@ -58,7 +58,7 @@ type BaseIndexer struct {
 const BLOCK_PREFETCH = 12
 
 func NewBaseIndexer(
-	basicDB *badger.DB,
+	basicDB db.KVDB,
 	chaincfgParam *chaincfg.Params,
 	maxIndexHeight int,
 	periodFlushToDB int,
@@ -252,7 +252,7 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	addressValueMap := make(map[string]*common.AddressValueInDB)
 
 	// 在循环次数300万级别时，时间大概1分钟。尽可能不要多次循环这些变量，特别是不要跟updateBasicDB执行通用的操作
-	b.db.View(func(txn *badger.Txn) error {
+	b.db.BatchRead(nil, false, func(k, v []byte) error {
 		//startTime := time.Now()
 
 		for _, v := range b.utxoIndex.Index {
@@ -266,7 +266,7 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 		}
 
 		for _, value := range b.delUTXOs {
-			b.removeUtxo(&addressValueMap, value, txn)
+			b.removeUtxo(&addressValueMap, value)
 		}
 
 		//common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v\n",
@@ -287,7 +287,7 @@ func (b *BaseIndexer) UpdateDB() {
 	//////
 	// 测试一个异常问题：blockVector 区块丢失，导致exotic索引失败
 	if len(b.blockVector) > 0 && b.blockVector[0].Height > 1 {
-		key := db.GetBlockDBKey(b.blockVector[0].Height-1)
+		key := db.GetBlockDBKey(b.blockVector[0].Height - 1)
 		_, err := db.GetRawValueFromDB(key, b.db)
 		if err != nil {
 			common.Log.Panicf("can't find the previous block %d", b.blockVector[0].Height-1)
@@ -296,7 +296,7 @@ func (b *BaseIndexer) UpdateDB() {
 	/////
 
 	wb := b.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	totalSubsidySats := int64(0)
 	AllUtxoAdded := uint64(0)
@@ -444,10 +444,10 @@ func (b *BaseIndexer) UpdateDB() {
 	b.addressIdMap = make(map[string]*AddressStatus)
 }
 
-func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue, txn *badger.Txn) {
+func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue) {
 	utxoId := utxo.UtxoId
 	key := db.GetUtxoIdKey(utxoId)
-	_, err := txn.Get(key)
+	_, err := b.db.Read(key)
 	bExist := err == nil
 	for _, address := range utxo.Address.Addresses {
 		value, ok := (*addrmap)[address]
@@ -535,7 +535,7 @@ func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 				if hash != blockHash {
 					common.Log.Warnf("detected reorg at height %d, old hash %s, new hash %s", i, blockHash, hash)
 					reorgHeight = i
-					if i == b.lastHeight - b.keepBlockHistory + 1 {
+					if i == b.lastHeight-b.keepBlockHistory+1 {
 						common.Log.Panic("reorg may occur in previous block!")
 					}
 					break
@@ -768,9 +768,9 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	b.blockVector = append(b.blockVector, blockValue)
 }
 
-func (b *BaseIndexer) getAddressIdFromDB(address string, txn *badger.Txn, bGenerateNew bool) (uint64, bool) {
+func (b *BaseIndexer) getAddressIdFromDB(address string, bGenerateNew bool) (uint64, bool) {
 	bExist := true
-	addressId, err := db.GetAddressIdFromDBTxn(txn, address)
+	addressId, err := db.GetAddressIdFromDB(b.db, address)
 	if err == badger.ErrKeyNotFound {
 		bExist = false
 		if bGenerateNew {
@@ -801,7 +801,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 		} else if b.lastHeight >= 800000 {
 			step = 1000
 		}
-		if uint64(b.lastHeight + step) <= count {
+		if uint64(b.lastHeight+step) <= count {
 			count = uint64(b.lastHeight + step)
 		}
 	}
@@ -809,10 +809,10 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	return b.syncToBlock(int(count), stopChan)
 }
 
-func (b *BaseIndexer) loadUtxoFromDB(txn *badger.Txn, utxostr string) error {
+func (b *BaseIndexer) loadUtxoFromDB(utxostr string) error {
 	utxo := &common.UtxoValueInDB{}
 	dbKey := db.GetUTXODBKey(utxostr)
-	err := db.GetValueFromDBWithProto3(dbKey, txn, utxo)
+	err := db.GetValueFromDBWithProto3(dbKey, b.db, utxo)
 	if err == badger.ErrKeyNotFound {
 		return err
 	}
@@ -823,7 +823,7 @@ func (b *BaseIndexer) loadUtxoFromDB(txn *badger.Txn, utxostr string) error {
 
 	var addresses common.ScriptPubKey
 	for _, addressId := range utxo.AddressIds {
-		address, err := db.GetAddressByIDFromDBTxn(txn, addressId)
+		address, err := db.GetAddressByID(b.db, addressId)
 		if err != nil {
 			common.Log.Errorf("failed to get address by id %d, utxo: %s, utxoId: %d, err: %v", addressId, utxostr, utxo.UtxoId, err)
 			return err
@@ -845,7 +845,7 @@ func (b *BaseIndexer) loadUtxoFromDB(txn *badger.Txn, utxostr string) error {
 
 func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	//startTime := time.Now()
-	err := b.db.View(func(txn *badger.Txn) error {
+	
 		for _, tx := range block.Transactions {
 			for _, input := range tx.Inputs {
 				if input.Vout >= 0xffffffff {
@@ -854,12 +854,12 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 
 				utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
 				if _, ok := b.utxoIndex.Index[utxo]; !ok {
-					err := b.loadUtxoFromDB(txn, utxo)
+					err := b.loadUtxoFromDB(utxo)
 					if err == badger.ErrKeyNotFound {
 						continue
 					} else if err != nil {
 						common.Log.Errorf("failed to get value of utxo: %s, %v", utxo, err)
-						return err
+						return
 					}
 				}
 			}
@@ -868,7 +868,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				for _, address := range output.Address.Addresses {
 					_, ok := b.addressIdMap[address]
 					if !ok {
-						addressId, bExist := b.getAddressIdFromDB(address, txn, true)
+						addressId, bExist := b.getAddressIdFromDB(address, true)
 						op := 1
 						if bExist {
 							op = 0
@@ -879,45 +879,37 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			}
 		}
 
-		return nil
-	})
+		return 
+	
 
-	if err != nil {
-		common.Log.Panicf("BaseIndexer.prefetchIndexesFromDB-> Error prefetching utxos from db: %v", err)
-	}
+	
 
 	//common.Log.Infof("BaseIndexer.prefetchIndexesFromDB-> prefetched in %v\n", time.Since(startTime))
 }
 
 func (b *BaseIndexer) loadSyncStatsFromDB() {
-	err := b.db.View(func(txn *badger.Txn) error {
-		syncStats := &SyncStats{}
-		err := db.GetValueFromDB([]byte(SyncStatsKey), txn, syncStats)
-		if err == badger.ErrKeyNotFound {
-			common.Log.Info("BaseIndexer.LoadSyncStatsFromDB-> No sync stats found in db")
-			syncStats.SyncHeight = -1
-		} else if err != nil {
-			return err
-		}
-		common.Log.Infof("stats: %v", syncStats)
-		common.Log.Infof("Code Ver: %s", common.ORDX_INDEXER_VERSION)
-		common.Log.Infof("DB Ver: %s", b.GetBaseDBVer())
-
-		if syncStats.ReorgsDetected == nil {
-			syncStats.ReorgsDetected = make([]int, 0)
-		}
-
-		b.stats = syncStats
-		b.lastHash = b.stats.SyncBlockHash
-		b.lastHeight = b.stats.SyncHeight
-		b.lastSats = b.stats.TotalSats
-
-		return nil
-	})
-
-	if err != nil {
+	
+	syncStats := &SyncStats{}
+	err := db.GetValueFromDB([]byte(SyncStatsKey), syncStats, b.db)
+	if err == badger.ErrKeyNotFound {
+		common.Log.Info("BaseIndexer.LoadSyncStatsFromDB-> No sync stats found in db")
+		syncStats.SyncHeight = -1
+	} else if err != nil {
 		common.Log.Panicf("BaseIndexer.LoadSyncStatsFromDB-> Error loading sync stats from db: %v", err)
 	}
+	common.Log.Infof("stats: %v", syncStats)
+	common.Log.Infof("Code Ver: %s", common.ORDX_INDEXER_VERSION)
+	common.Log.Infof("DB Ver: %s", b.GetBaseDBVer())
+
+	if syncStats.ReorgsDetected == nil {
+		syncStats.ReorgsDetected = make([]int, 0)
+	}
+
+	b.stats = syncStats
+	b.lastHash = b.stats.SyncBlockHash
+	b.lastHeight = b.stats.SyncHeight
+	b.lastSats = b.stats.TotalSats
+
 }
 
 // triggerReorg is meant to be used for debugging and tests only
@@ -944,9 +936,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 
 	startTime := time.Now()
 
-	lsm, vlog := b.db.Size()
-	common.Log.Infof("DB lsm: %0.2f, vlog: %0.2f", float64(lsm)/(1024*1024), float64(vlog)/(1024*1024))
-
 	common.Log.Infof("stats: %v", b.stats)
 	common.Log.Infof("Code Ver: %s", common.ORDX_INDEXER_VERSION)
 	common.Log.Infof("DB Ver: %s", b.GetBaseDBVer())
@@ -957,8 +946,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 	// var wg sync.WaitGroup
 	// wg.Add(3)
 
-	b.db.View(func(txn *badger.Txn) error {
-		//defer wg.Done()
 
 		startTime2 := time.Now()
 		common.Log.Infof("calculating in %s table ...", common.DB_KEY_BLOCK)
@@ -966,7 +953,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 		for i := 0; i <= b.stats.SyncHeight; i++ {
 			key := db.GetBlockDBKey(i)
 			value := common.BlockValueInDB{}
-			err := db.GetValueFromDB(key, txn, &value)
+			err := db.GetValueFromDB(key, &value, b.db)
 			if err != nil {
 				common.Log.Panicf("GetValueFromDB %s error: %v", key, err)
 			}
@@ -987,8 +974,8 @@ func (b *BaseIndexer) CheckSelf() bool {
 			preValue = &value
 		}
 		common.Log.Infof("%s table takes %v", common.DB_KEY_BLOCK, time.Since(startTime2))
-		return nil
-	})
+		
+
 
 	satsInUtxo := int64(0)
 	utxoCount := 0
@@ -996,27 +983,13 @@ func (b *BaseIndexer) CheckSelf() bool {
 	addressInUtxo := 0
 	addressesInT1 := make(map[uint64]bool, 0)
 	utxosInT1 := make(map[uint64]bool, 0)
-	b.db.View(func(txn *badger.Txn) error {
-		//defer wg.Done()
+	startTime2 = time.Now()
+	common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
+	b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
+		
 
-		var err error
-		prefix := []byte(common.DB_KEY_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
 			var value common.UtxoValueInDB
-			err = item.Value(func(data []byte) error {
-				//return db.DecodeBytes(data, &value)
-				return db.DecodeBytesWithProto3(data, &value)
-			})
+			err := db.DecodeBytesWithProto3(v, &value)
 			if err != nil {
 				common.Log.Panicf("item.Value error: %v", err)
 			}
@@ -1040,15 +1013,14 @@ func (b *BaseIndexer) CheckSelf() bool {
 				addressesInT1[addressId] = true
 			}
 			utxosInT1[value.UtxoId] = true
-		}
+		
 
 		addressInUtxo = len(addressesInT1)
-
-		common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime2))
-		common.Log.Infof("1. utxo: %d(%d), sats %d, address %d", utxoCount, nonZeroUtxo, satsInUtxo, addressInUtxo)
-
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime2))
+	common.Log.Infof("1. utxo: %d(%d), sats %d, address %d", utxoCount, nonZeroUtxo, satsInUtxo, addressInUtxo)
+
 
 	satsInAddress := int64(0)
 	allAddressCount := 0
@@ -1056,49 +1028,36 @@ func (b *BaseIndexer) CheckSelf() bool {
 	nonZeroUtxoInAddress := 0
 	addressesInT2 := make(map[uint64]bool, 0)
 	utxosInT2 := make(map[uint64]bool, 0)
-	b.db.View(func(txn *badger.Txn) error {
-		//defer wg.Done()
 
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", common.DB_KEY_ADDRESSVALUE)
-
-		prefix := []byte(common.DB_KEY_ADDRESSVALUE)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-		for itr.Seek(prefix); itr.ValidForPrefix(prefix); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			value := int64(0)
-			item.Value(func(data []byte) error {
-				value = int64(common.BytesToUint64(data))
-				return nil
-			})
-
-			addressId, utxoId, _, index, err := common.ParseAddressIdKey(string(item.Key()))
-			if err != nil {
-				common.Log.Panicf("ParseAddressIdKey %s failed: %v", string(item.Key()), err)
-			}
-
-			allutxoInAddress++
-			if index == 0 {
-				satsInAddress += value
-				if value > 0 {
-					nonZeroUtxoInAddress++
-				}
-			}
-
-			addressesInT2[addressId] = true
-			utxosInT2[utxoId] = true
+	startTime2 = time.Now()
+	common.Log.Infof("calculating in %s table ...", common.DB_KEY_ADDRESSVALUE)
+	b.db.BatchRead([]byte(common.DB_KEY_ADDRESSVALUE), false, func(k, v []byte) error {
+			
+		value := int64(common.BytesToUint64(v))
+			
+		addressId, utxoId, _, index, err := common.ParseAddressIdKey(string(k))
+		if err != nil {
+			common.Log.Panicf("ParseAddressIdKey %s failed: %v", string(k), err)
 		}
-		allAddressCount = len(addressesInT2)
 
-		common.Log.Infof("%s table takes %v", common.DB_KEY_ADDRESSVALUE, time.Since(startTime2))
-		common.Log.Infof("2. utxo: %d(%d), sats %d, address %d", allutxoInAddress, nonZeroUtxoInAddress, satsInAddress, allAddressCount)
+		allutxoInAddress++
+		if index == 0 {
+			satsInAddress += value
+			if value > 0 {
+				nonZeroUtxoInAddress++
+			}
+		}
+
+		addressesInT2[addressId] = true
+		utxosInT2[utxoId] = true
+		
+		allAddressCount = len(addressesInT2)
 
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", common.DB_KEY_ADDRESSVALUE, time.Since(startTime2))
+	common.Log.Infof("2. utxo: %d(%d), sats %d, address %d", allutxoInAddress, nonZeroUtxoInAddress, satsInAddress, allAddressCount)
+
 
 	//wg.Wait()
 
@@ -1180,30 +1139,17 @@ func (b *BaseIndexer) verifyAllUtxosWithBtcd() {
 	// 3. indexer通过btcd，验证本地记录的所有utxo都是正确的
 	// 目的：数据库在压缩后有数据错乱情况，暂时没办法解决，在压缩后必须做数据验证。
 	// 验证数据分两步，一般调用checkself，只需要10分钟。最后数据跑到最新高度后，执行本函数，做一次最严格验证，可能需要4-5个小时
-	b.db.View(func(txn *badger.Txn) error {
-		var err error
-		prefix := []byte(common.DB_KEY_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value common.UtxoValueInDB
-			err = item.Value(func(data []byte) error {
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Errorf("item.Value error: %v", err)
-				continue
-			}
-
-			//key := item.Key()
-			//utxo, _ := db.GetUtxoByDBKey(key)
-			// 调用rpc接口检查utxo是否存在，包括内存池中还没有被确认的utxo。
+	b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
+		
+		
+		var value common.UtxoValueInDB
+		
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Errorf("item.Value error: %v", err)
+			return err
 		}
+		
 
 		return nil
 	})
@@ -1223,30 +1169,18 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 // only for test
 func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 	result := make(map[uint64]string)
-	b.db.View(func(txn *badger.Txn) error {
-		var err error
-		prefix := []byte(common.DB_KEY_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
+	b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
+		
 			var value common.UtxoValueInDB
-			err = item.Value(func(data []byte) error {
-				return db.DecodeBytesWithProto3(data, &value)
-			})
+			err := db.DecodeBytesWithProto3(v, &value)
 			if err != nil {
 				common.Log.Errorf("item.Value error: %v", err)
-				continue
+				return err
 			}
 
 			// 用于打印不存在table2中的utxo
 			if _, ok := utxos[value.UtxoId]; ok {
-				key := item.Key()
-				str, err := db.GetUtxoByDBKey(key)
+				str, err := db.GetUtxoByDBKey(k)
 				if err == nil {
 					common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
 					result[value.UtxoId] = str
@@ -1257,7 +1191,7 @@ func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 					return nil
 				}
 			}
-		}
+		
 
 		return nil
 	})
@@ -1268,7 +1202,7 @@ func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 // only for test
 func (b *BaseIndexer) deleteUtxos(utxos map[uint64]string) {
 	wb := b.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	for utxoId, utxo := range utxos {
 		key := db.GetUTXODBKey(utxo)
@@ -1310,7 +1244,7 @@ func (b *BaseIndexer) GetBaseDBVer() string {
 	return string(value)
 }
 
-func (b *BaseIndexer) GetBaseDB() *badger.DB {
+func (b *BaseIndexer) GetBaseDB() db.KVDB {
 	return b.db
 }
 
@@ -1344,7 +1278,7 @@ func (b *BaseIndexer) SetReorgHeight(height int) {
 	if len(b.stats.ReorgsDetected) > 100 {
 		b.stats.ReorgsDetected = b.stats.ReorgsDetected[len(b.stats.ReorgsDetected)-50:]
 	}
-	err := db.GobSetDB1([]byte(SyncStatsKey), b.stats, b.db)
+	err := db.GobSetDB([]byte(SyncStatsKey), b.stats, b.db)
 	if err != nil {
 		common.Log.Panicf("Error setting in db %v", err)
 	}

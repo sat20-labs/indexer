@@ -1,7 +1,6 @@
 package base
 
 import (
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -25,16 +24,9 @@ func (b *BaseIndexer) GetAddressWithUtxo(utxo string) string {
 		return output.Address.Addresses[0]
 	}
 
-	err := b.db.View(func(txn *badger.Txn) error {
-		err := b.loadUtxoFromDB(txn, utxo)
-		if err != nil {
-			common.Log.Errorf("failed to get value of utxo: %s, %v", utxo, err)
-			return err
-		}
-		return nil
-	})
-
+	err := b.loadUtxoFromDB(utxo)
 	if err != nil {
+		common.Log.Errorf("failed to get value of utxo: %s, %v", utxo, err)
 		return ""
 	}
 

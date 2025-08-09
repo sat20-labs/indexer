@@ -15,7 +15,7 @@ import (
 const key_last = DB_PREFIX_BUCK + "lk"
 
 type NftBuckStore struct {
-	db       *badger.DB
+	db       db.KVDB
 	BuckSize int64
 	prefix   string
 }
@@ -25,7 +25,7 @@ type BuckValue struct {
 	Sat int64
 }
 
-func NewBuckStore(db *badger.DB) *NftBuckStore {
+func NewBuckStore(db db.KVDB) *NftBuckStore {
 	return &NftBuckStore{
 		db:       db,
 		BuckSize: 10000,

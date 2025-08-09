@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,12 +31,12 @@ type DbLog struct {
 }
 
 type DbWrite struct {
-	Db             *badger.DB
+	Db             db.KVDB
 	logs           *cmap.ConcurrentMap[string, *DbLog]
 	cloneTimeStamp int64
 }
 
-func NewDbWrite(db *badger.DB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
+func NewDbWrite(db db.KVDB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
 	return &DbWrite{
 		Db:   db,
 		logs: logs,

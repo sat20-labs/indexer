@@ -15,7 +15,7 @@ import (
 const key_last = DB_PREFIX_BUCK + "lk"
 
 type NSBuckStore struct {
-	db       *badger.DB
+	db       db.KVDB
 	BuckSize int
 	prefix   string
 }
@@ -25,7 +25,7 @@ type BuckValue struct {
 	Sat  int64
 }
 
-func NewBuckStore(db *badger.DB) *NSBuckStore {
+func NewBuckStore(db db.KVDB) *NSBuckStore {
 	return &NSBuckStore{
 		db:       db,
 		BuckSize: 1000,

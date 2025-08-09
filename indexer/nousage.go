@@ -684,7 +684,7 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 			return nil
 		})
 
-		db.GobSetDB1(key, pizzaAddrMap, ldb)
+		db.GobSetDB(key, pizzaAddrMap, ldb)
 	}
 
 	syncHeight := pizzaAddrMap[0]
@@ -970,7 +970,6 @@ func (p *IndexerMgr) searchD6(filepath, suffix string) bool {
 	p.writeToFile(filepath, names)
 	return true
 }
-
 
 func (p *IndexerMgr) searchD7(filepath, suffix string) bool {
 	startTime := time.Now()

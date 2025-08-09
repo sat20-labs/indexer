@@ -263,7 +263,7 @@ func (p *BRC20Indexer) UpdateDB() {
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	// new ticker
 	for _, v := range p.tickerAdded {
