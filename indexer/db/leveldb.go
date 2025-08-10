@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
+	"github.com/sat20-labs/indexer/common"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -90,7 +92,25 @@ func (p *kvDB) Delete(key []byte) error {
 
 func (p *kvDB) DropPrefix(prefix []byte) error {
 	deletingKeyMap := make(map[string]bool)
-	err := p.iterForwardWithPrefix(prefix, nil, func(k []byte, v []byte) error {
+	err := p.BatchRead(prefix, false, func(k, v []byte) error {
+		deletingKeyMap[string(k)] = true
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	wb := p.NewWriteBatch()
+	defer wb.Close()
+
+	for k := range deletingKeyMap {
+		wb.Delete([]byte(k))
+	}
+	return wb.Flush()
+}
+
+func (p *kvDB) DropAll() error {
+	deletingKeyMap := make(map[string]bool)
+	err := p.BatchRead(nil, false, func(k, v []byte) error {
 		deletingKeyMap[string(k)] = true
 		return nil
 	})
@@ -207,9 +227,20 @@ func (p *kvDB) BackupToFile(fname string) error {
 	}
 	defer f.Close()
 	enc := gob.NewEncoder(f)
-	return p.BatchRead(nil, false, func(k, v []byte) error {
+	total := 0
+	err = p.BatchRead(nil, false, func(k, v []byte) error {
+		total++
 		return enc.Encode([2][]byte{k, v})
 	})
+
+	if err != nil {
+		common.Log.Errorf("BackupToFile %s failed, %v", fname, err)
+		return err
+	}
+
+	common.Log.Infof("BackupToFile %s succeed, total %d", fname, total)
+
+	return err
 }
 
 func (p *kvDB) RestoreFromFile(backupFile string) error {
@@ -231,6 +262,69 @@ func (p *kvDB) RestoreFromFile(backupFile string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+
+func (p *kvDB) CompareWithBackupFile(backupFile string) error {
+	f, err := os.Open(backupFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	itemsInFile := make(map[string][]byte)
+	dec := gob.NewDecoder(f)
+	for {
+		var kv [2][]byte
+		if err := dec.Decode(&kv); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		itemsInFile[string(kv[0])] = append([]byte{}, kv[1]...)
+	}
+
+	itemsInDB := make(map[string][]byte)
+	p.BatchRead(nil, false, func(k, v []byte) error {
+		itemsInDB[string(k)] = append([]byte{}, v...)
+		return nil
+	})
+
+	if len(itemsInFile) != len(itemsInDB) {
+		common.Log.Errorf("count different %d %d", len(itemsInFile), len(itemsInDB))
+		return fmt.Errorf("count different %d %d", len(itemsInFile), len(itemsInDB))
+	}
+
+	succ := true
+	for k, v := range itemsInFile {
+		v2, ok := itemsInDB[k]
+		if !ok {
+			common.Log.Errorf("can't find key %s in db", k)
+		} else if !bytes.Equal(v, v2) {
+			common.Log.Errorf("key %s value different", k)
+			succ = false
+		}
+	}
+
+	for k, v := range itemsInDB {
+		v2, ok := itemsInFile[k]
+		if !ok {
+			common.Log.Errorf("can't find key %s in file", k)
+		} else if !bytes.Equal(v, v2) {
+			common.Log.Errorf("key %s value different", k)
+			succ = false
+		}
+	}
+
+	if succ {
+		common.Log.Infof("db file check succeed")
+	} else {
+		common.Log.Infof("db file check failed")
+	}
+	
+
 	return nil
 }
 
