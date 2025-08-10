@@ -5,7 +5,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -175,56 +174,6 @@ func needMerge(rngs []*common.Range) bool {
 
 func (b *BaseIndexer) Repair() {
 
-	// changedUtxoMap := make(map[string]*common.UtxoValueInDB)
-	// b.db.View(func(txn *badger.Txn) error {
-	// 	var err error
-	// 	prefix := []byte(common.DB_KEY_UTXO)
-	// 	itr := txn.NewIterator(badger.DefaultIteratorOptions)
-	// 	defer itr.Close()
-
-	// 	startTime2 := time.Now()
-	// 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
-
-	// 	for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-	// 		item := itr.Item()
-	// 		if item.IsDeletedOrExpired() {
-	// 			continue
-	// 		}
-
-	// 		var value common.UtxoValueInDB
-	// 		err = item.Value(func(data []byte) error {
-	// 			//return db.DecodeBytes(data, &value)
-	// 			return db.DecodeBytesWithProto3(data, &value)
-	// 		})
-	// 		if err != nil {
-	// 			common.Log.Panicf("item.Value error: %v", err)
-	// 		}
-
-	// 		if needMerge(value.Ordinals) {
-	// 			key := item.KeyCopy(nil)
-	// 			changedUtxoMap[string(key)] = &value
-	// 		}
-	// 	}
-
-	// 	common.Log.Infof("%s table %d takes %v", common.DB_KEY_UTXO, len(changedUtxoMap), time.Since(startTime2))
-	// 	return nil
-	// })
-
-	// wb := b.db.NewWriteBatch()
-	// defer wb.Cancel()
-
-	// for k, v := range changedUtxoMap {
-	// 	v.Ordinals = appendRanges(nil, v.Ordinals)
-	// 	err := db.SetDBWithProto3([]byte(k), v, wb)
-	// 	if err != nil {
-	// 		common.Log.Panicf("Error setting in db %v", err)
-	// 	}
-	// }
-
-	// err := wb.Flush()
-	// if err != nil {
-	// 	common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
-	// }
 }
 
 // only call in compiling data
@@ -252,28 +201,26 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	addressValueMap := make(map[string]*common.AddressValueInDB)
 
 	// 在循环次数300万级别时，时间大概1分钟。尽可能不要多次循环这些变量，特别是不要跟updateBasicDB执行通用的操作
-	b.db.BatchRead(nil, false, func(k, v []byte) error {
-		//startTime := time.Now()
+	
+	//startTime := time.Now()
 
-		for _, v := range b.utxoIndex.Index {
-			if v.Address.Type == int(txscript.NullDataTy) {
-				// 只有OP_RETURN 才不记录
-				if v.Value == 0 {
-					continue
-				}
+	for _, v := range b.utxoIndex.Index {
+		if v.Address.Type == int(txscript.NullDataTy) {
+			// 只有OP_RETURN 才不记录
+			if v.Value == 0 {
+				continue
 			}
-			b.addUtxo(&addressValueMap, v)
 		}
+		b.addUtxo(&addressValueMap, v)
+	}
 
-		for _, value := range b.delUTXOs {
-			b.removeUtxo(&addressValueMap, value)
-		}
+	for _, value := range b.delUTXOs {
+		b.removeUtxo(&addressValueMap, value)
+	}
 
-		//common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v\n",
-		//	len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
+	//common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v\n",
+	//	len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
 
-		return nil
-	})
 
 	return addressValueMap
 }
@@ -771,7 +718,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 func (b *BaseIndexer) getAddressIdFromDB(address string, bGenerateNew bool) (uint64, bool) {
 	bExist := true
 	addressId, err := db.GetAddressIdFromDB(b.db, address)
-	if err == badger.ErrKeyNotFound {
+	if err == db.ErrKeyNotFound {
 		bExist = false
 		if bGenerateNew {
 			addressId = b.generateAddressId()
@@ -813,7 +760,7 @@ func (b *BaseIndexer) loadUtxoFromDB(utxostr string) error {
 	utxo := &common.UtxoValueInDB{}
 	dbKey := db.GetUTXODBKey(utxostr)
 	err := db.GetValueFromDBWithProto3(dbKey, b.db, utxo)
-	if err == badger.ErrKeyNotFound {
+	if err == db.ErrKeyNotFound {
 		return err
 	}
 	if err != nil {
@@ -855,7 +802,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
 				if _, ok := b.utxoIndex.Index[utxo]; !ok {
 					err := b.loadUtxoFromDB(utxo)
-					if err == badger.ErrKeyNotFound {
+					if err == db.ErrKeyNotFound {
 						continue
 					} else if err != nil {
 						common.Log.Errorf("failed to get value of utxo: %s, %v", utxo, err)
@@ -891,7 +838,7 @@ func (b *BaseIndexer) loadSyncStatsFromDB() {
 	
 	syncStats := &SyncStats{}
 	err := db.GetValueFromDB([]byte(SyncStatsKey), syncStats, b.db)
-	if err == badger.ErrKeyNotFound {
+	if err == db.ErrKeyNotFound {
 		common.Log.Info("BaseIndexer.LoadSyncStatsFromDB-> No sync stats found in db")
 		syncStats.SyncHeight = -1
 	} else if err != nil {
@@ -1067,10 +1014,10 @@ func (b *BaseIndexer) CheckSelf() bool {
 		ids := b.printfUtxos(utxos1)
 		b.deleteUtxos(ids)
 		// 因为badger数据库的bug，在DB_KEY_UTXO中删除的数据可能还会出现，在检查后需要重新删除，再次检查，但只重新检查一次
-		if !b.reCheck {
-			b.reCheck = true
-			return b.CheckSelf()
-		}
+		// if !b.reCheck {
+		// 	b.reCheck = true
+		// 	return b.CheckSelf()
+		// }
 	}
 
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_UTXO)

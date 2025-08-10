@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -35,50 +34,50 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 	transferNftMap := make(map[uint64]*TransferNftInfo)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 		// 设置前缀扫描选项
-		
-			key := string(k)
-			addrId, ticker, err := parseHolderInfoKey(key)
-			if err != nil {
-				common.Log.Errorln(key + " " + err.Error())
-			} else {
-				var info common.BRC20TickAbbrInfo
-				err = db.DecodeBytes(v, &info)
-				if err == nil {
-					holder, ok := holderMap[addrId]
-					if ok {
-						holder.Tickers[ticker] = &info
-					} else {
-						holder = &HolderInfo{
-							AddressId: addrId,
-							Tickers:   make(map[string]*common.BRC20TickAbbrInfo),
-						}
-						holder.Tickers[ticker] = &info
-						holderMap[addrId] = holder
-					}
 
-					holders, ok := tickerToHolderMap[ticker]
-					if ok {
-						holders[addrId] = true
-					} else {
-						holders = make(map[uint64]bool)
-						holders[addrId] = true
-					}
-					tickerToHolderMap[ticker] = holders
-
-					for _, nft := range info.TransferableData {
-						transferNftMap[nft.UtxoId] = &TransferNftInfo{
-							AddressId:   addrId,
-							Ticker:      ticker,
-							TransferNft: nft,
-						}
-					}
+		key := string(k)
+		addrId, ticker, err := parseHolderInfoKey(key)
+		if err != nil {
+			common.Log.Errorln(key + " " + err.Error())
+		} else {
+			var info common.BRC20TickAbbrInfo
+			err = db.DecodeBytes(v, &info)
+			if err == nil {
+				holder, ok := holderMap[addrId]
+				if ok {
+					holder.Tickers[ticker] = &info
 				} else {
-					common.Log.Errorln("DecodeBytes " + err.Error())
+					holder = &HolderInfo{
+						AddressId: addrId,
+						Tickers:   make(map[string]*common.BRC20TickAbbrInfo),
+					}
+					holder.Tickers[ticker] = &info
+					holderMap[addrId] = holder
 				}
-				
+
+				holders, ok := tickerToHolderMap[ticker]
+				if ok {
+					holders[addrId] = true
+				} else {
+					holders = make(map[uint64]bool)
+					holders[addrId] = true
+				}
+				tickerToHolderMap[ticker] = holders
+
+				for _, nft := range info.TransferableData {
+					transferNftMap[nft.UtxoId] = &TransferNftInfo{
+						AddressId:   addrId,
+						Ticker:      ticker,
+						TransferNft: nft,
+					}
+				}
+			} else {
+				common.Log.Errorln("DecodeBytes " + err.Error())
 			}
-			count++
-		
+
+		}
+		count++
+
 		return nil
 	})
 	if err != nil {
@@ -101,14 +100,14 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 	startTime := time.Now()
 	common.Log.Info("BRC20Indexer loadTickListFromDB ...")
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
-		
+
 		key := string(k)
 		tickname, err := parseTickListKey(key)
 		if err == nil {
 			result = append(result, tickname)
 		}
 		count++
-		
+
 		return nil
 	})
 	if err != nil {
@@ -132,10 +131,10 @@ func (s *BRC20Indexer) getMintListFromDB(tickname string) map[string]*common.BRC
 
 func (s *BRC20Indexer) getMintFromDB(ticker, inscriptionId string) *common.BRC20Mint {
 	var result common.BRC20Mint
-	
+
 	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
-	if err == badger.ErrKeyNotFound {
+	if err == db.ErrKeyNotFound {
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
@@ -143,7 +142,6 @@ func (s *BRC20Indexer) getMintFromDB(ticker, inscriptionId string) *common.BRC20
 		return nil
 	}
 	return nil
-	
 
 	return &result
 }
@@ -153,28 +151,27 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("BRC20Indexer loadMintDataFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY + strings.ToLower(tickerName) + "-"), 
-	false, func(k, v []byte) error {
-		
+	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+strings.ToLower(tickerName)+"-"),
+		false, func(k, v []byte) error {
+
 			key := string(k)
 
 			tick, inscriptionId, _ := ParseMintHistoryKey(key)
 			if tick == tickerName {
 				var mint common.BRC20Mint
-				
+
 				err := db.DecodeBytes(v, &mint)
 				if err == nil {
 					result[inscriptionId] = &mint
 				} else {
 					common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
 				}
-				
+
 			}
 			count++
-		
 
-		return nil
-	})
+			return nil
+		})
 
 	if err != nil {
 		common.Log.Panicf("Error prefetching MintHistory %s from db: %v", tickerName, err)
@@ -191,28 +188,27 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("BRC20Indexer loadTransferHistoryFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY + strings.ToLower(tickerName) + "-"), 
+	err := s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY+strings.ToLower(tickerName)+"-"),
 		false, func(k, v []byte) error {
-		
-		key := string(k)
 
-		tick, _, _ := ParseTransferHistoryKey(key)
-		if tick == tickerName {
-			var history common.BRC20TransferHistory
-			
-			err := db.DecodeBytes(v, &history)
-			if err == nil {
-				result = append(result, &history)
-			} else {
-				common.Log.Errorln("loadTransferHistoryFromDB DecodeBytes " + err.Error())
+			key := string(k)
+
+			tick, _, _ := ParseTransferHistoryKey(key)
+			if tick == tickerName {
+				var history common.BRC20TransferHistory
+
+				err := db.DecodeBytes(v, &history)
+				if err == nil {
+					result = append(result, &history)
+				} else {
+					common.Log.Errorln("loadTransferHistoryFromDB DecodeBytes " + err.Error())
+				}
+
 			}
-			
-		}
-		count++
-		
+			count++
 
-		return nil
-	})
+			return nil
+		})
 
 	if err != nil {
 		common.Log.Panicf("loadTransferHistoryFromDB %s from db: %v", tickerName, err)
@@ -226,16 +222,16 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 
 func (s *BRC20Indexer) getTickerFromDB(tickerName string) *common.BRC20Ticker {
 	var result common.BRC20Ticker
-	
+
 	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
-	if err == badger.ErrKeyNotFound {
+	if err == db.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
 		common.Log.Debugf("GetTickFromDB error: %v", err)
 		return nil
 	}
-	
+
 	return &result
 }

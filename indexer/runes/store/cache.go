@@ -324,12 +324,11 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 	
 		v, err := s.dbWrite.Db.Read(key)
-		if err != nil {
+		if err != nil && err != db.ErrKeyNotFound {
 			return
 		}
-		
-		var out T
-		
+
+		var out T		
 		if len(v) == 0 {
 			return
 		}

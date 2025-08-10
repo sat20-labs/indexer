@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -36,74 +35,69 @@ func NewBuckStore(db db.KVDB) *NftBuckStore {
 func (bs *NftBuckStore) Put(key int64, value *BuckValue) error {
 	bucket := bs.getBucket(key)
 
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	val, err := bs.db.Read(dbkey)
+	if err != nil && err != db.ErrKeyNotFound {
+		common.Log.Errorf("Get %s: %v", dbkey, err)
+		return err
+	}
 
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		val, err := bs.db.Read(dbkey)
-		if err != nil && err != badger.ErrKeyNotFound {
-			common.Log.Errorf("Get %s: %v", dbkey, err)
-			return err
-		}
-
-		storedData, err := bs.deserialize(val)
+	var storedData map[int64]*BuckValue
+	if err == nil {
+		storedData, err = bs.deserialize(val)
 		if err != nil {
 			common.Log.Errorf("deserialize: %v", err)
 			return err
-		} else {
-			storedData = make(map[int64]*BuckValue, 0)
 		}
+	} else {
+		storedData = make(map[int64]*BuckValue, 0)
+	}
 
-		storedData[key] = value
+	storedData[key] = value
 
-		serializedData, err := bs.serialize(storedData)
-		if err != nil {
-			return err
-		}
-
-		err = bs.db.Write(dbkey, serializedData)
-		if err != nil {
-			common.Log.Errorf("db.Write %s failed: %v", dbkey, err)
-			return err
-		}
-
-		lastKeyBytes := make([]byte, binary.MaxVarintLen64)
-		binary.BigEndian.PutUint64(lastKeyBytes, uint64(key))
-		err = bs.db.Write([]byte(key_last), lastKeyBytes)
-		if err != nil {
-			common.Log.Errorf("db.Write %s failed: %v", key_last, err)
-			return err
-		}
-
-
+	serializedData, err := bs.serialize(storedData)
 	if err != nil {
-		common.Log.Panicf("failed to update Badger DB: %v", err)
+		return err
+	}
+
+	err = bs.db.Write(dbkey, serializedData)
+	if err != nil {
+		common.Log.Errorf("db.Write %s failed: %v", dbkey, err)
+		return err
+	}
+
+	lastKeyBytes := make([]byte, binary.MaxVarintLen64)
+	binary.BigEndian.PutUint64(lastKeyBytes, uint64(key))
+	err = bs.db.Write([]byte(key_last), lastKeyBytes)
+	if err != nil {
+		common.Log.Panicf("failed to update DB: %v", err)
 	}
 
 	return nil
 }
 
 func (bs *NftBuckStore) GetLastKey() int64 {
-		dbkey := []byte(key_last)
-		val, err := bs.db.Read(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return -1
-		}
+	dbkey := []byte(key_last)
+	val, err := bs.db.Read(dbkey)
+	if err != nil {
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
+		return -1
+	}
 
-		return int64(binary.BigEndian.Uint64(val))
+	return int64(binary.BigEndian.Uint64(val))
 }
 
 func (bs *NftBuckStore) Get(key int64) (*BuckValue, error) {
 	bucket := bs.getBucket(key)
 
 	var value *BuckValue
-	
+
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	val, err := bs.db.Read(dbkey)
 	if err != nil {
 		common.Log.Errorf("Get %s failed: %v", dbkey, err)
 		return nil, err
 	}
-
 
 	storedData, err := bs.deserialize(val)
 	if err != nil {
@@ -123,22 +117,20 @@ func (bs *NftBuckStore) Get(key int64) (*BuckValue, error) {
 
 func (bs *NftBuckStore) getBucketData(bucket int) map[int64]*BuckValue {
 	result := make(map[int64]*BuckValue)
-	
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		val, err := bs.db.Read(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return nil
-		}
 
-		result, err = bs.deserialize(val)
-			
-		if err != nil {
-			common.Log.Errorf("Value %s failed: %v", dbkey, err)
-			return nil
-		}
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	val, err := bs.db.Read(dbkey)
+	if err != nil {
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
+		return nil
+	}
 
-		
+	result, err = bs.deserialize(val)
+
+	if err != nil {
+		common.Log.Errorf("Value %s failed: %v", dbkey, err)
+		return nil
+	}
 
 	return result
 }
@@ -190,7 +182,7 @@ func (bs *NftBuckStore) BatchPut(valuemap map[int64]*BuckValue) error {
 	for bucket, value := range buckets {
 		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 		item, err := bs.db.Read(dbkey)
-		if err == badger.ErrKeyNotFound {
+		if err == db.ErrKeyNotFound {
 			continue
 		}
 		if err != nil {
@@ -205,7 +197,7 @@ func (bs *NftBuckStore) BatchPut(valuemap map[int64]*BuckValue) error {
 			value[height] = rng
 		}
 	}
-		
+
 	wb := bs.db.NewWriteBatch()
 	defer wb.Close()
 	for bucket, value := range buckets {
@@ -254,7 +246,7 @@ func (bs *NftBuckStore) GetAll() map[int64]*BuckValue {
 		for k, v := range storedData {
 			result[k] = v
 		}
-		
+
 		return nil
 	})
 

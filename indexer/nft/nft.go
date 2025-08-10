@@ -106,27 +106,7 @@ func (p *NftIndexer) GetBaseIndexer() *base.BaseIndexer {
 }
 
 func (p *NftIndexer) Repair() {
-	// addressId, _ := common.GetAddressIdFromDB(baseDB, "bc1pxvkx8ls7kfpx9kt423lqwv6q7hcshwywfnywnxxfd7udyctk93wqe8x9gh")
-	// utxoId, rngs, _ := base_indexer.ShareBaseIndexer.GetOrdinalsForUTXO("4e37618704dbba19f9c26e4eaf99be03bd66e41909f9906d66e886993e32289f:0")
-	// reg := &NameRegister{
-	// 	InscriptionId: "4e37618704dbba19f9c26e4eaf99be03bd66e41909f9906d66e886993e32289fi0",
-	// 	BlockHeight:   827307,
-	// 	Sat:  rngs[0].Start,
-	// 	Name: "pearl",
-	// 	OwnerAddressId: addressId,
-	// 	UtxoId:         utxoId,
-	// }
-	// p.NameRegister(reg)
-	// p.UpdateDB()
-
-	// p.db.Update(func(txn *badger.Txn) error {
-	// 	key := GetNameKey("pearl")
-	// 	err := txn.Delete([]byte(key))
-	// 	if err != nil {
-	// 		common.Log.Panicf("can't delete %s, %v", key, err)
-	// 	}
-	// 	return nil
-	// })
+	
 }
 
 // 每个NFT Mint都调用
@@ -625,55 +605,59 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 		result = false
 	}
 
-	needReCheck := false
+	// needReCheck := false
 	common.Log.Infof("sats not in table %s", DB_PREFIX_NFT)
 	sats1 := findDifferentItemsV2(satsInT1, satsInT2)
 	if len(sats1) > 0 {
 		common.Log.Errorf("sat1 wrong %d %v", len(sats1), sats1)
+		result = false
+
 		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
-		deleteSats := make(map[uint64]uint64)
+		// deleteSats := make(map[uint64]uint64)
 	
-		for sat, utxoId := range sats1 {
-			_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
-			if err != nil {
-				deleteSats[sat] = utxoId
-			}
-		}
+		// for sat, utxoId := range sats1 {
+		// 	_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
+		// 	if err != nil {
+		// 		deleteSats[sat] = utxoId
+		// 	}
+		// }
 		
-		if len(deleteSats) == len(sats1) {
-			p.deleteSats(deleteSats)
-			needReCheck = true
-		} else {
-			result = false
-		}
+		// if len(deleteSats) == len(sats1) {
+		// 	p.deleteSats(deleteSats)
+		// 	needReCheck = true
+		// } else {
+		// 	result = false
+		// }
 	}
 
 	common.Log.Infof("sats not in table %s", DB_PREFIX_UTXO)
 	sats2 := findDifferentItemsV2(satsInT2, satsInT1)
 	if len(sats2) > 0 {
 		common.Log.Errorf("sats2 wrong %d", len(sats2))
+		result = false
+
 		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
-		deleteSats := make(map[uint64]uint64)
+		// deleteSats := make(map[uint64]uint64)
 		
-		for sat, utxoId := range sats2 {
-			_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
-			if err != nil {
-				deleteSats[sat] = utxoId
-			}
-		}
+		// for sat, utxoId := range sats2 {
+		// 	_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
+		// 	if err != nil {
+		// 		deleteSats[sat] = utxoId
+		// 	}
+		// }
 			
-		if len(deleteSats) == len(sats2) {
-			p.deleteSats(deleteSats)
-			needReCheck = true
-		} else {
-			result = false
-		}
+		// if len(deleteSats) == len(sats2) {
+		// 	p.deleteSats(deleteSats)
+		// 	needReCheck = true
+		// } else {
+		// 	result = false
+		// }
 	}
 
-	if needReCheck && !p.reCheck {
-		p.reCheck = true
-		return p.CheckSelf(baseDB)
-	}
+	// if needReCheck && !p.reCheck {
+	// 	p.reCheck = true
+	// 	return p.CheckSelf(baseDB)
+	// }
 
 	// 1. 每个utxoId都存在baseDB中
 	// 2. 两个表格中的数据相互对应: name，sat

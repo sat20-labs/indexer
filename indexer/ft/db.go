@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -32,8 +31,8 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	startTime := time.Now()
 	common.Log.Info("loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
-	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k,v []byte) error {
-		
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
+
 		key := string(k)
 		utxo, err := parseHolderInfoKey(key)
 		if err != nil {
@@ -46,10 +45,10 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 			} else {
 				common.Log.Errorln("DecodeBytes " + err.Error())
 			}
-			
+
 		}
 		count++
-		
+
 		return nil
 	})
 
@@ -68,33 +67,33 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
 	startTime := time.Now()
 	common.Log.Info("loadUtxoMapFromDB ...")
 	result := make(map[string]*map[uint64]int64, 0)
-	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k,v []byte) error {
-	
-			key := string(k)
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k, v []byte) error {
 
-			ticker, utxo, err := parseTickUtxoKey(key)
-			if err != nil {
-				common.Log.Errorln(key + " " + err.Error())
-			} else {
-				var amount int64
-				
-				err = db.DecodeBytes(v, &amount)
-				if err == nil {
-					oldmap, ok := result[ticker]
-					if ok {
-						(*oldmap)[utxo] = amount
-					} else {
-						utxomap := make(map[uint64]int64, 0)
-						utxomap[utxo] = amount
-						result[ticker] = &utxomap
-					}
+		key := string(k)
+
+		ticker, utxo, err := parseTickUtxoKey(key)
+		if err != nil {
+			common.Log.Errorln(key + " " + err.Error())
+		} else {
+			var amount int64
+
+			err = db.DecodeBytes(v, &amount)
+			if err == nil {
+				oldmap, ok := result[ticker]
+				if ok {
+					(*oldmap)[utxo] = amount
 				} else {
-					common.Log.Errorln("DecodeBytes " + err.Error())
+					utxomap := make(map[uint64]int64, 0)
+					utxomap[utxo] = amount
+					result[ticker] = &utxomap
 				}
-				
+			} else {
+				common.Log.Errorln("DecodeBytes " + err.Error())
 			}
-			count++
-		
+
+		}
+		count++
+
 		return nil
 	})
 
@@ -113,15 +112,14 @@ func (s *FTIndexer) loadTickListFromDB() []string {
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadTickListFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k,v []byte) error {
-		
-			key := string(k)
-			tickname, err := parseTickListKey(key)
-			if err == nil {
-				result = append(result, tickname)
-			}
-			count++
-		
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
+
+		key := string(k)
+		tickname, err := parseTickListKey(key)
+		if err == nil {
+			result = append(result, tickname)
+		}
+		count++
 
 		return nil
 	})
@@ -146,17 +144,16 @@ func (s *FTIndexer) getMintListFromDB(tickname string) map[string]*common.Mint {
 
 func (s *FTIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
-	
-		key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
-		err := db.GetValueFromDB([]byte(key), &result, s.db)
-		if err == badger.ErrKeyNotFound {
-			common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
-			return nil
-		} else if err != nil {
-			common.Log.Errorf("GetMintFromDB error: %v", err)
-			return nil
-		}
-		
+
+	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
+	err := db.GetValueFromDB([]byte(key), &result, s.db)
+	if err == db.ErrKeyNotFound {
+		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
+		return nil
+	} else if err != nil {
+		common.Log.Errorf("GetMintFromDB error: %v", err)
+		return nil
+	}
 
 	return &result
 }
@@ -166,24 +163,23 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadMintDataFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY + strings.ToLower(tickerName) + "-"), false, func(k,v []byte) error {
-	
-			key := string(k)
+	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+strings.ToLower(tickerName)+"-"), false, func(k, v []byte) error {
 
-			tick, utxo, _ := ParseMintHistoryKey(key)
-			if tick == tickerName {
-				var mint common.Mint
-				
-				err := db.DecodeBytes(v, &mint)
-				if err == nil {
-					result[utxo] = &mint
-				} else {
-					common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
-				}
-				
+		key := string(k)
+
+		tick, utxo, _ := ParseMintHistoryKey(key)
+		if tick == tickerName {
+			var mint common.Mint
+
+			err := db.DecodeBytes(v, &mint)
+			if err == nil {
+				result[utxo] = &mint
+			} else {
+				common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
 			}
-			count++
-		
+
+		}
+		count++
 
 		return nil
 	})
@@ -200,16 +196,16 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 
 func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	var result common.Ticker
-	
-		key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
-		err := db.GetValueFromDB([]byte(key), &result, s.db)
-		if err == badger.ErrKeyNotFound {
-			common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
-			return nil
-		} else if err != nil {
-			common.Log.Errorf("GetTickFromDB error: %v", err)
-			return nil
-		}
-		
+
+	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
+	err := db.GetValueFromDB([]byte(key), &result, s.db)
+	if err == db.ErrKeyNotFound {
+		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
+		return nil
+	} else if err != nil {
+		common.Log.Errorf("GetTickFromDB error: %v", err)
+		return nil
+	}
+
 	return &result
 }

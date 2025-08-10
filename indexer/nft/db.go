@@ -11,19 +11,18 @@ import (
 
 func initStatusFromDB(ldb db.KVDB) *common.NftStatus {
 	stats := &common.NftStatus{}
-		err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), stats, ldb)
-		if err != nil {
-			common.Log.Info("initStatusFromDB no stats found in db")
-			stats.Version = NFT_DB_VERSION
-		}
-		common.Log.Infof("nft stats: %v", stats)
+	err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), stats, ldb)
+	if err == db.ErrKeyNotFound {
+		common.Log.Info("initStatusFromDB no stats found in db")
+		stats.Version = NFT_DB_VERSION
+	} else if err != nil {
+		common.Log.Panicf("initStatusFromDB failed. %v", err)
+	}
+	common.Log.Infof("nft stats: %v", stats)
 
-		if stats.Version != NFT_DB_VERSION {
-			common.Log.Panicf("nft data version inconsistent %s", NFT_DB_VERSION)
-		}
-
-		
-	
+	if stats.Version != NFT_DB_VERSION {
+		common.Log.Panicf("nft data version inconsistent %s", NFT_DB_VERSION)
+	}
 
 	return stats
 }
@@ -68,8 +67,9 @@ func hasNftInUtxo(utxoId uint64, ldb db.KVDB) bool {
 	return err == nil
 }
 
+// 聪的十进制数字不超过16位，为了排序，这里填足够的0
 func GetSatKey(sat int64) string {
-	return fmt.Sprintf("%s%d", DB_PREFIX_NFT, sat)
+	return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat)
 }
 
 func GetUtxoKey(UtxoId uint64) string {

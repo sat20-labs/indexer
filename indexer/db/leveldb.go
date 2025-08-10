@@ -50,7 +50,7 @@ func (p *kvDB) get(key []byte) ([]byte, error) {
 	val, err := p.db.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			return nil, err
+			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}

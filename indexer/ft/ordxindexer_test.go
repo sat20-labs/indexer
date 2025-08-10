@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
-	badger "github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/exotic"
@@ -46,64 +44,6 @@ func printRBTree(tree *indexer.RangeRBTree) {
 	fmt.Printf("\n")
 }
 
-func TestPerformanceInitFromDB(t *testing.T) {
-	opts := badger.DefaultOptions("../../ordx-db").
-		WithLoggingLevel(badger.WARNING).
-		WithBlockCacheSize(2000 << 20)
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	disksize, uncompresssize := db.EstimateSize([]byte("u-"))
-	fmt.Printf("disksize size %d, uncompresssize %d\n", disksize/(1024*1024), uncompresssize/(1024*1024))
-
-	lsm, vlog := db.Size()
-	fmt.Printf("lsm size %d, vlog %d\n", lsm/(1024*1024), vlog/(1024*1024))
-
-	// lvs := db.Levels()
-	// fmt.Println(lvs)
-
-	// tbs := db.Tables()
-	// fmt.Println(tbs)
-
-	count := 0
-	startTime := time.Now()
-	err = db.View(func(txn *badger.Txn) error {
-		prefix := []byte("u-066")
-
-		// 设置前缀扫描选项
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefix
-
-		// 使用前缀扫描选项创建迭代器
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-
-		// 遍历匹配前缀的key
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			//item := it.Item()
-			//key := item.Key()
-
-			// ticker
-			//fmt.Printf("key: %s\n", key)
-
-			// 进行你的处理，例如统计数量等
-			count++
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		t.Fatal("Error prefetching utxos from db ", err)
-	}
-
-	elapsed := time.Since(startTime).Milliseconds()
-	fmt.Printf("initFromDB %d utxos in %d ms\n", count, elapsed)
-}
 
 func TestSplitRange(t *testing.T) {
 

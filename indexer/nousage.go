@@ -1169,23 +1169,23 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 	common.Log.Infof("calculating in %s table ...", ns.DB_PREFIX_NAME)
 	p.nsDB.BatchRead([]byte(ns.DB_PREFIX_NAME), false, func(k, v []byte) error {
 
-		var value ns.NameValueInDB
-		err := db.DecodeBytesWithProto3(v, &value)
+		var nameValue ns.NameValueInDB
+		err := db.DecodeBytesWithProto3(v, &nameValue)
 		if err != nil {
 			common.Log.Panicf("item.Value error: %v", err)
 		}
 
-		satsInT1[value.Sat] = true
-		parts := strings.Split(value.Name, ".")
+		satsInT1[nameValue.Sat] = true
+		parts := strings.Split(nameValue.Name, ".")
 		var key, val string
 		if len(parts) == 2 {
 			key = parts[1]
 			val = parts[0]
 		} else if len(parts) == 1 {
 			key = "."
-			val = value.Name
+			val = nameValue.Name
 		} else {
-			common.Log.Infof("wrong format %s", value.Name)
+			common.Log.Infof("wrong format %s", nameValue.Name)
 		}
 		m, ok := namesInT1[key]
 		if ok {

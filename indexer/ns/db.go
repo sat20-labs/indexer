@@ -14,9 +14,11 @@ func initStatusFromDB(ldb db.KVDB) *common.NameServiceStatus {
 	stats := &common.NameServiceStatus{}
 	
 	err := db.GetValueFromDB([]byte(NS_STATUS_KEY), stats, ldb)
-	if err != nil {
+	if err == db.ErrKeyNotFound {
 		common.Log.Info("initStatusFromDB no stats found in db")
 		stats.Version = NS_DB_VERSION
+	} else if err != nil {
+		common.Log.Panicf("initStatusFromDB failed. %v", err)
 	}
 	common.Log.Infof("ns stats: %v", stats)
 

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -33,15 +32,18 @@ func (bs *BuckStore) Put(key int, value *common.Range) error {
 
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	item, err := bs.db.Read(dbkey)
-	if err != nil && err != badger.ErrKeyNotFound {
+	if err != nil && err != db.ErrKeyNotFound {
 		common.Log.Errorf("Get %s: %v", dbkey, err)
 		return err
 	}
 
-	storedData, err := bs.deserialize(item)	
-	if err != nil {
-		common.Log.Errorf("deserialize: %v", err)
-		return err
+	var storedData map[int]*common.Range
+	if err == nil {
+		storedData, err = bs.deserialize(item)
+		if err != nil {
+			common.Log.Errorf("deserialize: %v", err)
+			return err
+		}
 	} else {
 		storedData = make(map[int]*common.Range)
 	}
@@ -63,8 +65,7 @@ func (bs *BuckStore) Put(key int, value *common.Range) error {
 	binary.BigEndian.PutUint32(lastKeyBytes, uint32(key))
 	err = bs.db.Write([]byte(key_last), lastKeyBytes)
 	if err != nil {
-		common.Log.Errorf("db.Write %s failed: %v", key_last, err)
-		return err
+		common.Log.Panicf("failed to update DB: %v", err)
 	}
 
 	return nil
@@ -72,7 +73,7 @@ func (bs *BuckStore) Put(key int, value *common.Range) error {
 }
 
 func (bs *BuckStore) GetLastKey() int {
-	
+
 	dbkey := []byte(key_last)
 	val, err := bs.db.Read(dbkey)
 	if err != nil {
@@ -88,7 +89,7 @@ func (bs *BuckStore) Get(key int) (*common.Range, error) {
 
 	var value *common.Range
 	var ok bool
-	
+
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	val, err := bs.db.Read(dbkey)
 	if err != nil {
@@ -96,7 +97,6 @@ func (bs *BuckStore) Get(key int) (*common.Range, error) {
 		return nil, err
 	}
 
-	
 	storedData, err := bs.deserialize(val)
 	if err != nil {
 		common.Log.Errorf("Value %s failed: %v", dbkey, err)
@@ -118,7 +118,6 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 	buckets := make(map[int]map[int]*common.Range, 0)
 
 	var err error
-	
 
 	for height, value := range valuemap {
 		bucket := bs.getBucket(height)
@@ -138,7 +137,7 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 	for bucket, value := range buckets {
 		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 		val, err := bs.db.Read(dbkey)
-		if err == badger.ErrKeyNotFound {
+		if err == db.ErrKeyNotFound {
 			continue
 		}
 		if err != nil {
@@ -153,7 +152,6 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 			value[height] = rng
 		}
 	}
-	
 
 	wb := bs.db.NewWriteBatch()
 	defer wb.Close()
@@ -193,8 +191,8 @@ func (bs *BuckStore) GetAll() map[int]*common.Range {
 	result := make(map[int]*common.Range, 0)
 	err := bs.db.BatchRead([]byte(bs.prefix), false, func(k, v []byte) error {
 		// 设置前缀扫描选项
-		
-		bulk, err := bs.deserialize(v)	
+
+		bulk, err := bs.deserialize(v)
 		if err != nil {
 			common.Log.Errorf("Value failed: %v", err)
 			return nil
@@ -202,7 +200,7 @@ func (bs *BuckStore) GetAll() map[int]*common.Range {
 		for k, v := range bulk {
 			result[k] = v
 		}
-		
+
 		return nil
 	})
 

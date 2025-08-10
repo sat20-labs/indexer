@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -36,95 +35,90 @@ func NewBuckStore(db db.KVDB) *NSBuckStore {
 func (bs *NSBuckStore) Put(key int, value *BuckValue) error {
 	bucket := bs.getBucket(key)
 
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		item, err := bs.db.Read(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s: %v", dbkey, err)
-			return err
-		}
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	item, err := bs.db.Read(dbkey)
+	if err != nil && err != db.ErrKeyNotFound {
+		common.Log.Errorf("Get %s: %v", dbkey, err)
+		return err
+	}
 
-		storedData, err := bs.deserialize(item)
+	var storedData map[int]*BuckValue
+	if err == nil {
+		storedData, err = bs.deserialize(item)
 		if err != nil {
 			common.Log.Errorf("deserialize: %v", err)
 			return err
-		} else {
-			storedData = make(map[int]*BuckValue, 0)
 		}
-		
+	} else {
+		storedData = make(map[int]*BuckValue, 0)
+	}
 
-		storedData[key] = value
+	storedData[key] = value
+	serializedData, err := bs.serialize(storedData)
+	if err != nil {
+		return err
+	}
 
-		serializedData, err := bs.serialize(storedData)
-		if err != nil {
-			return err
-		}
+	err = bs.db.Write(dbkey, serializedData)
+	if err != nil {
+		common.Log.Errorf("SetEntry %s failed: %v", dbkey, err)
+		return err
+	}
 
-		err = bs.db.Write(dbkey, serializedData)
-		if err != nil {
-			common.Log.Errorf("SetEntry %s failed: %v", dbkey, err)
-			return err
-		}
-
-		lastKeyBytes := make([]byte, binary.MaxVarintLen32)
-		binary.BigEndian.PutUint32(lastKeyBytes, uint32(key))
-		err =bs.db.Write([]byte(key_last), lastKeyBytes)
-		if err != nil {
-			common.Log.Errorf("SetEntry %s failed: %v", key_last, err)
-			return err
-		}
+	lastKeyBytes := make([]byte, binary.MaxVarintLen32)
+	binary.BigEndian.PutUint32(lastKeyBytes, uint32(key))
+	err = bs.db.Write([]byte(key_last), lastKeyBytes)
 
 	if err != nil {
-		common.Log.Panicf("failed to update Badger DB: %v", err)
+		common.Log.Panicf("failed to update DB: %v", err)
 	}
 
 	return nil
 }
 
 func (bs *NSBuckStore) GetLastKey() int {
-	
-		dbkey := []byte(key_last)
-		item, err := bs.db.Read(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return -1
-		}
-		
-		return int(binary.BigEndian.Uint32(item))
-			
+
+	dbkey := []byte(key_last)
+	item, err := bs.db.Read(dbkey)
+	if err != nil {
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
+		return -1
+	}
+
+	return int(binary.BigEndian.Uint32(item))
+
 }
 
 func (bs *NSBuckStore) Get(key int) (*BuckValue, error) {
 	bucket := bs.getBucket(key)
 
 	var value *BuckValue
-	
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		item, err := bs.db.Read(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return nil, err
-		}
-		
-		storedData, err := bs.deserialize(item)
-		if err != nil {
-			common.Log.Errorf("Value %s failed: %v", dbkey, err)
-			return nil, err
-		}
 
-		var ok bool
-		value, ok = storedData[key]
-		if !ok {
-			common.Log.Errorf("key %d not found in bucket", key)
-			return nil, fmt.Errorf("key not found in bucket")
-		}
-		
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	item, err := bs.db.Read(dbkey)
+	if err != nil {
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
+		return nil, err
+	}
+
+	storedData, err := bs.deserialize(item)
+	if err != nil {
+		common.Log.Errorf("Value %s failed: %v", dbkey, err)
+		return nil, err
+	}
+
+	var ok bool
+	value, ok = storedData[key]
+	if !ok {
+		common.Log.Errorf("key %d not found in bucket", key)
+		return nil, fmt.Errorf("key not found in bucket")
+	}
 
 	return value, nil
 }
 
 func (bs *NSBuckStore) getBucketData(bucket int) map[int]*BuckValue {
-	
-	
+
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	item, err := bs.db.Read(dbkey)
 	if err != nil {
@@ -169,45 +163,40 @@ func (bs *NSBuckStore) BatchPut(valuemap map[int]*BuckValue) error {
 	buckets := make(map[int]map[int]*BuckValue, 0)
 
 	var err error
-	
 
-		for key, value := range valuemap {
-			bucket := bs.getBucket(key)
-			rngmap, ok := buckets[bucket]
-			if ok {
-				rngmap[key] = value
-			} else {
-				rngmap = make(map[int]*BuckValue)
-				rngmap[key] = value
-				buckets[bucket] = rngmap
-			}
-			if key > lastkey {
-				lastkey = key
-			}
+	for key, value := range valuemap {
+		bucket := bs.getBucket(key)
+		rngmap, ok := buckets[bucket]
+		if ok {
+			rngmap[key] = value
+		} else {
+			rngmap = make(map[int]*BuckValue)
+			rngmap[key] = value
+			buckets[bucket] = rngmap
+		}
+		if key > lastkey {
+			lastkey = key
+		}
+	}
+
+	for bucket, value := range buckets {
+		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+		item, err := bs.db.Read(dbkey)
+		if err == db.ErrKeyNotFound {
+			continue
+		}
+		if err != nil {
+			common.Log.Panicf("Get %s failed. %v", dbkey, err)
 		}
 
-		for bucket, value := range buckets {
-			dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-			item, err := bs.db.Read(dbkey)
-			if err == badger.ErrKeyNotFound {
-				continue
-			}
-			if err != nil {
-				common.Log.Panicf("Get %s failed. %v", dbkey, err)
-			}
-
-			
-			
-			storedData, err := bs.deserialize(item)
-			if err != nil {
-				common.Log.Panicf("Value %s failed. %v", dbkey, err)
-			}
-			for height, rng := range storedData {
-				value[height] = rng
-			}
+		storedData, err := bs.deserialize(item)
+		if err != nil {
+			common.Log.Panicf("Value %s failed. %v", dbkey, err)
 		}
-		
-	
+		for height, rng := range storedData {
+			value[height] = rng
+		}
+	}
 
 	wb := bs.db.NewWriteBatch()
 	defer wb.Close()
@@ -243,21 +232,21 @@ func (bs *NSBuckStore) Reset() {
 func (bs *NSBuckStore) GetAll() map[int]*BuckValue {
 	result := make(map[int]*BuckValue, 0)
 	err := bs.db.BatchRead([]byte(bs.prefix), false, func(k, v []byte) error {
-		
-			if string(k) == key_last {
-				return nil
-			}
 
-			storedData, err := bs.deserialize(v)
-			if err != nil {
-				// last_key
-				common.Log.Errorf("Value %s failed: %v", string(k), err)
-				return nil
-			}
-			for k, v := range storedData {
-				result[k] = v
-			}
-		
+		if string(k) == key_last {
+			return nil
+		}
+
+		storedData, err := bs.deserialize(v)
+		if err != nil {
+			// last_key
+			common.Log.Errorf("Value %s failed: %v", string(k), err)
+			return nil
+		}
+		for k, v := range storedData {
+			result[k] = v
+		}
+
 		return nil
 	})
 
