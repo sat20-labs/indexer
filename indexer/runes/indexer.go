@@ -125,6 +125,9 @@ func (s *Indexer) Subtract(backupIndexer *Indexer) {
 }
 
 func (s *Indexer) CheckSelf() bool {
+
+	common.Log.Infof("total runes: %d", len(s.GetAllRuneIds()))
+
 	var firstRuneName = ""
 	switch s.chaincfgParam.Net {
 	case wire.TestNet4:

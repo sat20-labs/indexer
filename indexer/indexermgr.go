@@ -328,8 +328,9 @@ func (b *IndexerMgr) checkSelf() {
 		b.RunesIndexer.CheckSelf() &&
 		b.ns.CheckSelf(b.baseDB) {
 		common.Log.Infof("IndexerMgr.checkSelf takes %v", time.Since(start))
+	} else {
+		common.Log.Errorf("db check failed.")
 	}
-
 }
 
 func (b *IndexerMgr) forceUpdateDB() {

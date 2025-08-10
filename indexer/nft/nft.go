@@ -22,7 +22,6 @@ type NftIndexer struct {
 	db       db.KVDB
 	status   *common.NftStatus
 	bEnabled bool
-	reCheck  bool
 
 	baseIndexer *base.BaseIndexer
 	mutex       sync.RWMutex
@@ -493,7 +492,7 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	getbuck()
 
 	//wg.Wait()
-	common.Log.Infof("nft count: %d %d %d", p.status.Count, len(nftsInT1), lastkey+1)
+	common.Log.Infof("nft count: %d %d %d", p.status.Count - uint64(len(p.nftAdded)), len(nftsInT1), lastkey+1)
 
 	wrongAddress := make([]uint64, 0)
 	wrongUtxo1 := make([]uint64, 0)
@@ -505,7 +504,7 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	startTime2 = time.Now()
 	for address := range addressesInT1 {
 		key := db.GetAddressIdKey(address)
-		_, err := p.db.Read(key)
+		_, err := baseDB.Read(key)
 		if err != nil {
 			wrongAddress = append(wrongAddress, address)
 		}
@@ -519,7 +518,7 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
 	for utxo := range utxosInT2 {
 		key := db.GetUtxoIdKey(utxo)
-		_, err := p.db.Read(key)
+		_, err := baseDB.Read(key)
 		if err != nil {
 			wrongUtxo2 = append(wrongUtxo2, utxo)
 		}
@@ -611,23 +610,6 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	if len(sats1) > 0 {
 		common.Log.Errorf("sat1 wrong %d %v", len(sats1), sats1)
 		result = false
-
-		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
-		// deleteSats := make(map[uint64]uint64)
-	
-		// for sat, utxoId := range sats1 {
-		// 	_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
-		// 	if err != nil {
-		// 		deleteSats[sat] = utxoId
-		// 	}
-		// }
-		
-		// if len(deleteSats) == len(sats1) {
-		// 	p.deleteSats(deleteSats)
-		// 	needReCheck = true
-		// } else {
-		// 	result = false
-		// }
 	}
 
 	common.Log.Infof("sats not in table %s", DB_PREFIX_UTXO)
@@ -635,29 +617,7 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	if len(sats2) > 0 {
 		common.Log.Errorf("sats2 wrong %d", len(sats2))
 		result = false
-
-		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
-		// deleteSats := make(map[uint64]uint64)
-		
-		// for sat, utxoId := range sats2 {
-		// 	_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
-		// 	if err != nil {
-		// 		deleteSats[sat] = utxoId
-		// 	}
-		// }
-			
-		// if len(deleteSats) == len(sats2) {
-		// 	p.deleteSats(deleteSats)
-		// 	needReCheck = true
-		// } else {
-		// 	result = false
-		// }
 	}
-
-	// if needReCheck && !p.reCheck {
-	// 	p.reCheck = true
-	// 	return p.CheckSelf(baseDB)
-	// }
 
 	// 1. 每个utxoId都存在baseDB中
 	// 2. 两个表格中的数据相互对应: name，sat
