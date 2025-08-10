@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -89,9 +88,22 @@ func (p *kvDB) Delete(key []byte) error {
 	return p.commit()
 }
 
-func (p *kvDB) DropPrefix([]byte) error {
-	// TODO 
-	return fmt.Errorf("not implemented")
+func (p *kvDB) DropPrefix(prefix []byte) error {
+	deletingKeyMap := make(map[string]bool)
+	err := p.iterForwardWithPrefix(prefix, nil, func(k []byte, v []byte) error {
+		deletingKeyMap[string(k)] = true
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	wb := p.NewWriteBatch()
+	defer wb.Close()
+
+	for k := range deletingKeyMap {
+		wb.Delete([]byte(k))
+	}
+	return wb.Flush()
 }
 
 func (p *kvDB) Close() error {
