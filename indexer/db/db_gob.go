@@ -58,7 +58,7 @@ func GetValueFromDB(key []byte, v interface{}, db KVDB) (error) {
 	if err != nil {
 		return err
 	}
-	if err := DecodeBytes(buf, &v); err != nil {
+	if err := DecodeBytes(buf, v); err != nil {
 		return err
 	}
 	return nil

@@ -129,6 +129,9 @@ func (s *Indexer) CheckSelf() bool {
 	switch s.chaincfgParam.Net {
 	case wire.TestNet4:
 		firstRuneName = "BESTINSLOT•XYZ"
+		if s.height < 30562 {
+			return true
+		}
 	case wire.MainNet:
 		firstRuneName = "UNCOMMON•GOODS"
 		if s.height < 840000 {
