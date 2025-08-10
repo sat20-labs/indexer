@@ -21,3 +21,6 @@ type KVDB interface {
 	BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error  // 只用于非客户端模式下
 }
 
+func RunDBGC(db KVDB) {
+
+}

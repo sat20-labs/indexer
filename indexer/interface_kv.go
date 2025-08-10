@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -55,7 +54,7 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 
 	wb := b.kvDB.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	checkedPubKey := make(map[string]bool)
 	for _, value := range kvs {
@@ -110,7 +109,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
 
 	wb := b.kvDB.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	pkStr := hex.EncodeToString(pubkey)
 
@@ -137,18 +136,17 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 
 	pkStr := hex.EncodeToString(pubkey)
 	result := make([]*common.KeyValue, 0)
-	b.kvDB.View(func(txn *badger.Txn) error {
+	
 		for _, k := range keys {
 			key := getKvKey(pkStr, k)
 
-			item, err := txn.Get([]byte(key))
+			item, err := b.kvDB.Read([]byte(key))
 			if err != nil {
 				continue
 			}
 			var value common.KeyValue
-			err = item.Value(func(v []byte) error {
-				return db.DecodeBytes(v, &value)
-			})
+			
+			err = db.DecodeBytes(item, &value)
 			if err != nil {
 				common.Log.Errorf("decoding key %s failed, %v", key, err)
 				continue
@@ -156,8 +154,8 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 
 			result = append(result, &value)
 		}
-		return nil
-	})
+		
+	
 
 	return result, nil
 }

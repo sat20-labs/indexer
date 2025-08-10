@@ -294,14 +294,14 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 }
 
 func (b *IndexerMgr) dbgc() {
-	db.RunBadgerGC(b.kvDB)
-	db.RunBadgerGC(b.localDB)
-	db.RunBadgerGC(b.baseDB)
-	db.RunBadgerGC(b.nftDB)
-	db.RunBadgerGC(b.nsDB)
-	db.RunBadgerGC(b.ftDB)
-	db.RunBadgerGC(b.brc20DB)
-	db.RunBadgerGC(b.runesDB)
+	db.RunDBGC(b.kvDB)
+	db.RunDBGC(b.localDB)
+	db.RunDBGC(b.baseDB)
+	db.RunDBGC(b.nftDB)
+	db.RunDBGC(b.nsDB)
+	db.RunDBGC(b.ftDB)
+	db.RunDBGC(b.brc20DB)
+	db.RunDBGC(b.runesDB)
 	common.Log.Infof("dbgc completed")
 }
 

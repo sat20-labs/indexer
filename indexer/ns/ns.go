@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
@@ -111,7 +110,7 @@ func (p *NameService) UpdateDB() {
 	buckNames := make(map[int]*BuckValue)
 
 	wb := p.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	// index: name
 	for _, name := range p.nameAdded {
@@ -179,39 +178,24 @@ func (p *NameService) CheckSelf(baseDB db.KVDB) bool {
 	nftIdInT1 := make(map[int64]bool, 0)
 	namesInT1 := make(map[string]bool, 0)
 	satsInT1 := make(map[int64]bool, 0)
-	p.db.View(func(txn *badger.Txn) error {
+	startTime2 := time.Now()
+	common.Log.Infof("calculating in %s table ...", DB_PREFIX_NAME)
+	p.db.BatchRead([]byte(DB_PREFIX_NAME), false, func(k, v []byte) error {
 		//defer wg.Done()
-
-		var err error
-		prefix := []byte(DB_PREFIX_NAME)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", DB_PREFIX_NAME)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value NameValueInDB
-			err = item.Value(func(data []byte) error {
-				// return db.DecodeBytes(data, &value)
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Panicf("item.Value error: %v", err)
-			}
-
-			nftIdInT1[value.NftId] = true
-			namesInT1[value.Name] = true
-			satsInT1[value.Sat] = true
+		
+		var value NameValueInDB
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
 		}
 
-		common.Log.Infof("%s table takes %v", DB_PREFIX_NAME, time.Since(startTime2))
+		nftIdInT1[value.NftId] = true
+		namesInT1[value.Name] = true
+		satsInT1[value.Sat] = true
+		
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", DB_PREFIX_NAME, time.Since(startTime2))
 
 	bs := NewBuckStore(p.db)
 	lastkey := bs.GetLastKey()

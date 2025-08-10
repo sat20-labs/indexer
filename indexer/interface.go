@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -522,9 +521,8 @@ func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string
 	value := make([]string, 0)
 	switch ntype {
 	case common.ASSET_TYPE_NFT:
-		err := b.localDB.View(func(txn *badger.Txn) error {
-			return db.GetValueFromDB(key, txn, value)
-		})
+	
+		err := db.GetValueFromDB(key, value, b.localDB)
 		if err != nil {
 			common.Log.Errorf("GetCollection %s %s failed: %v", ntype, ticker, err)
 		}

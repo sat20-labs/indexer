@@ -3,7 +3,6 @@ package ns
 import (
 	"strings"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -95,10 +94,7 @@ func (p *NameService) IsNameExist(name string) bool {
 	}
 
 	value := NameValueInDB{}
-	err := p.db.View(func(txn *badger.Txn) error {
-		return loadNameFromDB(name, &value, txn)
-	})
-
+	err := loadNameFromDB(name, &value, p.db)
 	return err == nil
 }
 
@@ -113,9 +109,7 @@ func (p *NameService) GetNameRegisterInfo(name string) *NameRegister {
 	}
 
 	value := NameValueInDB{}
-	err := p.db.View(func(txn *badger.Txn) error {
-		return loadNameFromDB(name, &value, txn)
-	})
+	err := loadNameFromDB(name, &value, p.db)
 	if err != nil {
 		return nil
 	}

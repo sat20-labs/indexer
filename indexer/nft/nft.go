@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
@@ -167,36 +166,36 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 	defer p.mutex.Unlock()
 
 	startTime := time.Now()
-	p.db.View(func(txn *badger.Txn) error {
-		for _, tx := range block.Transactions[1:] {
-			hasAsset := false
-			for _, input := range tx.Inputs {
-				sats := p.getBindingSatsWithUtxo(input.UtxoId, txn)
-				for sat := range sats {
+	
+	for _, tx := range block.Transactions[1:] {
+		hasAsset := false
+		for _, input := range tx.Inputs {
+			sats := p.getBindingSatsWithUtxo(input.UtxoId)
+			for sat := range sats {
 
-					p.satTree.Put(sat, true)
-				}
-				if len(sats) > 0 {
-					hasAsset = true
-					delete(p.utxoMap, input.UtxoId)
-					p.utxoDeled = append(p.utxoDeled, input.UtxoId)
-				}
+				p.satTree.Put(sat, true)
 			}
-
-			if hasAsset {
-				for _, output := range tx.Outputs {
-					p.innerUpdateTransfer2(output)
-				}
+			if len(sats) > 0 {
+				hasAsset = true
+				delete(p.utxoMap, input.UtxoId)
+				p.utxoDeled = append(p.utxoDeled, input.UtxoId)
 			}
 		}
 
-		// 按顺序是最后一块，要放最后，保持顺序很重要
-		tx := block.Transactions[0]
-		for _, output := range tx.Outputs {
-			p.innerUpdateTransfer2(output)
+		if hasAsset {
+			for _, output := range tx.Outputs {
+				p.innerUpdateTransfer2(output)
+			}
 		}
-		return nil
-	})
+	}
+
+	// 按顺序是最后一块，要放最后，保持顺序很重要
+	tx := block.Transactions[0]
+	for _, output := range tx.Outputs {
+		p.innerUpdateTransfer2(output)
+	}
+		
+	
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
@@ -226,11 +225,8 @@ func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
 }
 
 func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
-	p.db.View(func(txn *badger.Txn) error {
-		p.getBindingSatsWithUtxo(utxoId, txn)
-		return nil
-	})
-
+	
+	p.getBindingSatsWithUtxo(utxoId)
 	satmap, ok := p.utxoMap[utxoId]
 	if ok {
 		satmap[sat] = true
@@ -242,14 +238,14 @@ func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
 }
 
 // fast
-func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn *badger.Txn) map[int64]bool {
+func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64) map[int64]bool {
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		return sats
 	}
 
 	value := NftsInUtxo{}
-	err := loadUtxoValueFromDB(utxoId, &value, txn)
+	err := loadUtxoValueFromDB(utxoId, &value, p.db)
 	if err != nil {
 		//common.Log.Infof("loadUtxoValueFromDB %d failed. %v", utxoId, err)
 		return nil
@@ -305,7 +301,7 @@ func (p *NftIndexer) getNftInBuffer4(sat int64) *common.Nft {
 func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 	nftmap := make(map[int64]*common.NftsInSat)
 
-	p.db.View(func(txn *badger.Txn) error {
+	
 
 		for sat, info := range p.satMap {
 			_, ok := nftmap[sat]
@@ -313,7 +309,7 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 				key := GetSatKey(sat)
 				oldvalue := common.NftsInSat{}
 				// err := db.GetValueFromDB([]byte(key), txn, &oldvalue)
-				err := db.GetValueFromDBWithProto3([]byte(key), txn, &oldvalue)
+				err := db.GetValueFromDBWithProto3([]byte(key), p.db, &oldvalue)
 				if err == nil {
 					oldvalue.OwnerAddressId = info.AddressId
 					oldvalue.UtxoId = info.UtxoId
@@ -346,8 +342,7 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 			}
 		}
 
-		return nil
-	})
+		
 
 	return nftmap
 }
@@ -366,7 +361,7 @@ func (p *NftIndexer) UpdateDB() {
 	buckNfts := make(map[int64]*BuckValue)
 
 	wb := p.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	for _, nft := range p.nftAdded {
 		key := GetInscriptionIdKey(nft.Base.InscriptionId)
@@ -453,87 +448,57 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	utxosInT1 := make(map[uint64]bool, 0)
 	satsInT1 := make(map[uint64]uint64, 0)
 	nftsInT1 := make(map[int64]bool, 0)
-	p.db.View(func(txn *badger.Txn) error {
+	startTime2 := time.Now()
+	common.Log.Infof("calculating in %s table ...", DB_PREFIX_NFT)
+	p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
 		//defer wg.Done()
 
-		var err error
-		prefix := []byte(DB_PREFIX_NFT)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", DB_PREFIX_NFT)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value common.NftsInSat
-			err = item.Value(func(data []byte) error {
-				// return db.DecodeBytes(data, &value)
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Panicf("item.Value error: %v", err)
-			}
-
-			addressesInT1[value.OwnerAddressId] = true
-			utxosInT1[value.UtxoId] = true
-			satsInT1[uint64(value.Sat)] = value.UtxoId
-			for _, nft := range value.Nfts {
-				nftsInT1[nft.Id] = true
-			}
+		var value common.NftsInSat
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
 		}
 
-		common.Log.Infof("%s table takes %v", DB_PREFIX_NFT, time.Since(startTime2))
-		common.Log.Infof("1: address %d, utxo %d, sats %d, nfts %d", len(addressesInT1), len(utxosInT1), len(satsInT1), len(nftsInT1))
+		addressesInT1[value.OwnerAddressId] = true
+		utxosInT1[value.UtxoId] = true
+		satsInT1[uint64(value.Sat)] = value.UtxoId
+		for _, nft := range value.Nfts {
+			nftsInT1[nft.Id] = true
+		}
+
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", DB_PREFIX_NFT, time.Since(startTime2))
+	common.Log.Infof("1: address %d, utxo %d, sats %d, nfts %d", len(addressesInT1), len(utxosInT1), len(satsInT1), len(nftsInT1))
+	
 
 	// utxo的数据涉及到delete操作，但是badger的delete操作有隐藏的bug，需要检查下该utxo是否存在
 	utxosInT2 := make(map[uint64]bool)
 	satsInT2 := make(map[uint64]uint64)
-	p.db.View(func(txn *badger.Txn) error {
+	startTime2 = time.Now()
+	common.Log.Infof("calculating in %s table ...", DB_PREFIX_UTXO)
+	p.db.BatchRead([]byte(DB_PREFIX_UTXO), false, func(k, v []byte) error {
 		//defer wg.Done()
 
-		var err error
-		prefix := []byte(DB_PREFIX_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", DB_PREFIX_UTXO)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value NftsInUtxo
-			err = item.Value(func(data []byte) error {
-				// return db.DecodeBytes(data, &value)
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Panicf("item.Value error: %v", err)
-			}
-
-			utxoId, err := ParseUtxoKey(string(item.Key()))
-			if err != nil {
-				common.Log.Panicf("item.Key error: %v", err)
-			}
-
-			utxosInT2[utxoId] = true
-			for _, sat := range value.Sats {
-				satsInT2[uint64(sat)] = utxoId
-			}
+		var value NftsInUtxo
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
 		}
 
-		common.Log.Infof("%s table takes %v", DB_PREFIX_UTXO, time.Since(startTime2))
-		common.Log.Infof("2: utxo %d, sats %d", len(utxosInT2), len(satsInT2))
+		utxoId, err := ParseUtxoKey(string(k))
+		if err != nil {
+			common.Log.Panicf("item.Key error: %v", err)
+		}
+
+		utxosInT2[utxoId] = true
+		for _, sat := range value.Sats {
+			satsInT2[uint64(sat)] = utxoId
+		}
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", DB_PREFIX_UTXO, time.Since(startTime2))
+	common.Log.Infof("2: utxo %d, sats %d", len(utxosInT2), len(satsInT2))
 
 	bs := NewBuckStore(p.db)
 	lastkey := bs.GetLastKey()
@@ -555,33 +520,32 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	wrongUtxo2 := make([]uint64, 0)
 
 	//wg.Add(2)
-	baseDB.View(func(txn *badger.Txn) error {
+	
 		//defer wg.Done()
-		startTime2 := time.Now()
-		for address := range addressesInT1 {
-			key := db.GetAddressIdKey(address)
-			_, err := txn.Get(key)
-			if err != nil {
-				wrongAddress = append(wrongAddress, address)
-			}
+	startTime2 = time.Now()
+	for address := range addressesInT1 {
+		key := db.GetAddressIdKey(address)
+		_, err := p.db.Read(key)
+		if err != nil {
+			wrongAddress = append(wrongAddress, address)
 		}
-		common.Log.Infof("check addressesInT1 in baseDB takes %v", time.Since(startTime2))
-		return nil
-	})
-	baseDB.View(func(txn *badger.Txn) error {
-		//defer wg.Done()
-		startTime2 := time.Now()
-		// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
-		for utxo := range utxosInT2 {
-			key := db.GetUtxoIdKey(utxo)
-			_, err := txn.Get(key)
-			if err != nil {
-				wrongUtxo2 = append(wrongUtxo2, utxo)
-			}
+	}
+	common.Log.Infof("check addressesInT1 in baseDB takes %v", time.Since(startTime2))
+	
+	
+
+	//defer wg.Done()
+	startTime2 = time.Now()
+	// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
+	for utxo := range utxosInT2 {
+		key := db.GetUtxoIdKey(utxo)
+		_, err := p.db.Read(key)
+		if err != nil {
+			wrongUtxo2 = append(wrongUtxo2, utxo)
 		}
-		common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
-		return nil
-	})
+	}
+	common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
+		
 	//wg.Wait()
 	common.Log.Infof("check in baseDB completed")
 
@@ -668,15 +632,14 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 		common.Log.Errorf("sat1 wrong %d %v", len(sats1), sats1)
 		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
 		deleteSats := make(map[uint64]uint64)
-		baseDB.View(func(txn *badger.Txn) error {
-			for sat, utxoId := range sats1 {
-				_, err := txn.Get(db.GetUtxoIdKey(utxoId))
-				if err != nil {
-					deleteSats[sat] = utxoId
-				}
+	
+		for sat, utxoId := range sats1 {
+			_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
+			if err != nil {
+				deleteSats[sat] = utxoId
 			}
-			return nil
-		})
+		}
+		
 		if len(deleteSats) == len(sats1) {
 			p.deleteSats(deleteSats)
 			needReCheck = true
@@ -691,15 +654,14 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 		common.Log.Errorf("sats2 wrong %d", len(sats2))
 		// 因为badger数据库的bug，在DB_PREFIX_NFT中删除的数据可能还会出现
 		deleteSats := make(map[uint64]uint64)
-		baseDB.View(func(txn *badger.Txn) error {
-			for sat, utxoId := range sats2 {
-				_, err := txn.Get(db.GetUtxoIdKey(utxoId))
-				if err != nil {
-					deleteSats[sat] = utxoId
-				}
+		
+		for sat, utxoId := range sats2 {
+			_, err := p.db.Read(db.GetUtxoIdKey(utxoId))
+			if err != nil {
+				deleteSats[sat] = utxoId
 			}
-			return nil
-		})
+		}
+			
 		if len(deleteSats) == len(sats2) {
 			p.deleteSats(deleteSats)
 			needReCheck = true
@@ -748,42 +710,31 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 // only for test
 func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb db.KVDB) map[uint64]string {
 	result := make(map[uint64]string)
-	ldb.View(func(txn *badger.Txn) error {
-		var err error
-		prefix := []byte(common.DB_KEY_UTXO)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value common.UtxoValueInDB
-			err = item.Value(func(data []byte) error {
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Errorf("item.Value error: %v", err)
-				continue
-			}
-
-			// 用于打印不存在table中的utxo
-			if _, ok := utxos[value.UtxoId]; ok {
-				key := item.Key()
-				str, err := db.GetUtxoByDBKey(key)
-				if err == nil {
-					common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
-					result[value.UtxoId] = str
-				}
-
-				delete(utxos, value.UtxoId)
-				if len(utxos) == 0 {
-					return nil
-				}
-			}
+	ldb.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
+		
+		
+		var value common.UtxoValueInDB
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Errorf("item.Value error: %v", err)
+			return nil
 		}
 
+		// 用于打印不存在table中的utxo
+		if _, ok := utxos[value.UtxoId]; ok {
+			
+			str, err := db.GetUtxoByDBKey(k)
+			if err == nil {
+				common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
+				result[value.UtxoId] = str
+			}
+
+			delete(utxos, value.UtxoId)
+			if len(utxos) == 0 {
+				return nil
+			}
+		}
+		
 		return nil
 	})
 
@@ -793,7 +744,7 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb db.KVDB) map[uint64]
 // only for test
 func (b *NftIndexer) deleteSats(sats map[uint64]uint64) {
 	wb := b.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	for sat := range sats {
 		key := GetSatKey(int64(sat))
