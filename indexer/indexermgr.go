@@ -136,7 +136,9 @@ func (b *IndexerMgr) Init() {
 		common.Log.Panicf("initDB failed. %v", err)
 	}
 	b.compiling = base_indexer.NewBaseIndexer(b.baseDB, b.chaincfgParam, b.maxIndexHeight, b.periodFlushToDB)
-	b.compiling.Init(b.processOrdProtocol, b.forceUpdateDB)
+	b.compiling.Init()
+	b.compiling.SetUpdateDBCallback(b.forceUpdateDB)
+	b.compiling.SetBlockCallback(b.processOrdProtocol)
 	b.lastCheckHeight = b.compiling.GetSyncHeight()
 	b.initCollections()
 
@@ -221,6 +223,9 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 					}
 
 					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
+						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
+						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
+						b.compiling.SetUpdateDBCallback(nil)
 						b.updateDB()
 						b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 					}
