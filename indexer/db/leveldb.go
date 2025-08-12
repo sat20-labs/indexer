@@ -227,7 +227,14 @@ type kvReadBatch struct {
 }
 
 func (p *kvReadBatch) Get(key []byte) ([]byte, error) {
-	return p.snap.Get(key, nil)
+	r, err := p.snap.Get(key, nil)
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			return nil, ErrKeyNotFound
+		}
+		return nil, err
+	}
+	return r, nil
 }
 
 // View 在一致性快照中执行只读操作
