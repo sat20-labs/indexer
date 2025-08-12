@@ -688,26 +688,29 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	theTaprootAddresses := make([]*AddressPizza, 0)
 	total2 := int64(0)
 
-	it := addrTreeMap.Iterator()
-	it.End()
+	ldb.View(func(txn db.ReadBatch) error {
+		it := addrTreeMap.Iterator()
+		it.End()
 
-	for it.Prev() {
-		pizza := it.Key().(int64)
-		addressId := it.Value().(uint64)
-		address, err := db.GetAddressByID(ldb, addressId)
-		if err != nil {
-			common.Log.Warnf("GetAddressByID %d failed. %v", addressId, err)
-		} else {
-			if len(theBigAddresses) < num1 {
-				total1 += pizza
-				theBigAddresses = append(theBigAddresses, &AddressPizza{Address: address, Pizza: pizza})
-			}
-			if strings.HasPrefix(address, "bc1p") {
-				total2 += pizza
-				theTaprootAddresses = append(theTaprootAddresses, &AddressPizza{Address: address, Pizza: pizza})
+		for it.Prev() {
+			pizza := it.Key().(int64)
+			addressId := it.Value().(uint64)
+			address, err := db.GetAddressByID(txn, addressId)
+			if err != nil {
+				common.Log.Warnf("GetAddressByID %d failed. %v", addressId, err)
+			} else {
+				if len(theBigAddresses) < num1 {
+					total1 += pizza
+					theBigAddresses = append(theBigAddresses, &AddressPizza{Address: address, Pizza: pizza})
+				}
+				if strings.HasPrefix(address, "bc1p") {
+					total2 += pizza
+					theTaprootAddresses = append(theTaprootAddresses, &AddressPizza{Address: address, Pizza: pizza})
+				}
 			}
 		}
-	}
+		return nil
+	})
 
 	common.Log.Infof("the top %d addresses hold pizza %d", len(theBigAddresses), total1)
 	common.Log.Infof("the total %d taproot addresses hold pizza %d", len(theTaprootAddresses), total2)
@@ -1202,15 +1205,17 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 
 	startTime2 = time.Now()
 	addrInT1 := make(map[uint64]int, 0)
-
-	for k := range satsInT1 {
-		var value common.NftsInSat
-		key := nft.GetSatKey(k)
-		err := db.GetValueFromDBWithProto3([]byte(key), p.nftDB, &value)
-		if err == nil {
-			addrInT1[value.OwnerAddressId] += len(value.Nfts)
+	p.nftDB.View(func(txn db.ReadBatch) error {
+		for k := range satsInT1 {
+			var value common.NftsInSat
+			key := nft.GetSatKey(k)
+			err := db.GetValueFromTxnWithProto3([]byte(key), txn, &value)
+			if err == nil {
+				addrInT1[value.OwnerAddressId] += len(value.Nfts)
+			}
 		}
-	}
+		return nil
+	})
 		
 	common.Log.Infof("get address %d takes %v", len(addrInT1), time.Since(startTime2))
 
@@ -1307,14 +1312,17 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 	startTime := time.Now()
 	common.Log.Infof("get all addresses ...")
 	addrIdMap := make(map[uint64]int)
-	for _, v := range nameMap {
-		key := nft.GetSatKey(v)
-		nfts := &common.NftsInSat{}
-		err := db.GetValueFromDBWithProto3([]byte(key), p.nftDB, nfts)
-		if err == nil {
-			addrIdMap[nfts.OwnerAddressId]++
+	p.nftDB.View(func(txn db.ReadBatch) error {
+		for _, v := range nameMap {
+			key := nft.GetSatKey(v)
+			nfts := &common.NftsInSat{}
+			err := db.GetValueFromTxnWithProto3([]byte(key), txn, nfts)
+			if err == nil {
+				addrIdMap[nfts.OwnerAddressId]++
+			}
 		}
-	}
+		return nil
+	})
 	common.Log.Infof("name count %d takes %v", len(nameMap), time.Since(startTime))
 
 	type AddressAndCount struct {

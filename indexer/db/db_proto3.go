@@ -1,8 +1,8 @@
 package db
 
 import (
-    "google.golang.org/protobuf/proto"
-    "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func SetDBWithProto3(key []byte, data protoreflect.ProtoMessage, wb WriteBatch) error {
@@ -21,8 +21,14 @@ func GetValueFromDB2WithProto3(key []byte, target protoreflect.ProtoMessage, db 
     return proto.Unmarshal(data, target)
 }
 
-func GetValueFromDBWithProto3(key []byte, db KVDB, target protoreflect.ProtoMessage) error {
-    data, err := db.Read(key)
+func GetValueFromDBWithProto3(key []byte, ldb KVDB, target protoreflect.ProtoMessage) error {
+    return ldb.View(func(txn ReadBatch) error {
+		return GetValueFromTxnWithProto3(key, txn, target)
+	})
+}
+
+func GetValueFromTxnWithProto3(key []byte, txn ReadBatch, target protoreflect.ProtoMessage) error {
+    data, err := txn.Get(key)
     if err != nil {
         return err
     }

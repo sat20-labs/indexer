@@ -171,16 +171,16 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 	}
 
 	var result map[string][]*common.Range
-	
-		result = p.getMoreRodarmorRarityRangesToHeight(startHeight, endHeight)
+	p.db.View(func(txn db.ReadBatch) error {
+		result = p.getMoreRodarmorRarityRangesToHeight(startHeight, endHeight, txn)
 		// TODO
 		//result[Alpha] = p.GetRangesForAlpha(startHeight, endHeight)
 		//result[Omega] = p.GetRangesForOmega(startHeight, endHeight)
 		if endHeight >= 9 {
-			result[Block9] = p.getRangeForBlock(9)
+			result[Block9] = p.getRangeForBlock(9, txn)
 		}
 		if endHeight >= 78 {
-			result[Block78] = p.getRangeForBlock(78)
+			result[Block78] = p.getRangeForBlock(78, txn)
 		}
 		validBlock := make([]int, 0)
 		for h := range NakamotoBlocks {
@@ -188,12 +188,14 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 				validBlock = append(validBlock, h)
 			}
 		}
-		result[Nakamoto] = p.getRangesForBlocks(validBlock)
+		result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
 
 		result[FirstTransaction] = FirstTransactionRanges
 		if endHeight >= 1000 {
-			result[Vintage] = p.getRangeToBlock(1000)
+			result[Vintage] = p.getRangeToBlock(1000, txn)
 		}
+		return nil
+	})
 
 
 	return result
@@ -201,28 +203,30 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 
 func initEpochSat(ldb db.KVDB, height int) {
 
+	ldb.View(func(txn db.ReadBatch) error {
+		currentEpoch := height / HalvingInterval
+		underpays := int64(0)
 
-	currentEpoch := height / HalvingInterval
-	underpays := int64(0)
+		for epoch := (height / HalvingInterval); epoch > 0; epoch-- {
 
-	for epoch := (height / HalvingInterval); epoch > 0; epoch-- {
+			value := &common.BlockValueInDB{}
+			key := db.GetBlockDBKey(210000 * epoch)
+			err := db.GetValueFromTxn(key, value, txn)
+			if err != nil {
+				common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
+			}
 
-		value := &common.BlockValueInDB{}
-		key := db.GetBlockDBKey(210000 * epoch)
-		err := db.GetValueFromDB(key, value, ldb)
-		if err != nil {
-			common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
+			if epoch == currentEpoch {
+				underpays = int64(Epoch(int64(epoch)).GetStartingSat()) - value.Ordinals.Start
+			}
+			SetEpochStartingSat(int64(epoch), value.Ordinals.Start)
 		}
 
-		if epoch == currentEpoch {
-			underpays = int64(Epoch(int64(epoch)).GetStartingSat()) - value.Ordinals.Start
+		for epoch := currentEpoch + 1; epoch < MAX_EPOCH; epoch++ {
+			SetEpochStartingSat(int64(epoch), int64(Epoch(int64(epoch)).GetStartingSat())-underpays)
 		}
-		SetEpochStartingSat(int64(epoch), value.Ordinals.Start)
-	}
-
-	for epoch := currentEpoch + 1; epoch < MAX_EPOCH; epoch++ {
-		SetEpochStartingSat(int64(epoch), int64(Epoch(int64(epoch)).GetStartingSat())-underpays)
-	}
+		return nil
+	})
 
 }
 

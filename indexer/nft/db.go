@@ -55,10 +55,22 @@ func loadNftFromDB(sat int64, value *common.NftsInSat, ldb db.KVDB) error {
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
+func loadNftFromTxn(sat int64, value *common.NftsInSat, txn db.ReadBatch) error {
+	key := GetSatKey(sat)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
+}
+
 func loadUtxoValueFromDB(utxoId uint64, value *NftsInUtxo, ldb db.KVDB) error {
 	key := GetUtxoKey(utxoId)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
+}
+
+func loadUtxoValueFromTxn(utxoId uint64, value *NftsInUtxo, txn db.ReadBatch) error {
+	key := GetUtxoKey(utxoId)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
 }
 
 func hasNftInUtxo(utxoId uint64, ldb db.KVDB) bool {

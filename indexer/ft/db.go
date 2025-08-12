@@ -144,7 +144,6 @@ func (s *FTIndexer) getMintListFromDB(tickname string) map[string]*common.Mint {
 
 func (s *FTIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
-
 	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == db.ErrKeyNotFound {

@@ -203,20 +203,22 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	// 在循环次数300万级别时，时间大概1分钟。尽可能不要多次循环这些变量，特别是不要跟updateBasicDB执行通用的操作
 	
 	//startTime := time.Now()
-
-	for _, v := range b.utxoIndex.Index {
-		if v.Address.Type == int(txscript.NullDataTy) {
-			// 只有OP_RETURN 才不记录
-			if v.Value == 0 {
-				continue
+	b.db.View(func(txn db.ReadBatch) error {
+		for _, v := range b.utxoIndex.Index {
+			if v.Address.Type == int(txscript.NullDataTy) {
+				// 只有OP_RETURN 才不记录
+				if v.Value == 0 {
+					continue
+				}
 			}
+			b.addUtxo(&addressValueMap, v)
 		}
-		b.addUtxo(&addressValueMap, v)
-	}
 
-	for _, value := range b.delUTXOs {
-		b.removeUtxo(&addressValueMap, value)
-	}
+		for _, value := range b.delUTXOs {
+			b.removeUtxo(&addressValueMap, value, txn)
+		}
+		return nil
+	})
 
 	//common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v\n",
 	//	len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
@@ -227,6 +229,7 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 
 func (b *BaseIndexer) UpdateDB() {
 	common.Log.Infof("BaseIndexer->updateBasicDB %d start...", b.lastHeight)
+
 
 	// 拿到所有的addressId
 	addressValueMap := b.prefechAddress()
@@ -269,7 +272,7 @@ func (b *BaseIndexer) UpdateDB() {
 	// 	}
 	// }
 
-	//startTime := time.Now()
+	startTime := time.Now()
 	// Add the new utxos first
 	utxoAdded := 0
 	satsAdded := int64(0)
@@ -331,10 +334,10 @@ func (b *BaseIndexer) UpdateDB() {
 		utxoAdded++
 		satsAdded += v.Value
 	}
-	//common.Log.Infof("BaseIndexer.updateBasicDB-> add utxos %d (+ %d), cost: %v", utxoAdded, utxoSkipped, time.Since(startTime))
+	common.Log.Infof("BaseIndexer.updateBasicDB-> add utxos %d (+ %d), cost: %v", utxoAdded, utxoSkipped, time.Since(startTime))
 
 	// 很多要删除的utxo，其实还没有保存到数据库
-	//startTime = time.Now()
+	startTime = time.Now()
 	utxoDeled := 0
 	for _, value := range b.delUTXOs {
 
@@ -364,7 +367,7 @@ func (b *BaseIndexer) UpdateDB() {
 		}
 
 	}
-	//common.Log.Infof("BaseIndexer.updateBasicDB-> delete utxos %d, cost: %v", utxoDeled, time.Since(startTime))
+	common.Log.Infof("BaseIndexer.updateBasicDB-> delete utxos %d, cost: %v", utxoDeled, time.Since(startTime))
 
 	b.stats.UtxoCount += uint64(utxoAdded)
 	b.stats.UtxoCount -= uint64(utxoDeled)
@@ -377,12 +380,12 @@ func (b *BaseIndexer) UpdateDB() {
 		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error setting in db %v", err)
 	}
 
-	//startTime = time.Now()
+	startTime = time.Now()
 	err = wb.Flush()
 	if err != nil {
 		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
 	}
-	//common.Log.Infof("BaseIndexer.updateBasicDB-> flush db,  cost: %v", time.Since(startTime))
+	common.Log.Infof("BaseIndexer.updateBasicDB-> flush db,  cost: %v", time.Since(startTime))
 
 	// reset memory buffer
 	b.blockVector = make([]*common.BlockValueInDB, 0)
@@ -391,10 +394,10 @@ func (b *BaseIndexer) UpdateDB() {
 	b.addressIdMap = make(map[string]*AddressStatus)
 }
 
-func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue) {
+func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue, txn db.ReadBatch) {
 	utxoId := utxo.UtxoId
 	key := db.GetUtxoIdKey(utxoId)
-	_, err := b.db.Read(key)
+	_, err := txn.Get(key)
 	bExist := err == nil
 	for _, address := range utxo.Address.Addresses {
 		value, ok := (*addrmap)[address]
@@ -715,9 +718,9 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	b.blockVector = append(b.blockVector, blockValue)
 }
 
-func (b *BaseIndexer) getAddressIdFromDB(address string, bGenerateNew bool) (uint64, bool) {
+func (b *BaseIndexer) getAddressIdFromTxn(address string, bGenerateNew bool, txn db.ReadBatch) (uint64, bool) {
 	bExist := true
-	addressId, err := db.GetAddressIdFromDB(b.db, address)
+	addressId, err := db.GetAddressIdFromTxn(txn, address)
 	if err == db.ErrKeyNotFound {
 		bExist = false
 		if bGenerateNew {
@@ -756,10 +759,17 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	return b.syncToBlock(int(count), stopChan)
 }
 
+
 func (b *BaseIndexer) loadUtxoFromDB(utxostr string) error {
+	return b.db.View(func(txn db.ReadBatch) error {
+		return b.loadUtxoFromTxn(utxostr, txn)
+	})
+}
+
+func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn db.ReadBatch) error {
 	utxo := &common.UtxoValueInDB{}
 	dbKey := db.GetUTXODBKey(utxostr)
-	err := db.GetValueFromDBWithProto3(dbKey, b.db, utxo)
+	err := db.GetValueFromTxnWithProto3(dbKey, txn, utxo)
 	if err == db.ErrKeyNotFound {
 		return err
 	}
@@ -770,7 +780,7 @@ func (b *BaseIndexer) loadUtxoFromDB(utxostr string) error {
 
 	var addresses common.ScriptPubKey
 	for _, addressId := range utxo.AddressIds {
-		address, err := db.GetAddressByID(b.db, addressId)
+		address, err := db.GetAddressByID(txn, addressId)
 		if err != nil {
 			common.Log.Errorf("failed to get address by id %d, utxo: %s, utxoId: %d, err: %v", addressId, utxostr, utxo.UtxoId, err)
 			return err
@@ -792,38 +802,42 @@ func (b *BaseIndexer) loadUtxoFromDB(utxostr string) error {
 
 func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	//startTime := time.Now()
+
+	b.db.View(func(txn db.ReadBatch) error {
 	
-	for _, tx := range block.Transactions {
-		for _, input := range tx.Inputs {
-			if input.Vout >= 0xffffffff {
-				continue
-			}
-
-			utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
-			if _, ok := b.utxoIndex.Index[utxo]; !ok {
-				err := b.loadUtxoFromDB(utxo)
-				if err == db.ErrKeyNotFound {
+		for _, tx := range block.Transactions {
+			for _, input := range tx.Inputs {
+				if input.Vout >= 0xffffffff {
 					continue
-				} else if err != nil {
-					common.Log.Panicf("failed to get value of utxo: %s, %v", utxo, err)
 				}
-			}
-		}
 
-		for _, output := range tx.Outputs {
-			for _, address := range output.Address.Addresses {
-				_, ok := b.addressIdMap[address]
-				if !ok {
-					addressId, bExist := b.getAddressIdFromDB(address, true)
-					op := 1
-					if bExist {
-						op = 0
+				utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
+				if _, ok := b.utxoIndex.Index[utxo]; !ok {
+					err := b.loadUtxoFromTxn(utxo, txn)
+					if err == db.ErrKeyNotFound {
+						continue
+					} else if err != nil {
+						common.Log.Panicf("failed to get value of utxo: %s, %v", utxo, err)
 					}
-					b.addressIdMap[address] = &AddressStatus{addressId, op}
+				}
+			}
+
+			for _, output := range tx.Outputs {
+				for _, address := range output.Address.Addresses {
+					_, ok := b.addressIdMap[address]
+					if !ok {
+						addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
+						op := 1
+						if bExist {
+							op = 0
+						}
+						b.addressIdMap[address] = &AddressStatus{addressId, op}
+					}
 				}
 			}
 		}
-	}
+		return nil
+	})
 
 	//common.Log.Infof("BaseIndexer.prefetchIndexesFromDB-> prefetched in %v\n", time.Since(startTime))
 }
@@ -1018,19 +1032,23 @@ func (b *BaseIndexer) CheckSelf() bool {
 		b.printfUtxos(utxos2)
 	}
 
+	var addresses1, addresses2 map[uint64]bool
 	common.Log.Infof("address not in table %s", common.DB_KEY_ADDRESSVALUE)
-	addresses1 := findDifferentItems(addressesInT1, addressesInT2)
-	for uid := range addresses1 {
-		str, _ := db.GetAddressByID(b.db, uid)
-		common.Log.Infof("%s", str)
-	}
+	b.db.View(func(txn db.ReadBatch) error {
+		addresses1 = findDifferentItems(addressesInT1, addressesInT2)
+		for uid := range addresses1 {
+			str, _ := db.GetAddressByID(txn, uid)
+			common.Log.Infof("%s", str)
+		}
 
-	common.Log.Infof("address not in table %s", common.DB_KEY_UTXO)
-	addresses2 := findDifferentItems(addressesInT2, addressesInT1)
-	for uid := range addresses2 {
-		str, _ := db.GetAddressByID(b.db, uid)
-		common.Log.Infof("%s", str)
-	}
+		common.Log.Infof("address not in table %s", common.DB_KEY_UTXO)
+		addresses2 = findDifferentItems(addressesInT2, addressesInT1)
+		for uid := range addresses2 {
+			str, _ := db.GetAddressByID(txn, uid)
+			common.Log.Infof("%s", str)
+		}
+		return nil
+	})
 
 	result := true
 	if len(utxos1) > 0 || len(utxos2) > 0 || len(addresses1) > 0 || len(addresses2) > 0 {

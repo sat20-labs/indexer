@@ -53,8 +53,23 @@ func GetRawValueFromDB(key []byte, db KVDB) ([]byte, error) {
 }
 
 
+func GetRawValueFromTxn(key []byte, db ReadBatch) ([]byte, error) {
+	return db.Get(key)
+}
+
 func GetValueFromDB(key []byte, v interface{}, db KVDB) (error) {
 	buf, err := db.Read(key)
+	if err != nil {
+		return err
+	}
+	if err := DecodeBytes(buf, v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetValueFromTxn(key []byte, v interface{}, db ReadBatch) (error) {
+	buf, err := db.Get(key)
 	if err != nil {
 		return err
 	}
@@ -150,8 +165,16 @@ func UnBindAddressId(address string, id uint64, wb WriteBatch) error {
 	return nil
 }
 
-func GetAddressByID(db KVDB, id uint64) (string, error) {
-	key, err := db.Read(GetAddressIdKey(id))
+func GetAddressByIDFromDB(ldb KVDB, id uint64) (string, error) {
+	key, err := ldb.Read(GetAddressIdKey(id))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
+}
+
+func GetAddressByID(txn ReadBatch, id uint64) (string, error) {
+	key, err := txn.Get(GetAddressIdKey(id))
 	if err != nil {
 		return "", err
 	}
@@ -166,8 +189,22 @@ func GetAddressIdFromDB(db KVDB, address string) (uint64, error) {
 	return common.BytesToUint64(key), nil
 }
 
+
+func GetAddressIdFromTxn(db ReadBatch, address string) (uint64, error) {
+	key, err := db.Get(GetAddressDBKey(address))
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	return common.BytesToUint64(key), nil
+}
+
 func CheckKeyExists(db KVDB, key []byte) bool {
 	_, err := db.Read(key)
+	return err == nil
+}
+
+func CheckKeyExistsFromTxn(db ReadBatch, key []byte) bool {
+	_, err := db.Get(key)
 	return err == nil
 }
 

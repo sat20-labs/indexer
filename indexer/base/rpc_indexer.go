@@ -70,12 +70,10 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 
 	output := &common.UtxoValueInDB{}
 	
-		key := db.GetUTXODBKey(utxo)
-		//err := db.GetValueFromDB(key, txn, output)
-		err := db.GetValueFromDBWithProto3(key, b.db, output)
-		
+	key := db.GetUTXODBKey(utxo)
+	//err := db.GetValueFromDB(key, txn, output)
+	err := db.GetValueFromDBWithProto3(key, b.db, output)
 	
-
 	if err != nil {
 		return common.INVALID_ID, nil, err
 	}
@@ -244,7 +242,7 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 		return addrStr, nil
 	}
 
-	address, err := db.GetAddressByID(b.db, id)
+	address, err := db.GetAddressByIDFromDB(b.db, id)
 	if err != nil {
 		common.Log.Errorf("RpcIndexer->GetAddressByID %d failed, err: %v", id, err)
 		return "", err
@@ -350,7 +348,7 @@ func (b *RpcIndexer) searhing(sat int64) {
 		})
 		common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime))
 		if bFound {
-			address, _ = db.GetAddressByID(b.db, value.AddressIds[0])
+			address, _ = db.GetAddressByIDFromDB(b.db, value.AddressIds[0])
 			utxo, _ = db.GetUtxoByID(b.db, value.UtxoId)
 		}
 	}

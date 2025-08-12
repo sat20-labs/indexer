@@ -60,11 +60,6 @@ func (s *DbWrite) FlushToDB() {
 			}
 		}
 
-		err := wb.Flush()
-		if err != nil {
-			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
-		}
-
 		isFinishUpdate := false
 		for {
 			if isFinishUpdate {
@@ -81,6 +76,11 @@ func (s *DbWrite) FlushToDB() {
 				}
 			}
 			isFinishUpdate = true
+		}
+		
+		err := wb.Flush()
+		if err != nil {
+			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
 		}
 	}
 	s.clearLogs()

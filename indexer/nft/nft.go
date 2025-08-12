@@ -145,34 +145,36 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 	defer p.mutex.Unlock()
 
 	startTime := time.Now()
-	
-	for _, tx := range block.Transactions[1:] {
-		hasAsset := false
-		for _, input := range tx.Inputs {
-			sats := p.getBindingSatsWithUtxo(input.UtxoId)
-			for sat := range sats {
+	p.db.View(func(txn db.ReadBatch) error {
+		for _, tx := range block.Transactions[1:] {
+			hasAsset := false
+			for _, input := range tx.Inputs {
+				sats := p.getBindingSatsWithUtxo(input.UtxoId, txn)
+				for sat := range sats {
 
-				p.satTree.Put(sat, true)
+					p.satTree.Put(sat, true)
+				}
+				if len(sats) > 0 {
+					hasAsset = true
+					delete(p.utxoMap, input.UtxoId)
+					p.utxoDeled = append(p.utxoDeled, input.UtxoId)
+				}
 			}
-			if len(sats) > 0 {
-				hasAsset = true
-				delete(p.utxoMap, input.UtxoId)
-				p.utxoDeled = append(p.utxoDeled, input.UtxoId)
+
+			if hasAsset {
+				for _, output := range tx.Outputs {
+					p.innerUpdateTransfer2(output)
+				}
 			}
 		}
 
-		if hasAsset {
-			for _, output := range tx.Outputs {
-				p.innerUpdateTransfer2(output)
-			}
+		// 按顺序是最后一块，要放最后，保持顺序很重要
+		tx := block.Transactions[0]
+		for _, output := range tx.Outputs {
+			p.innerUpdateTransfer2(output)
 		}
-	}
-
-	// 按顺序是最后一块，要放最后，保持顺序很重要
-	tx := block.Transactions[0]
-	for _, output := range tx.Outputs {
-		p.innerUpdateTransfer2(output)
-	}
+		return nil
+	})
 		
 	
 
@@ -204,8 +206,10 @@ func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
 }
 
 func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
-	
-	p.getBindingSatsWithUtxo(utxoId)
+	p.db.View(func(txn db.ReadBatch) error {
+		p.getBindingSatsWithUtxo(utxoId, txn)
+		return nil
+	})
 	satmap, ok := p.utxoMap[utxoId]
 	if ok {
 		satmap[sat] = true
@@ -217,14 +221,14 @@ func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
 }
 
 // fast
-func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64) map[int64]bool {
+func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn db.ReadBatch) map[int64]bool {
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		return sats
 	}
 
 	value := NftsInUtxo{}
-	err := loadUtxoValueFromDB(utxoId, &value, p.db)
+	err := loadUtxoValueFromTxn(utxoId, &value, txn)
 	if err != nil {
 		//common.Log.Infof("loadUtxoValueFromDB %d failed. %v", utxoId, err)
 		return nil
@@ -280,7 +284,7 @@ func (p *NftIndexer) getNftInBuffer4(sat int64) *common.Nft {
 func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 	nftmap := make(map[int64]*common.NftsInSat)
 
-	
+	p.db.View(func(txn db.ReadBatch) error {
 
 		for sat, info := range p.satMap {
 			_, ok := nftmap[sat]
@@ -288,7 +292,7 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 				key := GetSatKey(sat)
 				oldvalue := common.NftsInSat{}
 				// err := db.GetValueFromDB([]byte(key), txn, &oldvalue)
-				err := db.GetValueFromDBWithProto3([]byte(key), p.db, &oldvalue)
+				err := db.GetValueFromTxnWithProto3([]byte(key), txn, &oldvalue)
 				if err == nil {
 					oldvalue.OwnerAddressId = info.AddressId
 					oldvalue.UtxoId = info.UtxoId
@@ -321,7 +325,8 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 			}
 		}
 
-		
+		return nil
+	})
 
 	return nftmap
 }
@@ -499,31 +504,35 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	wrongUtxo2 := make([]uint64, 0)
 
 	//wg.Add(2)
-	
+	baseDB.View(func(txn db.ReadBatch) error {
 		//defer wg.Done()
-	startTime2 = time.Now()
-	for address := range addressesInT1 {
-		key := db.GetAddressIdKey(address)
-		_, err := baseDB.Read(key)
-		if err != nil {
-			wrongAddress = append(wrongAddress, address)
+		startTime2 = time.Now()
+		for address := range addressesInT1 {
+			key := db.GetAddressIdKey(address)
+			_, err := txn.Get(key)
+			if err != nil {
+				wrongAddress = append(wrongAddress, address)
+			}
 		}
-	}
-	common.Log.Infof("check addressesInT1 in baseDB takes %v", time.Since(startTime2))
+		common.Log.Infof("check addressesInT1 in baseDB takes %v", time.Since(startTime2))
+		return nil
+	})
 	
 	
-
-	//defer wg.Done()
-	startTime2 = time.Now()
-	// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
-	for utxo := range utxosInT2 {
-		key := db.GetUtxoIdKey(utxo)
-		_, err := baseDB.Read(key)
-		if err != nil {
-			wrongUtxo2 = append(wrongUtxo2, utxo)
+	baseDB.View(func(txn db.ReadBatch) error {
+		//defer wg.Done()
+		startTime2 = time.Now()
+		// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
+		for utxo := range utxosInT2 {
+			key := db.GetUtxoIdKey(utxo)
+			_, err := txn.Get(key)
+			if err != nil {
+				wrongUtxo2 = append(wrongUtxo2, utxo)
+			}
 		}
-	}
-	common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
+		common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
+		return nil
+	})
 		
 	//wg.Wait()
 	common.Log.Infof("check in baseDB completed")

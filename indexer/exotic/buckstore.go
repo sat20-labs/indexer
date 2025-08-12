@@ -134,24 +134,27 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 		}
 	}
 
-	for bucket, value := range buckets {
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		val, err := bs.db.Read(dbkey)
-		if err == db.ErrKeyNotFound {
-			continue
-		}
-		if err != nil {
-			common.Log.Panicf("Get %s failed. %v", dbkey, err)
-		}
+	bs.db.View(func(txn db.ReadBatch) error {
+		for bucket, value := range buckets {
+			dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+			val, err := txn.Get(dbkey)
+			if err == db.ErrKeyNotFound {
+				continue
+			}
+			if err != nil {
+				common.Log.Panicf("Get %s failed. %v", dbkey, err)
+			}
 
-		storedData, err := bs.deserialize(val)
-		if err != nil {
-			common.Log.Panicf("Value %s failed. %v", dbkey, err)
+			storedData, err := bs.deserialize(val)
+			if err != nil {
+				common.Log.Panicf("Value %s failed. %v", dbkey, err)
+			}
+			for height, rng := range storedData {
+				value[height] = rng
+			}
 		}
-		for height, rng := range storedData {
-			value[height] = rng
-		}
-	}
+		return nil 
+	})
 
 	wb := bs.db.NewWriteBatch()
 	defer wb.Close()
