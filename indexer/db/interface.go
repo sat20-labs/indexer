@@ -20,10 +20,13 @@ type WriteBatch interface {
 
 // 每个调用都是完整的transaction
 type KVDB interface {
+
+	DropAll() error
+	DropPrefix([]byte) error
+	
 	Read(key []byte) ([]byte, error)
 	Write(key, value []byte) error
 	Delete(key []byte) error
-	DropPrefix([]byte) error
 	Close() error
 
 
