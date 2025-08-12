@@ -83,18 +83,24 @@ func NewBaseIndexer(
 	return indexer
 }
 
-func (b *BaseIndexer) Init(cb1 BlockProcCallback, cb2 UpdateDBCallback) {
+func (b *BaseIndexer) Init() {
 	dbver := b.GetBaseDBVer()
 	common.Log.Infof("base db version: %s", b.GetBaseDBVer())
 	if dbver != "" && dbver != common.BASE_DB_VERSION {
 		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
 	}
 
-	b.blockprocCB = cb1
-	b.updateDBCB = cb2
-
 	b.reset()
 }
+
+func (b *BaseIndexer) SetUpdateDBCallback(cb2 UpdateDBCallback) {
+	b.updateDBCB = cb2
+}
+
+func (b *BaseIndexer) SetBlockCallback(cb1 BlockProcCallback) {
+	b.blockprocCB = cb1
+}
+
 
 func (b *BaseIndexer) reset() {
 	b.loadSyncStatsFromDB()
@@ -229,15 +235,19 @@ func (b *BaseIndexer) Repair() {
 
 // only call in compiling data
 func (b *BaseIndexer) forceUpdateDB() {
-	startTime := time.Now()
-	b.UpdateDB()
-	common.Log.Infof("BaseIndexer.updateBasicDB: cost: %v", time.Since(startTime))
+	if b.updateDBCB != nil {
+		startTime := time.Now()
+		b.UpdateDB()
+		common.Log.Infof("BaseIndexer.updateBasicDB: cost: %v", time.Since(startTime))
 
-	// startTime = time.Now()
-	b.updateDBCB()
-	// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
+		// startTime = time.Now()
+		b.updateDBCB()
+		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
 
-	common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
+		common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
+	} //else {
+	// 	common.Log.Infof("don't run forceUpdateDB after entering service mode")
+	// }
 }
 
 func (b *BaseIndexer) closeDB() {
