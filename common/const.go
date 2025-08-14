@@ -46,9 +46,13 @@ const (
 	MIN_NORMAL_NODEID    = 100000
 )
 
+var ENABLE_TESTING bool = false
 var CHAIN string = "mainnet"
 
 func GetBootstrapPubKey() string {
+	if ENABLE_TESTING {
+		return _bootstrapPubKey_testnet
+	}
 	switch CHAIN {
 	case "mainnet":
 		return _bootstrapPubKey
@@ -59,6 +63,9 @@ func GetBootstrapPubKey() string {
 }
 
 func GetCoreNodePubKey() string {
+	if ENABLE_TESTING {
+		return _coreNodePubKey_testnet
+	}
 	switch CHAIN {
 	case "mainnet":
 		return _coreNodePubKey
@@ -69,6 +76,9 @@ func GetCoreNodePubKey() string {
 }
 
 func GetStakeAssetName() string {
+	if ENABLE_TESTING {
+		return TESTNET_CORENODE_STAKING_ASSET_NAME
+	}
 	switch CHAIN {
 	case "mainnet":
 		return CORENODE_STAKING_ASSET_NAME
@@ -79,6 +89,9 @@ func GetStakeAssetName() string {
 }
 
 func GetStakeAssetAmt() int64 {
+	if ENABLE_TESTING {
+		return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+	}
 	switch CHAIN {
 	case "mainnet":
 		return CORENODE_STAKING_ASSET_AMOUNT
