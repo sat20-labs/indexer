@@ -566,7 +566,6 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> assignOrdinals: cost: %v", time.Since(localStartTime))
 
 			// Update the sync stats
-			b.stats.ChainTip = height
 			b.lastHeight = block.Height
 			b.lastHash = block.Hash
 			b.prevBlockHashMap[b.lastHeight] = b.lastHash
@@ -748,6 +747,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 		return -2
 	}
 
+	b.stats.ChainTip = int(count)
 	// 每跑足够的区块，回到返回进行数据库的清理，防止数据库膨胀过大
 	bRunInStepMode := true
 	if bRunInStepMode {
