@@ -678,16 +678,28 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		deleteSats := make(map[uint64]uint64)
 		baseDB.View(func(txn *badger.Txn) error {
 			for sat, utxoId := range sats1 {
-				_, err := txn.Get(db.GetUtxoIdKey(utxoId))
+				item, err := txn.Get(db.GetUtxoIdKey(utxoId))
 				if err != nil {
+					var key []byte
+					err = item.Value(func(val []byte) error {
+						key = append([]byte{}, val...)
+						return nil
+					})
+					if err != nil {
+						utxo, _ := db.GetUtxoByDBKey(key)
+						common.Log.Infof("utxo: %s, sat: %d", utxo, sat)
+					}
+
 					deleteSats[sat] = utxoId
 				}
 			}
 			return nil
 		})
 		if len(deleteSats) == len(sats1) {
-			p.deleteSats(deleteSats)
-			needReCheck = true
+			result = false
+			// 删除不能解决问题
+			// p.deleteSats(deleteSats)
+			// needReCheck = true
 		} else {
 			result = false
 		}
@@ -701,16 +713,28 @@ func (p *NftIndexer) CheckSelf(baseDB *badger.DB) bool {
 		deleteSats := make(map[uint64]uint64)
 		baseDB.View(func(txn *badger.Txn) error {
 			for sat, utxoId := range sats2 {
-				_, err := txn.Get(db.GetUtxoIdKey(utxoId))
+				item, err := txn.Get(db.GetUtxoIdKey(utxoId))
 				if err != nil {
+					var key []byte
+					err = item.Value(func(val []byte) error {
+						key = append([]byte{}, val...)
+						return nil
+					})
+					if err != nil {
+						utxo, _ := db.GetUtxoByDBKey(key)
+						common.Log.Infof("utxo: %s, sat: %d", utxo, sat)
+					}
+
 					deleteSats[sat] = utxoId
 				}
 			}
 			return nil
 		})
 		if len(deleteSats) == len(sats2) {
-			p.deleteSats(deleteSats)
-			needReCheck = true
+			result = false
+			// 删除不能解决问题
+			// p.deleteSats(deleteSats)
+			// needReCheck = true
 		} else {
 			result = false
 		}
