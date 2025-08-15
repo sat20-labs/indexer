@@ -144,3 +144,19 @@ func (p *SatRBTree) Get(start, end int) []interface{} {
 
 	return result
 }
+
+func (p *SatRBTree) Delete(key int64) {
+	p.tree.Remove(key)
+}
+
+func (p *SatRBTree) View(f func(k int64, v interface{}) error) {
+	it := p.tree.Iterator()
+	for it.Next() {
+		k := it.Key().(int64)
+		v := it.Value()
+		err := f(k, v)
+		if err != nil {
+			break
+		}
+	}
+}
