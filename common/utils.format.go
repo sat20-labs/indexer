@@ -246,6 +246,10 @@ func DeleteUtxo(arr []*UtxoIdInDB, utxoId uint64) []*UtxoIdInDB {
 	return arr
 }
 
+// 通过切片操作删除元素（保持原有顺序）
+func RemoveIndex[T any](slice []T, index int) []T {
+    return append(slice[:index], slice[index+1:]...)
+}
 
 func Uint64ToBytes(value uint64) []byte {
 	bytes := make([]byte, 8)

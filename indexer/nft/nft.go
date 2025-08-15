@@ -6,7 +6,6 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
-	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
@@ -15,6 +14,8 @@ type SatInfo struct {
 	Index     int
 	UtxoId    uint64
 }
+
+//var _using_sattree = false
 
 // 所有nft的记录
 // 以后ns和ordx模块，数据变大，导致加载、跑数据等太慢，需要按照这个模块的方式来修改优化。
@@ -27,8 +28,8 @@ type NftIndexer struct {
 	mutex       sync.RWMutex
 
 	// realtime buffer
-	satTree *indexer.SatRBTree        // key: sat, 用于范围搜索
-	utxoMap map[uint64]map[int64]bool // utxo->sats  确保utxo中包含的所有nft都列在这里
+	//satTree *indexer.SatRBTree        // key: sat, 用于范围搜索
+	utxoMap map[uint64][]int64        // utxo->sats  确保utxo中包含的所有nft都列在这里
 	satMap  map[int64]*SatInfo        // sat->utxo
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
@@ -56,8 +57,8 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 }
 
 func (p *NftIndexer) reset() {
-	p.satTree = indexer.NewSatRBTress()
-	p.utxoMap = make(map[uint64]map[int64]bool)
+	//p.satTree = indexer.NewSatRBTress()
+	p.utxoMap = make(map[uint64][]int64)
 	p.satMap = make(map[int64]*SatInfo)
 	p.nftAdded = make([]*common.Nft, 0)
 	p.utxoDeled = make([]uint64, 0)
@@ -65,9 +66,11 @@ func (p *NftIndexer) reset() {
 
 func (p *NftIndexer) Clone() *NftIndexer {
 	newInst := NewNftIndexer(p.db)
-	newInst.utxoMap = make(map[uint64]map[int64]bool)
+	newInst.utxoMap = make(map[uint64][]int64)
 	for k, v := range p.utxoMap {
-		newInst.utxoMap[k] = v
+		nv := make([]int64, len(v))
+		copy(nv, v)
+		newInst.utxoMap[k] = nv
 	}
 	newInst.satMap = make(map[int64]*SatInfo)
 	for k, v := range p.satMap {
@@ -87,10 +90,10 @@ func (p *NftIndexer) Clone() *NftIndexer {
 
 func (p *NftIndexer) Subtract(another *NftIndexer) {
 
-	another.satTree.View(func(k int64, v interface{}) error {
-		p.satTree.Delete(k)
-		return nil
-	})
+	// another.satTree.View(func(k int64, v interface{}) error {
+	// 	p.satTree.Delete(k)
+	// 	return nil
+	// })
 
 	for k := range another.utxoMap {
 		delete(p.utxoMap, k)
@@ -134,7 +137,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	// 确保该nft已经加入utxomap中
 	p.addSatToUtxo(nft.UtxoId, nft.Base.Sat)
 	p.satMap[(nft.Base.Sat)] = &SatInfo{AddressId: nft.OwnerAddressId, Index: 0, UtxoId: nft.UtxoId}
-	p.satTree.Put(nft.Base.Sat, true)
+	//p.satTree.Put(nft.Base.Sat, true)
 
 	//action := TransferAction{UtxoId: inputUtxo, Sats: v, Action: -1}
 	//p.transferActionList = append(p.transferActionList, &action)
@@ -154,14 +157,20 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 
 	startTime := time.Now()
 	p.db.View(func(txn db.ReadBatch) error {
+		bindingSatsInCoinbase := make([]int64, 0)
 		for _, tx := range block.Transactions[1:] {
+			bindingSats := make([]int64, 0)
 			hasAsset := false
 			for _, input := range tx.Inputs {
 				sats := p.getBindingSatsWithUtxo(input.UtxoId, txn)
-				for sat := range sats {
-
-					p.satTree.Put(sat, true)
-				}
+				// if _using_sattree {
+				// 	for _, sat := range sats {
+				// 		p.satTree.Put(sat, true)
+				// 	}
+				// } else {
+					bindingSats = append(bindingSats, sats...)
+				//}
+				
 				if len(sats) > 0 {
 					hasAsset = true
 					delete(p.utxoMap, input.UtxoId)
@@ -171,7 +180,14 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 
 			if hasAsset {
 				for _, output := range tx.Outputs {
-					p.innerUpdateTransfer2(output)
+					// if _using_sattree {
+					// 	p.innerUpdateTransfer2(output)
+					// } else {
+						bindingSats = p.innerUpdateTransfer3(output, bindingSats)
+					//}
+				}
+				if len(bindingSats) > 0 {
+					bindingSatsInCoinbase = append(bindingSatsInCoinbase, bindingSats...)
 				}
 			}
 		}
@@ -179,7 +195,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 		// 按顺序是最后一块，要放最后，保持顺序很重要
 		tx := block.Transactions[0]
 		for _, output := range tx.Outputs {
-			p.innerUpdateTransfer2(output)
+			// if _using_sattree {
+			// 	p.innerUpdateTransfer2(output)
+			// } else {
+				bindingSatsInCoinbase = p.innerUpdateTransfer3(output, bindingSatsInCoinbase)
+			//}
 		}
 		return nil
 	})
@@ -189,28 +209,60 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
 
-func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
-	bUpdated := false
+// func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
+// 	bUpdated := false
+// 	newUtxo := common.GetUtxoId(output)
+
+// 	sats := make([]int64, 0)
+// 	for _, r := range output.Ordinals {
+// 		values := p.satTree.FindSatValuesWithRange(r)
+// 		for k := range values {
+// 			sats = append(sats, k)
+// 			for i, address := range output.Address.Addresses {
+// 				newAddress := p.baseIndexer.GetAddressId(address)
+// 				p.satMap[k] = &SatInfo{AddressId: newAddress, Index: i, UtxoId: newUtxo}
+// 			}
+
+// 			bUpdated = true
+// 		}
+// 	}
+
+// 	if bUpdated {
+// 		// add output utxo
+// 		p.utxoMap[newUtxo] = sats
+// 	}
+// }
+
+
+func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int64) []int64 {
+	// 只考虑放在第一个地址上 (output的地址处理过，肯定有值)
 	newUtxo := common.GetUtxoId(output)
+	addressId := p.baseIndexer.GetAddressId(output.Address.Addresses[0])
+	satInfo := &SatInfo{AddressId: addressId, Index: 0, UtxoId: newUtxo}
 
-	sats := make(map[int64]bool, 0)
-	for _, r := range output.Ordinals {
-		values := p.satTree.FindSatValuesWithRange(r)
-		for k := range values {
-			sats[k] = true
-			for i, address := range output.Address.Addresses {
-				newAddress := p.baseIndexer.GetAddressId(address)
-				p.satMap[k] = &SatInfo{AddressId: newAddress, Index: i, UtxoId: newUtxo}
-			}
-
-			bUpdated = true
+	sats := make([]int64, 0)
+	i := 0
+	for i < len(inputSats) {
+		sat := inputSats[i]
+		if common.IsSatInRanges(sat, output.Ordinals) {
+			sats = append(sats, sat)
+			inputSats = common.RemoveIndex(inputSats, i)
+		} else {
+			i++
 		}
 	}
+	
+	if len(sats) > 0 {
+		for _, k := range sats {
+			if len(output.Address.Addresses) > 0 {
+				p.satMap[k] = satInfo
+			}
+		}
 
-	if bUpdated {
 		// add output utxo
 		p.utxoMap[newUtxo] = sats
 	}
+	return inputSats
 }
 
 func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
@@ -218,18 +270,12 @@ func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
 		p.getBindingSatsWithUtxo(utxoId, txn)
 		return nil
 	})
-	satmap, ok := p.utxoMap[utxoId]
-	if ok {
-		satmap[sat] = true
-	} else {
-		satmap = make(map[int64]bool)
-		satmap[sat] = true
-		p.utxoMap[utxoId] = satmap
-	}
+	satmap := p.utxoMap[utxoId]
+	p.utxoMap[utxoId] = append(satmap, sat)
 }
 
 // fast
-func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn db.ReadBatch) map[int64]bool {
+func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn db.ReadBatch) []int64 {
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		return sats
@@ -241,12 +287,9 @@ func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn db.ReadBatch) map
 		//common.Log.Infof("loadUtxoValueFromDB %d failed. %v", utxoId, err)
 		return nil
 	}
-	result := make(map[int64]bool)
-	for _, sat := range value.Sats {
-		result[sat] = true
-	}
-	p.utxoMap[utxoId] = result
-	return result
+
+	p.utxoMap[utxoId] = value.Sats
+	return value.Sats
 }
 
 func (p *NftIndexer) refreshNft(nft *common.Nft) {
@@ -392,7 +435,7 @@ func (p *NftIndexer) UpdateDB() {
 
 	for utxoId, sats := range p.utxoMap {
 		utxokey := GetUtxoKey(utxoId)
-		utxoValue := NftsInUtxo{Sats: mapToVector(sats)}
+		utxoValue := NftsInUtxo{Sats: sats}
 		// err := db.SetDB([]byte(utxokey), &utxoValue, wb)
 		err := db.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
 		if err != nil {
@@ -416,9 +459,9 @@ func (p *NftIndexer) UpdateDB() {
 	}
 
 	// reset memory buffer
-	p.satTree = indexer.NewSatRBTress()
+	//p.satTree = indexer.NewSatRBTress()
 	p.nftAdded = make([]*common.Nft, 0)
-	p.utxoMap = make(map[uint64]map[int64]bool)
+	p.utxoMap = make(map[uint64][]int64)
 	p.utxoDeled = make([]uint64, 0)
 	p.satMap = make(map[int64]*SatInfo)
 

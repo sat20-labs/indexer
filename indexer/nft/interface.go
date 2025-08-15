@@ -78,7 +78,7 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
-		for sat := range sats {
+		for _, sat := range sats {
 			satmap[sat] = true
 		}
 	}
