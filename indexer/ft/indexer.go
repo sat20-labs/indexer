@@ -144,7 +144,8 @@ func (s *FTIndexer) Clone() *FTIndexer {
 // update之后，删除原来instance中的数据
 func (s *FTIndexer) Subtract(another *FTIndexer) {
 
-	s.holderActionList = s.holderActionList[len(another.holderActionList):]
+	//s.holderActionList = s.holderActionList[len(another.holderActionList):]
+	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)
 
 	for key := range another.tickerAdded {
 		delete(s.tickerAdded, key)
@@ -153,7 +154,8 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 	for key, value := range another.tickerMap {
 		ticker, ok := s.tickerMap[key]
 		if ok {
-			ticker.MintAdded = ticker.MintAdded[len(value.MintAdded):]
+			//ticker.MintAdded = ticker.MintAdded[len(value.MintAdded):]
+			ticker.MintAdded = append([]*common.Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
 		}
 	}
 

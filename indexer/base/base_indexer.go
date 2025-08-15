@@ -119,9 +119,6 @@ func (b *BaseIndexer) Clone() *BaseIndexer {
 	for key, value := range b.utxoIndex.Index {
 		newInst.utxoIndex.Index[key] = value
 	}
-	for _, value := range b.delUTXOs {
-		delete(newInst.utxoIndex.Index, value.Utxo)
-	}
 	newInst.delUTXOs = make([]*UtxoValue, len(b.delUTXOs))
 	copy(newInst.delUTXOs, b.delUTXOs)
 
@@ -144,6 +141,7 @@ func (b *BaseIndexer) Clone() *BaseIndexer {
 	return newInst
 }
 
+// 在 UpdateDB 用到的数据，这里需要先剪去，这些剪去的数据，当作已经备份到数据库
 func (b *BaseIndexer) Subtract(another *BaseIndexer) {
 	for key := range another.utxoIndex.Index {
 		delete(b.utxoIndex.Index, key)
@@ -152,11 +150,17 @@ func (b *BaseIndexer) Subtract(another *BaseIndexer) {
 		delete(b.utxoIndex.Index, del.Utxo)
 	}
 
+	for k := range another.addressIdMap {
+		delete(b.addressIdMap, k)
+	}
+
 	l := len(another.delUTXOs)
-	b.delUTXOs = b.delUTXOs[l:]
+	//b.delUTXOs = b.delUTXOs[l:] 不会释放前面的内存
+	b.delUTXOs = append([]*UtxoValue(nil), b.delUTXOs[l:]...) // 释放前面删除的切片
 
 	l = len(another.blockVector)
-	b.blockVector = b.blockVector[l:]
+	// b.blockVector = b.blockVector[l:]
+	b.blockVector = append([]*common.BlockValueInDB(nil), b.blockVector[l:]...)
 }
 
 func needMerge(rngs []*common.Range) bool {

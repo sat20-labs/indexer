@@ -86,14 +86,22 @@ func (p *NftIndexer) Clone() *NftIndexer {
 }
 
 func (p *NftIndexer) Subtract(another *NftIndexer) {
+
+	another.satTree.View(func(k int64, v interface{}) error {
+		p.satTree.Delete(k)
+		return nil
+	})
+
 	for k := range another.utxoMap {
 		delete(p.utxoMap, k)
 	}
 	for k := range another.satMap {
 		delete(p.satMap, k)
 	}
-	p.nftAdded = p.nftAdded[len(another.nftAdded):]
-	p.utxoDeled = p.utxoDeled[len(another.utxoDeled):]
+	// p.nftAdded = p.nftAdded[len(another.nftAdded):]
+	p.nftAdded = append([]*common.Nft(nil), p.nftAdded[len(another.nftAdded):]...)
+	// p.utxoDeled = p.utxoDeled[len(another.utxoDeled):]
+	p.utxoDeled = append([]uint64(nil), p.utxoDeled[len(another.utxoDeled):]...)
 }
 
 // func (p *NftIndexer) IsEnabled() bool {

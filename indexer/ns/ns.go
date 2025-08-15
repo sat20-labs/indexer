@@ -60,8 +60,10 @@ func (p *NameService) Clone() *NameService {
 }
 
 func (p *NameService) Subtract(another *NameService) {
-	p.nameAdded = p.nameAdded[len(another.nameAdded):]
-	p.updateAdded = p.updateAdded[len(another.updateAdded):]
+	//p.nameAdded = p.nameAdded[len(another.nameAdded):]
+	p.nameAdded = append([]*NameRegister(nil), p.nameAdded[len(another.nameAdded):]...)
+	//p.updateAdded = p.updateAdded[len(another.updateAdded):]
+	p.updateAdded = append([]*NameUpdate(nil), p.updateAdded[len(another.updateAdded):]...)
 }
 
 func (p *NameService) GetNftIndexer() *nft.NftIndexer {
