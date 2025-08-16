@@ -150,9 +150,9 @@ func (b *BaseIndexer) Subtract(another *BaseIndexer) {
 		delete(b.utxoIndex.Index, del.Utxo)
 	}
 
-	for k := range another.addressIdMap {
-		delete(b.addressIdMap, k)
-	}
+	// for k := range another.addressIdMap {
+	// 	delete(b.addressIdMap, k)
+	// }
 
 	l := len(another.delUTXOs)
 	//b.delUTXOs = b.delUTXOs[l:] 不会释放前面的内存

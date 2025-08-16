@@ -91,10 +91,10 @@ func (p *NftIndexer) Clone() *NftIndexer {
 
 func (p *NftIndexer) Subtract(another *NftIndexer) {
 
-	another.satTree.View(func(k int64, v interface{}) error {
-		p.satTree.Delete(k)
-		return nil
-	})
+	// another.satTree.View(func(k int64, v interface{}) error {
+	// 	p.satTree.Delete(k)
+	// 	return nil
+	// })
 
 	for k := range another.utxoMap {
 		delete(p.utxoMap, k)
