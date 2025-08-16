@@ -173,15 +173,27 @@ func (p *AssetsInUtxo) ToTxAssets() TxAssets {
 }
 
 // 需要考虑一个聪多种资产的情况
+// 如果聪网的数据，并没有offset数据
 func (p* AssetsInUtxo) GetBindingSatAmout() int64 {
 	if p.Assets == nil {
 		return 0
 	}
+	fromL2 := false
+	bindingSatNum := int64(0)
 	offset := make(AssetOffsets, 0)
 	for _, asset := range p.Assets {
 		for _, off := range asset.Offsets {
 			offset.Insert(off)
 		}
+		if asset.BindingSat > 0 && len(asset.Offsets) == 0 {
+			// 来自聪网的数据
+			fromL2 = true
+			dAmt, _ := NewDecimalFromString(asset.Amount, 0)
+			bindingSatNum += GetBindingSatNum(dAmt, uint32(asset.BindingSat))
+		}
+	}
+	if fromL2 {
+		return bindingSatNum
 	}
 	return offset.Size()
 }
