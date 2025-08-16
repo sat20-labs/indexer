@@ -525,7 +525,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 		return nil
 	}
 	if amt.Sign() <= 0 || amt.Cmp(&deployTicker.Limit) > 0 {
-		common.Log.Warnf("mint %s, invalid amount(%s), limit(%s)", content.Ticker, content.Amt, deployTicker.Limit)
+		common.Log.Warnf("mint %s, invalid amount(%s), limit(%s)", content.Ticker, content.Amt, deployTicker.Limit.String())
 		return nil
 	}
 

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,53 +15,6 @@ import (
 	"lukechampine.com/uint128"
 )
 
-func GetRawData(txID string, network string) ([][]byte, error) {
-	url := ""
-	switch network {
-	case ChainTestnet:
-		url = fmt.Sprintf("https://mempool.space/testnet/api/tx/%s", txID)
-	case ChainTestnet4:
-		url = fmt.Sprintf("https://mempool.space/testnet4/api/tx/%s", txID)
-	case ChainMainnet:
-		url = fmt.Sprintf("https://mempool.space/api/tx/%s", txID)
-	default:
-		return nil, fmt.Errorf("unsupported network: %s", network)
-	}
-
-	response, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
-
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
-	}
-
-	var data map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", txID, err)
-	}
-	txWitness := data["vin"].([]interface{})[0].(map[string]interface{})["witness"].([]interface{})
-
-	if len(txWitness) < 2 {
-		return nil, fmt.Errorf("failed to retrieve witness for %s", txID)
-	}
-
-	var rawData [][]byte = make([][]byte, len(txWitness))
-	for i, v := range txWitness {
-		rawData[i], err = hex.DecodeString(v.(string))
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode hex string to byte array for %s, error: %v", txID, err)
-		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode hex string to byte array for %s, error: %v", txID, err)
-	}
-	return rawData, nil
-}
 
 func readBytes(raw []byte, pointer *int, n int) []byte {
 	value := raw[*pointer : *pointer+n]
