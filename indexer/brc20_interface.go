@@ -49,7 +49,6 @@ func (p *IndexerMgr) GetBRC20TickerV2(tickerName string) *common.TickerInfo {
 	result.MintTimes = ms
 
 	result.Limit = fmt.Sprintf("%d", ticker.Limit)
-	result.MaxSupply = fmt.Sprintf("%d", ticker.Max)
 	if ticker.SelfMint {
 		result.SelfMint = 100
 	} else {

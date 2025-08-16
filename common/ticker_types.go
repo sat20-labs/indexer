@@ -31,6 +31,7 @@ type Ticker struct {
 	BlockStart int     `json:"blockStart,omitempty"`
 	BlockEnd   int     `json:"blockEnd,omitempty"`
 	Attr       SatAttr `json:"attr,omitempty"`
+	// TODO 增加一个Status，铸造开始，进行中，结束三个状态
 }
 
 type RBTreeValue_Mint struct {

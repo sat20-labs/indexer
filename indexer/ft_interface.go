@@ -69,7 +69,7 @@ func (p *IndexerMgr) GetTickerV2(tickerName string, typ string) *common.TickerIn
 	result.Limit = fmt.Sprintf("%d", ticker.Limit)
 	result.N = ticker.N
 	if ticker.Max < 0 {
-		result.MaxSupply = fmt.Sprintf("%d", common.MaxSupply)
+		result.MaxSupply = "-"
 	} else {
 		result.MaxSupply = fmt.Sprintf("%d", ticker.Max)
 	}
