@@ -475,12 +475,6 @@ func (b *BaseIndexer) addUtxo(addrmap *map[string]*common.AddressValueInDB, outp
 	}
 }
 
-func (b *BaseIndexer) forceMajeure() {
-	common.Log.Info("Graceful shutdown received, flushing db...")
-
-	b.closeDB()
-}
-
 func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
 	common.Log.Warnf("BaseIndexer.handleReorg-> reorg detected at heigh %d", currentBlock.Height)
 
@@ -539,7 +533,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 
 		select {
 		case <-stopChan:
-			b.forceMajeure()
+			common.Log.Errorf("BaseIndexer.SyncToBlock-> Graceful shutdown received")
 			return -1
 		default:
 			block := <-b.blocksChan
