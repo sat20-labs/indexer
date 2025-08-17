@@ -216,9 +216,8 @@ func (b *BaseIndexer) closeDB() {
 func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	// 测试下提前取的所有地址
 	addressValueMap := make(map[string]*common.AddressValueInDB)
-
-	// 在循环次数300万级别时，时间大概1分钟。尽可能不要多次循环这些变量，特别是不要跟updateBasicDB执行通用的操作
 	
+	// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 	startTime := time.Now()
 	b.db.View(func(txn db.ReadBatch) error {
 		for _, v := range b.utxoIndex.Index {
@@ -906,6 +905,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	// 	return nil
 	// })
 
+	// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 	sort.Slice(utxos, func(i, j int) bool {
 		return utxos[i] < utxos[j]
 	})

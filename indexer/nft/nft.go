@@ -176,6 +176,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 					}) 
 			}
 		}
+		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 		sort.Slice(utxos, func(i, j int) bool {
 			return utxos[i].key < utxos[j].key
 		})
@@ -386,6 +387,7 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 				sat: sat,
 			})
 		}
+		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 		sort.Slice(loadingSats, func(i, j int) bool {
 			return loadingSats[i].key < loadingSats[j].key
 		})
