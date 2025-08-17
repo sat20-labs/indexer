@@ -4,6 +4,14 @@ import (
 	"fmt"
 )
 
+const (
+	TICKER_STATUS_INVALID 	int = -1
+	TICKER_STATUS_INIT 		int = 0
+	TICKER_STATUS_NOT_START int = 1
+	TICKER_STATUS_MINTING 	int = 2
+	TICKER_STATUS_MINT_COMPLETED int = 3
+)
+
 const TickerSeparatedFromName = true
 
 // amt / n == sizeof(ordinals)
@@ -31,6 +39,7 @@ type Ticker struct {
 	BlockStart int     `json:"blockStart,omitempty"`
 	BlockEnd   int     `json:"blockEnd,omitempty"`
 	Attr       SatAttr `json:"attr,omitempty"`
+	Status     int     `json:"status"`
 }
 
 type RBTreeValue_Mint struct {
@@ -111,6 +120,7 @@ type TickerInfo struct {
 	Content         []byte `json:"content,omitempty"`
 	ContentType     string `json:"contenttype,omitempty"`
 	Delegate        string `json:"delegate,omitempty"`
+	Status          int    `json:"status"`
 }
 
 type MintInfo struct {

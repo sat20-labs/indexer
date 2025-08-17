@@ -1,6 +1,7 @@
 package nft
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -158,52 +159,84 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 
 	startTime := time.Now()
 	p.db.View(func(txn db.ReadBatch) error {
-		bindingSatsInCoinbase := make([]int64, 0)
+		type pair struct {
+			key string
+			value uint64
+		}
+		utxos := make([]*pair, 0)
 		for _, tx := range block.Transactions[1:] {
-			bindingSats := make([]int64, 0)
-			hasAsset := false
 			for _, input := range tx.Inputs {
-				sats := p.getBindingSatsWithUtxo(input.UtxoId, txn)
-				if _using_sattree {
-					for _, sat := range sats {
-						p.satTree.Put(sat, true)
-					}
-				} else {
-					bindingSats = append(bindingSats, sats...)
+				_, ok := p.utxoMap[input.UtxoId]
+				if ok {
+					continue
 				}
-				
-				if len(sats) > 0 {
-					hasAsset = true
-					delete(p.utxoMap, input.UtxoId)
-					p.utxoDeled = append(p.utxoDeled, input.UtxoId)
-				}
-			}
-
-			if hasAsset {
-				for _, output := range tx.Outputs {
-					if _using_sattree {
-						p.innerUpdateTransfer2(output)
-					} else {
-						bindingSats = p.innerUpdateTransfer3(output, bindingSats)
-					}
-				}
-				if len(bindingSats) > 0 {
-					bindingSatsInCoinbase = append(bindingSatsInCoinbase, bindingSats...)
-				}
+				utxos = append(utxos, &pair{
+					key: GetUtxoKey(input.UtxoId),
+					value: input.UtxoId,
+					}) 
 			}
 		}
-
-		// 按顺序是最后一块，要放最后，保持顺序很重要
-		tx := block.Transactions[0]
-		for _, output := range tx.Outputs {
-			if _using_sattree {
-				p.innerUpdateTransfer2(output)
-			} else {
-				bindingSatsInCoinbase = p.innerUpdateTransfer3(output, bindingSatsInCoinbase)
+		sort.Slice(utxos, func(i, j int) bool {
+			return utxos[i].key < utxos[j].key
+		})
+		for _, v := range utxos {
+			value := NftsInUtxo{}
+			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &value)
+			if err != nil {
+				//common.Log.Infof("loadUtxoValueFromDB %d failed. %v", utxoId, err)
+				return nil
 			}
+			p.utxoMap[v.value] = value.Sats
 		}
 		return nil
 	})
+	
+	bindingSatsInCoinbase := make([]int64, 0)
+	for _, tx := range block.Transactions[1:] {
+		bindingSats := make([]int64, 0)
+		hasAsset := false
+		for _, input := range tx.Inputs {
+			sats := p.utxoMap[input.UtxoId]
+			if _using_sattree {
+				for _, sat := range sats {
+					p.satTree.Put(sat, true)
+				}
+			} else {
+				bindingSats = append(bindingSats, sats...)
+			}
+			
+			if len(sats) > 0 {
+				hasAsset = true
+				delete(p.utxoMap, input.UtxoId)
+				p.utxoDeled = append(p.utxoDeled, input.UtxoId)
+			}
+		}
+
+		if hasAsset {
+			for _, output := range tx.Outputs {
+				if _using_sattree {
+					p.innerUpdateTransfer2(output)
+				} else {
+					bindingSats = p.innerUpdateTransfer3(output, bindingSats)
+				}
+			}
+			if len(bindingSats) > 0 {
+				bindingSatsInCoinbase = append(bindingSatsInCoinbase, bindingSats...)
+			}
+		}
+	}
+
+	// 按顺序是最后一块，要放最后，保持顺序很重要
+	tx := block.Transactions[0]
+	for _, output := range tx.Outputs {
+		if _using_sattree {
+			p.innerUpdateTransfer2(output)
+		} else {
+			bindingSatsInCoinbase = p.innerUpdateTransfer3(output, bindingSatsInCoinbase)
+		}
+	}
+	
+	
 		
 	
 
@@ -338,21 +371,35 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 
 	p.db.View(func(txn db.ReadBatch) error {
 
+		type pair struct {
+			key string
+			value *SatInfo
+			sat int64
+		}
+
+		loadingSats := make([]*pair, 0)
 		for sat, info := range p.satMap {
-			_, ok := nftmap[sat]
-			if !ok {
-				key := GetSatKey(sat)
-				oldvalue := common.NftsInSat{}
-				// err := db.GetValueFromDB([]byte(key), txn, &oldvalue)
-				err := db.GetValueFromTxnWithProto3([]byte(key), txn, &oldvalue)
-				if err == nil {
-					oldvalue.OwnerAddressId = info.AddressId
-					oldvalue.UtxoId = info.UtxoId
-					nftmap[sat] = &oldvalue
-				} //else {
-				// 在p.nftAdded中，稍等再加载
-				//}
-			}
+			key := GetSatKey(sat)
+			loadingSats = append(loadingSats, &pair{
+				key: key,
+				value: info,
+				sat: sat,
+			})
+		}
+		sort.Slice(loadingSats, func(i, j int) bool {
+			return loadingSats[i].key < loadingSats[j].key
+		})
+		for _, v := range loadingSats {
+			oldvalue := common.NftsInSat{}
+			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &oldvalue)
+			if err == nil {
+				info := v.value
+				oldvalue.OwnerAddressId = info.AddressId
+				oldvalue.UtxoId = info.UtxoId
+				nftmap[v.sat] = &oldvalue
+			} //else {
+			// 在p.nftAdded中，稍等再加载
+			//}
 		}
 
 		for _, nft := range p.nftAdded {
