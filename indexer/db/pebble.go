@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"os"
+	"sort"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/sat20-labs/indexer/common"
@@ -16,11 +18,12 @@ type pebbleDB struct {
 	db   *pebble.DB
 }
 
-func openDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
+func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 	if o == nil {
 		// 建议：Cache 设为机器内存的 20%~40%
-		cache := pebble.NewCache(4 << 30) // 4 GiB，可按需调整
+		cache := pebble.NewCache(8 << 30) // 4 GiB，可按需调整
 		// 可选：TableCache 默认够用；需要更高并发可单独配置
+
 
 		o = &pebble.Options{
 			Cache:         cache,
@@ -32,28 +35,33 @@ func openDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 			// L0 门限：控制写入背压。NVMe 下可更激进些（更大阈值）
 			L0CompactionThreshold:  8,
 			L0StopWritesThreshold:  24, // 达到后暂停写入，给 compaction 让路
-			LBaseMaxBytes:          512 << 20, // L1 基准容量，放大后减少 L0→L1 频繁抖动
+			LBaseMaxBytes:          2 << 30, // L1 基准容量，放大后减少 L0→L1 频繁抖动
 
 			// 并行压缩（非常关键，避免 compaction 成为瓶颈）
 			MaxConcurrentCompactions: func() int { return 4 },
 
-			// 表级别选项
-			// Levels: []pebble.LevelOptions{
-			// 	// L0 使用全局默认
-			// 	{}, // L0
-			// 	// 从 L1 起启用 BloomFilter & 压缩（按需开 Zstd）
-			// 	// {BloomFilter: pebble.BloomFilter(10)}, // L1
-			// 	// {BloomFilter: pebble.BloomFilter(10)}, // L2
-			// 	// {BloomFilter: pebble.BloomFilter(10)}, // L3
-			// 	// {BloomFilter: pebble.BloomFilter(10)}, // L4
-			// 	// {BloomFilter: pebble.BloomFilter(10)}, // L5
-			// 	// {BloomFilter: pebble.BloomFilter(10)}, // L6
-			// },
+			Levels: func() []pebble.LevelOptions {
+				lvls := make([]pebble.LevelOptions, 7)
+				for i := range lvls {
+					lvls[i].TargetFileSize = 64 << 20  // 64 MiB；可逐层×2
+					lvls[i].BlockSize = 16 << 10       // 32 KiB（小 value 可降至 16 KiB 试验）
+					// 其余默认即可；表级 Bloom 由 Pebble 管
+				}
+				// 逐层放大 TargetFileSize（非必须，但对大数据集更友好）
+				for i := 1; i < len(lvls); i++ { 
+					lvls[i].TargetFileSize = lvls[i-1].TargetFileSize << 1 
+				}
+				return lvls
+			}(),
 
 			// WAL 同步策略：强一致用 Sync；追求吞吐可结合时间门限
 			// 注：WALMinSyncInterval 在新版本里可用（按你的 Pebble 版本）
-			// WALMinSyncInterval: 5 * time.Millisecond,
+			WALMinSyncInterval: func() time.Duration {return 5 * time.Millisecond},
 		}
+		//o.Levels[0].EnsureDefaults()
+
+	
+		// o.TableCache = pebble.NewTableCache()
 		// 压缩算法（可选）：Zstd 压缩比/速度更佳（取决于 Pebble/Go 版本支持）
 		// for i := range opts.Levels {
 		// 	opts.Levels[i].Compression = pebble.ZstdCompression
@@ -62,20 +70,21 @@ func openDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 	return pebble.Open(filepath, o)
 }
 
-func NewKVDB(path string) KVDB {
-	db, err := initDB(path)
+func NewPebbleDB(path string) KVDB {
+	db, err := initPebbleDB(path)
 	if err != nil {
+		common.Log.Errorf("initPebbleDB failed, %v", err)
 		return nil
 	}
 	kvdb := pebbleDB{path: path, db: db}
 	return &kvdb
 }
 
-func initDB(path string) (*pebble.DB, error) {
+func initPebbleDB(path string) (*pebble.DB, error) {
 	if path == "" {
 		path = "./data/db"
 	}
-	return openDB(path, nil)
+	return openPebbleDB(path, nil)
 }
 
 func (p *pebbleDB) get(key []byte) ([]byte, error) {
@@ -252,28 +261,118 @@ func (p *pebbleDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v
 	return p.iter(prefix, seekKey, reverse, r)
 }
 
-type kvReadBatch struct {
+type pebbleReadBatch struct {
 	snap *pebble.Snapshot
+	it *pebble.Iterator
 }
 
-func (p *kvReadBatch) Get(key []byte) ([]byte, error) {
-	val, closer, err := p.snap.Get(key)
-	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
-			return nil, ErrKeyNotFound
+func (p *pebbleReadBatch) Get(key []byte) ([]byte, error) {
+	// val, closer, err := p.snap.Get(key)
+	// if err != nil {
+	// 	if errors.Is(err, pebble.ErrNotFound) {
+	// 		return nil, ErrKeyNotFound
+	// 	}
+	// 	return nil, err
+	// }
+	// defer closer.Close()
+	// return append([]byte{}, val...), nil
+	if p.it.SeekGE(key) && bytes.Equal(p.it.Key(), key) {
+		return append([]byte{}, p.it.Value()...), nil
+	} 
+	return nil, ErrKeyNotFound
+}
+
+
+func (p *pebbleReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	// 排序 keys，避免迭代器来回 Seek
+	// sort.Slice(keys, func(i, j int) bool {
+	// 	return bytes.Compare(keys[i], keys[j]) < 0
+	// })
+
+	results := make([][]byte, len(keys))
+	for i, k := range keys {
+		if ok := p.it.SeekGE(k); ok && bytes.Equal(p.it.Key(), k) {
+			// 必须拷贝，避免底层 buffer 复用
+			val := append([]byte{}, p.it.Value()...)
+			results[i] = val
+		} else {
+			results[i] = nil
 		}
+	}
+	return results, nil
+}
+
+func (p *pebbleReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, error) {
+	
+	sortedKeys := make([][]byte, len(keys))
+	copy(sortedKeys, keys)
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
+	})
+
+	result := make(map[string][]byte, len(keys))
+	i := 0
+	for p.it.Next() && i < len(sortedKeys) {
+		key := sortedKeys[i]
+		for p.it.Valid() && bytes.Compare(p.it.Key(), key) >= 0 {
+			if bytes.Equal(p.it.Key(), key) {
+				// 命中 key
+				valCopy := append([]byte(nil), p.it.Value()...) // 避免复用 p.it.Value()
+				result[string(key)] = valCopy
+				i++
+				if i >= len(sortedKeys) {
+					break
+				}
+				key = sortedKeys[i]
+			} else if bytes.Compare(p.it.Key(), key) > 0 {
+				// 数据库 key 比当前目标 key 大，说明该 key 不存在
+				i++
+				if i < len(sortedKeys) {
+					key = sortedKeys[i]
+				}
+			}
+		}
+	}
+
+	if err := p.it.Error(); err != nil {
 		return nil, err
 	}
-	defer closer.Close()
-	return append([]byte{}, val...), nil
+	return result, nil
 }
 
 func (p *pebbleDB) View(fn func(txn ReadBatch) error) error {
 	snap := p.db.NewSnapshot()
 	defer snap.Close()
-	rb := kvReadBatch{snap: snap}
+
+	it, err := snap.NewIter(nil)
+	if err != nil {
+		return err
+	}
+	defer it.Close()
+
+	rb := pebbleReadBatch{
+		snap: snap,
+		it: it,
+	}
 	return fn(&rb)
+	// rb := &pebbleReadBatchDirect{db: p.db}
+    // return fn(rb)
 }
+
+// type pebbleReadBatchDirect struct{ db *pebble.DB }
+// func (r *pebbleReadBatchDirect) Get(key []byte) ([]byte, error) {
+//     val, closer, err := r.db.Get(key)
+// 	if errors.Is(err, pebble.ErrNotFound) {
+// 		return nil, ErrKeyNotFound
+// 	}
+//     defer closer.Close()
+//     buf := make([]byte, len(val))
+// 	copy(buf, val)
+//     return buf, nil
+// }
 
 func (p *pebbleDB) Update(fn func(any) error) error {
 	batch := p.db.NewBatch()
@@ -325,38 +424,38 @@ func (p *pebbleDB) RestoreFromFile(backupFile string) error {
 	return nil
 }
 
-type kvWriteBatch struct {
+type pebbleWriteBatch struct {
 	db     *pebble.DB
 	batch  *pebble.Batch
 	closed bool
 }
 
-func (p *kvWriteBatch) Put(key, value []byte) error {
+func (p *pebbleWriteBatch) Put(key, value []byte) error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
 	return p.batch.Set(key, value, nil)
 }
 
-func (p *kvWriteBatch) Delete(key []byte) error {
+func (p *pebbleWriteBatch) Delete(key []byte) error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
 	return p.batch.Delete(key, nil)
 }
 
-func (p *kvWriteBatch) Flush() error {
+func (p *pebbleWriteBatch) Flush() error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
 	return p.batch.Commit(pebble.Sync)
 }
 
-func (p *kvWriteBatch) Close() {
+func (p *pebbleWriteBatch) Close() {
 	p.closed = true
 	_ = p.batch.Close()
 }
 
 func (p *pebbleDB) NewWriteBatch() WriteBatch {
-	return &kvWriteBatch{db: p.db, batch: p.db.NewBatch()}
+	return &pebbleWriteBatch{db: p.db, batch: p.db.NewBatch()}
 }

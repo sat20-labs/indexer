@@ -9,6 +9,8 @@ var (
 
 type ReadBatch interface {
 	Get(key []byte) ([]byte, error) // 与 KVDB.Read 区分
+	MultiGet(keys [][]byte) ([][]byte, error) // 需要key排序才能提高性能
+	MultiGetSorted(keys [][]byte) (map[string][]byte, error) // 需要key排序才能提高性能
 }
 
 type WriteBatch interface {
@@ -42,4 +44,9 @@ type KVDB interface {
 
 func RunDBGC(db KVDB) {
 
+}
+
+func NewKVDB(path string) KVDB {
+	//return NewLevelDB(path)
+	return NewPebbleDB(path)
 }
