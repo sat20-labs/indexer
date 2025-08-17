@@ -231,13 +231,64 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 			b.addUtxo(&addressValueMap, v)
 		}
 
-		for _, value := range b.delUTXOs {
-			b.removeUtxo(&addressValueMap, value, txn)
+		type deleteUtxo struct {
+			key []byte
+			value *UtxoValue
 		}
+
+		deleteUtxos := make([]*deleteUtxo, len(b.delUTXOs))
+		for i, value := range b.delUTXOs {
+			deleteUtxos[i] = &deleteUtxo{
+				key: db.GetUtxoIdKey(value.UtxoId),
+				value: value,
+			}
+		}
+		sort.Slice(deleteUtxos, func(i, j int) bool {
+			return bytes.Compare(deleteUtxos[i].key, deleteUtxos[j].key) < 0
+		})
+		for _, v := range deleteUtxos {
+			_, err := txn.Get(v.key)
+			bExist := err == nil
+			//b.removeUtxo(&addressValueMap, value, txn)
+			utxo := v.value
+			utxoId := v.value.UtxoId
+			for _, address := range utxo.Address.Addresses {
+				value, ok := addressValueMap[address]
+				if ok {
+					if bExist {
+						// 存在数据库中，等会去删除
+						value.Utxos[utxoId] = &common.UtxoValue{Op: -1}
+					} else {
+						// 仅从缓存数据中删除
+						delete(value.Utxos, utxoId)
+					}
+				} else {
+					if bExist {
+						// 存在数据库中，等会去删除
+						utxos := make(map[uint64]*common.UtxoValue)
+						utxos[utxoId] = &common.UtxoValue{Op: -1}
+		
+						id, op := b.getAddressId(address)
+						if op >= 0 {
+							value = &common.AddressValueInDB{
+								AddressType: uint32(utxo.Address.Type),
+								AddressId:   id,
+								Op:          op,
+								Utxos:       utxos,
+							}
+							addressValueMap[address] = value
+						} else {
+							common.Log.Panicf("utxo %x exists but address %s not exists.", utxoId, address)
+						}
+					}
+				}
+			}
+		}
+		
 		return nil
 	})
 
-	common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v\n",
+	common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v",
 		len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
 
 
@@ -941,7 +992,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			}
 		}
 
-		common.Log.Infof("BaseIndexer.prefetchIndexesFromDB-> prefetched %d in %v\n", len(addressIdMap), time.Since(startTime))
+		common.Log.Infof("BaseIndexer.prefetchIndexesFromDB-> prefetched %d in %v", len(addressIdMap), time.Since(startTime))
 
 		return nil
 	})
