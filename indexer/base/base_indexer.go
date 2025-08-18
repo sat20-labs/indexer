@@ -3,7 +3,6 @@ package base
 import (
 	"bytes"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -206,12 +205,6 @@ func (b *BaseIndexer) forceUpdateDB() {
 	// }
 }
 
-func (b *BaseIndexer) closeDB() {
-	err := b.db.Close()
-	if err != nil {
-		common.Log.Errorf("BaseIndexer.closeDB-> Error closing sat db %v", err)
-	}
-}
 
 func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	// 测试下提前取的所有地址
@@ -246,9 +239,8 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 			return bytes.Compare(deleteUtxos[i].key, deleteUtxos[j].key) < 0
 		})
 		for _, v := range deleteUtxos {
-			_, err := txn.Get(v.key)
+			_, err := txn.GetRef(v.key)
 			bExist := err == nil
-			//b.removeUtxo(&addressValueMap, value, txn)
 			utxo := v.value
 			utxoId := v.value.UtxoId
 			for _, address := range utxo.Address.Addresses {
@@ -864,7 +856,12 @@ func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn db.ReadBatch) error {
 func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	startTime := time.Now()
 
-	utxos := make([]string, 0)
+	type pair struct {
+		key []byte
+		value string
+	}
+
+	utxos := make([]*pair, 0)
 	addressMap := make(map[string]uint64)
 
 	//b.db.View(func(txn db.ReadBatch) error {
@@ -877,7 +874,10 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 
 				utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
 				if _, ok := b.utxoIndex.Index[utxo]; !ok {
-					utxos = append(utxos, utxo)
+					utxos = append(utxos, &pair{
+						key: db.GetUTXODBKey(utxo),
+						value: utxo,
+					})
 					// err := b.loadUtxoFromTxn(utxo, txn)
 					// if err == db.ErrKeyNotFound {
 					// 	continue
@@ -907,7 +907,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 
 	// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 	sort.Slice(utxos, func(i, j int) bool {
-		return utxos[i] < utxos[j]
+		return bytes.Compare(utxos[i].key, utxos[j].key) < 0
 	})
 
 	b.db.View(func(txn db.ReadBatch) error {
@@ -915,8 +915,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		addressIdMap := make(map[uint64]string)
 		for _, utxo := range utxos {
 			utxoValue := &common.UtxoValueInDB{}
-			dbKey := db.GetUTXODBKey(utxo)
-			err := db.GetValueFromTxnWithProto3(dbKey, txn, utxoValue)
+			err := db.GetValueFromTxnWithProto3(utxo.key, txn, utxoValue)
 			if err == db.ErrKeyNotFound {
 				continue
 			} else if err != nil {
@@ -927,42 +926,44 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			for _, addressId := range utxoValue.AddressIds {
 				addressIdMap[addressId] = ""
 			}
-			utxoAddressMap[utxo] = utxoValue.AddressIds
+			utxoAddressMap[utxo.value] = utxoValue.AddressIds
 
 			var addresses common.ScriptPubKey
 			addresses.Type = int(utxoValue.AddressType)
 			addresses.ReqSig = int(utxoValue.ReqSigs)
 
 			height, txid, vout := common.FromUtxoId(utxoValue.UtxoId)
-			b.utxoIndex.Index[utxo] = &common.Output{Height: height, TxId: txid,
+			b.utxoIndex.Index[utxo.value] = &common.Output{Height: height, TxId: txid,
 				Value:   common.GetOrdinalsSize(utxoValue.Ordinals),
 				Address: &addresses,
 				N:       int64(vout), Ordinals: utxoValue.Ordinals}
 		}
 
-		addressIds := make([][]byte, len(addressIdMap))
+		type addressIdPair struct {
+			key []byte
+			value uint64
+		}
+
+		addressIds := make([]*addressIdPair, len(addressIdMap))
 		i := 0
 		for k := range addressIdMap {
-			addressIds[i] = db.GetAddressIdKey(k)
+			addressIds[i] = &addressIdPair{
+				key: db.GetAddressIdKey(k),
+				value: k,
+			}
 			i++
 		}
 		sort.Slice(addressIds, func(i, j int) bool {
-			return bytes.Compare(addressIds[i], addressIds[j]) < 0
+			return bytes.Compare(addressIds[i].key, addressIds[j].key) < 0
 		})
-		for _, key := range addressIds {
-			idStr := strings.TrimPrefix(string(key), common.DB_KEY_ADDRESSID)
-			id, err := strconv.ParseUint(idStr, 10, 64)
+		for _, v := range addressIds {
+			value, err := txn.Get(v.key)
 			if err != nil {
-				common.Log.Panicf("ParseUint %s failed, %v", idStr, err)
-			}
-
-			value, err := txn.Get(key)
-			if err != nil {
-				common.Log.Panicf("failed to get value of address: %s, %v", key, err)
+				common.Log.Panicf("failed to get value of address: %s, %v", v.key, err)
 			}
 			address := strings.TrimPrefix(string(value), common.DB_KEY_ADDRESS)
-			addressMap[address] = id
-			addressIdMap[id] = address
+			addressMap[address] = v.value
+			addressIdMap[v.value] = address
 		}
 		addresses := make([]string, len(addressMap))
 		i = 0
@@ -974,19 +975,22 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			return addresses[i] < addresses[j]
 		})
 		for _, address := range addresses {
-			addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
-			op := 1
-			if bExist {
-				op = 0
+			s, ok := b.addressIdMap[address]
+			if !ok {
+				addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
+				op := 1
+				if bExist {
+					op = 0
+				}
+				s = &AddressStatus{addressId, op}
+				b.addressIdMap[address] = s
 			}
-			b.addressIdMap[address] = &AddressStatus{addressId, op}
-			addressIdMap[addressId] = address
+			addressIdMap[s.AddressId] = address
 		}
 
-
 		for _, utxo := range utxos {
-			output := b.utxoIndex.Index[utxo]
-			addresses := utxoAddressMap[utxo]
+			output := b.utxoIndex.Index[utxo.value]
+			addresses := utxoAddressMap[utxo.value]
 			for _, addressId := range addresses {
 				output.Address.Addresses = append(output.Address.Addresses, addressIdMap[addressId])
 			}

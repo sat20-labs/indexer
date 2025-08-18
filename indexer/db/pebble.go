@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/sat20-labs/indexer/common"
@@ -56,7 +55,7 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 
 			// WAL 同步策略：强一致用 Sync；追求吞吐可结合时间门限
 			// 注：WALMinSyncInterval 在新版本里可用（按你的 Pebble 版本）
-			WALMinSyncInterval: func() time.Duration {return 5 * time.Millisecond},
+			// WALMinSyncInterval: func() time.Duration {return 5 * time.Millisecond},
 		}
 		//o.Levels[0].EnsureDefaults()
 
@@ -283,14 +282,26 @@ func (p *pebbleReadBatch) Get(key []byte) ([]byte, error) {
 }
 
 
+func (p *pebbleReadBatch) GetRef(key []byte) ([]byte, error) {
+	// val, closer, err := p.snap.Get(key)
+	// if err != nil {
+	// 	if errors.Is(err, pebble.ErrNotFound) {
+	// 		return nil, ErrKeyNotFound
+	// 	}
+	// 	return nil, err
+	// }
+	// defer closer.Close()
+	// return val, nil
+	if p.it.SeekGE(key) && bytes.Equal(p.it.Key(), key) {
+		return p.it.Value(), nil
+	} 
+	return nil, ErrKeyNotFound
+}
+
 func (p *pebbleReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	// 排序 keys，避免迭代器来回 Seek
-	// sort.Slice(keys, func(i, j int) bool {
-	// 	return bytes.Compare(keys[i], keys[j]) < 0
-	// })
 
 	results := make([][]byte, len(keys))
 	for i, k := range keys {
@@ -320,7 +331,7 @@ func (p *pebbleReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, erro
 		for p.it.Valid() && bytes.Compare(p.it.Key(), key) >= 0 {
 			if bytes.Equal(p.it.Key(), key) {
 				// 命中 key
-				valCopy := append([]byte(nil), p.it.Value()...) // 避免复用 p.it.Value()
+				valCopy := append([]byte(nil), p.it.Value()...) 
 				result[string(key)] = valCopy
 				i++
 				if i >= len(sortedKeys) {

@@ -307,6 +307,22 @@ func (p *levelDBReadBatch) Get(key []byte) ([]byte, error) {
 	// }
 	// return r, nil
 	if p.it.Seek(key) && bytes.Equal(p.it.Key(), key) {
+		return append([]byte{}, p.it.Value()...), nil
+	} 
+	return nil, ErrKeyNotFound
+}
+
+
+func (p *levelDBReadBatch) GetRef(key []byte) ([]byte, error) {
+	// r, err := p.snap.Get(key, nil)
+	// if err != nil {
+	// 	if err == leveldb.ErrNotFound {
+	// 		return nil, ErrKeyNotFound
+	// 	}
+	// 	return nil, err
+	// }
+	// return r, nil
+	if p.it.Seek(key) && bytes.Equal(p.it.Key(), key) {
 		return p.it.Value(), nil
 	} 
 	return nil, ErrKeyNotFound
@@ -343,7 +359,7 @@ func (p *levelDBReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, err
 		for p.it.Valid() && bytes.Compare(p.it.Key(), key) >= 0 {
 			if bytes.Equal(p.it.Key(), key) {
 				// 命中 key
-				valCopy := append([]byte(nil), p.it.Value()...) // 避免复用 p.it.Value()
+				valCopy := append([]byte(nil), p.it.Value()...)
 				result[string(key)] = valCopy
 				i++
 				if i >= len(sortedKeys) {
