@@ -184,8 +184,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 			value := NftsInUtxo{}
 			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &value)
 			if err != nil {
-				//common.Log.Infof("loadUtxoValueFromDB %d failed. %v", utxoId, err)
-				return nil
+				continue
 			}
 			p.utxoMap[v.value] = value.Sats
 		}
