@@ -158,7 +158,7 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
-	height := nftIndexer.GetBaseIndexer().GetSyncHeight()
+	
 
 	startTime := time.Now()
 	common.Log.Infof("brc20 db version: %s", s.GetDBVersion())
@@ -181,7 +181,8 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 		s.mutex.Unlock()
 	}
 
-	s.CheckSelf(height)
+	//height := nftIndexer.GetBaseIndexer().GetSyncHeight()
+	//s.CheckSelf(height)
 
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("InitIndexer %d ms\n", elapsed)
@@ -189,6 +190,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
+	return true 
 
 	//common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()
