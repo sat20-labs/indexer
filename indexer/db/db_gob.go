@@ -173,6 +173,14 @@ func GetAddressByIDFromDB(ldb KVDB, id uint64) (string, error) {
 	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
 }
 
+func GetAddressByIDFromTxn(txn ReadBatch, id uint64) (string, error) {
+	key, err := txn.Get(GetAddressIdKey(id))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
+}
+
 func GetAddressByID(txn ReadBatch, id uint64) (string, error) {
 	key, err := txn.Get(GetAddressIdKey(id))
 	if err != nil {
@@ -196,6 +204,33 @@ func GetAddressIdFromTxn(db ReadBatch, address string) (uint64, error) {
 		return common.INVALID_ID, err
 	}
 	return common.BytesToUint64(key), nil
+}
+
+
+func GetAddressDataFromDBV2(db KVDB, address string) (*common.AddressValueInDBV2, error) {
+	var result common.AddressValueInDBV2
+
+	v, err := db.Read(GetAddressDBKeyV2(address))
+	if err != nil {
+		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
+		return nil, err
+	}
+	
+	err = DecodeBytes(v, &result)
+	return &result, err
+}
+
+func GetAddressDataFromDBTxnV2(txn ReadBatch, address string) (*common.AddressValueInDBV2, error) {
+	var result common.AddressValueInDBV2
+
+	v, err := txn.Get(GetAddressDBKeyV2(address))
+	if err != nil {
+		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
+		return nil, err
+	}
+	
+	err = DecodeBytes(v, &result)
+	return &result, err
 }
 
 func CheckKeyExists(db KVDB, key []byte) bool {

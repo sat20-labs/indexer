@@ -192,6 +192,27 @@ func (b *BaseIndexer) Repair() {
 
 // only call in compiling data
 func (b *BaseIndexer) forceUpdateDB() {
+	/* TODO 优化 NftIndexer->UpdateDB 
+
+2025-08-21 10:21:22 [info] default: BaseIndexer->updateBasicDB 883100 start...
+2025-08-21 10:21:30 [info] default: BaseIndexer.prefechAddress add 379442, del 564247, address 337455 in 7.975174159s
+2025-08-21 10:21:32 [info] default: BaseIndexer.updateBasicDB-> add utxos 376540 (+ 2902), cost: 1.612725272s
+2025-08-21 10:21:32 [info] default: BaseIndexer.updateBasicDB-> delete utxos 564247, cost: 295.996357ms
+2025-08-21 10:21:35 [info] default: BaseIndexer.updateBasicDB-> flush db,  cost: 2.141388775s
+2025-08-21 10:21:35 [info] default: BaseIndexer.updateBasicDB: cost: 12.027970259s
+2025-08-21 10:21:35 [info] default: InitRarityDB 883100 takes 14.283141ms
+2025-08-21 10:21:35 [info] default: ExoticIndexer->UpdateDB takes 14.65488ms
+2025-08-21 10:22:03 [info] default: NftIndexer->UpdateDB takes 28.526164031s
+2025-08-21 10:22:03 [info] default: NameService->UpdateDB takes 9.490898ms
+2025-08-21 10:22:03 [info] default: OrdxIndexer->UpdateDB takse: 16.034782ms
+2025-08-21 10:22:03 [info] default: BRC20Indexer->UpdateDB takse: 1.246µs
+2025-08-21 10:22:03 [info] default: DbWrite.FlushToDB-> logs count:85453, update count:0, remove count:0, total bytes:4046793
+2025-08-21 10:22:03 [info] default: RuneIndexer.UpdateDB-> db commit success, height:883100
+2025-08-21 10:22:03 [info] default: IndexerMgr.forceUpdateDB: takes: 28.83885863s
+2025-08-21 10:22:03 [info] default: forceUpdateDB sync to height 883100
+2025-08-21 10:22:03 [info] default: processed block 883100 (2025-02-10 08:14:34) with 1909 transactions took 44.166077839s (23.135713ms per tx)
+
+	*/
 	if b.updateDBCB != nil {
 		startTime := time.Now()
 		b.UpdateDB()
