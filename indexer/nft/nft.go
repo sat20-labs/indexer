@@ -22,7 +22,7 @@ var _using_sattree = true
 // 所有nft的记录
 // 以后ns和ordx模块，数据变大，导致加载、跑数据等太慢，需要按照这个模块的方式来修改优化。
 type NftIndexer struct {
-	db       db.KVDB
+	db       common.KVDB
 	status   *common.NftStatus
 	bEnabled bool
 
@@ -30,16 +30,16 @@ type NftIndexer struct {
 	mutex       sync.RWMutex
 
 	// realtime buffer
-	satTree *indexer.SatRBTree        // key: sat, 用于范围搜索
-	utxoMap map[uint64][]int64        // utxo->sats  确保utxo中包含的所有nft都列在这里
-	satMap  map[int64]*SatInfo        // sat->utxo
+	satTree *indexer.SatRBTree // key: sat, 用于范围搜索
+	utxoMap map[uint64][]int64 // utxo->sats  确保utxo中包含的所有nft都列在这里
+	satMap  map[int64]*SatInfo // sat->utxo
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
 	nftAdded  []*common.Nft // 保持顺序
 	utxoDeled []uint64
 }
 
-func NewNftIndexer(db db.KVDB) *NftIndexer {
+func NewNftIndexer(db common.KVDB) *NftIndexer {
 	ns := &NftIndexer{
 		db:        db,
 		bEnabled:  true,
@@ -119,7 +119,7 @@ func (p *NftIndexer) GetBaseIndexer() *base.BaseIndexer {
 }
 
 func (p *NftIndexer) Repair() {
-	
+
 }
 
 // 每个NFT Mint都调用
@@ -159,9 +159,9 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 	defer p.mutex.Unlock()
 
 	startTime := time.Now()
-	p.db.View(func(txn db.ReadBatch) error {
+	p.db.View(func(txn common.ReadBatch) error {
 		type pair struct {
-			key string
+			key   string
 			value uint64
 		}
 		utxos := make([]*pair, 0)
@@ -172,9 +172,9 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 					continue
 				}
 				utxos = append(utxos, &pair{
-					key: GetUtxoKey(input.UtxoId),
+					key:   GetUtxoKey(input.UtxoId),
 					value: input.UtxoId,
-					}) 
+				})
 			}
 		}
 		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
@@ -191,7 +191,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 		}
 		return nil
 	})
-	
+
 	bindingSatsInCoinbase := make([]int64, 0)
 	for _, tx := range block.Transactions[1:] {
 		bindingSats := make([]int64, 0)
@@ -205,7 +205,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 			} else {
 				bindingSats = append(bindingSats, sats...)
 			}
-			
+
 			if len(sats) > 0 {
 				hasAsset = true
 				delete(p.utxoMap, input.UtxoId)
@@ -236,10 +236,6 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 			bindingSatsInCoinbase = p.innerUpdateTransfer3(output, bindingSatsInCoinbase)
 		}
 	}
-	
-	
-		
-	
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
@@ -268,7 +264,6 @@ func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
 	}
 }
 
-
 func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int64) []int64 {
 	// 只考虑放在第一个地址上 (output的地址处理过，肯定有值)
 	newUtxo := common.GetUtxoId(output)
@@ -278,6 +273,7 @@ func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int
 	sats := make([]int64, 0)
 	i := 0
 	for i < len(inputSats) {
+		// 当个遍历，在sat很多，range也很多的时候，性能很低，远远低于 SatRBTree
 		sat := inputSats[i]
 		if common.IsSatInRanges(sat, output.Ordinals) {
 			sats = append(sats, sat)
@@ -286,7 +282,7 @@ func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int
 			i++
 		}
 	}
-	
+
 	if len(sats) > 0 {
 		for _, k := range sats {
 			if len(output.Address.Addresses) > 0 {
@@ -301,7 +297,7 @@ func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int
 }
 
 func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
-	p.db.View(func(txn db.ReadBatch) error {
+	p.db.View(func(txn common.ReadBatch) error {
 		p.getBindingSatsWithUtxo(utxoId, txn)
 		return nil
 	})
@@ -310,7 +306,7 @@ func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
 }
 
 // fast
-func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn db.ReadBatch) []int64 {
+func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn common.ReadBatch) []int64 {
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		return sats
@@ -370,21 +366,21 @@ func (p *NftIndexer) getNftInBuffer4(sat int64) *common.Nft {
 func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 	nftmap := make(map[int64]*common.NftsInSat)
 
-	p.db.View(func(txn db.ReadBatch) error {
+	p.db.View(func(txn common.ReadBatch) error {
 
 		type pair struct {
-			key string
+			key   string
 			value *SatInfo
-			sat int64
+			sat   int64
 		}
 
 		loadingSats := make([]*pair, 0)
 		for sat, info := range p.satMap {
 			key := GetSatKey(sat)
 			loadingSats = append(loadingSats, &pair{
-				key: key,
+				key:   key,
 				value: info,
-				sat: sat,
+				sat:   sat,
 			})
 		}
 		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
@@ -519,7 +515,7 @@ func (p *NftIndexer) UpdateDB() {
 }
 
 // 耗时很长。仅用于在数据编译完成时验证数据，或者测试时验证数据。
-func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
+func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 
 	common.Log.Info("NftIndexer->checkSelf ... ")
 
@@ -555,7 +551,6 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	})
 	common.Log.Infof("%s table takes %v", DB_PREFIX_NFT, time.Since(startTime2))
 	common.Log.Infof("1: address %d, utxo %d, sats %d, nfts %d", len(addressesInT1), len(utxosInT1), len(satsInT1), len(nftsInT1))
-	
 
 	// utxo的数据涉及到delete操作，但是badger的delete操作有隐藏的bug，需要检查下该utxo是否存在
 	utxosInT2 := make(map[uint64]bool)
@@ -598,14 +593,14 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 	getbuck()
 
 	//wg.Wait()
-	common.Log.Infof("nft count: %d %d %d", p.status.Count - uint64(len(p.nftAdded)), len(nftsInT1), lastkey+1)
+	common.Log.Infof("nft count: %d %d %d", p.status.Count-uint64(len(p.nftAdded)), len(nftsInT1), lastkey+1)
 
 	wrongAddress := make([]uint64, 0)
 	wrongUtxo1 := make([]uint64, 0)
 	wrongUtxo2 := make([]uint64, 0)
 
 	//wg.Add(2)
-	baseDB.View(func(txn db.ReadBatch) error {
+	baseDB.View(func(txn common.ReadBatch) error {
 		//defer wg.Done()
 		startTime2 = time.Now()
 		for address := range addressesInT1 {
@@ -618,9 +613,8 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 		common.Log.Infof("check addressesInT1 in baseDB takes %v", time.Since(startTime2))
 		return nil
 	})
-	
-	
-	baseDB.View(func(txn db.ReadBatch) error {
+
+	baseDB.View(func(txn common.ReadBatch) error {
 		//defer wg.Done()
 		startTime2 = time.Now()
 		// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
@@ -634,7 +628,7 @@ func (p *NftIndexer) CheckSelf(baseDB db.KVDB) bool {
 		common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
 		return nil
 	})
-		
+
 	//wg.Wait()
 	common.Log.Infof("check in baseDB completed")
 
@@ -762,11 +756,10 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 }
 
 // only for test
-func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb db.KVDB) map[uint64]string {
+func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb common.KVDB) map[uint64]string {
 	result := make(map[uint64]string)
 	ldb.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
-		
-		
+
 		var value common.UtxoValueInDB
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
@@ -776,7 +769,7 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb db.KVDB) map[uint64]
 
 		// 用于打印不存在table中的utxo
 		if _, ok := utxos[value.UtxoId]; ok {
-			
+
 			str, err := db.GetUtxoByDBKey(k)
 			if err == nil {
 				common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
@@ -788,7 +781,7 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb db.KVDB) map[uint64]
 				return nil
 			}
 		}
-		
+
 		return nil
 	})
 

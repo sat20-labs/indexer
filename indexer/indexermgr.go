@@ -24,15 +24,15 @@ type IndexerMgr struct {
 	cfg   *config.YamlConf
 	dbDir string
 	// data from blockchain
-	baseDB  db.KVDB
-	ftDB    db.KVDB
-	nsDB    db.KVDB
-	nftDB   db.KVDB
-	brc20DB db.KVDB
-	runesDB db.KVDB
+	baseDB  common.KVDB
+	ftDB    common.KVDB
+	nsDB    common.KVDB
+	nftDB   common.KVDB
+	brc20DB common.KVDB
+	runesDB common.KVDB
 	// data from market
-	localDB db.KVDB
-	kvDB    db.KVDB
+	localDB common.KVDB
+	kvDB    common.KVDB
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -181,7 +181,7 @@ func (b *IndexerMgr) Init() {
 	b.addressToNameMap = nil
 }
 
-func (b *IndexerMgr) GetBaseDB() db.KVDB {
+func (b *IndexerMgr) GetBaseDB() common.KVDB {
 	return b.baseDB
 }
 

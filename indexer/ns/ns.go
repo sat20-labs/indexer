@@ -11,7 +11,7 @@ import (
 
 // 名字注册到几百万几千万后，这个模块的加载速度查找速度
 type NameService struct {
-	db         db.KVDB
+	db         common.KVDB
 	status     *common.NameServiceStatus
 	nftIndexer *nft.NftIndexer
 
@@ -25,7 +25,7 @@ type NameService struct {
 	updateAdded []*NameUpdate   // 保持顺序
 }
 
-func NewNameService(db db.KVDB) *NameService {
+func NewNameService(db common.KVDB) *NameService {
 	ns := &NameService{
 		db:     db,
 		status: nil,
@@ -167,7 +167,7 @@ func (p *NameService) UpdateDB() {
 }
 
 // 耗时很长。仅用于在数据编译完成时验证数据，或者测试时验证数据。
-func (p *NameService) CheckSelf(baseDB db.KVDB) bool {
+func (p *NameService) CheckSelf(baseDB common.KVDB) bool {
 
 	common.Log.Info("NameService->checkSelf ... ")
 
@@ -184,7 +184,7 @@ func (p *NameService) CheckSelf(baseDB db.KVDB) bool {
 	common.Log.Infof("calculating in %s table ...", DB_PREFIX_NAME)
 	p.db.BatchRead([]byte(DB_PREFIX_NAME), false, func(k, v []byte) error {
 		//defer wg.Done()
-		
+
 		var value NameValueInDB
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
@@ -194,7 +194,7 @@ func (p *NameService) CheckSelf(baseDB db.KVDB) bool {
 		nftIdInT1[value.NftId] = true
 		namesInT1[value.Name] = true
 		satsInT1[value.Sat] = true
-		
+
 		return nil
 	})
 	common.Log.Infof("%s table takes %v", DB_PREFIX_NAME, time.Since(startTime2))

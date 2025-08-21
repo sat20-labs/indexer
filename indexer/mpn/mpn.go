@@ -24,7 +24,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/lru"
 
-	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/mpn/addrmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/connmgr"
 	"github.com/sat20-labs/indexer/indexer/mpn/peer"
@@ -222,7 +221,7 @@ type MemPoolNode struct {
 	wg                   sync.WaitGroup
 	quit                 chan struct{}
 	nat                  NAT
-	db                   db.KVDB
+	db                   common.KVDB
 	//timeSource           localCommon.MedianTimeSource
 	services wire.ServiceFlag
 
@@ -2676,7 +2675,7 @@ out:
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
 func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
-	db db.KVDB, chainParams *chaincfg.Params,
+	db common.KVDB, chainParams *chaincfg.Params,
 	indexManager localCommon.IndexManager,
 	interrupt <-chan struct{}) (*MemPoolNode, error) {
 

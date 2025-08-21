@@ -146,7 +146,7 @@ func (s *FTIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
 	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
@@ -198,7 +198,7 @@ func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 
 	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {

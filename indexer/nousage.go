@@ -632,7 +632,6 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	ldb := p.compiling.GetBaseDB()
 	key := []byte("pizza-holder")
 
-	
 	err := db.GetValueFromDB(key, &pizzaAddrMap, ldb)
 	if err != nil || bRegenerat {
 		pizzaAddrMap = make(map[uint64]int64)
@@ -688,7 +687,7 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	theTaprootAddresses := make([]*AddressPizza, 0)
 	total2 := int64(0)
 
-	ldb.View(func(txn db.ReadBatch) error {
+	ldb.View(func(txn common.ReadBatch) error {
 		it := addrTreeMap.Iterator()
 		it.End()
 
@@ -1198,14 +1197,14 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 			m[val] = true
 			namesInT1[key] = m
 		}
-		
+
 		return nil
 	})
 	common.Log.Infof("%s table takes %v", ns.DB_PREFIX_NAME, time.Since(startTime2))
 
 	startTime2 = time.Now()
 	addrInT1 := make(map[uint64]int, 0)
-	p.nftDB.View(func(txn db.ReadBatch) error {
+	p.nftDB.View(func(txn common.ReadBatch) error {
 		for k := range satsInT1 {
 			var value common.NftsInSat
 			key := nft.GetSatKey(k)
@@ -1216,7 +1215,7 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 		}
 		return nil
 	})
-		
+
 	common.Log.Infof("get address %d takes %v", len(addrInT1), time.Since(startTime2))
 
 	addrTreeMap := treemap.NewWith(utils.IntComparator)
@@ -1287,7 +1286,7 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 	common.Log.Infof("calculating in %s table ...", ns.DB_PREFIX_NAME)
 	nameMap := make(map[string]int64)
 	p.nsDB.BatchRead([]byte(ns.DB_PREFIX_NAME), false, func(k, v []byte) error {
-		
+
 		var value ns.NameValueInDB
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
@@ -1304,7 +1303,7 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 				nameMap[value.Name] = value.Sat
 			}
 		}
-		
+
 		return nil
 	})
 	common.Log.Infof("%s table takes %v", ns.DB_PREFIX_NAME, time.Since(startTime2))
@@ -1312,7 +1311,7 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 	startTime := time.Now()
 	common.Log.Infof("get all addresses ...")
 	addrIdMap := make(map[uint64]int)
-	p.nftDB.View(func(txn db.ReadBatch) error {
+	p.nftDB.View(func(txn common.ReadBatch) error {
 		for _, v := range nameMap {
 			key := nft.GetSatKey(v)
 			nfts := &common.NftsInSat{}

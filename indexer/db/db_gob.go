@@ -12,7 +12,7 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-func GobSetDB(key []byte, value interface{}, db KVDB) error {
+func GobSetDB(key []byte, value interface{}, db common.KVDB) error {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(value); err != nil {
 		return err
@@ -20,7 +20,7 @@ func GobSetDB(key []byte, value interface{}, db KVDB) error {
 	return db.Write(key, buf.Bytes())
 }
 
-func GobGetDB(key []byte, value interface{}, db KVDB) error {
+func GobGetDB(key []byte, value interface{}, db common.KVDB) error {
 	buf, err := db.Read(key)
 	if err != nil {
 		return err
@@ -28,7 +28,7 @@ func GobGetDB(key []byte, value interface{}, db KVDB) error {
 	return DecodeBytes(buf, value)
 }
 
-func SetDB(key []byte, data interface{}, wb WriteBatch) error {
+func SetDB(key []byte, data interface{}, wb common.WriteBatch) error {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(data); err != nil {
 		return err
@@ -36,28 +36,28 @@ func SetDB(key []byte, data interface{}, wb WriteBatch) error {
 	return wb.Put(key, buf.Bytes())
 }
 
-func SetRawDB(key []byte, data []byte, wb WriteBatch) error {
+func SetRawDB(key []byte, data []byte, wb common.WriteBatch) error {
 	return wb.Put(key, data)
 }
 
-func SetRawValueToDB(key, value []byte, db KVDB) error {
+func SetRawValueToDB(key, value []byte, db common.KVDB) error {
 	return db.Write(key, value)
 }
 
-func DeleteInDB(key []byte, db KVDB) error {
+func DeleteInDB(key []byte, db common.KVDB) error {
 	return db.Delete(key)
 }
 
-func GetRawValueFromDB(key []byte, db KVDB) ([]byte, error) {
+func GetRawValueFromDB(key []byte, db common.KVDB) ([]byte, error) {
 	return db.Read(key)
 }
 
 
-func GetRawValueFromTxn(key []byte, db ReadBatch) ([]byte, error) {
+func GetRawValueFromTxn(key []byte, db common.ReadBatch) ([]byte, error) {
 	return db.Get(key)
 }
 
-func GetValueFromDB(key []byte, v interface{}, db KVDB) (error) {
+func GetValueFromDB(key []byte, v interface{}, db common.KVDB) (error) {
 	buf, err := db.Read(key)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func GetValueFromDB(key []byte, v interface{}, db KVDB) (error) {
 	return nil
 }
 
-func GetValueFromTxn(key []byte, v interface{}, db ReadBatch) (error) {
+func GetValueFromTxn(key []byte, v interface{}, db common.ReadBatch) (error) {
 	buf, err := db.Get(key)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func GetValueFromTxn(key []byte, v interface{}, db ReadBatch) (error) {
 	return nil
 }
 
-func GetValueFromDB2[T any](key []byte, db KVDB) (*T, error) {
+func GetValueFromDB2[T any](key []byte, db common.KVDB) (*T, error) {
 	var ret T
 	buf, err := db.Read(key)
 	if err != nil {
@@ -127,15 +127,15 @@ func GetBlockDBKey(height int) []byte {
 	return []byte(fmt.Sprintf(common.DB_KEY_BLOCK+"%x", height))
 }
 
-func BindUtxoDBKeyToId(utxoDBKey []byte, id uint64, wb WriteBatch) error {
+func BindUtxoDBKeyToId(utxoDBKey []byte, id uint64, wb common.WriteBatch) error {
 	return wb.Put(GetUtxoIdKey(id), utxoDBKey)
 }
 
-func UnBindUtxoId(id uint64, wb WriteBatch) error {
+func UnBindUtxoId(id uint64, wb common.WriteBatch) error {
 	return wb.Delete(GetUtxoIdKey(id))
 }
 
-func GetUtxoByID(db KVDB, id uint64) (string, error) {
+func GetUtxoByID(db common.KVDB, id uint64) (string, error) {
 	key, err := db.Read(GetUtxoIdKey(id))
 	if err != nil {
 		return "", err
@@ -152,20 +152,20 @@ func GetAddressIdKey(id uint64) []byte {
 	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSID+"%d", id))
 }
 
-func BindAddressDBKeyToId(address string, id uint64, wb WriteBatch) error {
+func BindAddressDBKeyToId(address string, id uint64, wb common.WriteBatch) error {
 	if err := wb.Put(GetAddressIdKey(id), []byte(address)); err != nil {
 		return err
 	}
 	return wb.Put(GetAddressDBKey(address), common.Uint64ToBytes(id))
 }
 
-func UnBindAddressId(address string, id uint64, wb WriteBatch) error {
+func UnBindAddressId(address string, id uint64, wb common.WriteBatch) error {
 	wb.Delete(GetAddressIdKey(id))
 	wb.Delete(GetAddressDBKey(address))
 	return nil
 }
 
-func GetAddressByIDFromDB(ldb KVDB, id uint64) (string, error) {
+func GetAddressByIDFromDB(ldb common.KVDB, id uint64) (string, error) {
 	key, err := ldb.Read(GetAddressIdKey(id))
 	if err != nil {
 		return "", err
@@ -173,7 +173,7 @@ func GetAddressByIDFromDB(ldb KVDB, id uint64) (string, error) {
 	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
 }
 
-func GetAddressByIDFromTxn(txn ReadBatch, id uint64) (string, error) {
+func GetAddressByIDFromTxn(txn common.ReadBatch, id uint64) (string, error) {
 	key, err := txn.Get(GetAddressIdKey(id))
 	if err != nil {
 		return "", err
@@ -181,7 +181,7 @@ func GetAddressByIDFromTxn(txn ReadBatch, id uint64) (string, error) {
 	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
 }
 
-func GetAddressByID(txn ReadBatch, id uint64) (string, error) {
+func GetAddressByID(txn common.ReadBatch, id uint64) (string, error) {
 	key, err := txn.Get(GetAddressIdKey(id))
 	if err != nil {
 		return "", err
@@ -189,7 +189,7 @@ func GetAddressByID(txn ReadBatch, id uint64) (string, error) {
 	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
 }
 
-func GetAddressIdFromDB(db KVDB, address string) (uint64, error) {
+func GetAddressIdFromDB(db common.KVDB, address string) (uint64, error) {
 	key, err := db.Read(GetAddressDBKey(address))
 	if err != nil {
 		return common.INVALID_ID, err
@@ -198,7 +198,7 @@ func GetAddressIdFromDB(db KVDB, address string) (uint64, error) {
 }
 
 
-func GetAddressIdFromTxn(db ReadBatch, address string) (uint64, error) {
+func GetAddressIdFromTxn(db common.ReadBatch, address string) (uint64, error) {
 	key, err := db.Get(GetAddressDBKey(address))
 	if err != nil {
 		return common.INVALID_ID, err
@@ -207,7 +207,7 @@ func GetAddressIdFromTxn(db ReadBatch, address string) (uint64, error) {
 }
 
 
-func GetAddressDataFromDBV2(db KVDB, address string) (*common.AddressValueInDBV2, error) {
+func GetAddressDataFromDBV2(db common.KVDB, address string) (*common.AddressValueInDBV2, error) {
 	var result common.AddressValueInDBV2
 
 	v, err := db.Read(GetAddressDBKeyV2(address))
@@ -220,7 +220,7 @@ func GetAddressDataFromDBV2(db KVDB, address string) (*common.AddressValueInDBV2
 	return &result, err
 }
 
-func GetAddressDataFromDBTxnV2(txn ReadBatch, address string) (*common.AddressValueInDBV2, error) {
+func GetAddressDataFromDBTxnV2(txn common.ReadBatch, address string) (*common.AddressValueInDBV2, error) {
 	var result common.AddressValueInDBV2
 
 	v, err := txn.Get(GetAddressDBKeyV2(address))
@@ -233,17 +233,17 @@ func GetAddressDataFromDBTxnV2(txn ReadBatch, address string) (*common.AddressVa
 	return &result, err
 }
 
-func CheckKeyExists(db KVDB, key []byte) bool {
+func CheckKeyExists(db common.KVDB, key []byte) bool {
 	_, err := db.Read(key)
 	return err == nil
 }
 
-func CheckKeyExistsFromTxn(db ReadBatch, key []byte) bool {
+func CheckKeyExistsFromTxn(db common.ReadBatch, key []byte) bool {
 	_, err := db.Get(key)
 	return err == nil
 }
 
-func BackupDB(fname string, db KVDB) error {
+func BackupDB(fname string, db common.KVDB) error {
 	if bdb, ok := db.(interface{ BackupToFile(string) error }); ok {
 		return bdb.BackupToFile(fname)
 	}
@@ -258,7 +258,7 @@ func BackupDB(fname string, db KVDB) error {
 	})
 }
 
-func RestoreDB(backupFile string, db KVDB) error {
+func RestoreDB(backupFile string, db common.KVDB) error {
 	if rdb, ok := db.(interface{ RestoreFromFile(string) error }); ok {
 		return rdb.RestoreFromFile(backupFile)
 	}
@@ -284,3 +284,16 @@ func RestoreDB(backupFile string, db KVDB) error {
 	}
 	return wb.Flush()
 }
+
+
+func IterateRangeInDB(db common.KVDB, prefix, startKey, endKey []byte, 
+	processFunc func(key, value []byte) error) error {
+    return db.BatchReadV2(prefix, startKey, false, func(k, v []byte) error {
+        // 检查是否超过结束键
+        if len(endKey) > 0 && bytes.Compare(k, endKey) > 0 {
+            return fmt.Errorf("reach the endkey") // 作为特殊信号来终止迭代
+        }
+        return processFunc(k, v)
+    })
+}
+

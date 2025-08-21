@@ -9,10 +9,10 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func initStatusFromDB(ldb db.KVDB) *common.NftStatus {
+func initStatusFromDB(ldb common.KVDB) *common.NftStatus {
 	stats := &common.NftStatus{}
 	err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), stats, ldb)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Info("initStatusFromDB no stats found in db")
 		stats.Version = NFT_DB_VERSION
 	} else if err != nil {
@@ -27,20 +27,20 @@ func initStatusFromDB(ldb db.KVDB) *common.NftStatus {
 	return stats
 }
 
-func getNftsWithAddressFromDB(addressId uint64, db db.KVDB) []int64 {
+func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	result := make([]int64, 0)
-	err := db.BatchRead([]byte(fmt.Sprintf("%s%d-", DB_PREFIX_INSCADDR, addressId)), 
-	false, func(k, v []byte) error {
-		
-		key := string(k)
+	err := db.BatchRead([]byte(fmt.Sprintf("%s%d-", DB_PREFIX_INSCADDR, addressId)),
+		false, func(k, v []byte) error {
 
-		_, nftId, err := ParseAddressKey(key)
-		if err == nil {
-			result = append(result, nftId)
-		}
-		
-		return nil
-	})
+			key := string(k)
+
+			_, nftId, err := ParseAddressKey(key)
+			if err == nil {
+				result = append(result, nftId)
+			}
+
+			return nil
+		})
 
 	if err != nil {
 		common.Log.Panicf("getNftsWithAddressFromDB Error: %v", err)
@@ -49,31 +49,31 @@ func getNftsWithAddressFromDB(addressId uint64, db db.KVDB) []int64 {
 	return result
 }
 
-func loadNftFromDB(sat int64, value *common.NftsInSat, ldb db.KVDB) error {
+func loadNftFromDB(sat int64, value *common.NftsInSat, ldb common.KVDB) error {
 	key := GetSatKey(sat)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func loadNftFromTxn(sat int64, value *common.NftsInSat, txn db.ReadBatch) error {
+func loadNftFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBatch) error {
 	key := GetSatKey(sat)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
 }
 
-func loadUtxoValueFromDB(utxoId uint64, value *NftsInUtxo, ldb db.KVDB) error {
+func loadUtxoValueFromDB(utxoId uint64, value *NftsInUtxo, ldb common.KVDB) error {
 	key := GetUtxoKey(utxoId)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func loadUtxoValueFromTxn(utxoId uint64, value *NftsInUtxo, txn db.ReadBatch) error {
+func loadUtxoValueFromTxn(utxoId uint64, value *NftsInUtxo, txn common.ReadBatch) error {
 	key := GetUtxoKey(utxoId)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
 }
 
-func hasNftInUtxo(utxoId uint64, ldb db.KVDB) bool {
+func hasNftInUtxo(utxoId uint64, ldb common.KVDB) bool {
 	key := GetUtxoKey(utxoId)
 	_, err := ldb.Read([]byte(key))
 	return err == nil

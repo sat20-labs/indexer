@@ -134,7 +134,7 @@ func (s *BRC20Indexer) getMintFromDB(ticker, inscriptionId string) *common.BRC20
 
 	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
@@ -225,7 +225,7 @@ func (s *BRC20Indexer) getTickerFromDB(tickerName string) *common.BRC20Ticker {
 
 	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {

@@ -1,4 +1,4 @@
-package db
+package common
 
 import "errors"
 
@@ -41,13 +41,4 @@ type KVDB interface {
 
 	// 多次读
 	View(func(ReadBatch) error) error
-}
-
-func RunDBGC(db KVDB) {
-
-}
-
-func NewKVDB(path string) KVDB {
-	//return NewLevelDB(path)
-	return NewPebbleDB(path)
 }

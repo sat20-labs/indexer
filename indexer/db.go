@@ -8,8 +8,8 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func openDB(filepath string) (db.KVDB, error) {
-	
+func openDB(filepath string) (common.KVDB, error) {
+
 	ldb := db.NewKVDB(filepath)
 	if ldb == nil {
 		return nil, fmt.Errorf("NewKVDB failed")
@@ -21,42 +21,42 @@ func openDB(filepath string) (db.KVDB, error) {
 func (p *IndexerMgr) initDB() (err error) {
 	common.Log.Info("InitDB-> start...")
 
-	p.baseDB, err = openDB(p.dbDir+"base")
+	p.baseDB, err = openDB(p.dbDir + "base")
 	if err != nil {
 		return err
 	}
 
-	p.nftDB, err = openDB(p.dbDir+"nft")
+	p.nftDB, err = openDB(p.dbDir + "nft")
 	if err != nil {
 		return err
 	}
 
-	p.nsDB, err = openDB(p.dbDir+"ns")
+	p.nsDB, err = openDB(p.dbDir + "ns")
 	if err != nil {
 		return err
 	}
 
-	p.ftDB, err = openDB(p.dbDir+"ft")
+	p.ftDB, err = openDB(p.dbDir + "ft")
 	if err != nil {
 		return err
 	}
 
-	p.brc20DB, err = openDB(p.dbDir+"brc20")
+	p.brc20DB, err = openDB(p.dbDir + "brc20")
 	if err != nil {
 		return err
 	}
 
-	p.runesDB, err = openDB(p.dbDir+"runes")
+	p.runesDB, err = openDB(p.dbDir + "runes")
 	if err != nil {
 		return err
 	}
 
-	p.localDB, err = openDB(p.dbDir+"local")
+	p.localDB, err = openDB(p.dbDir + "local")
 	if err != nil {
 		return err
 	}
 
-	p.kvDB, err = openDB(p.dbDir+"dkvs")
+	p.kvDB, err = openDB(p.dbDir + "dkvs")
 	if err != nil {
 		return err
 	}
@@ -89,22 +89,21 @@ func (p *IndexerMgr) initCollections() {
 
 	p.clmap = make(map[common.TickerName]map[string]int64)
 	err := p.localDB.BatchRead([]byte("c-"), false, func(k, v []byte) error {
-		
-			key := string(k)
 
-			nty, name, err := parseCollectionKey(key)
+		key := string(k)
+
+		nty, name, err := parseCollectionKey(key)
+		if err == nil {
+			var ids []string
+
+			err = db.DecodeBytes(v, &ids)
 			if err == nil {
-				var ids []string
-				
-				err = db.DecodeBytes(v, &ids)
-				if err == nil {
-					p.clmap[common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: nty, Ticker: name}] = inscriptionIdsToCollectionMap(ids)
-				} else {
-					common.Log.Errorln("initCollections DecodeBytes " + err.Error())
-				}
-				
+				p.clmap[common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: nty, Ticker: name}] = inscriptionIdsToCollectionMap(ids)
+			} else {
+				common.Log.Errorln("initCollections DecodeBytes " + err.Error())
 			}
-		
+
+		}
 
 		return nil
 	})

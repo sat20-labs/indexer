@@ -20,7 +20,7 @@ type ExoticTickInfo struct {
 }
 
 type ExoticIndexer struct {
-	db          db.KVDB
+	db          common.KVDB
 	baseIndexer *base.BaseIndexer
 
 	mutex sync.RWMutex // 只保护这几个结构
@@ -171,7 +171,7 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 	}
 
 	var result map[string][]*common.Range
-	p.db.View(func(txn db.ReadBatch) error {
+	p.db.View(func(txn common.ReadBatch) error {
 		result = p.getMoreRodarmorRarityRangesToHeight(startHeight, endHeight, txn)
 		// TODO
 		//result[Alpha] = p.GetRangesForAlpha(startHeight, endHeight)
@@ -197,13 +197,12 @@ func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) 
 		return nil
 	})
 
-
 	return result
 }
 
-func initEpochSat(ldb db.KVDB, height int) {
+func initEpochSat(ldb common.KVDB, height int) {
 
-	ldb.View(func(txn db.ReadBatch) error {
+	ldb.View(func(txn common.ReadBatch) error {
 		currentEpoch := height / HalvingInterval
 		underpays := int64(0)
 

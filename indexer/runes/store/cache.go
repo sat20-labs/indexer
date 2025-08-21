@@ -8,7 +8,6 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/db"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,12 +29,12 @@ type DbLog struct {
 }
 
 type DbWrite struct {
-	Db             db.KVDB
+	Db             common.KVDB
 	logs           *cmap.ConcurrentMap[string, *DbLog]
 	cloneTimeStamp int64
 }
 
-func NewDbWrite(db db.KVDB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
+func NewDbWrite(db common.KVDB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
 	return &DbWrite{
 		Db:   db,
 		logs: logs,
@@ -65,7 +64,7 @@ func (s *DbWrite) FlushToDB() {
 			if isFinishUpdate {
 				break
 			}
-			
+
 			for log := range s.logs.IterBuffered() {
 				if log.Val.Type == DEL && log.Val.ExistInDb {
 					err := wb.Delete([]byte(log.Key))
@@ -77,7 +76,7 @@ func (s *DbWrite) FlushToDB() {
 			}
 			isFinishUpdate = true
 		}
-		
+
 		err := wb.Flush()
 		if err != nil {
 			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
@@ -202,10 +201,10 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 }
 
 func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
-	
+
 	v, err := proto.Marshal(val)
 	if err != nil {
-		return 
+		return
 	}
 	err = s.dbWrite.Db.Write(key, v)
 	if err != nil {
@@ -265,7 +264,7 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 
 func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
 	err := s.dbWrite.Db.BatchRead(keyPrefix, false, func(k, v []byte) error {
-		
+
 		var out T
 		if isNeedValue {
 			msg, ok := any(&out).(proto.Message)
@@ -285,7 +284,7 @@ func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[st
 		}
 
 		ret[string(k)] = &out
-		
+
 		return nil
 	})
 
@@ -297,8 +296,7 @@ func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[st
 
 func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T) bool) (ret bool) {
 	err := s.dbWrite.Db.BatchRead(keyPrefix, false, func(k, v []byte) error {
-		
-			
+
 		var out T
 		msg, ok := any(&out).(proto.Message)
 		if !ok {
@@ -312,7 +310,7 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 		if ret {
 			return nil
 		}
-		
+
 		return nil
 	})
 
@@ -324,29 +322,28 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 }
 
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
-	
-		v, err := s.dbWrite.Db.Read(key)
-		if err != nil && err != db.ErrKeyNotFound {
-			return
-		}
 
-		var out T		
-		if len(v) == 0 {
-			return
-		}
-		msg, ok := any(&out).(proto.Message)
-		if !ok {
-			common.Log.Errorf("type %T does not implement proto.Message", out)
-			return
-		}
-		err = proto.Unmarshal(v, msg)
-		if err != nil {
-			common.Log.Errorf("Unmarshal failed, %v", err)
-			return 
-		}
-		ret = &out
-		raw = v
-			
-		
+	v, err := s.dbWrite.Db.Read(key)
+	if err != nil && err != common.ErrKeyNotFound {
 		return
+	}
+
+	var out T
+	if len(v) == 0 {
+		return
+	}
+	msg, ok := any(&out).(proto.Message)
+	if !ok {
+		common.Log.Errorf("type %T does not implement proto.Message", out)
+		return
+	}
+	err = proto.Unmarshal(v, msg)
+	if err != nil {
+		common.Log.Errorf("Unmarshal failed, %v", err)
+		return
+	}
+	ret = &out
+	raw = v
+
+	return
 }

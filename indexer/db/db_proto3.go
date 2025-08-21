@@ -1,11 +1,12 @@
 package db
 
 import (
+	"github.com/sat20-labs/indexer/common"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func SetDBWithProto3(key []byte, data protoreflect.ProtoMessage, wb WriteBatch) error {
+func SetDBWithProto3(key []byte, data protoreflect.ProtoMessage, wb common.WriteBatch) error {
     dataBytes, err := proto.Marshal(data)
     if err != nil {
         return err
@@ -13,7 +14,7 @@ func SetDBWithProto3(key []byte, data protoreflect.ProtoMessage, wb WriteBatch) 
     return wb.Put(key, dataBytes)
 }
 
-func GetValueFromDB2WithProto3(key []byte, target protoreflect.ProtoMessage, db KVDB) error {
+func GetValueFromDB2WithProto3(key []byte, target protoreflect.ProtoMessage, db common.KVDB) error {
     data, err := db.Read(key)
     if err != nil {
         return err
@@ -21,13 +22,13 @@ func GetValueFromDB2WithProto3(key []byte, target protoreflect.ProtoMessage, db 
     return proto.Unmarshal(data, target)
 }
 
-func GetValueFromDBWithProto3(key []byte, ldb KVDB, target protoreflect.ProtoMessage) error {
-    return ldb.View(func(txn ReadBatch) error {
+func GetValueFromDBWithProto3(key []byte, ldb common.KVDB, target protoreflect.ProtoMessage) error {
+    return ldb.View(func(txn common.ReadBatch) error {
 		return GetValueFromTxnWithProto3(key, txn, target)
 	})
 }
 
-func GetValueFromTxnWithProto3(key []byte, txn ReadBatch, target protoreflect.ProtoMessage) error {
+func GetValueFromTxnWithProto3(key []byte, txn common.ReadBatch, target protoreflect.ProtoMessage) error {
     data, err := txn.Get(key)
     if err != nil {
         return err
@@ -35,7 +36,7 @@ func GetValueFromTxnWithProto3(key []byte, txn ReadBatch, target protoreflect.Pr
     return proto.Unmarshal(data, target)
 }
 
-func GetValueFromDBWithTypeWithProto3[T protoreflect.ProtoMessage](key []byte, db KVDB) (T, error) {
+func GetValueFromDBWithTypeWithProto3[T protoreflect.ProtoMessage](key []byte, db common.KVDB) (T, error) {
     var ret T
     data, err := db.Read(key)
     if err != nil {

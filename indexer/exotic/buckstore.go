@@ -14,12 +14,12 @@ import (
 const key_last = "exotic-lastkey"
 
 type BuckStore struct {
-	db       db.KVDB
+	db       common.KVDB
 	BuckSize int
 	prefix   string
 }
 
-func NewBuckStore(db db.KVDB, prefix string) *BuckStore {
+func NewBuckStore(db common.KVDB, prefix string) *BuckStore {
 	return &BuckStore{
 		db:       db,
 		BuckSize: 10000,
@@ -32,7 +32,7 @@ func (bs *BuckStore) Put(key int, value *common.Range) error {
 
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	item, err := bs.db.Read(dbkey)
-	if err != nil && err != db.ErrKeyNotFound {
+	if err != nil && err != common.ErrKeyNotFound {
 		common.Log.Errorf("Get %s: %v", dbkey, err)
 		return err
 	}
@@ -134,11 +134,11 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 		}
 	}
 
-	bs.db.View(func(txn db.ReadBatch) error {
+	bs.db.View(func(txn common.ReadBatch) error {
 		for bucket, value := range buckets {
 			dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 			val, err := txn.Get(dbkey)
-			if err == db.ErrKeyNotFound {
+			if err == common.ErrKeyNotFound {
 				continue
 			}
 			if err != nil {
@@ -153,7 +153,7 @@ func (bs *BuckStore) BatchPut(valuemap map[int]*common.Range) error {
 				value[height] = rng
 			}
 		}
-		return nil 
+		return nil
 	})
 
 	wb := bs.db.NewWriteBatch()

@@ -11,7 +11,7 @@ func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {
 	return p.baseIndexer.GetBlockInBuffer(height)
 }
 
-func (p *ExoticIndexer) getBlockRange(height int, txn db.ReadBatch) *common.Range {
+func (p *ExoticIndexer) getBlockRange(height int, txn common.ReadBatch) *common.Range {
 
 	if height < 0 || height > p.baseIndexer.GetHeight() {
 		return nil
@@ -31,12 +31,12 @@ func (p *ExoticIndexer) getBlockRange(height int, txn db.ReadBatch) *common.Rang
 	return &block.Ordinals
 }
 
-func (p *ExoticIndexer) getRangeForBlock(height int, txn db.ReadBatch) []*common.Range {
+func (p *ExoticIndexer) getRangeForBlock(height int, txn common.ReadBatch) []*common.Range {
 	rng := p.getBlockRange(height, txn)
 	return []*common.Range{rng}
 }
 
-func (p *ExoticIndexer) getRangeToBlock(height int, txn db.ReadBatch) []*common.Range {
+func (p *ExoticIndexer) getRangeToBlock(height int, txn common.ReadBatch) []*common.Range {
 	rng := p.getBlockRange(height, txn)
 	r := &common.Range{
 		Start: 0,
@@ -45,7 +45,7 @@ func (p *ExoticIndexer) getRangeToBlock(height int, txn db.ReadBatch) []*common.
 	return []*common.Range{r}
 }
 
-func (p *ExoticIndexer) getRangesForBlocks(blocks []int, txn db.ReadBatch) []*common.Range {
+func (p *ExoticIndexer) getRangesForBlocks(blocks []int, txn common.ReadBatch) []*common.Range {
 	ranges := []*common.Range{}
 	for _, b := range blocks {
 		ranges = append(ranges, p.getRangeForBlock(b, txn)...)
@@ -66,7 +66,7 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 	}
 
 	Uncommon := make(map[int]*common.Range, 0)
-	p.db.View(func(txn db.ReadBatch) error {
+	p.db.View(func(txn common.ReadBatch) error {
 		for i := syncHeight + 1; i <= height; i++ {
 			rng := p.getBlockRange(i, txn)
 			r := common.Range{
@@ -75,15 +75,15 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 			}
 			Uncommon[i] = &r
 		}
-		return nil 
+		return nil
 	})
-	
+
 	bs.BatchPut(Uncommon)
 
 	common.Log.Infof("InitRarityDB %d takes %v", height, time.Since(start))
 }
 
-func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn db.ReadBatch) map[string][]*common.Range {
+func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn common.ReadBatch) map[string][]*common.Range {
 	start := time.Now()
 
 	result := make(map[string][]*common.Range, 0)
@@ -168,7 +168,7 @@ func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn db.ReadBatch)
 	return result
 }
 
-func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeight int, txn db.ReadBatch) map[string][]*common.Range {
+func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeight int, txn common.ReadBatch) map[string][]*common.Range {
 	result := make(map[string][]*common.Range, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
@@ -203,7 +203,7 @@ func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeig
 	return result
 }
 
-func (p *ExoticIndexer) getRangesForAlpha(startHeight, endHeight int, txn db.ReadBatch) []*common.Range {
+func (p *ExoticIndexer) getRangesForAlpha(startHeight, endHeight int, txn common.ReadBatch) []*common.Range {
 	ranges := []*common.Range{}
 	rng1 := p.getBlockRange(startHeight, txn)
 	rng2 := p.getBlockRange(endHeight, txn)
@@ -221,7 +221,7 @@ func (p *ExoticIndexer) getRangesForAlpha(startHeight, endHeight int, txn db.Rea
 	return ranges
 }
 
-func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn db.ReadBatch) []*common.Range {
+func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn common.ReadBatch) []*common.Range {
 	ranges := []*common.Range{}
 	rng1 := p.getBlockRange(startHeight, txn)
 	rng2 := p.getBlockRange(endHeight, txn)
@@ -248,7 +248,7 @@ func (p *ExoticIndexer) loadExoticRanges(height int) map[string][]*common.Range 
 	}
 
 	var result map[string][]*common.Range
-	p.db.View(func(txn db.ReadBatch) error {
+	p.db.View(func(txn common.ReadBatch) error {
 		result = p.GetRangesForRodarmorRarity(height, txn)
 
 		result[Pizza] = PizzaRanges

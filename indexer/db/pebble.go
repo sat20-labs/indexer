@@ -69,7 +69,7 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 	return pebble.Open(filepath, o)
 }
 
-func NewPebbleDB(path string) KVDB {
+func NewPebbleDB(path string) common.KVDB {
 	db, err := initPebbleDB(path)
 	if err != nil {
 		common.Log.Errorf("initPebbleDB failed, %v", err)
@@ -90,7 +90,7 @@ func (p *pebbleDB) get(key []byte) ([]byte, error) {
 	val, closer, err := p.db.Get(key)
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
-			return nil, ErrKeyNotFound
+			return nil, common.ErrKeyNotFound
 		}
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (p *pebbleReadBatch) Get(key []byte) ([]byte, error) {
 	// val, closer, err := p.snap.Get(key)
 	// if err != nil {
 	// 	if errors.Is(err, pebble.ErrNotFound) {
-	// 		return nil, ErrKeyNotFound
+	// 		return nil, common.ErrKeyNotFound
 	// 	}
 	// 	return nil, err
 	// }
@@ -278,7 +278,7 @@ func (p *pebbleReadBatch) Get(key []byte) ([]byte, error) {
 	if p.it.SeekGE(key) && bytes.Equal(p.it.Key(), key) {
 		return append([]byte{}, p.it.Value()...), nil
 	} 
-	return nil, ErrKeyNotFound
+	return nil, common.ErrKeyNotFound
 }
 
 
@@ -286,7 +286,7 @@ func (p *pebbleReadBatch) GetRef(key []byte) ([]byte, error) {
 	// val, closer, err := p.snap.Get(key)
 	// if err != nil {
 	// 	if errors.Is(err, pebble.ErrNotFound) {
-	// 		return nil, ErrKeyNotFound
+	// 		return nil, common.ErrKeyNotFound
 	// 	}
 	// 	return nil, err
 	// }
@@ -295,7 +295,7 @@ func (p *pebbleReadBatch) GetRef(key []byte) ([]byte, error) {
 	if p.it.SeekGE(key) && bytes.Equal(p.it.Key(), key) {
 		return p.it.Value(), nil
 	} 
-	return nil, ErrKeyNotFound
+	return nil, common.ErrKeyNotFound
 }
 
 func (p *pebbleReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
@@ -354,7 +354,7 @@ func (p *pebbleReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, erro
 	return result, nil
 }
 
-func (p *pebbleDB) View(fn func(txn ReadBatch) error) error {
+func (p *pebbleDB) View(fn func(txn common.ReadBatch) error) error {
 	snap := p.db.NewSnapshot()
 	defer snap.Close()
 
@@ -377,7 +377,7 @@ func (p *pebbleDB) View(fn func(txn ReadBatch) error) error {
 // func (r *pebbleReadBatchDirect) Get(key []byte) ([]byte, error) {
 //     val, closer, err := r.db.Get(key)
 // 	if errors.Is(err, pebble.ErrNotFound) {
-// 		return nil, ErrKeyNotFound
+// 		return nil, common.ErrKeyNotFound
 // 	}
 //     defer closer.Close()
 //     buf := make([]byte, len(val))
@@ -467,6 +467,6 @@ func (p *pebbleWriteBatch) Close() {
 	_ = p.batch.Close()
 }
 
-func (p *pebbleDB) NewWriteBatch() WriteBatch {
+func (p *pebbleDB) NewWriteBatch() common.WriteBatch {
 	return &pebbleWriteBatch{db: p.db, batch: p.db.NewBatch()}
 }

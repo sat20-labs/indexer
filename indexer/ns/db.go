@@ -10,11 +10,11 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func initStatusFromDB(ldb db.KVDB) *common.NameServiceStatus {
+func initStatusFromDB(ldb common.KVDB) *common.NameServiceStatus {
 	stats := &common.NameServiceStatus{}
-	
+
 	err := db.GetValueFromDB([]byte(NS_STATUS_KEY), stats, ldb)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Info("initStatusFromDB no stats found in db")
 		stats.Version = NS_DB_VERSION
 	} else if err != nil {
@@ -29,12 +29,12 @@ func initStatusFromDB(ldb db.KVDB) *common.NameServiceStatus {
 	return stats
 }
 
-func initNameTreeFromDB(tree *indexer.SatRBTree, ldb db.KVDB) {
+func initNameTreeFromDB(tree *indexer.SatRBTree, ldb common.KVDB) {
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("initNameTreeFromDB ...")
 	err := ldb.BatchRead([]byte(DB_PREFIX_NAME), false, func(k, v []byte) error {
-		
+
 		key := string(k)
 		_, err := ParseNameKey(key)
 		if err == nil {
@@ -59,7 +59,7 @@ func initNameTreeFromDB(tree *indexer.SatRBTree, ldb db.KVDB) {
 }
 
 // 没有utxo数据，utxo是变动的数据，不适合保持在buck中，避免动态数据多处保持，容易出问题。
-func initNameTreeFromDB2(tree *indexer.SatRBTree, db db.KVDB) {
+func initNameTreeFromDB2(tree *indexer.SatRBTree, db common.KVDB) {
 	startTime := time.Now()
 	common.Log.Info("initNameTreeFromDB2 ...")
 
@@ -76,17 +76,17 @@ func initNameTreeFromDB2(tree *indexer.SatRBTree, db db.KVDB) {
 	common.Log.Infof("initNameTreeFromDB2 loaded %d records in %v\n", len(bulkMap), time.Since(startTime))
 }
 
-func loadNameFromDB(name string, value *NameValueInDB, ldb db.KVDB) error {
+func loadNameFromDB(name string, value *NameValueInDB, ldb common.KVDB) error {
 	key := GetNameKey(name)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func loadNameProperties(name string, ldb db.KVDB) map[string]*common.KeyValueInDB {
+func loadNameProperties(name string, ldb common.KVDB) map[string]*common.KeyValueInDB {
 	KVs := make(map[string]*common.KeyValueInDB)
 
-	err := ldb.BatchRead([]byte(DB_PREFIX_KV + name + "-"), false, func(k, v []byte) error {
-		
+	err := ldb.BatchRead([]byte(DB_PREFIX_KV+name+"-"), false, func(k, v []byte) error {
+
 		_, key, err := ParseKVKey(string(k))
 		if err == nil {
 			var valueInDB common.KeyValueInDB
@@ -108,13 +108,12 @@ func loadNameProperties(name string, ldb db.KVDB) map[string]*common.KeyValueInD
 	return KVs
 }
 
-func loadValueWithKey(name, key string, ldb db.KVDB) *common.KeyValueInDB {
+func loadValueWithKey(name, key string, ldb common.KVDB) *common.KeyValueInDB {
 	kv := common.KeyValueInDB{}
 
-	
 	k := GetKVKey(name, key)
 	err := db.GetValueFromDB([]byte(k), &kv, ldb)
-	
+
 	if err != nil {
 		common.Log.Errorf("GetValueFromDB %s-%s failed. %v", name, key, err)
 		return nil

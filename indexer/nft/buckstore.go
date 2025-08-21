@@ -14,7 +14,7 @@ import (
 const key_last = DB_PREFIX_BUCK + "lk"
 
 type NftBuckStore struct {
-	db       db.KVDB
+	db       common.KVDB
 	BuckSize int64
 	prefix   string
 }
@@ -24,7 +24,7 @@ type BuckValue struct {
 	Sat int64
 }
 
-func NewBuckStore(db db.KVDB) *NftBuckStore {
+func NewBuckStore(db common.KVDB) *NftBuckStore {
 	return &NftBuckStore{
 		db:       db,
 		BuckSize: 10000,
@@ -37,7 +37,7 @@ func (bs *NftBuckStore) Put(key int64, value *BuckValue) error {
 
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	val, err := bs.db.Read(dbkey)
-	if err != nil && err != db.ErrKeyNotFound {
+	if err != nil && err != common.ErrKeyNotFound {
 		common.Log.Errorf("Get %s: %v", dbkey, err)
 		return err
 	}
@@ -179,11 +179,11 @@ func (bs *NftBuckStore) BatchPut(valuemap map[int64]*BuckValue) error {
 		}
 	}
 
-	bs.db.View(func(txn db.ReadBatch) error {
+	bs.db.View(func(txn common.ReadBatch) error {
 		for bucket, value := range buckets {
 			dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 			item, err := txn.Get(dbkey)
-			if err == db.ErrKeyNotFound {
+			if err == common.ErrKeyNotFound {
 				continue
 			}
 			if err != nil {

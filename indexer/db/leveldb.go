@@ -53,7 +53,7 @@ func openLevelDB(filepath string, o *opt.Options) (*leveldb.DB, error) {
 	return db, nil
 }
 
-func NewLevelDB(path string) KVDB {
+func NewLevelDB(path string) common.KVDB {
 	db, err := initLevelDB(path)
 	if err != nil {
 		return nil
@@ -74,7 +74,7 @@ func (p *levelDB) get(key []byte) ([]byte, error) {
 	val, err := p.db.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			return nil, ErrKeyNotFound
+			return nil, common.ErrKeyNotFound
 		}
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func (p *levelDBReadBatch) Get(key []byte) ([]byte, error) {
 	// r, err := p.snap.Get(key, nil)
 	// if err != nil {
 	// 	if err == leveldb.ErrNotFound {
-	// 		return nil, ErrKeyNotFound
+	// 		return nil, common.ErrKeyNotFound
 	// 	}
 	// 	return nil, err
 	// }
@@ -309,7 +309,7 @@ func (p *levelDBReadBatch) Get(key []byte) ([]byte, error) {
 	if p.it.Seek(key) && bytes.Equal(p.it.Key(), key) {
 		return append([]byte{}, p.it.Value()...), nil
 	} 
-	return nil, ErrKeyNotFound
+	return nil, common.ErrKeyNotFound
 }
 
 
@@ -317,7 +317,7 @@ func (p *levelDBReadBatch) GetRef(key []byte) ([]byte, error) {
 	// r, err := p.snap.Get(key, nil)
 	// if err != nil {
 	// 	if err == leveldb.ErrNotFound {
-	// 		return nil, ErrKeyNotFound
+	// 		return nil, common.ErrKeyNotFound
 	// 	}
 	// 	return nil, err
 	// }
@@ -325,7 +325,7 @@ func (p *levelDBReadBatch) GetRef(key []byte) ([]byte, error) {
 	if p.it.Seek(key) && bytes.Equal(p.it.Key(), key) {
 		return p.it.Value(), nil
 	} 
-	return nil, ErrKeyNotFound
+	return nil, common.ErrKeyNotFound
 }
 
 func (p *levelDBReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
@@ -383,7 +383,7 @@ func (p *levelDBReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, err
 }
 
 // View 在一致性快照中执行只读操作
-func (p *levelDB) View(fn func(txn ReadBatch) error) error {
+func (p *levelDB) View(fn func(txn common.ReadBatch) error) error {
 	snap, err := p.db.GetSnapshot()
 	if err != nil {
 		return err
@@ -558,6 +558,6 @@ func (p *levelDBWriteBatch) Close() {
 	p.batch = nil
 }
 
-func (p *levelDB) NewWriteBatch() WriteBatch {
+func (p *levelDB) NewWriteBatch() common.WriteBatch {
 	return &levelDBWriteBatch{db: p.db, batch: &leveldb.Batch{}}
 }

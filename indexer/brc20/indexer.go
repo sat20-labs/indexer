@@ -44,7 +44,7 @@ type TransferNftInfo struct {
 }
 
 type BRC20Indexer struct {
-	db         db.KVDB
+	db         common.KVDB
 	nftIndexer *nft.NftIndexer
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
@@ -61,7 +61,7 @@ type BRC20Indexer struct {
 	tickerAdded      map[string]*common.BRC20Ticker // key: ticker
 }
 
-func NewIndexer(db db.KVDB) *BRC20Indexer {
+func NewIndexer(db common.KVDB) *BRC20Indexer {
 	return &BRC20Indexer{
 		db: db,
 	}
@@ -158,7 +158,6 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
-	
 
 	startTime := time.Now()
 	common.Log.Infof("brc20 db version: %s", s.GetDBVersion())
@@ -190,7 +189,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
-	return true 
+	return true
 
 	//common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()

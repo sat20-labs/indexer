@@ -28,8 +28,8 @@ type BlockProcCallback func(*common.Block)
 type UpdateDBCallback func()
 
 type BaseIndexer struct {
-	db      db.KVDB
-	stats   *SyncStats // 数据库状态
+	db    common.KVDB
+	stats *SyncStats // 数据库状态
 	//reCheck bool
 
 	// 需要clone的数据
@@ -60,7 +60,7 @@ type BaseIndexer struct {
 const BLOCK_PREFETCH = 12
 
 func NewBaseIndexer(
-	basicDB db.KVDB,
+	basicDB common.KVDB,
 	chaincfgParam *chaincfg.Params,
 	maxIndexHeight int,
 	periodFlushToDB int,
@@ -102,7 +102,6 @@ func (b *BaseIndexer) SetUpdateDBCallback(cb2 UpdateDBCallback) {
 func (b *BaseIndexer) SetBlockCallback(cb1 BlockProcCallback) {
 	b.blockprocCB = cb1
 }
-
 
 func (b *BaseIndexer) reset() {
 	b.loadSyncStatsFromDB()
@@ -192,25 +191,25 @@ func (b *BaseIndexer) Repair() {
 
 // only call in compiling data
 func (b *BaseIndexer) forceUpdateDB() {
-	/* TODO 优化 NftIndexer->UpdateDB 
+	/* TODO 优化 NftIndexer->UpdateDB
 
-2025-08-21 10:21:22 [info] default: BaseIndexer->updateBasicDB 883100 start...
-2025-08-21 10:21:30 [info] default: BaseIndexer.prefechAddress add 379442, del 564247, address 337455 in 7.975174159s
-2025-08-21 10:21:32 [info] default: BaseIndexer.updateBasicDB-> add utxos 376540 (+ 2902), cost: 1.612725272s
-2025-08-21 10:21:32 [info] default: BaseIndexer.updateBasicDB-> delete utxos 564247, cost: 295.996357ms
-2025-08-21 10:21:35 [info] default: BaseIndexer.updateBasicDB-> flush db,  cost: 2.141388775s
-2025-08-21 10:21:35 [info] default: BaseIndexer.updateBasicDB: cost: 12.027970259s
-2025-08-21 10:21:35 [info] default: InitRarityDB 883100 takes 14.283141ms
-2025-08-21 10:21:35 [info] default: ExoticIndexer->UpdateDB takes 14.65488ms
-2025-08-21 10:22:03 [info] default: NftIndexer->UpdateDB takes 28.526164031s
-2025-08-21 10:22:03 [info] default: NameService->UpdateDB takes 9.490898ms
-2025-08-21 10:22:03 [info] default: OrdxIndexer->UpdateDB takse: 16.034782ms
-2025-08-21 10:22:03 [info] default: BRC20Indexer->UpdateDB takse: 1.246µs
-2025-08-21 10:22:03 [info] default: DbWrite.FlushToDB-> logs count:85453, update count:0, remove count:0, total bytes:4046793
-2025-08-21 10:22:03 [info] default: RuneIndexer.UpdateDB-> db commit success, height:883100
-2025-08-21 10:22:03 [info] default: IndexerMgr.forceUpdateDB: takes: 28.83885863s
-2025-08-21 10:22:03 [info] default: forceUpdateDB sync to height 883100
-2025-08-21 10:22:03 [info] default: processed block 883100 (2025-02-10 08:14:34) with 1909 transactions took 44.166077839s (23.135713ms per tx)
+	2025-08-21 10:21:22 [info] default: BaseIndexer->updateBasicDB 883100 start...
+	2025-08-21 10:21:30 [info] default: BaseIndexer.prefechAddress add 379442, del 564247, address 337455 in 7.975174159s
+	2025-08-21 10:21:32 [info] default: BaseIndexer.updateBasicDB-> add utxos 376540 (+ 2902), cost: 1.612725272s
+	2025-08-21 10:21:32 [info] default: BaseIndexer.updateBasicDB-> delete utxos 564247, cost: 295.996357ms
+	2025-08-21 10:21:35 [info] default: BaseIndexer.updateBasicDB-> flush db,  cost: 2.141388775s
+	2025-08-21 10:21:35 [info] default: BaseIndexer.updateBasicDB: cost: 12.027970259s
+	2025-08-21 10:21:35 [info] default: InitRarityDB 883100 takes 14.283141ms
+	2025-08-21 10:21:35 [info] default: ExoticIndexer->UpdateDB takes 14.65488ms
+	2025-08-21 10:22:03 [info] default: NftIndexer->UpdateDB takes 28.526164031s
+	2025-08-21 10:22:03 [info] default: NameService->UpdateDB takes 9.490898ms
+	2025-08-21 10:22:03 [info] default: OrdxIndexer->UpdateDB takse: 16.034782ms
+	2025-08-21 10:22:03 [info] default: BRC20Indexer->UpdateDB takse: 1.246µs
+	2025-08-21 10:22:03 [info] default: DbWrite.FlushToDB-> logs count:85453, update count:0, remove count:0, total bytes:4046793
+	2025-08-21 10:22:03 [info] default: RuneIndexer.UpdateDB-> db commit success, height:883100
+	2025-08-21 10:22:03 [info] default: IndexerMgr.forceUpdateDB: takes: 28.83885863s
+	2025-08-21 10:22:03 [info] default: forceUpdateDB sync to height 883100
+	2025-08-21 10:22:03 [info] default: processed block 883100 (2025-02-10 08:14:34) with 1909 transactions took 44.166077839s (23.135713ms per tx)
 
 	*/
 	if b.updateDBCB != nil {
@@ -228,14 +227,13 @@ func (b *BaseIndexer) forceUpdateDB() {
 	// }
 }
 
-
 func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	// 测试下提前取的所有地址
 	addressValueMap := make(map[string]*common.AddressValueInDB)
-	
+
 	// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 	startTime := time.Now()
-	b.db.View(func(txn db.ReadBatch) error {
+	b.db.View(func(txn common.ReadBatch) error {
 		for _, v := range b.utxoIndex.Index {
 			if v.Address.Type == int(txscript.NullDataTy) {
 				// 只有OP_RETURN 才不记录
@@ -247,14 +245,14 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 		}
 
 		type deleteUtxo struct {
-			key []byte
+			key   []byte
 			value *UtxoValue
 		}
 
 		deleteUtxos := make([]*deleteUtxo, len(b.delUTXOs))
 		for i, value := range b.delUTXOs {
 			deleteUtxos[i] = &deleteUtxo{
-				key: db.GetUtxoIdKey(value.UtxoId),
+				key:   db.GetUtxoIdKey(value.UtxoId),
 				value: value,
 			}
 		}
@@ -281,7 +279,7 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 						// 存在数据库中，等会去删除
 						utxos := make(map[uint64]*common.UtxoValue)
 						utxos[utxoId] = &common.UtxoValue{Op: -1}
-		
+
 						id, op := b.getAddressId(address)
 						if op >= 0 {
 							value = &common.AddressValueInDB{
@@ -298,20 +296,18 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 				}
 			}
 		}
-		
+
 		return nil
 	})
 
 	common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v",
 		len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
 
-
 	return addressValueMap
 }
 
 func (b *BaseIndexer) UpdateDB() {
 	common.Log.Infof("BaseIndexer->updateBasicDB %d start...", b.lastHeight)
-
 
 	// 拿到所有的addressId
 	addressValueMap := b.prefechAddress()
@@ -476,7 +472,7 @@ func (b *BaseIndexer) UpdateDB() {
 	b.addressIdMap = make(map[string]*AddressStatus)
 }
 
-func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue, txn db.ReadBatch) {
+func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue, txn common.ReadBatch) {
 	utxoId := utxo.UtxoId
 	key := db.GetUtxoIdKey(utxoId)
 	_, err := txn.Get(key)
@@ -793,10 +789,10 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	b.blockVector = append(b.blockVector, blockValue)
 }
 
-func (b *BaseIndexer) getAddressIdFromTxn(address string, bGenerateNew bool, txn db.ReadBatch) (uint64, bool) {
+func (b *BaseIndexer) getAddressIdFromTxn(address string, bGenerateNew bool, txn common.ReadBatch) (uint64, bool) {
 	bExist := true
 	addressId, err := db.GetAddressIdFromTxn(txn, address)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		bExist = false
 		if bGenerateNew {
 			addressId = b.generateAddressId()
@@ -835,18 +831,17 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	return b.syncToBlock(int(count), stopChan)
 }
 
-
 func (b *BaseIndexer) loadUtxoFromDB(utxostr string) error {
-	return b.db.View(func(txn db.ReadBatch) error {
+	return b.db.View(func(txn common.ReadBatch) error {
 		return b.loadUtxoFromTxn(utxostr, txn)
 	})
 }
 
-func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn db.ReadBatch) error {
+func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn common.ReadBatch) error {
 	utxo := &common.UtxoValueInDB{}
 	dbKey := db.GetUTXODBKey(utxostr)
 	err := db.GetValueFromTxnWithProto3(dbKey, txn, utxo)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		return err
 	}
 	if err != nil {
@@ -878,77 +873,77 @@ func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn db.ReadBatch) error {
 
 func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	/* TODO 在后期，这个函数经常消耗了跑区块的80%时间，有时间需要继续优化。
-2025-08-21 10:09:02 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 8338 in 2.779987657s
-2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 2.780052419s
-2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 42.401982ms
-2025-08-21 10:09:02 [info] default: updateExoticTicker in 404.766µs
-2025-08-21 10:09:03 [info] default: NftIndexer.UpdateTransfer loop 3339 in 1.103972964s
-2025-08-21 10:09:03 [info] default: OrdxIndexer->UpdateTransfer loop 3339 in 1.800919ms
-2025-08-21 10:09:03 [info] default: OrdxIndexer->CheckSelf took 70.940899ms.
-2025-08-21 10:09:03 [info] default: RuneIndexer.UpdateTransfer-> handle block succ, height:882895, tx count:3339, update holder count:374, remove holder count:372, block took time:53.112239ms, tx took avg time:15.906µs
-2025-08-21 10:09:03 [info] default: processOrdProtocol 882895,is done: cost: 1.233547213s
-2025-08-21 10:09:03 [info] default: processed block 882895 (2025-02-08 22:05:46) with 3339 transactions took 4.056047383s (1.214749ms per tx)
+	2025-08-21 10:09:02 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 8338 in 2.779987657s
+	2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 2.780052419s
+	2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 42.401982ms
+	2025-08-21 10:09:02 [info] default: updateExoticTicker in 404.766µs
+	2025-08-21 10:09:03 [info] default: NftIndexer.UpdateTransfer loop 3339 in 1.103972964s
+	2025-08-21 10:09:03 [info] default: OrdxIndexer->UpdateTransfer loop 3339 in 1.800919ms
+	2025-08-21 10:09:03 [info] default: OrdxIndexer->CheckSelf took 70.940899ms.
+	2025-08-21 10:09:03 [info] default: RuneIndexer.UpdateTransfer-> handle block succ, height:882895, tx count:3339, update holder count:374, remove holder count:372, block took time:53.112239ms, tx took avg time:15.906µs
+	2025-08-21 10:09:03 [info] default: processOrdProtocol 882895,is done: cost: 1.233547213s
+	2025-08-21 10:09:03 [info] default: processed block 882895 (2025-02-08 22:05:46) with 3339 transactions took 4.056047383s (1.214749ms per tx)
 
-2025-08-21 10:09:06 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 7608 in 3.235794921s
-2025-08-21 10:09:06 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 3.235867578s
-2025-08-21 10:09:06 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 40.887636ms
-2025-08-21 10:09:06 [info] default: updateExoticTicker in 392.84µs
-2025-08-21 10:09:07 [info] default: NftIndexer.UpdateTransfer loop 3749 in 1.093159612s
-2025-08-21 10:09:07 [info] default: OrdxIndexer->UpdateTransfer loop 3749 in 7.705359ms
-2025-08-21 10:09:08 [info] default: OrdxIndexer->CheckSelf took 101.788654ms.
-2025-08-21 10:09:08 [info] default: RuneIndexer.UpdateTransfer-> handle block succ, height:882896, tx count:3749, update holder count:322, remove holder count:304, block took time:54.745046ms, tx took avg time:14.602µs
-2025-08-21 10:09:08 [info] default: processOrdProtocol 882896,is done: cost: 1.270160635s
-2025-08-21 10:09:08 [info] default: processed block 882896 (2025-02-08 22:25:32) with 3749 transactions took 4.546972122s (1.212849ms per tx)
+	2025-08-21 10:09:06 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 7608 in 3.235794921s
+	2025-08-21 10:09:06 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 3.235867578s
+	2025-08-21 10:09:06 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 40.887636ms
+	2025-08-21 10:09:06 [info] default: updateExoticTicker in 392.84µs
+	2025-08-21 10:09:07 [info] default: NftIndexer.UpdateTransfer loop 3749 in 1.093159612s
+	2025-08-21 10:09:07 [info] default: OrdxIndexer->UpdateTransfer loop 3749 in 7.705359ms
+	2025-08-21 10:09:08 [info] default: OrdxIndexer->CheckSelf took 101.788654ms.
+	2025-08-21 10:09:08 [info] default: RuneIndexer.UpdateTransfer-> handle block succ, height:882896, tx count:3749, update holder count:322, remove holder count:304, block took time:54.745046ms, tx took avg time:14.602µs
+	2025-08-21 10:09:08 [info] default: processOrdProtocol 882896,is done: cost: 1.270160635s
+	2025-08-21 10:09:08 [info] default: processed block 882896 (2025-02-08 22:25:32) with 3749 transactions took 4.546972122s (1.212849ms per tx)
 	*/
 
 	startTime := time.Now()
 
 	type pair struct {
-		key []byte
+		key   []byte
 		value string
 	}
 
 	utxos := make([]*pair, 0)
 	addressMap := make(map[string]uint64)
 
-	//b.db.View(func(txn db.ReadBatch) error {
-	
-		for _, tx := range block.Transactions {
-			for _, input := range tx.Inputs {
-				if input.Vout >= 0xffffffff {
-					continue
-				}
+	//b.db.View(func(txn common.ReadBatch) error {
 
-				utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
-				if _, ok := b.utxoIndex.Index[utxo]; !ok {
-					utxos = append(utxos, &pair{
-						key: db.GetUTXODBKey(utxo),
-						value: utxo,
-					})
-					// err := b.loadUtxoFromTxn(utxo, txn)
-					// if err == db.ErrKeyNotFound {
-					// 	continue
-					// } else if err != nil {
-					// 	common.Log.Panicf("failed to get value of utxo: %s, %v", utxo, err)
-					// }
-				}
+	for _, tx := range block.Transactions {
+		for _, input := range tx.Inputs {
+			if input.Vout >= 0xffffffff {
+				continue
 			}
 
-			for _, output := range tx.Outputs {
-				for _, address := range output.Address.Addresses {
-					_, ok := b.addressIdMap[address]
-					if !ok {
-						addressMap[address] = common.INVALID_ID
-						// addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
-						// op := 1
-						// if bExist {
-						// 	op = 0
-						// }
-						// b.addressIdMap[address] = &AddressStatus{addressId, op}
-					}
+			utxo := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
+			if _, ok := b.utxoIndex.Index[utxo]; !ok {
+				utxos = append(utxos, &pair{
+					key:   db.GetUTXODBKey(utxo),
+					value: utxo,
+				})
+				// err := b.loadUtxoFromTxn(utxo, txn)
+				// if err == common.ErrKeyNotFound {
+				// 	continue
+				// } else if err != nil {
+				// 	common.Log.Panicf("failed to get value of utxo: %s, %v", utxo, err)
+				// }
+			}
+		}
+
+		for _, output := range tx.Outputs {
+			for _, address := range output.Address.Addresses {
+				_, ok := b.addressIdMap[address]
+				if !ok {
+					addressMap[address] = common.INVALID_ID
+					// addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
+					// op := 1
+					// if bExist {
+					// 	op = 0
+					// }
+					// b.addressIdMap[address] = &AddressStatus{addressId, op}
 				}
 			}
 		}
+	}
 	// 	return nil
 	// })
 
@@ -957,13 +952,13 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		return bytes.Compare(utxos[i].key, utxos[j].key) < 0
 	})
 
-	b.db.View(func(txn db.ReadBatch) error {
+	b.db.View(func(txn common.ReadBatch) error {
 		utxoAddressMap := make(map[string][]uint64)
 		addressIdMap := make(map[uint64]string)
 		for _, utxo := range utxos {
 			utxoValue := &common.UtxoValueInDB{}
 			err := db.GetValueFromTxnWithProto3(utxo.key, txn, utxoValue)
-			if err == db.ErrKeyNotFound {
+			if err == common.ErrKeyNotFound {
 				continue
 			} else if err != nil {
 				common.Log.Panicf("failed to get value of utxo: %s, %v", utxo, err)
@@ -987,7 +982,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		}
 
 		type addressIdPair struct {
-			key []byte
+			key   []byte
 			value uint64
 		}
 
@@ -995,7 +990,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		i := 0
 		for k := range addressIdMap {
 			addressIds[i] = &addressIdPair{
-				key: db.GetAddressIdKey(k),
+				key:   db.GetAddressIdKey(k),
 				value: k,
 			}
 			i++
@@ -1051,10 +1046,10 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 }
 
 func (b *BaseIndexer) loadSyncStatsFromDB() {
-	
+
 	syncStats := &SyncStats{}
 	err := db.GetValueFromDB([]byte(SyncStatsKey), syncStats, b.db)
-	if err == db.ErrKeyNotFound {
+	if err == common.ErrKeyNotFound {
 		common.Log.Info("BaseIndexer.LoadSyncStatsFromDB-> No sync stats found in db")
 		syncStats.SyncHeight = -1
 	} else if err != nil {
@@ -1106,7 +1101,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("expected total sats %d", totalSats)
 	common.Log.Infof("total leak sats %d", totalSats-b.stats.TotalSats)
 
-
 	startTime2 := time.Now()
 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_BLOCK)
 	var preValue *common.BlockValueInDB
@@ -1134,8 +1128,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 		preValue = &value
 	}
 	common.Log.Infof("%s table takes %v", common.DB_KEY_BLOCK, time.Since(startTime2))
-		
-
 
 	satsInUtxo := int64(0)
 	utxoCount := 0
@@ -1146,7 +1138,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 	startTime2 = time.Now()
 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
 	b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
-		
 
 		var value common.UtxoValueInDB
 		err := db.DecodeBytesWithProto3(v, &value)
@@ -1173,14 +1164,12 @@ func (b *BaseIndexer) CheckSelf() bool {
 			addressesInT1[addressId] = true
 		}
 		utxosInT1[value.UtxoId] = true
-		
 
 		addressInUtxo = len(addressesInT1)
 		return nil
 	})
 	common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime2))
 	common.Log.Infof("1. utxo: %d(%d), sats %d, address %d", utxoCount, nonZeroUtxo, satsInUtxo, addressInUtxo)
-
 
 	satsInAddress := int64(0)
 	allAddressCount := 0
@@ -1192,9 +1181,9 @@ func (b *BaseIndexer) CheckSelf() bool {
 	startTime2 = time.Now()
 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_ADDRESSVALUE)
 	b.db.BatchRead([]byte(common.DB_KEY_ADDRESSVALUE), false, func(k, v []byte) error {
-			
+
 		value := int64(common.BytesToUint64(v))
-			
+
 		addressId, utxoId, _, index, err := common.ParseAddressIdKey(string(k))
 		if err != nil {
 			common.Log.Panicf("ParseAddressIdKey %s failed: %v", string(k), err)
@@ -1210,14 +1199,13 @@ func (b *BaseIndexer) CheckSelf() bool {
 
 		addressesInT2[addressId] = true
 		utxosInT2[utxoId] = true
-		
+
 		allAddressCount = len(addressesInT2)
 
 		return nil
 	})
 	common.Log.Infof("%s table takes %v", common.DB_KEY_ADDRESSVALUE, time.Since(startTime2))
 	common.Log.Infof("2. utxo: %d(%d), sats %d, address %d", allutxoInAddress, nonZeroUtxoInAddress, satsInAddress, allAddressCount)
-
 
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_ADDRESSVALUE)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
@@ -1242,7 +1230,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 
 	var addresses1, addresses2 map[uint64]bool
 	common.Log.Infof("address not in table %s", common.DB_KEY_ADDRESSVALUE)
-	b.db.View(func(txn db.ReadBatch) error {
+	b.db.View(func(txn common.ReadBatch) error {
 		addresses1 = findDifferentItems(addressesInT1, addressesInT2)
 		for uid := range addresses1 {
 			str, _ := db.GetAddressByID(txn, uid)
@@ -1304,16 +1292,14 @@ func (b *BaseIndexer) verifyAllUtxosWithBtcd() {
 	// 目的：数据库在压缩后有数据错乱情况，暂时没办法解决，在压缩后必须做数据验证。
 	// 验证数据分两步，一般调用checkself，只需要10分钟。最后数据跑到最新高度后，执行本函数，做一次最严格验证，可能需要4-5个小时
 	b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
-		
-		
+
 		var value common.UtxoValueInDB
-		
+
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
 			common.Log.Errorf("item.Value error: %v", err)
 			return err
 		}
-		
 
 		return nil
 	})
@@ -1334,28 +1320,27 @@ func findDifferentItems(map1, map2 map[uint64]bool) map[uint64]bool {
 func (b *BaseIndexer) printfUtxos(utxos map[uint64]bool) map[uint64]string {
 	result := make(map[uint64]string)
 	b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
-		
-			var value common.UtxoValueInDB
-			err := db.DecodeBytesWithProto3(v, &value)
-			if err != nil {
-				common.Log.Errorf("item.Value error: %v", err)
-				return err
+
+		var value common.UtxoValueInDB
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Errorf("item.Value error: %v", err)
+			return err
+		}
+
+		// 用于打印不存在table2中的utxo
+		if _, ok := utxos[value.UtxoId]; ok {
+			str, err := db.GetUtxoByDBKey(k)
+			if err == nil {
+				common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
+				result[value.UtxoId] = str
 			}
 
-			// 用于打印不存在table2中的utxo
-			if _, ok := utxos[value.UtxoId]; ok {
-				str, err := db.GetUtxoByDBKey(k)
-				if err == nil {
-					common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
-					result[value.UtxoId] = str
-				}
-
-				delete(utxos, value.UtxoId)
-				if len(utxos) == 0 {
-					return nil
-				}
+			delete(utxos, value.UtxoId)
+			if len(utxos) == 0 {
+				return nil
 			}
-		
+		}
 
 		return nil
 	})
@@ -1408,7 +1393,7 @@ func (b *BaseIndexer) GetBaseDBVer() string {
 	return string(value)
 }
 
-func (b *BaseIndexer) GetBaseDB() db.KVDB {
+func (b *BaseIndexer) GetBaseDB() common.KVDB {
 	return b.db
 }
 

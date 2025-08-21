@@ -14,7 +14,7 @@ import (
 const key_last = DB_PREFIX_BUCK + "lk"
 
 type NSBuckStore struct {
-	db       db.KVDB
+	db       common.KVDB
 	BuckSize int
 	prefix   string
 }
@@ -24,7 +24,7 @@ type BuckValue struct {
 	Sat  int64
 }
 
-func NewBuckStore(db db.KVDB) *NSBuckStore {
+func NewBuckStore(db common.KVDB) *NSBuckStore {
 	return &NSBuckStore{
 		db:       db,
 		BuckSize: 1000,
@@ -37,7 +37,7 @@ func (bs *NSBuckStore) Put(key int, value *BuckValue) error {
 
 	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 	item, err := bs.db.Read(dbkey)
-	if err != nil && err != db.ErrKeyNotFound {
+	if err != nil && err != common.ErrKeyNotFound {
 		common.Log.Errorf("Get %s: %v", dbkey, err)
 		return err
 	}
@@ -179,11 +179,11 @@ func (bs *NSBuckStore) BatchPut(valuemap map[int]*BuckValue) error {
 		}
 	}
 
-	bs.db.View(func(txn db.ReadBatch) error {
+	bs.db.View(func(txn common.ReadBatch) error {
 		for bucket, value := range buckets {
 			dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 			item, err := txn.Get(dbkey)
-			if err == db.ErrKeyNotFound {
+			if err == common.ErrKeyNotFound {
 				continue
 			}
 			if err != nil {
@@ -198,7 +198,7 @@ func (bs *NSBuckStore) BatchPut(valuemap map[int]*BuckValue) error {
 				value[height] = rng
 			}
 		}
-		return nil 
+		return nil
 	})
 
 	wb := bs.db.NewWriteBatch()
