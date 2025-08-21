@@ -15,7 +15,6 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/gogo/protobuf/proto"
 	ds "github.com/ipfs/go-datastore"
-	badgerds "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kadpb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	recpb "github.com/libp2p/go-libp2p-record/pb"
@@ -66,7 +65,7 @@ func GetDht() *dht.IpfsDHT {
 
 func NewDkvs(cfg *DkvsConfig) *Dkvs {
 	dbPath := "./db" + string(filepath.Separator) + "unsynckv"
-	dkvsdb, err := createBadgerDB(dbPath)
+	dkvsdb, err := CreateDataStore(dbPath)
 	if err != nil {
 		Logger.Errorf("NewDkvs CreateDataStore: %v", err)
 		return nil
@@ -355,13 +354,6 @@ func (d *Dkvs) putRecord(key string, record *pb.DkvsRecord) error {
 	recordKey := RecordKey(key)
 	//return d.dhtPut(recordKey, drMarsh)
 	return d.asyncPut(recordKey, drMarsh)
-}
-
-func createBadgerDB(dbRootDir string) (*badgerds.Datastore, error) {
-	defopts := badgerds.DefaultOptions
-	defopts.SyncWrites = false
-	defopts.Truncate = true
-	return badgerds.NewDatastore(dbRootDir, &defopts)
 }
 
 func getProtocolMessenger(baseServiceCfg *DHTConfig, dht *dht.IpfsDHT) (*kadpb.ProtocolMessenger, error) {

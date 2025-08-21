@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
@@ -70,18 +69,11 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	}
 
 	output := &common.UtxoValueInDB{}
-	err := b.db.View(func(txn *badger.Txn) error {
-		key := db.GetUTXODBKey(utxo)
-		//err := db.GetValueFromDB(key, txn, output)
-		err := db.GetValueFromDBWithProto3(key, txn, output)
-		if err != nil {
-			//common.Log.Warningf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
-			return err
-		}
-
-		return nil
-	})
-
+	
+	key := db.GetUTXODBKey(utxo)
+	//err := db.GetValueFromDB(key, txn, output)
+	err := db.GetValueFromDBWithProto3(key, b.db, output)
+	
 	if err != nil {
 		return common.INVALID_ID, nil, err
 	}
@@ -113,16 +105,12 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 	}
 
 	output := &common.UtxoValueInDB{}
-	err := b.db.View(func(txn *badger.Txn) error {
+	
 		key := db.GetUTXODBKey(utxo)
 		//err := db.GetValueFromDB(key, txn, output)
-		err := db.GetValueFromDBWithProto3(key, txn, output)
-		if err != nil {
-			//common.Log.Warningf("GetOrdinalsForUTXO %s failed, %v", utxo, err)
-			return err
-		}
-		return nil
-	})
+		err := db.GetValueFromDBWithProto3(key, b.db, output)
+		
+	
 
 	if err != nil {
 		return nil, err
@@ -174,37 +162,29 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 }
 
 // only for api access
-func (b *RpcIndexer) getAddressValue2(address string, txn *badger.Txn) *common.AddressValueInDB {
+func (b *RpcIndexer) getAddressValue2(address string) *common.AddressValueInDB {
 	result := &common.AddressValueInDB{AddressId: common.INVALID_ID}
-	addressId, err := db.GetAddressIdFromDBTxn(txn, address)
+	addressId, err := db.GetAddressIdFromDB(b.db, address)
 	if err == nil {
 		utxos := make(map[uint64]*common.UtxoValue)
 		prefix := []byte(fmt.Sprintf("%s%x-", common.DB_KEY_ADDRESSVALUE, addressId))
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		for itr.Seek(prefix); itr.ValidForPrefix(prefix); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			value := int64(0)
-			item.Value(func(data []byte) error {
-				value = int64(common.BytesToUint64(data))
-				return nil
-			})
-
-			newAddressId, utxoId, typ, _, err := common.ParseAddressIdKey(string(item.Key()))
+	
+		b.db.BatchRead(prefix, false, func(k, v []byte) error {
+			value := int64(common.BytesToUint64(v))
+			newAddressId, utxoId, typ, _, err := common.ParseAddressIdKey(string(k))
 			if err != nil {
-				common.Log.Panicf("ParseAddressIdKey %s failed: %v", string(item.Key()), err)
+				common.Log.Errorf("ParseAddressIdKey %s failed: %v", string(k), err)
+				return nil
 			}
 			if newAddressId != addressId {
-				common.Log.Panicf("ParseAddressIdKey %s get different addressid %d, %d", string(item.Key()), newAddressId, addressId)
+				common.Log.Errorf("ParseAddressIdKey %s get different addressid %d, %d", string(k), newAddressId, addressId)
+				return nil
 			}
 			result.AddressType = uint32(typ)
 
 			utxos[utxoId] = &common.UtxoValue{Op: 0, Value: value}
-		}
+			return nil
+		})
 
 		result.AddressId = addressId
 		result.Op = 0
@@ -262,7 +242,7 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 		return addrStr, nil
 	}
 
-	address, err := db.GetAddressByID(b.db, id)
+	address, err := db.GetAddressByIDFromDB(b.db, id)
 	if err != nil {
 		common.Log.Errorf("RpcIndexer->GetAddressByID %d failed, err: %v", id, err)
 		return "", err
@@ -349,42 +329,26 @@ func (b *RpcIndexer) searhing(sat int64) {
 	}
 
 	if !bFound {
+		startTime := time.Now()
+		common.Log.Infof("Search sat in %s table ...", common.DB_KEY_UTXO)
 		var value common.UtxoValueInDB
-		b.db.View(func(txn *badger.Txn) error {
-			var err error
-			prefix := []byte(common.DB_KEY_UTXO)
-			itr := txn.NewIterator(badger.DefaultIteratorOptions)
-			defer itr.Close()
-
-			startTime := time.Now()
-			common.Log.Infof("Search sat in %s table ...", common.DB_KEY_UTXO)
-
-			for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-				item := itr.Item()
-				if item.IsDeletedOrExpired() {
-					continue
-				}
-
-				err = item.Value(func(data []byte) error {
-					return db.DecodeBytesWithProto3(data, &value)
-				})
-				if err != nil {
-					common.Log.Errorf("item.Value error: %v", err)
-					continue
-				}
-
-				if common.IsSatInRanges(sat, value.Ordinals) {
-					common.Log.Infof("find sat %d in utxo %d in address %d", sat, value.UtxoId, value.AddressIds[0])
-					bFound = true
-					break
-				}
+		b.db.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
+			err := db.DecodeBytesWithProto3(v, &value)
+			if err != nil {
+				common.Log.Errorf("item.Value error: %v", err)
+				return nil
 			}
-			common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime))
 
+			if common.IsSatInRanges(sat, value.Ordinals) {
+				common.Log.Infof("find sat %d in utxo %d in address %d", sat, value.UtxoId, value.AddressIds[0])
+				bFound = true
+				return nil
+			}
 			return nil
 		})
+		common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime))
 		if bFound {
-			address, _ = db.GetAddressByID(b.db, value.AddressIds[0])
+			address, _ = db.GetAddressByIDFromDB(b.db, value.AddressIds[0])
 			utxo, _ = db.GetUtxoByID(b.db, value.UtxoId)
 		}
 	}
@@ -455,12 +419,8 @@ func (b *RpcIndexer) FindSat(sat int64) (string, string, error) {
 }
 
 func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValue, error) {
-	var addressValueInDB *common.AddressValueInDB
-	b.db.View(func(txn *badger.Txn) error {
-		addressValueInDB = b.getAddressValue2(address, txn)
-		return nil
-	})
-
+	
+	addressValueInDB := b.getAddressValue2(address)
 	value := &common.AddressValue{}
 	value.Utxos = make(map[uint64]int64)
 	if addressValueInDB == nil {
@@ -489,9 +449,7 @@ func (b *RpcIndexer) GetBlockInfo(height int) (*common.BlockInfo, error) {
 
 	key := db.GetBlockDBKey(height)
 	block := common.BlockValueInDB{}
-	err := b.db.View(func(txn *badger.Txn) error {
-		return db.GetValueFromDB(key, txn, &block)
-	})
+	err := db.GetValueFromDB(key, &block, b.db)
 	if err != nil {
 		return nil, err
 	}

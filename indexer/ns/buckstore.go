@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -15,7 +14,7 @@ import (
 const key_last = DB_PREFIX_BUCK + "lk"
 
 type NSBuckStore struct {
-	db       *badger.DB
+	db       db.KVDB
 	BuckSize int
 	prefix   string
 }
@@ -25,7 +24,7 @@ type BuckValue struct {
 	Sat  int64
 }
 
-func NewBuckStore(db *badger.DB) *NSBuckStore {
+func NewBuckStore(db db.KVDB) *NSBuckStore {
 	return &NSBuckStore{
 		db:       db,
 		BuckSize: 1000,
@@ -36,147 +35,102 @@ func NewBuckStore(db *badger.DB) *NSBuckStore {
 func (bs *NSBuckStore) Put(key int, value *BuckValue) error {
 	bucket := bs.getBucket(key)
 
-	err := bs.db.Update(func(txn *badger.Txn) error {
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		item, err := txn.Get(dbkey)
-		if err != nil && err != badger.ErrKeyNotFound {
-			common.Log.Errorf("Get %s: %v", dbkey, err)
-			return err
-		}
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	item, err := bs.db.Read(dbkey)
+	if err != nil && err != db.ErrKeyNotFound {
+		common.Log.Errorf("Get %s: %v", dbkey, err)
+		return err
+	}
 
-		var storedData map[int]*BuckValue
-
-		if err == nil {
-			err = item.Value(func(val []byte) error {
-				storedData, err = bs.deserialize(val)
-				return err
-			})
-			if err != nil {
-				common.Log.Errorf("deserialize: %v", err)
-				return err
-			}
-		} else {
-			storedData = make(map[int]*BuckValue, 0)
-		}
-
-		storedData[key] = value
-
-		serializedData, err := bs.serialize(storedData)
+	var storedData map[int]*BuckValue
+	if err == nil {
+		storedData, err = bs.deserialize(item)
 		if err != nil {
+			common.Log.Errorf("deserialize: %v", err)
 			return err
 		}
+	} else {
+		storedData = make(map[int]*BuckValue, 0)
+	}
 
-		err = txn.SetEntry(&badger.Entry{
-			Key:   dbkey,
-			Value: serializedData,
-		})
-		if err != nil {
-			common.Log.Errorf("SetEntry %s failed: %v", dbkey, err)
-			return err
-		}
+	storedData[key] = value
+	serializedData, err := bs.serialize(storedData)
+	if err != nil {
+		return err
+	}
 
-		lastKeyBytes := make([]byte, binary.MaxVarintLen32)
-		binary.BigEndian.PutUint32(lastKeyBytes, uint32(key))
-		err = txn.SetEntry(&badger.Entry{
-			Key:   []byte(key_last),
-			Value: lastKeyBytes,
-		})
-		if err != nil {
-			common.Log.Errorf("SetEntry %s failed: %v", key_last, err)
-			return err
-		}
+	err = bs.db.Write(dbkey, serializedData)
+	if err != nil {
+		common.Log.Errorf("SetEntry %s failed: %v", dbkey, err)
+		return err
+	}
 
-		return nil
-	})
+	lastKeyBytes := make([]byte, binary.MaxVarintLen32)
+	binary.BigEndian.PutUint32(lastKeyBytes, uint32(key))
+	err = bs.db.Write([]byte(key_last), lastKeyBytes)
 
 	if err != nil {
-		common.Log.Panicf("failed to update Badger DB: %v", err)
+		common.Log.Panicf("failed to update DB: %v", err)
 	}
 
 	return nil
 }
 
 func (bs *NSBuckStore) GetLastKey() int {
-	key := -1
-	bs.db.View(func(txn *badger.Txn) error {
-		dbkey := []byte(key_last)
-		item, err := txn.Get(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return err
-		}
 
-		item.Value(func(val []byte) error {
-			key = int(binary.BigEndian.Uint32(val))
-			return nil
-		})
+	dbkey := []byte(key_last)
+	item, err := bs.db.Read(dbkey)
+	if err != nil {
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
+		return -1
+	}
 
-		return nil
-	})
+	return int(binary.BigEndian.Uint32(item))
 
-	return key
 }
 
 func (bs *NSBuckStore) Get(key int) (*BuckValue, error) {
 	bucket := bs.getBucket(key)
 
 	var value *BuckValue
-	err := bs.db.View(func(txn *badger.Txn) error {
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		item, err := txn.Get(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return err
-		}
 
-		var storedData map[int]*BuckValue
-		err = item.Value(func(val []byte) error {
-			storedData, err = bs.deserialize(val)
-			return err
-		})
-		if err != nil {
-			common.Log.Errorf("Value %s failed: %v", dbkey, err)
-			return err
-		}
-
-		var ok bool
-		value, ok = storedData[key]
-		if !ok {
-			common.Log.Errorf("key %d not found in bucket", key)
-			return fmt.Errorf("key not found in bucket")
-		}
-		return nil
-	})
-
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	item, err := bs.db.Read(dbkey)
 	if err != nil {
-		common.Log.Errorf("failed to read %d from Badger DB %v", key, err)
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
 		return nil, err
+	}
+
+	storedData, err := bs.deserialize(item)
+	if err != nil {
+		common.Log.Errorf("Value %s failed: %v", dbkey, err)
+		return nil, err
+	}
+
+	var ok bool
+	value, ok = storedData[key]
+	if !ok {
+		common.Log.Errorf("key %d not found in bucket", key)
+		return nil, fmt.Errorf("key not found in bucket")
 	}
 
 	return value, nil
 }
 
 func (bs *NSBuckStore) getBucketData(bucket int) map[int]*BuckValue {
-	result := make(map[int]*BuckValue)
-	bs.db.View(func(txn *badger.Txn) error {
-		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
-		item, err := txn.Get(dbkey)
-		if err != nil {
-			common.Log.Errorf("Get %s failed: %v", dbkey, err)
-			return err
-		}
 
-		err = item.Value(func(val []byte) error {
-			result, err = bs.deserialize(val)
-			return err
-		})
-		if err != nil {
-			common.Log.Errorf("Value %s failed: %v", dbkey, err)
-			return err
-		}
-
+	dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
+	item, err := bs.db.Read(dbkey)
+	if err != nil {
+		common.Log.Errorf("Get %s failed: %v", dbkey, err)
 		return nil
-	})
+	}
+
+	result, err := bs.deserialize(item)
+	if err != nil {
+		common.Log.Errorf("Value %s failed: %v", dbkey, err)
+		return nil
+	}
 
 	return result
 }
@@ -209,38 +163,34 @@ func (bs *NSBuckStore) BatchPut(valuemap map[int]*BuckValue) error {
 	buckets := make(map[int]map[int]*BuckValue, 0)
 
 	var err error
-	bs.db.View(func(txn *badger.Txn) error {
 
-		for key, value := range valuemap {
-			bucket := bs.getBucket(key)
-			rngmap, ok := buckets[bucket]
-			if ok {
-				rngmap[key] = value
-			} else {
-				rngmap = make(map[int]*BuckValue)
-				rngmap[key] = value
-				buckets[bucket] = rngmap
-			}
-			if key > lastkey {
-				lastkey = key
-			}
+	for key, value := range valuemap {
+		bucket := bs.getBucket(key)
+		rngmap, ok := buckets[bucket]
+		if ok {
+			rngmap[key] = value
+		} else {
+			rngmap = make(map[int]*BuckValue)
+			rngmap[key] = value
+			buckets[bucket] = rngmap
 		}
+		if key > lastkey {
+			lastkey = key
+		}
+	}
 
+	bs.db.View(func(txn db.ReadBatch) error {
 		for bucket, value := range buckets {
 			dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 			item, err := txn.Get(dbkey)
-			if err == badger.ErrKeyNotFound {
+			if err == db.ErrKeyNotFound {
 				continue
 			}
 			if err != nil {
 				common.Log.Panicf("Get %s failed. %v", dbkey, err)
 			}
 
-			var storedData map[int]*BuckValue
-			err = item.Value(func(val []byte) error {
-				storedData, err = bs.deserialize(val)
-				return err
-			})
+			storedData, err := bs.deserialize(item)
 			if err != nil {
 				common.Log.Panicf("Value %s failed. %v", dbkey, err)
 			}
@@ -248,11 +198,11 @@ func (bs *NSBuckStore) BatchPut(valuemap map[int]*BuckValue) error {
 				value[height] = rng
 			}
 		}
-		return nil
+		return nil 
 	})
 
 	wb := bs.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 	for bucket, value := range buckets {
 		dbkey := []byte(bs.prefix + strconv.Itoa(bucket))
 		err = db.SetDB(dbkey, value, wb)
@@ -284,41 +234,22 @@ func (bs *NSBuckStore) Reset() {
 
 func (bs *NSBuckStore) GetAll() map[int]*BuckValue {
 	result := make(map[int]*BuckValue, 0)
-	err := bs.db.View(func(txn *badger.Txn) error {
-		// 设置前缀扫描选项
-		prefixBytes := []byte(bs.prefix)
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
+	err := bs.db.BatchRead([]byte(bs.prefix), false, func(k, v []byte) error {
 
-		// 使用前缀扫描选项创建迭代器
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-
-		var err error
-		// 遍历匹配前缀的key
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			if string(item.Key()) == key_last {
-				continue
-			}
-
-			var storedData map[int]*BuckValue
-			err = item.Value(func(val []byte) error {
-				storedData, err = bs.deserialize(val)
-				return err
-			})
-			if err != nil {
-				// last_key
-				common.Log.Errorf("Value %s failed: %v", item.Key(), err)
-				continue
-			}
-			for k, v := range storedData {
-				result[k] = v
-			}
+		if string(k) == key_last {
+			return nil
 		}
+
+		storedData, err := bs.deserialize(v)
+		if err != nil {
+			// last_key
+			common.Log.Errorf("Value %s failed: %v", string(k), err)
+			return nil
+		}
+		for k, v := range storedData {
+			result[k] = v
+		}
+
 		return nil
 	})
 

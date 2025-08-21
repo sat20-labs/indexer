@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/emirpasic/gods/utils"
 	"github.com/sat20-labs/indexer/common"
@@ -633,58 +632,38 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	ldb := p.compiling.GetBaseDB()
 	key := []byte("pizza-holder")
 
-	err := ldb.View(func(txn *badger.Txn) error {
-		err := db.GetValueFromDB(key, txn, &pizzaAddrMap)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	
+	err := db.GetValueFromDB(key, &pizzaAddrMap, ldb)
 	if err != nil || bRegenerat {
 		pizzaAddrMap = make(map[uint64]int64)
 		pizzaAddrMap[0] = int64(p.GetSyncHeight())
-		ldb.View(func(txn *badger.Txn) error {
-			var err error
-			prefix := []byte(common.DB_KEY_UTXO)
-			itr := txn.NewIterator(badger.DefaultIteratorOptions)
-			defer itr.Close()
-
-			startTime2 := time.Now()
-			common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
-
-			total := int64(0)
-			for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-				item := itr.Item()
-				if item.IsDeletedOrExpired() {
-					continue
-				}
-				var value common.UtxoValueInDB
-				err = item.Value(func(data []byte) error {
-					return db.DecodeBytesWithProto3(data, &value)
-				})
-				if err != nil {
-					common.Log.Panicf("item.Value error: %v", err)
-				}
-
-				er := p.exotic.GetExoticsWithType(value.Ordinals, exotic.Pizza)
-				if len(er) > 0 {
-					num := int64(0)
-					for _, r := range er {
-						num += r.Range.Size
-					}
-					total += num
-					pizzaAddrMap[(value.AddressIds[0])] += num
-				}
+		startTime2 := time.Now()
+		common.Log.Infof("calculating in %s table ...", common.DB_KEY_UTXO)
+		total := int64(0)
+		ldb.BatchRead([]byte(common.DB_KEY_UTXO), false, func(k, v []byte) error {
+			var value common.UtxoValueInDB
+			err := db.DecodeBytesWithProto3(v, &value)
+			if err != nil {
+				common.Log.Panicf("item.Value error: %v", err)
 			}
 
-			common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime2))
-			common.Log.Infof("network %s, block %d, %d addresses hold pizza %d",
-				p.chaincfgParam.Name, p.GetSyncHeight(), len(pizzaAddrMap), total)
+			er := p.exotic.GetExoticsWithType(value.Ordinals, exotic.Pizza)
+			if len(er) > 0 {
+				num := int64(0)
+				for _, r := range er {
+					num += r.Range.Size
+				}
+				total += num
+				pizzaAddrMap[(value.AddressIds[0])] += num
+			}
 
 			return nil
 		})
+		common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime2))
+		common.Log.Infof("network %s, block %d, %d addresses hold pizza %d",
+			p.chaincfgParam.Name, p.GetSyncHeight(), len(pizzaAddrMap), total)
 
-		db.GobSetDB1(key, pizzaAddrMap, ldb)
+		db.GobSetDB(key, pizzaAddrMap, ldb)
 	}
 
 	syncHeight := pizzaAddrMap[0]
@@ -709,16 +688,16 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 	theTaprootAddresses := make([]*AddressPizza, 0)
 	total2 := int64(0)
 
-	ldb.View(func(txn *badger.Txn) error {
+	ldb.View(func(txn db.ReadBatch) error {
 		it := addrTreeMap.Iterator()
 		it.End()
 
 		for it.Prev() {
 			pizza := it.Key().(int64)
 			addressId := it.Value().(uint64)
-			address, err := db.GetAddressByIDFromDBTxn(txn, addressId)
+			address, err := db.GetAddressByID(txn, addressId)
 			if err != nil {
-				common.Log.Warnf("GetAddressByIDFromDBTxn %d failed. %v", addressId, err)
+				common.Log.Warnf("GetAddressByID %d failed. %v", addressId, err)
 			} else {
 				if len(theBigAddresses) < num1 {
 					total1 += pizza
@@ -730,7 +709,6 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 				}
 			}
 		}
-
 		return nil
 	})
 
@@ -971,7 +949,6 @@ func (p *IndexerMgr) searchD6(filepath, suffix string) bool {
 	return true
 }
 
-
 func (p *IndexerMgr) searchD7(filepath, suffix string) bool {
 	startTime := time.Now()
 	names := make([]string, 0)
@@ -1191,68 +1168,55 @@ func (p *IndexerMgr) nameDBStatistic() bool {
 	satsInT1 := make(map[int64]bool, 0)
 	namesInT1 := make(map[string]map[string]bool, 0)
 
-	p.nsDB.View(func(txn *badger.Txn) error {
+	startTime2 := time.Now()
+	common.Log.Infof("calculating in %s table ...", ns.DB_PREFIX_NAME)
+	p.nsDB.BatchRead([]byte(ns.DB_PREFIX_NAME), false, func(k, v []byte) error {
 
-		var err error
-		prefix := []byte(ns.DB_PREFIX_NAME)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", ns.DB_PREFIX_NAME)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value ns.NameValueInDB
-			err = item.Value(func(data []byte) error {
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Panicf("item.Value error: %v", err)
-			}
-
-			satsInT1[value.Sat] = true
-			parts := strings.Split(value.Name, ".")
-			var key, v string
-			if len(parts) == 2 {
-				key = parts[1]
-				v = parts[0]
-			} else if len(parts) == 1 {
-				key = "."
-				v = value.Name
-			} else {
-				common.Log.Infof("wrong format %s", value.Name)
-			}
-			m, ok := namesInT1[key]
-			if ok {
-				m[v] = true
-			} else {
-				m := make(map[string]bool)
-				m[v] = true
-				namesInT1[key] = m
-			}
+		var nameValue ns.NameValueInDB
+		err := db.DecodeBytesWithProto3(v, &nameValue)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
 		}
 
-		common.Log.Infof("%s table takes %v", ns.DB_PREFIX_NAME, time.Since(startTime2))
+		satsInT1[nameValue.Sat] = true
+		parts := strings.Split(nameValue.Name, ".")
+		var key, val string
+		if len(parts) == 2 {
+			key = parts[1]
+			val = parts[0]
+		} else if len(parts) == 1 {
+			key = "."
+			val = nameValue.Name
+		} else {
+			common.Log.Infof("wrong format %s", nameValue.Name)
+		}
+		m, ok := namesInT1[key]
+		if ok {
+			m[val] = true
+		} else {
+			m := make(map[string]bool)
+			m[val] = true
+			namesInT1[key] = m
+		}
+		
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", ns.DB_PREFIX_NAME, time.Since(startTime2))
 
-	startTime2 := time.Now()
+	startTime2 = time.Now()
 	addrInT1 := make(map[uint64]int, 0)
-	p.nftDB.View(func(txn *badger.Txn) error {
+	p.nftDB.View(func(txn db.ReadBatch) error {
 		for k := range satsInT1 {
 			var value common.NftsInSat
 			key := nft.GetSatKey(k)
-			err := db.GetValueFromDBWithProto3([]byte(key), txn, &value)
+			err := db.GetValueFromTxnWithProto3([]byte(key), txn, &value)
 			if err == nil {
 				addrInT1[value.OwnerAddressId] += len(value.Nfts)
 			}
 		}
 		return nil
 	})
+		
 	common.Log.Infof("get address %d takes %v", len(addrInT1), time.Since(startTime2))
 
 	addrTreeMap := treemap.NewWith(utils.IntComparator)
@@ -1319,54 +1283,40 @@ func listMnemonicWords() []string {
 }
 
 func (p *IndexerMgr) subNameStatistic(sub string) bool {
+	startTime2 := time.Now()
+	common.Log.Infof("calculating in %s table ...", ns.DB_PREFIX_NAME)
 	nameMap := make(map[string]int64)
-	p.nsDB.View(func(txn *badger.Txn) error {
-		var err error
-		prefix := []byte(ns.DB_PREFIX_NAME)
-		itr := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer itr.Close()
-
-		startTime2 := time.Now()
-		common.Log.Infof("calculating in %s table ...", ns.DB_PREFIX_NAME)
-
-		for itr.Seek([]byte(prefix)); itr.ValidForPrefix([]byte(prefix)); itr.Next() {
-			item := itr.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			var value ns.NameValueInDB
-			err = item.Value(func(data []byte) error {
-				// return db.DecodeBytes(data, &value)
-				return db.DecodeBytesWithProto3(data, &value)
-			})
-			if err != nil {
-				common.Log.Panicf("item.Value error: %v", err)
-			}
-
-			if sub != "" {
-				if strings.HasSuffix(value.Name, sub) {
-					nameMap[value.Name] = value.Sat
-				}
-			} else {
-				if !strings.Contains(value.Name, ".") {
-					nameMap[value.Name] = value.Sat
-				}
-			}
-
+	p.nsDB.BatchRead([]byte(ns.DB_PREFIX_NAME), false, func(k, v []byte) error {
+		
+		var value ns.NameValueInDB
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Errorf("item.Value error: %v", err)
+			return nil
 		}
 
-		common.Log.Infof("%s table takes %v", ns.DB_PREFIX_NAME, time.Since(startTime2))
+		if sub != "" {
+			if strings.HasSuffix(value.Name, sub) {
+				nameMap[value.Name] = value.Sat
+			}
+		} else {
+			if !strings.Contains(value.Name, ".") {
+				nameMap[value.Name] = value.Sat
+			}
+		}
+		
 		return nil
 	})
+	common.Log.Infof("%s table takes %v", ns.DB_PREFIX_NAME, time.Since(startTime2))
 
 	startTime := time.Now()
 	common.Log.Infof("get all addresses ...")
 	addrIdMap := make(map[uint64]int)
-	p.nftDB.View(func(txn *badger.Txn) error {
+	p.nftDB.View(func(txn db.ReadBatch) error {
 		for _, v := range nameMap {
 			key := nft.GetSatKey(v)
 			nfts := &common.NftsInSat{}
-			err := db.GetValueFromDBWithProto3([]byte(key), txn, nfts)
+			err := db.GetValueFromTxnWithProto3([]byte(key), txn, nfts)
 			if err == nil {
 				addrIdMap[nfts.OwnerAddressId]++
 			}

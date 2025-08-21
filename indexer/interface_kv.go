@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -21,11 +20,9 @@ func getKvKey(pubkey string, key string) string {
 	return fmt.Sprintf("/%s/%s", pubkey, key)
 }
 
-
 func getRegisterKey(pubkey string) string {
 	return fmt.Sprintf("/register/%s", pubkey)
 }
-
 
 func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	// TODO 以后可以配置增加更多的pubkey，或者注册的地址
@@ -37,7 +34,7 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	// TODO 如果是注册的矿机，检查通道地址上的资产，和刷新时间
 	key := getRegisterKey(pkStr)
 	var value RegisterPubKeyInfo
-		
+
 	err := db.GobGetDB([]byte(key), &value, b.kvDB)
 	if err != nil {
 		common.Log.Infof("GobGetDB %s failed, %v", key, err)
@@ -50,14 +47,14 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	}
 
 	// 如果没有资产，是否超时？
-	return value.RefreshTime - time.Now().Unix() < 7 * 24 * int64(time.Hour.Seconds())
+	return value.RefreshTime-time.Now().Unix() < 7*24*int64(time.Hour.Seconds())
 }
 
 // TODO 每个地址限制多少条记录，每条记录限制多大？
-func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
+func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 
 	wb := b.kvDB.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	checkedPubKey := make(map[string]bool)
 	for _, value := range kvs {
@@ -71,11 +68,9 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 			checkedPubKey[pkStr] = true
 		}
 
-		if len(value.Value) > 100 * 1024 {
+		if len(value.Value) > 100*1024 {
 			return fmt.Errorf("too large data %d", len(value.Value))
 		}
-
-		
 
 		sig := value.Signature
 		value.Signature = nil
@@ -85,7 +80,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 			return err
 		}
 		value.Signature = sig
-		
+
 		// verify the signature
 		err = common.VerifySignOfMessage(msg, sig, value.PubKey)
 		if err != nil {
@@ -111,11 +106,10 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) (error) {
 	return nil
 }
 
+func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
 
-func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) (error) {
-	
 	wb := b.kvDB.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	pkStr := hex.EncodeToString(pubkey)
 
@@ -138,33 +132,31 @@ func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) (error) {
 	return nil
 }
 
-
 func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error) {
-	
+
 	pkStr := hex.EncodeToString(pubkey)
 	result := make([]*common.KeyValue, 0)
-	b.kvDB.View(func(txn *badger.Txn) error {
+	
 		for _, k := range keys {
 			key := getKvKey(pkStr, k)
-	
-			item, err := txn.Get([]byte(key))
+
+			item, err := b.kvDB.Read([]byte(key))
 			if err != nil {
 				continue
 			}
 			var value common.KeyValue
-			err = item.Value(func(v []byte) error {
-				return db.DecodeBytes(v, &value)
-			})
+			
+			err = db.DecodeBytes(item, &value)
 			if err != nil {
 				common.Log.Errorf("decoding key %s failed, %v", key, err)
 				continue
 			}
-	
+
 			result = append(result, &value)
 		}
-		return nil
-	})
+		
 	
+
 	return result, nil
 }
 
@@ -204,11 +196,11 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 	}
 
 	value = RegisterPubKeyInfo{
-		PubKey: []byte(minerPubKey),
+		PubKey:      []byte(minerPubKey),
 		ChannelAddr: channelAddr,
 		RefreshTime: time.Now().Unix(),
 	}
-	err = db.GobSetDB1([]byte(key), &value, b.kvDB)
+	err = db.GobSetDB([]byte(key), &value, b.kvDB)
 	if err != nil {
 		return "", err
 	}

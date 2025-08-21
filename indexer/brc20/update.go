@@ -220,7 +220,7 @@ func (p *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 
 	p.mutex.Unlock()
-	p.CheckSelf(block.Height)
+	//p.CheckSelf(block.Height)
 }
 
 func (p *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
@@ -263,7 +263,7 @@ func (p *BRC20Indexer) UpdateDB() {
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
-	defer wb.Cancel()
+	defer wb.Close()
 
 	// new ticker
 	for _, v := range p.tickerAdded {

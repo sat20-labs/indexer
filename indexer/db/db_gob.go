@@ -5,144 +5,103 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
-
-	badger "github.com/dgraph-io/badger/v4"
 )
 
-func GobSetDB1(key []byte, value interface{}, db *badger.DB) error {
+func GobSetDB(key []byte, value interface{}, db KVDB) error {
 	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(value); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(value); err != nil {
 		return err
 	}
-	err := db.Update(func(txn *badger.Txn) error {
-		return txn.Set(key, buf.Bytes())
-	})
-	return err
+	return db.Write(key, buf.Bytes())
 }
 
-func GobGetDB(key []byte, value interface{}, db *badger.DB) error {
-	buf, err := GetRawValueFromDB(key, db)
+func GobGetDB(key []byte, value interface{}, db KVDB) error {
+	buf, err := db.Read(key)
 	if err != nil {
 		return err
 	}
 	return DecodeBytes(buf, value)
 }
 
-func SetDB(key []byte, data interface{}, wb *badger.WriteBatch) error {
+func SetDB(key []byte, data interface{}, wb WriteBatch) error {
 	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(data); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(data); err != nil {
 		return err
 	}
-	return wb.Set([]byte(key), []byte(buf.Bytes()))
+	return wb.Put(key, buf.Bytes())
 }
 
-func SetRawDB(key []byte, data []byte, wb *badger.WriteBatch) error {
-	return wb.Set(key, data)
+func SetRawDB(key []byte, data []byte, wb WriteBatch) error {
+	return wb.Put(key, data)
 }
 
-func SetRawValueToDB(key, value []byte, db *badger.DB) error {
-	err := db.Update(func(txn *badger.Txn) error {
-		return txn.Set(key, value)
-	})
-	if err != nil {
-		common.Log.Errorf("Failed to write data: %v\n", err)
-	}
-	return err
+func SetRawValueToDB(key, value []byte, db KVDB) error {
+	return db.Write(key, value)
 }
 
-func DeleteInDB(key []byte, db *badger.DB) error {
-	err := db.Update(func(txn *badger.Txn) error {
-		return txn.Delete(key)
-	})
-	if err != nil {
-		common.Log.Errorf("Failed to delete key %v: %v\n", key, err)
-	}
-	return err
+func DeleteInDB(key []byte, db KVDB) error {
+	return db.Delete(key)
 }
 
-func GetRawValueFromDB(key []byte, db *badger.DB) ([]byte, error) {
-	var ret []byte
-	err := db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(key)
-		if err != nil {
-			return err
-		}
-		return item.Value(func(val []byte) error {
-			ret = append([]byte{}, val...)
-			return nil
-		})
-	})
-
-	return ret, err
+func GetRawValueFromDB(key []byte, db KVDB) ([]byte, error) {
+	return db.Read(key)
 }
 
-func GetValueFromDB2[T any](key []byte, db *badger.DB) (*T, error) {
-	var ret *T
-	var err error
-	err = db.View(func(txn *badger.Txn) error {
-		ret, err = GetValueFromDBWithType[T](key, txn)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
 
-	return ret, err
+func GetRawValueFromTxn(key []byte, db ReadBatch) ([]byte, error) {
+	return db.Get(key)
 }
 
-func GetValueFromDB(key []byte, txn *badger.Txn, target interface{}) error {
-	item, err := txn.Get([]byte(key))
+func GetValueFromDB(key []byte, v interface{}, db KVDB) (error) {
+	buf, err := db.Read(key)
 	if err != nil {
 		return err
 	}
-	err = item.Value(func(v []byte) error {
-		err := DecodeBytes(v, target)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	return err
+	if err := DecodeBytes(buf, v); err != nil {
+		return err
+	}
+	return nil
 }
 
-func GetValueFromDBWithType[T any](key []byte, txn *badger.Txn) (*T, error) {
-	item, err := txn.Get([]byte(key))
+func GetValueFromTxn(key []byte, v interface{}, db ReadBatch) (error) {
+	buf, err := db.Get(key)
+	if err != nil {
+		return err
+	}
+	if err := DecodeBytes(buf, v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetValueFromDB2[T any](key []byte, db KVDB) (*T, error) {
+	var ret T
+	buf, err := db.Read(key)
 	if err != nil {
 		return nil, err
 	}
-	var target T
-	err = item.Value(func(v []byte) error {
-		return DecodeBytes(v, &target)
-	})
-	return &target, err
+	if err := DecodeBytes(buf, &ret); err != nil {
+		return nil, err
+	}
+	return &ret, nil
 }
-
 
 func DecodeBytes(data []byte, target interface{}) error {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
-	return dec.Decode(target)
+	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(target)
 }
 
-
-
 func GetUTXODBKey(utxo string) []byte {
-	// 2d0a64a14faa9dc707dc84647a4e0dd1d4f31753e8a85574128bc8110e312e10 (testnet)
-	// 输出有10万个
 	parts := strings.Split(utxo, ":")
 	data, err := hex.DecodeString(parts[0])
 	if err != nil {
 		common.Log.Panicf("wrong utxo format %s", utxo)
 	}
-
-	ret := append([]byte(common.DB_KEY_UTXO), data...)
-	return append(ret, []byte(parts[1])...)
+	return append(append([]byte(common.DB_KEY_UTXO), data...), []byte(parts[1])...)
 }
 
 func GetAddressDBKey(address string) []byte {
@@ -156,9 +115,8 @@ func GetAddressDBKeyV2(address string) []byte {
 func GetAddressValueDBKey(addressid uint64, utxoid uint64, typ, i int) []byte {
 	if i == 0 {
 		return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x", addressid, utxoid, typ))
-	} else {
-		return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x-%x", addressid, utxoid, typ, i))
 	}
+	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x-%x", addressid, utxoid, typ, i))
 }
 
 func GetUtxoIdKey(id uint64) []byte {
@@ -169,261 +127,125 @@ func GetBlockDBKey(height int) []byte {
 	return []byte(fmt.Sprintf(common.DB_KEY_BLOCK+"%x", height))
 }
 
-func BindUtxoDBKeyToId(utxoDBKey []byte, id uint64, wb *badger.WriteBatch) error {
-	return wb.Set((GetUtxoIdKey(id)), (utxoDBKey))
+func BindUtxoDBKeyToId(utxoDBKey []byte, id uint64, wb WriteBatch) error {
+	return wb.Put(GetUtxoIdKey(id), utxoDBKey)
 }
 
-func UnBindUtxoId(id uint64, wb *badger.WriteBatch) error {
-	return wb.Delete((GetUtxoIdKey(id)))
+func UnBindUtxoId(id uint64, wb WriteBatch) error {
+	return wb.Delete(GetUtxoIdKey(id))
 }
 
-func GetUtxoByID(db *badger.DB, id uint64) (string, error) {
-	var key []byte
-	err := db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(GetUtxoIdKey(id))
-		if err != nil {
-			//common.Log.Errorf("GetUtxoByID %x error: %v", id, err)
-			return err
-		}
-		return item.Value(func(val []byte) error {
-			key = append([]byte{}, val...)
-			return nil
-		})
-	})
-
+func GetUtxoByID(db KVDB, id uint64) (string, error) {
+	key, err := db.Read(GetUtxoIdKey(id))
 	if err != nil {
 		return "", err
 	}
-
 	return GetUtxoByDBKey(key)
 }
 
 func GetUtxoByDBKey(key []byte) (string, error) {
-	// 至少35字节，前两位 u-，中间32位是utxo，最后是vout
-	klen := len(key)
 	plen := len(common.DB_KEY_UTXO)
-	utxoBytes := key[plen : 32+plen]
-	utxo := hex.EncodeToString(utxoBytes)
-	vout := string(key[32+plen : klen])
-
-	return utxo + ":" + vout, nil
+	return hex.EncodeToString(key[plen:plen+32]) + ":" + string(key[plen+32:]), nil
 }
 
 func GetAddressIdKey(id uint64) []byte {
 	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSID+"%d", id))
 }
 
-func BindAddressDBKeyToId(address string, id uint64, wb *badger.WriteBatch) error {
-	err := wb.Set((GetAddressIdKey(id)), []byte(address))
-	if err != nil {
+func BindAddressDBKeyToId(address string, id uint64, wb WriteBatch) error {
+	if err := wb.Put(GetAddressIdKey(id), []byte(address)); err != nil {
 		return err
 	}
-
-	return wb.Set(GetAddressDBKey(address), common.Uint64ToBytes(id))
+	return wb.Put(GetAddressDBKey(address), common.Uint64ToBytes(id))
 }
 
-func UnBindAddressId(address string, id uint64, wb *badger.WriteBatch) error {
-	wb.Delete((GetAddressIdKey(id)))
+func UnBindAddressId(address string, id uint64, wb WriteBatch) error {
+	wb.Delete(GetAddressIdKey(id))
 	wb.Delete(GetAddressDBKey(address))
 	return nil
 }
 
-func GetAddressByID(db *badger.DB, id uint64) (string, error) {
-	var key []byte
-	err := db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(GetAddressIdKey(id))
-		if err != nil {
-			common.Log.Errorf("GetAddressByID %x error: %v", id, err)
-			return err
-		}
-		return item.Value(func(val []byte) error {
-			key = append([]byte{}, val...)
-			return nil
-		})
-	})
-	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), err
-}
-
-func GetAddressByIDFromDBTxn(txn *badger.Txn, id uint64) (string, error) {
-	var key []byte
-
-	item, err := txn.Get(GetAddressIdKey(id))
+func GetAddressByIDFromDB(ldb KVDB, id uint64) (string, error) {
+	key, err := ldb.Read(GetAddressIdKey(id))
 	if err != nil {
-		common.Log.Errorf("GetAddressByIDFromDBTxn %x error: %v", id, err)
 		return "", err
 	}
-	err = item.Value(func(val []byte) error {
-		key = append([]byte{}, val...)
-		return nil
-	})
-
-	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), err
+	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
 }
 
-func GetAddressByIDFromDBTxnV2(txn *badger.Txn, id uint64) (string, error) {
-	var key []byte
-
-	item, err := txn.Get(GetAddressIdKey(id))
+func GetAddressByID(txn ReadBatch, id uint64) (string, error) {
+	key, err := txn.Get(GetAddressIdKey(id))
 	if err != nil {
-		common.Log.Errorf("GetAddressByIDFromDBTxn %x error: %v", id, err)
 		return "", err
 	}
-	err = item.Value(func(val []byte) error {
-		key = append([]byte{}, val...)
-		return nil
-	})
-
-	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), err
+	return strings.TrimPrefix(string(key), common.DB_KEY_ADDRESS), nil
 }
 
-func GetAddressIdFromDB(db *badger.DB, address string) (uint64, error) {
-	var key []byte
-	err := db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(GetAddressDBKey(address))
-		if err != nil {
-			common.Log.Errorf("GetAddressIdFromDB %s error: %v", address, err)
-			return err
-		}
-		return item.Value(func(val []byte) error {
-			key = append([]byte{}, val...)
-			return nil
-		})
-	})
+func GetAddressIdFromDB(db KVDB, address string) (uint64, error) {
+	key, err := db.Read(GetAddressDBKey(address))
 	if err != nil {
 		return common.INVALID_ID, err
 	}
-	return common.BytesToUint64(key), err
+	return common.BytesToUint64(key), nil
 }
 
-func GetAddressIdFromDBTxn(txn *badger.Txn, address string) (uint64, error) {
-	var key []byte
 
-	item, err := txn.Get(GetAddressDBKey(address))
+func GetAddressIdFromTxn(db ReadBatch, address string) (uint64, error) {
+	key, err := db.Get(GetAddressDBKey(address))
 	if err != nil {
-		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
 		return common.INVALID_ID, err
 	}
-	err = item.Value(func(val []byte) error {
-		key = append([]byte{}, val...)
-		return nil
-	})
-
-	return common.BytesToUint64(key), err
+	return common.BytesToUint64(key), nil
 }
 
+func CheckKeyExists(db KVDB, key []byte) bool {
+	_, err := db.Read(key)
+	return err == nil
+}
 
-func GetAddressDataFromDBTxnV2(txn *badger.Txn, address string) (*common.AddressValueInDBV2, error) {
-	var result common.AddressValueInDBV2
+func CheckKeyExistsFromTxn(db ReadBatch, key []byte) bool {
+	_, err := db.Get(key)
+	return err == nil
+}
 
-	item, err := txn.Get(GetAddressDBKeyV2(address))
+func BackupDB(fname string, db KVDB) error {
+	if bdb, ok := db.(interface{ BackupToFile(string) error }); ok {
+		return bdb.BackupToFile(fname)
+	}
+	f, err := os.Create(fname)
 	if err != nil {
-		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
-		return nil, err
+		return err
 	}
-	err = item.Value(func(val []byte) error {
-		return DecodeBytes(val, &result)
+	defer f.Close()
+	enc := gob.NewEncoder(f)
+	return db.BatchRead(nil, false, func(k, v []byte) error {
+		return enc.Encode([2][]byte{k, v})
 	})
-
-	return &result, err
 }
 
-func CheckKeyExists(db *badger.DB, key []byte) bool {
-	var exists bool
-
-	err := db.View(func(txn *badger.Txn) error {
-		_, err := txn.Get((key))
-		if err == nil {
-			exists = true
-		} else if err == badger.ErrKeyNotFound {
-			exists = false
-		} else {
-			return err
-		}
-
-		return nil
-	})
-
+func RestoreDB(backupFile string, db KVDB) error {
+	if rdb, ok := db.(interface{ RestoreFromFile(string) error }); ok {
+		return rdb.RestoreFromFile(backupFile)
+	}
+	f, err := os.Open(backupFile)
 	if err != nil {
-		common.Log.Errorf("failed to check key existence: %v", err)
-		return false
+		return err
 	}
-
-	return exists
-}
-
-// 不能与其他DB读写混用，要确保这一点
-func RunBadgerGC(db *badger.DB) {
-	// 只有在跑数据后，打开，压缩数据，同时做严格的数据检查
-	if db.IsClosed() {
-		return
-	}
-
+	defer f.Close()
+	dec := gob.NewDecoder(f)
+	wb := db.NewWriteBatch()
+	defer wb.Close()
 	for {
-		err := db.RunValueLogGC(0.5)
-		//common.Log.Infof("RunValueLogGC return %v", err)
-		if err == badger.ErrNoRewrite {
-			break
-		} else if err != nil {
-			break
+		var kv [2][]byte
+		if err := dec.Decode(&kv); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if err := wb.Put(kv[0], kv[1]); err != nil {
+			return err
 		}
 	}
-	db.Sync()
-	//common.Log.Info("badgerGc: RunValueLogGC is done")
-}
-
-func BackupDB(fname string, db *badger.DB) error {
-	// 创建备份文件
-	backupFile, err := os.Create(fname)
-	if err != nil {
-		common.Log.Errorf("create file %s failed. %v", fname, err)
-		return err
-	}
-	defer backupFile.Close()
-
-	// 执行备份
-	since := uint64(0) // 从最早的事务开始备份
-	latestVersion, err := db.Backup(backupFile, since)
-	if err != nil {
-		common.Log.Errorf("Backup failed. %v", err)
-		return err
-	}
-
-	common.Log.Infof("Backup completed, new version: %d\n", latestVersion)
-	return nil
-}
-
-func RestoreDB(backupFile string, targetDir string) error {
-	// 打开备份文件
-	backup, err := os.Open(backupFile)
-	if err != nil {
-		common.Log.Errorf("Open file %s failed. %v", backupFile, err)
-		return err
-	}
-	defer backup.Close()
-
-	// 创建目标数据库目录
-	err = os.MkdirAll(targetDir, os.ModePerm)
-	if err != nil {
-		common.Log.Errorf("MkdirAll %s failed. %v", targetDir, err)
-		return err
-	}
-
-	// 创建 Badger 数据库
-	opts := badger.DefaultOptions(targetDir).WithInMemory(false)
-	db, err := badger.Open(opts)
-	if err != nil {
-		common.Log.Errorf("Open DB failed. %v", err)
-		return err
-	}
-	defer db.Close()
-
-	// 执行恢复
-	err = db.Load(backup, 0)
-	if err != nil {
-		common.Log.Errorf("Load DB failed. %v", err)
-		return err
-	}
-
-	common.Log.Info("DB restored")
-	return nil
+	return wb.Flush()
 }

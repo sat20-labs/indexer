@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -32,43 +31,24 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	startTime := time.Now()
 	common.Log.Info("loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
-	err := s.db.View(func(txn *badger.Txn) error {
-		// 设置前缀扫描选项
-		prefixBytes := []byte(DB_PREFIX_TICKER_HOLDER)
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 
-		// 使用前缀扫描选项创建迭代器
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-
-		// 遍历匹配前缀的key
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := string(item.Key())
-
-			utxo, err := parseHolderInfoKey(key)
-			if err != nil {
-				common.Log.Errorln(key + " " + err.Error())
+		key := string(k)
+		utxo, err := parseHolderInfoKey(key)
+		if err != nil {
+			common.Log.Errorln(key + " " + err.Error())
+		} else {
+			var info HolderInfo
+			err = db.DecodeBytes(v, &info)
+			if err == nil {
+				result[utxo] = &info
 			} else {
-				var info HolderInfo
-				value, err := item.ValueCopy(nil)
-				if err != nil {
-					common.Log.Errorln("ValueCopy " + key + " " + err.Error())
-				} else {
-					err = db.DecodeBytes(value, &info)
-					if err == nil {
-						result[utxo] = &info
-					} else {
-						common.Log.Errorln("DecodeBytes " + err.Error())
-					}
-				}
+				common.Log.Errorln("DecodeBytes " + err.Error())
 			}
-			count++
+
 		}
+		count++
+
 		return nil
 	})
 
@@ -87,50 +67,33 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
 	startTime := time.Now()
 	common.Log.Info("loadUtxoMapFromDB ...")
 	result := make(map[string]*map[uint64]int64, 0)
-	err := s.db.View(func(txn *badger.Txn) error {
-		// 设置前缀扫描选项
-		prefixBytes := []byte(DB_PREFIX_TICKER_UTXO)
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k, v []byte) error {
 
-		// 使用前缀扫描选项创建迭代器
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
+		key := string(k)
 
-		// 遍历匹配前缀的key
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := string(item.Key())
+		ticker, utxo, err := parseTickUtxoKey(key)
+		if err != nil {
+			common.Log.Errorln(key + " " + err.Error())
+		} else {
+			var amount int64
 
-			ticker, utxo, err := parseTickUtxoKey(key)
-			if err != nil {
-				common.Log.Errorln(key + " " + err.Error())
-			} else {
-				var amount int64
-				value, err := item.ValueCopy(nil)
-				if err != nil {
-					common.Log.Errorln("ValueCopy " + key + " " + err.Error())
+			err = db.DecodeBytes(v, &amount)
+			if err == nil {
+				oldmap, ok := result[ticker]
+				if ok {
+					(*oldmap)[utxo] = amount
 				} else {
-					err = db.DecodeBytes(value, &amount)
-					if err == nil {
-						oldmap, ok := result[ticker]
-						if ok {
-							(*oldmap)[utxo] = amount
-						} else {
-							utxomap := make(map[uint64]int64, 0)
-							utxomap[utxo] = amount
-							result[ticker] = &utxomap
-						}
-					} else {
-						common.Log.Errorln("DecodeBytes " + err.Error())
-					}
+					utxomap := make(map[uint64]int64, 0)
+					utxomap[utxo] = amount
+					result[ticker] = &utxomap
 				}
+			} else {
+				common.Log.Errorln("DecodeBytes " + err.Error())
 			}
-			count++
+
 		}
+		count++
+
 		return nil
 	})
 
@@ -149,24 +112,14 @@ func (s *FTIndexer) loadTickListFromDB() []string {
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadTickListFromDB ...")
-	err := s.db.View(func(txn *badger.Txn) error {
-		prefixBytes := []byte(DB_PREFIX_TICKER)
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := string(item.Key())
-			tickname, err := parseTickListKey(key)
-			if err == nil {
-				result = append(result, tickname)
-			}
-			count++
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
+
+		key := string(k)
+		tickname, err := parseTickListKey(key)
+		if err == nil {
+			result = append(result, tickname)
 		}
+		count++
 
 		return nil
 	})
@@ -191,20 +144,13 @@ func (s *FTIndexer) getMintListFromDB(tickname string) map[string]*common.Mint {
 
 func (s *FTIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
-	err := s.db.View(func(txn *badger.Txn) error {
-		key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
-		err := db.GetValueFromDB([]byte(key), txn, &result)
-		if err == badger.ErrKeyNotFound {
-			common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
-			return err
-		} else if err != nil {
-			common.Log.Debugf("GetMintFromDB error: %v", err)
-			return err
-		}
+	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
+	err := db.GetValueFromDB([]byte(key), &result, s.db)
+	if err == db.ErrKeyNotFound {
+		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
-	})
-	if err != nil {
-		common.Log.Debugf("GetMintFromDB error: %v", err)
+	} else if err != nil {
+		common.Log.Errorf("GetMintFromDB error: %v", err)
 		return nil
 	}
 
@@ -216,36 +162,23 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadMintDataFromDB ...")
-	err := s.db.View(func(txn *badger.Txn) error {
-		prefixBytes := []byte(DB_PREFIX_MINTHISTORY + strings.ToLower(tickerName) + "-")
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := string(item.Key())
+	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+strings.ToLower(tickerName)+"-"), false, func(k, v []byte) error {
 
-			tick, utxo, _ := ParseMintHistoryKey(key)
-			if tick == tickerName {
-				var mint common.Mint
-				value, err := item.ValueCopy(nil)
-				if err != nil {
-					common.Log.Errorln("loadMintDataFromDB ValueCopy " + key + " " + err.Error())
-				} else {
-					err = db.DecodeBytes(value, &mint)
-					if err == nil {
-						result[utxo] = &mint
-					} else {
-						common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
-					}
-				}
+		key := string(k)
+
+		tick, utxo, _ := ParseMintHistoryKey(key)
+		if tick == tickerName {
+			var mint common.Mint
+
+			err := db.DecodeBytes(v, &mint)
+			if err == nil {
+				result[utxo] = &mint
+			} else {
+				common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
 			}
-			count++
+
 		}
+		count++
 
 		return nil
 	})
@@ -262,21 +195,16 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 
 func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	var result common.Ticker
-	err := s.db.View(func(txn *badger.Txn) error {
-		key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
-		err := db.GetValueFromDB([]byte(key), txn, &result)
-		if err == badger.ErrKeyNotFound {
-			common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
-			return err
-		} else if err != nil {
-			common.Log.Debugf("GetTickFromDB error: %v", err)
-			return err
-		}
+
+	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
+	err := db.GetValueFromDB([]byte(key), &result, s.db)
+	if err == db.ErrKeyNotFound {
+		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
-	})
-	if err != nil {
-		common.Log.Debugf("GetTickFromDB error: %v", err)
+	} else if err != nil {
+		common.Log.Errorf("GetTickFromDB error: %v", err)
 		return nil
 	}
+
 	return &result
 }

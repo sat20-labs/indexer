@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
@@ -36,7 +35,7 @@ type HolderInfo struct {
 }
 
 type FTIndexer struct {
-	db         *badger.DB
+	db         db.KVDB
 	nftIndexer *nft.NftIndexer
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
@@ -52,7 +51,7 @@ type FTIndexer struct {
 	tickerAdded      map[string]*common.Ticker // key: ticker
 }
 
-func NewOrdxIndexer(db *badger.DB) *FTIndexer {
+func NewOrdxIndexer(db db.KVDB) *FTIndexer {
 	return &FTIndexer{
 		db: db,
 	}

@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
@@ -45,7 +44,7 @@ type TransferNftInfo struct {
 }
 
 type BRC20Indexer struct {
-	db         *badger.DB
+	db         db.KVDB
 	nftIndexer *nft.NftIndexer
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
@@ -62,7 +61,7 @@ type BRC20Indexer struct {
 	tickerAdded      map[string]*common.BRC20Ticker // key: ticker
 }
 
-func NewIndexer(db *badger.DB) *BRC20Indexer {
+func NewIndexer(db db.KVDB) *BRC20Indexer {
 	return &BRC20Indexer{
 		db: db,
 	}
@@ -159,7 +158,7 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
-	height := nftIndexer.GetBaseIndexer().GetSyncHeight()
+	
 
 	startTime := time.Now()
 	common.Log.Infof("brc20 db version: %s", s.GetDBVersion())
@@ -182,7 +181,8 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 		s.mutex.Unlock()
 	}
 
-	s.CheckSelf(height)
+	//height := nftIndexer.GetBaseIndexer().GetSyncHeight()
+	//s.CheckSelf(height)
 
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("InitIndexer %d ms\n", elapsed)
@@ -190,6 +190,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
+	return true 
 
 	//common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()

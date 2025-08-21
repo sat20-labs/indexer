@@ -4,6 +4,14 @@ import (
 	"fmt"
 )
 
+const (
+	TICKER_STATUS_INVALID 	int = -1
+	TICKER_STATUS_INIT 		int = 0
+	TICKER_STATUS_NOT_START int = 1
+	TICKER_STATUS_MINTING 	int = 2
+	TICKER_STATUS_MINT_COMPLETED int = 3
+)
+
 const TickerSeparatedFromName = true
 
 // amt / n == sizeof(ordinals)
@@ -31,7 +39,7 @@ type Ticker struct {
 	BlockStart int     `json:"blockStart,omitempty"`
 	BlockEnd   int     `json:"blockEnd,omitempty"`
 	Attr       SatAttr `json:"attr,omitempty"`
-	// TODO 增加一个Status，铸造开始，进行中，结束三个状态
+	Status     int     `json:"status"`
 }
 
 type RBTreeValue_Mint struct {
@@ -112,6 +120,7 @@ type TickerInfo struct {
 	Content         []byte `json:"content,omitempty"`
 	ContentType     string `json:"contenttype,omitempty"`
 	Delegate        string `json:"delegate,omitempty"`
+	Status          int    `json:"status"`
 }
 
 type MintInfo struct {

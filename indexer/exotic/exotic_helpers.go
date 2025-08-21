@@ -3,7 +3,6 @@ package exotic
 import (
 	"time"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -12,7 +11,7 @@ func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {
 	return p.baseIndexer.GetBlockInBuffer(height)
 }
 
-func (p *ExoticIndexer) getBlockRange(height int, txn *badger.Txn) *common.Range {
+func (p *ExoticIndexer) getBlockRange(height int, txn db.ReadBatch) *common.Range {
 
 	if height < 0 || height > p.baseIndexer.GetHeight() {
 		return nil
@@ -25,19 +24,19 @@ func (p *ExoticIndexer) getBlockRange(height int, txn *badger.Txn) *common.Range
 
 	key := db.GetBlockDBKey(height)
 	block = &common.BlockValueInDB{}
-	err := db.GetValueFromDB([]byte(key), txn, block)
+	err := db.GetValueFromTxn([]byte(key), block, txn)
 	if err != nil {
 		common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
 	}
 	return &block.Ordinals
 }
 
-func (p *ExoticIndexer) getRangeForBlock(height int, txn *badger.Txn) []*common.Range {
+func (p *ExoticIndexer) getRangeForBlock(height int, txn db.ReadBatch) []*common.Range {
 	rng := p.getBlockRange(height, txn)
 	return []*common.Range{rng}
 }
 
-func (p *ExoticIndexer) getRangeToBlock(height int, txn *badger.Txn) []*common.Range {
+func (p *ExoticIndexer) getRangeToBlock(height int, txn db.ReadBatch) []*common.Range {
 	rng := p.getBlockRange(height, txn)
 	r := &common.Range{
 		Start: 0,
@@ -46,7 +45,7 @@ func (p *ExoticIndexer) getRangeToBlock(height int, txn *badger.Txn) []*common.R
 	return []*common.Range{r}
 }
 
-func (p *ExoticIndexer) getRangesForBlocks(blocks []int, txn *badger.Txn) []*common.Range {
+func (p *ExoticIndexer) getRangesForBlocks(blocks []int, txn db.ReadBatch) []*common.Range {
 	ranges := []*common.Range{}
 	for _, b := range blocks {
 		ranges = append(ranges, p.getRangeForBlock(b, txn)...)
@@ -67,7 +66,7 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 	}
 
 	Uncommon := make(map[int]*common.Range, 0)
-	p.db.View(func(txn *badger.Txn) error {
+	p.db.View(func(txn db.ReadBatch) error {
 		for i := syncHeight + 1; i <= height; i++ {
 			rng := p.getBlockRange(i, txn)
 			r := common.Range{
@@ -76,15 +75,15 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 			}
 			Uncommon[i] = &r
 		}
-		return nil
+		return nil 
 	})
-
+	
 	bs.BatchPut(Uncommon)
 
 	common.Log.Infof("InitRarityDB %d takes %v", height, time.Since(start))
 }
 
-func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn *badger.Txn) map[string][]*common.Range {
+func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn db.ReadBatch) map[string][]*common.Range {
 	start := time.Now()
 
 	result := make(map[string][]*common.Range, 0)
@@ -169,7 +168,7 @@ func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn *badger.Txn) 
 	return result
 }
 
-func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeight int, txn *badger.Txn) map[string][]*common.Range {
+func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeight int, txn db.ReadBatch) map[string][]*common.Range {
 	result := make(map[string][]*common.Range, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
@@ -204,7 +203,7 @@ func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeig
 	return result
 }
 
-func (p *ExoticIndexer) getRangesForAlpha(startHeight, endHeight int, txn *badger.Txn) []*common.Range {
+func (p *ExoticIndexer) getRangesForAlpha(startHeight, endHeight int, txn db.ReadBatch) []*common.Range {
 	ranges := []*common.Range{}
 	rng1 := p.getBlockRange(startHeight, txn)
 	rng2 := p.getBlockRange(endHeight, txn)
@@ -222,7 +221,7 @@ func (p *ExoticIndexer) getRangesForAlpha(startHeight, endHeight int, txn *badge
 	return ranges
 }
 
-func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn *badger.Txn) []*common.Range {
+func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn db.ReadBatch) []*common.Range {
 	ranges := []*common.Range{}
 	rng1 := p.getBlockRange(startHeight, txn)
 	rng2 := p.getBlockRange(endHeight, txn)
@@ -249,7 +248,7 @@ func (p *ExoticIndexer) loadExoticRanges(height int) map[string][]*common.Range 
 	}
 
 	var result map[string][]*common.Range
-	p.db.View(func(txn *badger.Txn) error {
+	p.db.View(func(txn db.ReadBatch) error {
 		result = p.GetRangesForRodarmorRarity(height, txn)
 
 		result[Pizza] = PizzaRanges
@@ -273,8 +272,8 @@ func (p *ExoticIndexer) loadExoticRanges(height int) map[string][]*common.Range 
 		}
 
 		// TODO
-		//result[Alpha] = GetRangesForAlpha(0, height, txn)
-		//result[Omega] = GetRangesForOmega(0, height, txn)
+		//result[Alpha] = GetRangesForAlpha(0, height)
+		//result[Omega] = GetRangesForOmega(0, height)
 
 		//result[Hitman] = HitmanRanges
 		//result[Jpeg] = JpegRanges

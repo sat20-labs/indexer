@@ -1,7 +1,6 @@
 package nft
 
 import (
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -15,12 +14,7 @@ func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
 		return true
 	}
 
-	bHasNft := false
-	p.db.View(func(txn *badger.Txn) error {
-		bHasNft = hasNftInUtxo(utxoId, txn)
-		return nil
-	})
-	return bHasNft
+	return hasNftInUtxo(utxoId, p.db)
 }
 
 func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
@@ -34,11 +28,8 @@ func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 	}
 
 	var value InscriptionInDB
-	err := p.db.View(func(txn *badger.Txn) error {
-		key := GetInscriptionIdKey(inscriptionId)
-		return db.GetValueFromDB([]byte(key), txn, &value)
-	})
-
+	key := GetInscriptionIdKey(inscriptionId)
+	err := db.GetValueFromDB([]byte(key), &value, p.db)
 	if err != nil {
 		//common.Log.Errorf("GetValueFromDB with inscription %s failed. %v", inscriptionId, err)
 		//return nil
@@ -72,9 +63,9 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 	defer p.mutex.RUnlock()
 
 	value := &NftsInUtxo{}
-	p.db.View(func(txn *badger.Txn) error {
-		return loadUtxoValueFromDB(utxoId, value, txn)
-	})
+	
+	loadUtxoValueFromDB(utxoId, value, p.db)
+	
 	//if err != nil {
 	// 还没有保存到数据库
 	// return nil
@@ -87,7 +78,7 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
-		for sat := range sats {
+		for _, sat := range sats {
 			satmap[sat] = true
 		}
 	}
@@ -133,9 +124,7 @@ func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 	}
 
 	nfts := &common.NftsInSat{}
-	err = p.db.View(func(txn *badger.Txn) error {
-		return loadNftFromDB(bv.Sat, nfts, txn)
-	})
+	err = loadNftFromDB(bv.Sat, nfts, p.db)
 	if err != nil {
 		return nil
 	}
@@ -161,7 +150,7 @@ func (p *NftIndexer) GetNftsWithRanges(rngs []*common.Range) []int64 {
 	for _, rng := range rngs {
 		startKey := []byte(GetSatKey(rng.Start))
 		endKey := []byte(GetSatKey(rng.Start + rng.Size - 1))
-		err := db.IterateRangeInDB(p.db, startKey, endKey, func(key, value []byte) error {
+		err := db.IterateRangeInDB(p.db, nil, startKey, endKey, func(key, value []byte) error {
 			sat, err := ParseSatKey(string(key))
 			if err == nil {
 				result = append(result, sat)
@@ -181,10 +170,7 @@ func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 	defer p.mutex.RUnlock()
 
 	nfts := &common.NftsInSat{}
-	err := p.db.View(func(txn *badger.Txn) error {
-		return loadNftFromDB(sat, nfts, txn)
-	})
-
+	err := loadNftFromDB(sat, nfts, p.db)
 	nft := p.getNftInBuffer4(sat)
 	if nft != nil {
 		if err != nil {

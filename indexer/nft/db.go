@@ -5,55 +5,40 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func initStatusFromDB(ldb *badger.DB) *common.NftStatus {
+func initStatusFromDB(ldb db.KVDB) *common.NftStatus {
 	stats := &common.NftStatus{}
-	ldb.View(func(txn *badger.Txn) error {
-		err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), txn, stats)
-		if err == badger.ErrKeyNotFound {
-			common.Log.Info("initStatusFromDB no stats found in db")
-			stats.Version = NFT_DB_VERSION
-		} else if err != nil {
-			common.Log.Panicf("initStatusFromDB failed. %v", err)
-			return err
-		}
-		common.Log.Infof("nft stats: %v", stats)
+	err := db.GetValueFromDB([]byte(NFT_STATUS_KEY), stats, ldb)
+	if err == db.ErrKeyNotFound {
+		common.Log.Info("initStatusFromDB no stats found in db")
+		stats.Version = NFT_DB_VERSION
+	} else if err != nil {
+		common.Log.Panicf("initStatusFromDB failed. %v", err)
+	}
+	common.Log.Infof("nft stats: %v", stats)
 
-		if stats.Version != NFT_DB_VERSION {
-			common.Log.Panicf("nft data version inconsistent %s", NFT_DB_VERSION)
-		}
-
-		return nil
-	})
+	if stats.Version != NFT_DB_VERSION {
+		common.Log.Panicf("nft data version inconsistent %s", NFT_DB_VERSION)
+	}
 
 	return stats
 }
 
-func getNftsWithAddressFromDB(addressId uint64, db *badger.DB) []int64 {
+func getNftsWithAddressFromDB(addressId uint64, db db.KVDB) []int64 {
 	result := make([]int64, 0)
-	err := db.View(func(txn *badger.Txn) error {
-		prefixBytes := []byte(fmt.Sprintf("%s%d-", DB_PREFIX_INSCADDR, addressId))
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := string(item.Key())
+	err := db.BatchRead([]byte(fmt.Sprintf("%s%d-", DB_PREFIX_INSCADDR, addressId)), 
+	false, func(k, v []byte) error {
+		
+		key := string(k)
 
-			_, nftId, err := ParseAddressKey(key)
-			if err == nil {
-				result = append(result, nftId)
-			}
+		_, nftId, err := ParseAddressKey(key)
+		if err == nil {
+			result = append(result, nftId)
 		}
-
+		
 		return nil
 	})
 
@@ -64,26 +49,39 @@ func getNftsWithAddressFromDB(addressId uint64, db *badger.DB) []int64 {
 	return result
 }
 
-func loadNftFromDB(sat int64, value *common.NftsInSat, txn *badger.Txn) error {
+func loadNftFromDB(sat int64, value *common.NftsInSat, ldb db.KVDB) error {
 	key := GetSatKey(sat)
 	// return db.GetValueFromDB([]byte(key), txn, value)
-	return db.GetValueFromDBWithProto3([]byte(key), txn, value)
+	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func loadUtxoValueFromDB(utxoId uint64, value *NftsInUtxo, txn *badger.Txn) error {
+func loadNftFromTxn(sat int64, value *common.NftsInSat, txn db.ReadBatch) error {
+	key := GetSatKey(sat)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
+}
+
+func loadUtxoValueFromDB(utxoId uint64, value *NftsInUtxo, ldb db.KVDB) error {
 	key := GetUtxoKey(utxoId)
 	// return db.GetValueFromDB([]byte(key), txn, value)
-	return db.GetValueFromDBWithProto3([]byte(key), txn, value)
+	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func hasNftInUtxo(utxoId uint64, txn *badger.Txn) bool {
+func loadUtxoValueFromTxn(utxoId uint64, value *NftsInUtxo, txn db.ReadBatch) error {
 	key := GetUtxoKey(utxoId)
-	_, err := txn.Get([]byte(key))
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
+}
+
+func hasNftInUtxo(utxoId uint64, ldb db.KVDB) bool {
+	key := GetUtxoKey(utxoId)
+	_, err := ldb.Read([]byte(key))
 	return err == nil
 }
 
+// 聪的十进制数字不超过16位，为了排序，这里填足够的0
 func GetSatKey(sat int64) string {
-	return fmt.Sprintf("%s%d", DB_PREFIX_NFT, sat)
+	return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat)
 }
 
 func GetUtxoKey(UtxoId uint64) string {

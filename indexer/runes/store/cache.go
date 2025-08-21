@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/dgraph-io/badger/v4"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,12 +30,12 @@ type DbLog struct {
 }
 
 type DbWrite struct {
-	Db             *badger.DB
+	Db             db.KVDB
 	logs           *cmap.ConcurrentMap[string, *DbLog]
 	cloneTimeStamp int64
 }
 
-func NewDbWrite(db *badger.DB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
+func NewDbWrite(db db.KVDB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWrite {
 	return &DbWrite{
 		Db:   db,
 		logs: logs,
@@ -56,13 +56,8 @@ func (s *DbWrite) FlushToDB() {
 			totalBytes += int64(unsafe.Sizeof(log.Val))
 			totalBytes += int64(len(log.Val.Val))
 			if log.Val.Type == PUT {
-				wb.Set([]byte(log.Key), log.Val.Val)
+				wb.Put([]byte(log.Key), log.Val.Val)
 			}
-		}
-
-		err := wb.Flush()
-		if err != nil {
-			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
 		}
 
 		isFinishUpdate := false
@@ -70,25 +65,23 @@ func (s *DbWrite) FlushToDB() {
 			if isFinishUpdate {
 				break
 			}
-			s.Db.Update(func(txn *badger.Txn) error {
-				for log := range s.logs.IterBuffered() {
-					if log.Val.Type == DEL && log.Val.ExistInDb {
-						err := txn.Delete([]byte(log.Key))
-						if err == badger.ErrTxnTooBig {
-							common.Log.Tracef("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
-							return nil
-						}
-						if err != nil {
-							common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
-						}
-						log.Val.ExistInDb = false
+			
+			for log := range s.logs.IterBuffered() {
+				if log.Val.Type == DEL && log.Val.ExistInDb {
+					err := wb.Delete([]byte(log.Key))
+					if err != nil {
+						common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
 					}
+					log.Val.ExistInDb = false
 				}
-				isFinishUpdate = true
-				return nil
-			})
+			}
+			isFinishUpdate = true
 		}
-
+		
+		err := wb.Flush()
+		if err != nil {
+			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
+		}
 	}
 	s.clearLogs()
 
@@ -209,13 +202,12 @@ func (s *Cache[T]) Set(key []byte, msg proto.Message) (ret *T) {
 }
 
 func (s *Cache[T]) SetToDB(key []byte, val proto.Message) {
-	err := s.dbWrite.Db.Update(func(txn *badger.Txn) error {
-		val, err := proto.Marshal(val)
-		if err != nil {
-			return err
-		}
-		return txn.Set(key, val)
-	})
+	
+	v, err := proto.Marshal(val)
+	if err != nil {
+		return 
+	}
+	err = s.dbWrite.Db.Write(key, v)
 	if err != nil {
 		common.Log.Panicf("Cache.SetToDB-> err: %v", err.Error())
 	}
@@ -272,38 +264,28 @@ func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*
 }
 
 func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
-	err := s.dbWrite.Db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		for it.Seek(keyPrefix); it.ValidForPrefix(keyPrefix); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
+	err := s.dbWrite.Db.BatchRead(keyPrefix, false, func(k, v []byte) error {
+		
+		var out T
+		if isNeedValue {
+			msg, ok := any(&out).(proto.Message)
+			if !ok {
+				common.Log.Errorf("type %T does not implement proto.Message", out)
+				return nil
 			}
-
-			key := item.KeyCopy(nil)
-			var out T
-			if isNeedValue {
-				v, err := item.ValueCopy(nil)
-				if err != nil {
-					return err
-				}
-				msg, ok := any(&out).(proto.Message)
-				if !ok {
-					return fmt.Errorf("type %T does not implement proto.Message", out)
-				}
-				err = proto.Unmarshal(v, msg)
-				if err != nil {
-					return err
-				}
+			err := proto.Unmarshal(v, msg)
+			if err != nil {
+				common.Log.Errorf("type %T Unmarshal failed, %v", out, err)
+				return nil
 			}
-
-			if ret == nil {
-				ret = make(map[string]*T)
-			}
-
-			ret[string(key)] = &out
 		}
+
+		if ret == nil {
+			ret = make(map[string]*T)
+		}
+
+		ret[string(k)] = &out
+		
 		return nil
 	})
 
@@ -314,33 +296,23 @@ func (s *Cache[T]) GetListFromDB(keyPrefix []byte, isNeedValue bool) (ret map[st
 }
 
 func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T) bool) (ret bool) {
-	err := s.dbWrite.Db.View(func(txn *badger.Txn) error {
-		it := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer it.Close()
-		for it.Seek(keyPrefix); it.ValidForPrefix(keyPrefix); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := item.KeyCopy(nil)
-			v, err := item.ValueCopy(nil)
-			if err != nil {
-				return err
-			}
-			var out T
-			msg, ok := any(&out).(proto.Message)
-			if !ok {
-				return fmt.Errorf("type %T does not implement proto.Message", out)
-			}
-			err = proto.Unmarshal(v, msg)
-			if err != nil {
-				return err
-			}
-			ret = cb(key, &out)
-			if ret {
-				return nil
-			}
+	err := s.dbWrite.Db.BatchRead(keyPrefix, false, func(k, v []byte) error {
+		
+			
+		var out T
+		msg, ok := any(&out).(proto.Message)
+		if !ok {
+			return fmt.Errorf("type %T does not implement proto.Message", out)
 		}
+		err := proto.Unmarshal(v, msg)
+		if err != nil {
+			return err
+		}
+		ret = cb(k, &out)
+		if ret {
+			return nil
+		}
+		
 		return nil
 	})
 
@@ -352,42 +324,29 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 }
 
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
-	err := s.dbWrite.Db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(key)
-		if err != nil && err != badger.ErrKeyNotFound {
-			return err
+	
+		v, err := s.dbWrite.Db.Read(key)
+		if err != nil && err != db.ErrKeyNotFound {
+			return
 		}
-		if item == nil {
-			return nil
-		}
-		if item.IsDeletedOrExpired() {
-			return nil
-		}
-		var out T
-		err = item.Value(func(v []byte) error {
-			if len(v) == 0 {
-				ret = nil
-				raw = nil
-				return nil
-			}
-			msg, ok := any(&out).(proto.Message)
-			if !ok {
-				return fmt.Errorf("type %T does not implement proto.Message", out)
-			}
-			err = proto.Unmarshal(v, msg)
-			if err != nil {
-				return err
-			}
-			ret = &out
-			raw = v
-			return nil
-		})
-		return err
-	})
 
-	if err != nil {
-		common.Log.Errorf("Cache.GetFromDB-> err: %v", err)
-	}
-
-	return
+		var out T		
+		if len(v) == 0 {
+			return
+		}
+		msg, ok := any(&out).(proto.Message)
+		if !ok {
+			common.Log.Errorf("type %T does not implement proto.Message", out)
+			return
+		}
+		err = proto.Unmarshal(v, msg)
+		if err != nil {
+			common.Log.Errorf("Unmarshal failed, %v", err)
+			return 
+		}
+		ret = &out
+		raw = v
+			
+		
+		return
 }

@@ -4,62 +4,59 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func openDB(filepath string, opts badger.Options) (ldb *badger.DB, err error) {
-	opts = opts.WithDir(filepath).WithValueDir(filepath).WithLoggingLevel(badger.WARNING)
-	ldb, err = badger.Open(opts)
-	if err != nil {
-		return nil, err
+func openDB(filepath string) (db.KVDB, error) {
+	
+	ldb := db.NewKVDB(filepath)
+	if ldb == nil {
+		return nil, fmt.Errorf("NewKVDB failed")
 	}
-	common.Log.Infof("InitDB-> start db gc for %s", filepath)
-	db.RunBadgerGC(ldb)
+
 	return ldb, nil
 }
 
 func (p *IndexerMgr) initDB() (err error) {
 	common.Log.Info("InitDB-> start...")
 
-	opts := badger.DefaultOptions("").WithBlockCacheSize(3000 << 20)
-	p.baseDB, err = openDB(p.dbDir+"base", opts)
+	p.baseDB, err = openDB(p.dbDir+"base")
 	if err != nil {
 		return err
 	}
 
-	p.nftDB, err = openDB(p.dbDir+"nft", opts)
+	p.nftDB, err = openDB(p.dbDir+"nft")
 	if err != nil {
 		return err
 	}
 
-	p.nsDB, err = openDB(p.dbDir+"ns", opts)
+	p.nsDB, err = openDB(p.dbDir+"ns")
 	if err != nil {
 		return err
 	}
 
-	p.ftDB, err = openDB(p.dbDir+"ft", opts)
+	p.ftDB, err = openDB(p.dbDir+"ft")
 	if err != nil {
 		return err
 	}
 
-	p.brc20DB, err = openDB(p.dbDir+"brc20", opts)
+	p.brc20DB, err = openDB(p.dbDir+"brc20")
 	if err != nil {
 		return err
 	}
 
-	p.runesDB, err = openDB(p.dbDir+"runes", opts)
+	p.runesDB, err = openDB(p.dbDir+"runes")
 	if err != nil {
 		return err
 	}
 
-	p.localDB, err = openDB(p.dbDir+"local", opts)
+	p.localDB, err = openDB(p.dbDir+"local")
 	if err != nil {
 		return err
 	}
 
-	p.kvDB, err = openDB(p.dbDir+"dkvs", opts)
+	p.kvDB, err = openDB(p.dbDir+"dkvs")
 	if err != nil {
 		return err
 	}
@@ -91,35 +88,23 @@ func (p *IndexerMgr) initCollections() {
 	common.Log.Info("initCollections ...")
 
 	p.clmap = make(map[common.TickerName]map[string]int64)
-	err := p.localDB.View(func(txn *badger.Txn) error {
-		prefixBytes := []byte("c-")
-		prefixOptions := badger.DefaultIteratorOptions
-		prefixOptions.Prefix = prefixBytes
-		it := txn.NewIterator(prefixOptions)
-		defer it.Close()
-		for it.Seek(prefixBytes); it.ValidForPrefix(prefixBytes); it.Next() {
-			item := it.Item()
-			if item.IsDeletedOrExpired() {
-				continue
-			}
-			key := string(item.Key())
+	err := p.localDB.BatchRead([]byte("c-"), false, func(k, v []byte) error {
+		
+			key := string(k)
 
 			nty, name, err := parseCollectionKey(key)
 			if err == nil {
 				var ids []string
-				value, err := item.ValueCopy(nil)
-				if err != nil {
-					common.Log.Errorln("initCollections ValueCopy " + key + " " + err.Error())
+				
+				err = db.DecodeBytes(v, &ids)
+				if err == nil {
+					p.clmap[common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: nty, Ticker: name}] = inscriptionIdsToCollectionMap(ids)
 				} else {
-					err = db.DecodeBytes(value, &ids)
-					if err == nil {
-						p.clmap[common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: nty, Ticker: name}] = inscriptionIdsToCollectionMap(ids)
-					} else {
-						common.Log.Errorln("initCollections DecodeBytes " + err.Error())
-					}
+					common.Log.Errorln("initCollections DecodeBytes " + err.Error())
 				}
+				
 			}
-		}
+		
 
 		return nil
 	})
