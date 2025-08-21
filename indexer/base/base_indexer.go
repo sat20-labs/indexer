@@ -856,6 +856,30 @@ func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn db.ReadBatch) error {
 }
 
 func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
+	/* TODO 在后期，这个函数经常消耗了跑区块的80%时间，有时间需要继续优化。
+2025-08-21 10:09:02 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 8338 in 2.779987657s
+2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 2.780052419s
+2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 42.401982ms
+2025-08-21 10:09:02 [info] default: updateExoticTicker in 404.766µs
+2025-08-21 10:09:03 [info] default: NftIndexer.UpdateTransfer loop 3339 in 1.103972964s
+2025-08-21 10:09:03 [info] default: OrdxIndexer->UpdateTransfer loop 3339 in 1.800919ms
+2025-08-21 10:09:03 [info] default: OrdxIndexer->CheckSelf took 70.940899ms.
+2025-08-21 10:09:03 [info] default: RuneIndexer.UpdateTransfer-> handle block succ, height:882895, tx count:3339, update holder count:374, remove holder count:372, block took time:53.112239ms, tx took avg time:15.906µs
+2025-08-21 10:09:03 [info] default: processOrdProtocol 882895,is done: cost: 1.233547213s
+2025-08-21 10:09:03 [info] default: processed block 882895 (2025-02-08 22:05:46) with 3339 transactions took 4.056047383s (1.214749ms per tx)
+
+2025-08-21 10:09:06 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 7608 in 3.235794921s
+2025-08-21 10:09:06 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 3.235867578s
+2025-08-21 10:09:06 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 40.887636ms
+2025-08-21 10:09:06 [info] default: updateExoticTicker in 392.84µs
+2025-08-21 10:09:07 [info] default: NftIndexer.UpdateTransfer loop 3749 in 1.093159612s
+2025-08-21 10:09:07 [info] default: OrdxIndexer->UpdateTransfer loop 3749 in 7.705359ms
+2025-08-21 10:09:08 [info] default: OrdxIndexer->CheckSelf took 101.788654ms.
+2025-08-21 10:09:08 [info] default: RuneIndexer.UpdateTransfer-> handle block succ, height:882896, tx count:3749, update holder count:322, remove holder count:304, block took time:54.745046ms, tx took avg time:14.602µs
+2025-08-21 10:09:08 [info] default: processOrdProtocol 882896,is done: cost: 1.270160635s
+2025-08-21 10:09:08 [info] default: processed block 882896 (2025-02-08 22:25:32) with 3749 transactions took 4.546972122s (1.212849ms per tx)
+	*/
+
 	startTime := time.Now()
 
 	type pair struct {
