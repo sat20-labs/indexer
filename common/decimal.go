@@ -126,10 +126,15 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 	}
 
 	integerPartStr := parts[0]
-	if integerPartStr == "" || integerPartStr[0] == '+' {
+	if integerPartStr == "" || integerPartStr == "+" {
 		return nil, errors.New("empty integer")
 	}
+	var neg bool
+	if integerPartStr[0] == '-' {
+		neg = true
+	}
 
+	// SetString("-0", 10) 结果跟 SetString("0", 10) 一样，需要特殊处理
 	integerPart, ok := new(big.Int).SetString(parts[0], 10)
 	if !ok {
 		return nil, fmt.Errorf("invalid integer format: %s", parts[0])
@@ -162,6 +167,10 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 		value = value.Sub(value, decimalPart)
 	} else {
 		value = value.Add(value, decimalPart)
+	}
+
+	if value.Sign() > 0 && neg {
+		value.Neg(value)
 	}
 
 	return &Decimal{Precision: int(maxPrecision), Value: value}, nil
@@ -395,6 +404,16 @@ func (d *Decimal) Sign() int {
 	return d.Value.Sign()
 }
 
+
+func (d *Decimal) Abs() *Decimal {
+	if d == nil {
+		return nil
+	}
+	r := d.Clone()
+	r.Value.Abs(r.Value)
+	return r
+}
+
 func (d *Decimal) IsOverflowInt64() bool {
 	if d == nil {
 		return false
@@ -486,7 +505,7 @@ func (d *Decimal) IntegerPart() int64 {
 	if d == nil {
 		return 0
 	}
-	value := new(big.Int).Abs(d.Value)
+	value := new(big.Int).Set(d.Value)
 	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
 	return quotient.Int64()
 }

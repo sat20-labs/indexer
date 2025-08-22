@@ -10,16 +10,32 @@ import (
 func TestDecimal(t *testing.T) {
 	// 测试通过整数创建 Decimal
 	{
-		// d1, _ := NewDecimalFromString("1999997", 2)
-		// d2, _ := NewDecimalFromString("0.00015", 10)
-		// d3 := DecimalMul(d1, d2)
-		d3,_ := NewDecimalFromString("0.49", 10)
+		d1, _ := NewDecimalFromString("1999997", 2)
+		d2, _ := NewDecimalFromString("0.00015", 10)
+		//d3 := DecimalMul(d1, d2)
+		d3 := DecimalMul(d2, d1)
+		//d3,_ := NewDecimalFromString("-0.49", 10)
 		fmt.Printf("d3  string: %s\n", d3.String())  
 		fmt.Printf("d3  float64: %v\n", d3.Float64())  
 		fmt.Printf("d3  Int64: %v\n", d3.Int64())  
 		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())  
 		fmt.Printf("d3  Floor: %v\n", d3.Floor())
 		fmt.Printf("d3  Round: %v\n", d3.Round())
+		fmt.Printf("d3  Abs: %v\n", d3.Abs())
+	}
+
+	{
+		//d3,_ := NewDecimalFromString("-0.49", 10)
+		//d3,_ := NewDecimalFromString("-1.49", 10)
+		//d3,_ := NewDecimalFromString("+1.49", 10)
+		d3,_ := NewDecimalFromString("-100.0049", 10)
+		fmt.Printf("d3  string: %s\n", d3.String())  
+		fmt.Printf("d3  float64: %v\n", d3.Float64())  
+		fmt.Printf("d3  Int64: %v\n", d3.Int64())  
+		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())  
+		fmt.Printf("d3  Floor: %v\n", d3.Floor())
+		fmt.Printf("d3  Round: %v\n", d3.Round())
+		fmt.Printf("d3  Abs: %v\n", d3.Abs())
 	}
 	
 
