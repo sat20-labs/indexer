@@ -674,10 +674,10 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		return nil
 	})
 
+	// 耗时很长，90w的高度，基本要10-20分钟
 	baseDB.View(func(txn common.ReadBatch) error {
 		//defer wg.Done()
 		startTime2 = time.Now()
-		// 这些utxo很可能是因为delete操作的bug，遗留了下来，直接从数据库中删除是最好的办法
 		for utxo := range utxosInT2 {
 			key := db.GetUtxoIdKey(utxo)
 			_, err := txn.Get(key)
@@ -698,6 +698,9 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		_, ok := nftsInT1[id]
 		if !ok {
 			wrongIds = append(wrongIds, id)
+		}
+		if v.Sat < 0 {
+			continue
 		}
 		_, ok = satsInT1[uint64(v.Sat)]
 		if !ok {
