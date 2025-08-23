@@ -169,5 +169,6 @@ func (s *Indexer) CheckSelf() bool {
 		return false
 	}
 
+	common.Log.Infof("runes checked.")
 	return true
 }

@@ -82,6 +82,7 @@ func hasNftInUtxo(utxoId uint64, ldb common.KVDB) bool {
 // 聪的十进制数字不超过16位，为了排序，这里填足够的0
 func GetSatKey(sat int64) string {
 	return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat)
+	//return fmt.Sprintf("%s%d", DB_PREFIX_NFT, sat) // 1.5.0
 }
 
 func GetUtxoKey(UtxoId uint64) string {

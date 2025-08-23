@@ -457,7 +457,11 @@ func (b *IndexerMgr) updateServiceInstance() {
 
 func (p *IndexerMgr) repair() bool {
 	//p.compiling.Repair()
-	return false
+
+	p.nft.Repair()
+	//p.nft.CheckSelf(p.baseDB)
+
+	return true
 }
 
 func (p *IndexerMgr) dbStatistic() bool {

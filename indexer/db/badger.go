@@ -6,7 +6,6 @@ package db
 // 	"errors"
 // 	"io"
 // 	"os"
-// 	"sort"
 
 // 	"github.com/dgraph-io/badger/v4"
 // 	"github.com/sat20-labs/indexer/common"
@@ -17,14 +16,15 @@ package db
 // 	db   *badger.DB
 // }
 
-// func openBadgerDB(filepath string, opt *badger.Options) (*badger.DB, error) {
-// 	if opt == nil {
-// 		opt = badger.DefaultOptions(filepath).
-// 			WithSyncWrites(true).
-// 			WithNumVersionsToKeep(1).
-// 			WithCompression(4) // Snappy(默认=1), ZSTD(4)，可按需求调整
-// 	}
-// 	return badger.Open(*opt)
+// func openBadgerDB(filepath string) (*badger.DB, error) {
+	
+// 	opt := badger.DefaultOptions(filepath).
+// 		WithBlockCacheSize(3000 << 20).
+// 		WithDir(filepath).
+// 		WithValueDir(filepath).
+// 		WithLoggingLevel(badger.WARNING)
+	
+// 	return badger.Open(opt)
 // }
 
 // func NewBadgerDB(path string) common.KVDB {
@@ -40,7 +40,7 @@ package db
 // 	if path == "" {
 // 		path = "./data/db"
 // 	}
-// 	return openBadgerDB(path, nil)
+// 	return openBadgerDB(path)
 // }
 
 // func (b *badgerDB) get(key []byte) ([]byte, error) {

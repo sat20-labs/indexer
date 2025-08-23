@@ -120,6 +120,58 @@ func (p *NftIndexer) GetBaseIndexer() *base.BaseIndexer {
 
 func (p *NftIndexer) Repair() {
 
+	fixingUtxoMap := make(map[uint64][]int64)
+	p.db.BatchRead([]byte(DB_PREFIX_UTXO), false, func(k, v []byte) error {
+		var value NftsInUtxo
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
+		}
+
+		utxoId, err := ParseUtxoKey(string(k))
+		if err != nil {
+			common.Log.Panicf("item.Key error: %v", err)
+		}
+
+		for _, sat := range value.Sats {
+			if sat < 0 {
+				nv := make([]int64, 0)
+				for _, sat := range value.Sats {
+					if sat >= 0 {
+						nv = append(nv, sat)
+					}
+				}
+				fixingUtxoMap[utxoId] = nv
+				break
+			}
+		}
+		return nil
+	})
+
+	common.Log.Infof("detect %d utxo has unbound sats", len(fixingUtxoMap))
+	
+	wb := p.db.NewWriteBatch()
+	defer wb.Close()
+
+	for utxoId, sats := range fixingUtxoMap {
+		utxokey := GetUtxoKey(utxoId)
+		var err error
+		if len(sats) == 0 {
+			err = wb.Delete([]byte(utxokey))
+		} else {
+			utxoValue := NftsInUtxo{Sats: sats}
+			err = db.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
+		}
+		
+		if err != nil {
+			common.Log.Panicf("NftIndexer->Repair Error setting %s in db %v", utxokey, err)
+		}
+	}
+
+	err := wb.Flush()
+	if err != nil {
+		common.Log.Panicf("NftIndexer->Repair Flush failed. %v", err)
+	}
 }
 
 // 每个NFT Mint都调用
@@ -127,15 +179,16 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if nft.Base.Sat < 0 {
-		// unbound nft
-		nft.Base.Sat = -int64(p.status.Unbound)
-		p.status.Unbound++
-	}
-
 	nft.Base.Id = int64(p.status.Count)
 	p.status.Count++
 	p.nftAdded = append(p.nftAdded, nft)
+
+	if nft.Base.Sat < 0 {
+		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
+		nft.Base.Sat = -int64(p.status.Unbound)
+		p.status.Unbound++
+		return
+	}
 
 	// 确保该nft已经加入utxomap中
 	p.addSatToUtxo(nft.UtxoId, nft.Base.Sat)
@@ -538,6 +591,13 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
 			common.Log.Panicf("item.Value error: %v", err)
+		}
+		if value.Sat < 0 {
+			// 负数铭文，没有绑定到任何聪的铭文，只统计nft数量
+			for _, nft := range value.Nfts {
+				nftsInT1[nft.Id] = true
+			}
+			return nil
 		}
 
 		addressesInT1[value.OwnerAddressId] = true
