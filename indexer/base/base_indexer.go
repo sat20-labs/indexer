@@ -1095,7 +1095,8 @@ func (b *BaseIndexer) CheckSelf() bool {
 		if err != nil {
 			common.Log.Panicf("GetValueFromDB %s error: %v", key, err)
 		}
-		leakSats += common.GetOrdinalsSize(value.LostSats)
+		satsInTheory := common.SubsidyInTheory(value.Height)
+		leakSats += satsInTheory - (value.OutputSats-value.InputSats) // common.GetOrdinalsSize(value.LostSats) sat20 always == 0
 		if value.Height != i {
 			common.Log.Panicf("block %d invalid value %d", i, value.Height)
 		}
