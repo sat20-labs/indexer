@@ -149,9 +149,6 @@ func (b *BaseIndexer) Subtract(another *BaseIndexer) {
 	for key := range another.utxoIndex.Index {
 		delete(b.utxoIndex.Index, key)
 	}
-	for _, del := range another.delUTXOs {
-		delete(b.utxoIndex.Index, del.Utxo)
-	}
 
 	// 会导致 UpdateServiceInstance 找不到addressId
 	// for k := range another.addressIdMap {
