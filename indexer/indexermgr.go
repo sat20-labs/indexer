@@ -65,9 +65,9 @@ type IndexerMgr struct {
 	ftBackupDB        *ft.FTIndexer
 	nsBackupDB        *ns.NameService
 	nftBackupDB       *nft.NftIndexer
+
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
-
 	// 本地缓存，在区块更新时清空
 	addressToNftMap  map[string][]*common.Nft
 	addressToNameMap map[string][]*common.Nft
@@ -369,40 +369,29 @@ func (b *IndexerMgr) updateDB() {
 	syncHeight := b.compiling.GetSyncHeight()
 	blocksInHistory := b.compiling.GetBlockHistory()
 
-	if complingHeight-syncHeight < blocksInHistory {
-		common.Log.Infof("updateDB do nothing at height %d-%d", complingHeight, syncHeight)
-		return
-	}
-
-	if complingHeight-syncHeight == blocksInHistory {
-		// 先备份数据在缓存
+	gap := complingHeight-syncHeight
+	if gap < blocksInHistory {
 		if b.compilingBackupDB == nil {
 			b.prepareDBBuffer()
-			common.Log.Infof("updateDB clone data at height %d-%d", complingHeight, syncHeight)
 		}
-		return
-	}
-
-	// 这个区间不备份数据
-	if complingHeight-syncHeight < 2*blocksInHistory {
-		common.Log.Infof("updateDB do nothing at height %d-%d", complingHeight, syncHeight)
-		return
-	}
-
-	// b.GetHeight()-b.GetSyncHeight() == 2*b.GetBlockHistory()
-
-	// 到达高度时，将备份的数据写入数据库中。
-	if b.compilingBackupDB != nil {
-		if complingHeight-b.compilingBackupDB.GetHeight() < blocksInHistory {
-			common.Log.Infof("updateDB do nothing at height %d, backup instance %d",
-				complingHeight, b.compilingBackupDB.GetHeight())
+	} else {
+		// 这个区间不备份数据
+		if gap < 2*blocksInHistory {
+			if b.compilingBackupDB == nil {
+				b.prepareDBBuffer()
+			}
 			return
 		}
-		common.Log.Infof("updateDB do backup->forceUpdateDB() at height %d-%d", complingHeight, syncHeight)
-		b.performUpdateDBInBuffer()
+
+		// 到达高度时，将备份的数据写入数据库中。
+		if b.compilingBackupDB != nil {
+			common.Log.Infof("updateDB performUpdateDBInBuffer at height %d-%d", complingHeight, syncHeight)
+			b.performUpdateDBInBuffer()
+
+			// 备份当前高度的数据
+			b.prepareDBBuffer()
+		}
 	}
-	b.prepareDBBuffer()
-	common.Log.Infof("updateDB clone data at height %d-%d", complingHeight, syncHeight)
 }
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
@@ -427,7 +416,7 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.nftBackupDB = b.nft.Clone()
 	b.brc20BackupDB = b.brc20Indexer.Clone()
 	b.runesBackupDB = b.RunesIndexer.Clone()
-	common.Log.Infof("backup instance %d cloned", b.compilingBackupDB.GetHeight())
+	common.Log.Infof("prepareDBBuffer backup instance at %d", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
