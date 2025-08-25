@@ -811,23 +811,6 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	}
 
 	b.stats.ChainTip = int(count)
-	// 每跑足够的区块，回到返回进行数据库的清理，防止数据库膨胀过大
-	bRunInStepMode := true
-	if bRunInStepMode {
-		if count == uint64(b.lastHeight) {
-			return 0
-		}
-		step := 10000
-		if b.lastHeight >= 900000 {
-			step = 100
-		} else if b.lastHeight >= 800000 {
-			step = 1000
-		}
-		if uint64(b.lastHeight+step) <= count {
-			count = uint64(b.lastHeight + step)
-		}
-	}
-
 	return b.syncToBlock(int(count), stopChan)
 }
 
@@ -1104,6 +1087,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 	startTime2 := time.Now()
 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_BLOCK)
 	var preValue *common.BlockValueInDB
+	var leakSats int64
 	for i := 0; i <= b.stats.SyncHeight; i++ {
 		key := db.GetBlockDBKey(i)
 		value := common.BlockValueInDB{}
@@ -1111,13 +1095,14 @@ func (b *BaseIndexer) CheckSelf() bool {
 		if err != nil {
 			common.Log.Panicf("GetValueFromDB %s error: %v", key, err)
 		}
+		leakSats += common.GetOrdinalsSize(value.LostSats)
 		if value.Height != i {
 			common.Log.Panicf("block %d invalid value %d", i, value.Height)
 		}
 		if preValue != nil {
 			if preValue.Ordinals.Start+preValue.Ordinals.Size != value.Ordinals.Start {
 				common.Log.Panicf("block %d invalid range %d-%d, %d", i, preValue.Ordinals.Start, preValue.Ordinals.Size, value.Ordinals.Start)
-			}
+			} 
 		}
 		if i == b.stats.SyncHeight {
 			if b.stats.TotalSats != value.Ordinals.Start+value.Ordinals.Size {
@@ -1128,6 +1113,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 		preValue = &value
 	}
 	common.Log.Infof("%s table takes %v", common.DB_KEY_BLOCK, time.Since(startTime2))
+	common.Log.Infof("leak sats %d, expected leak sats %d", leakSats, totalSats-b.stats.TotalSats)
 
 	satsInUtxo := int64(0)
 	utxoCount := 0

@@ -79,6 +79,14 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
     // go p.listenZMQBlock(zmqBlockAddr)
 }
 
+
+// 数据关闭前，要先停止内存池模块
+func (p *MiniMemPool) Stop() {
+    p.running = false
+    // 稍等一下，等相关操作都完成，后面数据库要关闭了
+    time.Sleep(time.Second)
+}
+
 // 通过RPC拉取mempool
 func (p *MiniMemPool) fetchMempoolFromRPC() {
     p.mutex.Lock()
@@ -100,6 +108,9 @@ func (p *MiniMemPool) fetchMempoolFromRPC() {
         if err != nil {
             common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
             continue
+        }
+        if !p.running {
+            return
         }
         p.txBroadcasted(tx)
     }
@@ -230,6 +241,13 @@ func getTxOutFromRawTx(utxo string) (*common.UtxoInfo, error) {
 	}, nil
 }
 
+func (p *MiniMemPool) getUtxoInfo(utxo string) (*common.UtxoInfo, error) {
+    if !p.running {
+        return nil, fmt.Errorf("is closing")
+    }
+    return instance.rpcService.GetUtxoInfo(utxo)
+}
+
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
@@ -245,7 +263,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             continue // coinbase
         }
         spentUtxo := txIn.PreviousOutPoint.String()
-        info, err := instance.rpcService.GetUtxoInfo(spentUtxo)
+        info, err := p.getUtxoInfo(spentUtxo)
         if err != nil {
             // 可能上个TX也在内存池中
             info, err = getTxOutFromRawTx(spentUtxo)
