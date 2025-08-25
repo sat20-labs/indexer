@@ -371,26 +371,23 @@ func (b *IndexerMgr) updateDB() {
 
 	gap := complingHeight-syncHeight
 	if gap < blocksInHistory {
+		common.Log.Infof("performUpdateDBInBuffer nothing to do at height %d-%d", complingHeight, syncHeight)
+	} else {
 		if b.compilingBackupDB == nil {
 			b.prepareDBBuffer()
 		}
-	} else {
 		// 这个区间不备份数据
 		if gap < 2*blocksInHistory {
-			if b.compilingBackupDB == nil {
-				b.prepareDBBuffer()
-			}
+			common.Log.Infof("performUpdateDBInBuffer nothing to do at height %d-%d", complingHeight, syncHeight)
 			return
 		}
 
 		// 到达高度时，将备份的数据写入数据库中。
-		if b.compilingBackupDB != nil {
-			common.Log.Infof("updateDB performUpdateDBInBuffer at height %d-%d", complingHeight, syncHeight)
-			b.performUpdateDBInBuffer()
+		common.Log.Infof("performUpdateDBInBuffer performUpdateDBInBuffer at height %d-%d", complingHeight, syncHeight)
+		b.performUpdateDBInBuffer()
 
-			// 备份当前高度的数据
-			b.prepareDBBuffer()
-		}
+		// 备份当前高度的数据
+		b.prepareDBBuffer()
 	}
 }
 
