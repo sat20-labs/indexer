@@ -224,6 +224,63 @@ func (b *BaseIndexer) forceUpdateDB() {
 	// }
 }
 
+
+func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
+	// 测试下提前取的所有地址
+	addressValueMap := make(map[string]*common.AddressValueInDB)
+
+	
+	startTime := time.Now()
+	
+	for _, v := range b.utxoIndex.Index {
+		if v.Address.Type == int(txscript.NullDataTy) {
+			// 只有OP_RETURN 才不记录
+			if v.Value == 0 {
+				continue
+			}
+		}
+		b.addUtxo(&addressValueMap, v)
+	}
+
+	type deleteUtxo struct {
+		key   []byte
+		value *UtxoValue
+	}
+
+	
+	for _, utxo := range b.delUTXOs {
+		utxoId := utxo.UtxoId
+		for _, address := range utxo.Address.Addresses {
+			value, ok := addressValueMap[address]
+			if ok {
+				value.Utxos[utxoId] = &common.UtxoValue{Op: -1}
+			} else {
+				utxos := make(map[uint64]*common.UtxoValue)
+				utxos[utxoId] = &common.UtxoValue{Op: -1}
+
+				id, op := b.getAddressId(address)
+				if op >= 0 {
+					value = &common.AddressValueInDB{
+						AddressType: uint32(utxo.Address.Type),
+						AddressId:   id,
+						Op:          op,
+						Utxos:       utxos,
+					}
+					addressValueMap[address] = value
+				} else {
+					common.Log.Panicf("utxo %x exists but address %s not exists.", utxoId, address)
+				}
+			}
+		}
+	}
+
+	common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v",
+		len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
+
+	return addressValueMap
+}
+
+
 func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 	// 测试下提前取的所有地址
 	addressValueMap := make(map[string]*common.AddressValueInDB)
@@ -307,7 +364,7 @@ func (b *BaseIndexer) UpdateDB() {
 	common.Log.Infof("BaseIndexer->updateBasicDB %d start...", b.lastHeight)
 
 	// 拿到所有的addressId
-	addressValueMap := b.prefechAddress()
+	addressValueMap := b.prefechAddressV2()
 
 	//////
 	// 测试一个异常问题：blockVector 区块丢失，导致exotic索引失败
