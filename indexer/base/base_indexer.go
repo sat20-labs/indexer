@@ -668,6 +668,7 @@ func appendRanges(rngs1, rngs2 []*common.Range) []*common.Range {
 	var r1, r2 *common.Range
 	len1 := len(rngs1)
 	len2 := len(rngs2)
+	rngs2 = common.CloneRanges(rngs2) // 不要影响第二个参数
 	if len1 > 0 {
 		if len2 == 0 {
 			return rngs1
@@ -726,7 +727,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 			satsInput += inputUtxo.Value
 
 			input.Address = inputUtxo.Address
-			input.Ordinals = inputUtxo.Ordinals
+			input.Ordinals = common.CloneRanges(inputUtxo.Ordinals)
 			input.UtxoId = utxoid
 
 			// add the utxo's ordinals to the list of ordinals to be transferred
@@ -736,7 +737,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 		for _, output := range tx.Outputs {
 			// transfer the ordinals to the output
 			transferred, remaining := common.TransferRanges(ranges, output.Value)
-			output.Ordinals = transferred
+			output.Ordinals = common.CloneRanges(transferred)
 			ranges = remaining
 			// add the output to the utxo index
 			u := common.GetUtxo(block.Height, tx.Txid, int(output.N))
@@ -765,7 +766,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	for _, output := range block.Transactions[0].Outputs {
 		// transfer the coinbase ordinals to the output
 		transferred, remaining := common.TransferRanges(coinbaseOrdinals, output.Value)
-		output.Ordinals = transferred
+		output.Ordinals = common.CloneRanges(transferred)
 		coinbaseOrdinals = remaining
 	}
 	//common.Log.Infof("b.utxoIndex.Index %d, b.delUTXOs %d, added %d, deled %d",

@@ -205,3 +205,14 @@ func MergeRange(dest []*Range, rng *Range) []*Range {
 
 	return result
 }
+
+func CloneRanges(ordinals []*Range) []*Range {
+	result := make([]*Range, len(ordinals))
+	for i, r := range ordinals {
+		result[i] = &Range{
+			Start: r.Start,
+			Size: r.Size,
+		}
+	}
+	return result
+}
