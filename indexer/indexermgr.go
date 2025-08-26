@@ -212,55 +212,49 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		if !isRunning {
 			isRunning = true
 			go func() {
-				//b.compiling.SetUpdateDBCallback(nil)
-				for b.maxIndexHeight <= 0 || b.maxIndexHeight > b.compiling.GetHeight() {
-					ret := b.compiling.SyncToChainTip(stopIndexerChan)
-					if ret == 0 {
-						
-
-						//if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
-							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
-							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
-							b.compiling.SetUpdateDBCallback(nil)
-							b.updateDB()
-							//b.checkSelf()
-							//b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
-						//}
-
-						if b.maxIndexHeight > 0 {
-							if b.maxIndexHeight <= b.compiling.GetHeight() {
-								b.checkSelf()
-								common.Log.Infof("reach expected height, set exit flag")
-								// bWantExit = true
-							}
-						}
-
-						b.dbgc()
-						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
-						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
-						// 	period := 1000
-						// 	if b.compiling.GetSyncHeight()%period == 0 {
-						// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
-						// 		b.checkSelf()
-						// 	}
-						// }
-						if b.dbStatistic() {
-							bWantExit = true
-						}
-
-					} else if ret > 0 {
-						// handle reorg
-						b.handleReorg(ret)
-						b.compiling.SyncToChainTip(stopIndexerChan)
-					} else {
-						if ret == -1 {
-							common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+				ret := b.compiling.SyncToChainTip(stopIndexerChan)
+				if ret == 0 {
+					if b.maxIndexHeight > 0 {
+						if b.maxIndexHeight <= b.compiling.GetHeight() {
+							b.checkSelf()
+							common.Log.Infof("reach expected height, set exit flag")
 							bWantExit = true
 						}
 					}
+
+					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
+						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
+						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
+						b.compiling.SetUpdateDBCallback(nil)
+						b.updateDB()
+						if b.maxIndexHeight <= 0 {
+							b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
+						}
+					}
+
+					b.dbgc()
+					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
+					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
+					// 	period := 1000
+					// 	if b.compiling.GetSyncHeight()%period == 0 {
+					// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
+					// 		b.checkSelf()
+					// 	}
+					// }
+					if b.dbStatistic() {
+						bWantExit = true
+					}
+
+				} else if ret > 0 {
+					// handle reorg
+					b.handleReorg(ret)
+					b.compiling.SyncToChainTip(stopIndexerChan)
+				} else {
+					if ret == -1 {
+						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+						bWantExit = true
+					}
 				}
-				b.checkSelf()
-				//bWantExit = true
 
 				isRunning = false
 			}()
