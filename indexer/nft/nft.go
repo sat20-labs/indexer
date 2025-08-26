@@ -67,6 +67,9 @@ func (p *NftIndexer) reset() {
 }
 
 func (p *NftIndexer) Clone() *NftIndexer {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	newInst := NewNftIndexer(p.db)
 	newInst.utxoMap = make(map[uint64][]int64)
 	for k, v := range p.utxoMap {
@@ -91,6 +94,8 @@ func (p *NftIndexer) Clone() *NftIndexer {
 }
 
 func (p *NftIndexer) Subtract(another *NftIndexer) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	// 待观察
 	// another.satTree.View(func(k int64, v interface{}) error {
@@ -489,6 +494,8 @@ func (p *NftIndexer) UpdateDB() {
 	if !p.bEnabled {
 		return
 	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	nftmap := p.prefetchNftsFromDB()
 	buckDB := NewBuckStore(p.db)
@@ -569,6 +576,8 @@ func (p *NftIndexer) UpdateDB() {
 
 // 耗时很长。仅用于在数据编译完成时验证数据，或者测试时验证数据。
 func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
 	common.Log.Info("NftIndexer->checkSelf ... ")
 

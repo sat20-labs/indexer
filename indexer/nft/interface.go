@@ -18,6 +18,9 @@ func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
 }
 
 func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	if inscriptionId == "" {
 		return nil
 	}
@@ -34,7 +37,7 @@ func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 		//common.Log.Errorf("GetValueFromDB with inscription %s failed. %v", inscriptionId, err)
 		//return nil
 	} else {
-		nfts := p.GetNftsWithSat(value.Sat)
+		nfts := p.getNftsWithSat(value.Sat)
 		if nfts != nil {
 			for _, nft := range nfts.Nfts {
 				if nft.Id == value.Id {
@@ -94,9 +97,12 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 	sats := p.GetBoundSatsWithUtxo(utxoId)
 
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	
 	result := make([]*common.Nft, 0)
 	for _, sat := range sats {
-		info := p.GetNftsWithSat(sat)
+		info := p.getNftsWithSat(sat)
 		if info != nil {
 			for _, nft := range info.Nfts {
 				result = append(result, &common.Nft{Base: nft,
@@ -169,6 +175,10 @@ func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
+	return p.getNftsWithSat(sat)
+}
+
+func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 	nfts := &common.NftsInSat{}
 	err := loadNftFromDB(sat, nfts, p.db)
 	nft := p.getNftInBuffer4(sat)

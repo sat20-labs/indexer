@@ -87,6 +87,9 @@ func (p *NameService) GetNameRegisterInfoWithSat(sat int64) []*NameRegister {
 }
 
 func (p *NameService) IsNameExist(name string) bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	name = strings.ToLower(name)
 	reg := p.getNameInBuffer(name)
 	if reg != nil {
@@ -99,6 +102,9 @@ func (p *NameService) IsNameExist(name string) bool {
 }
 
 func (p *NameService) GetNameRegisterInfo(name string) *NameRegister {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	name = strings.ToLower(name)
 	reg := p.getNameInBuffer(name)
 	if reg != nil {
@@ -152,8 +158,6 @@ func (p *NameService) GetNames(start, limit int) []string {
 
 // 按照铸造时间
 func (p *NameService) GetNamesWithInscriptionAddress(addressId uint64, start, limit int) ([]*common.Nft, int) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
 
 	nftIds := p.nftIndexer.GetAllNftsWithInscriptionAddress(addressId)
 

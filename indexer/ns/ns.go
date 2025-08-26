@@ -46,6 +46,9 @@ func (p *NameService) reset() {
 }
 
 func (p *NameService) Clone() *NameService {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	newInst := NewNameService(p.db)
 
 	newInst.nameAdded = make([]*NameRegister, len(p.nameAdded))
@@ -60,6 +63,9 @@ func (p *NameService) Clone() *NameService {
 }
 
 func (p *NameService) Subtract(another *NameService) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	//p.nameAdded = p.nameAdded[len(another.nameAdded):]
 	p.nameAdded = append([]*NameRegister(nil), p.nameAdded[len(another.nameAdded):]...)
 	//p.updateAdded = p.updateAdded[len(another.updateAdded):]
@@ -93,8 +99,6 @@ func (p *NameService) UpdateTransfer(block *common.Block) {
 }
 
 func (p *NameService) getNameInBuffer(name string) *NameRegister {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
 	for _, reg := range p.nameAdded {
 		if reg.Name == name {
 			return reg
@@ -106,6 +110,9 @@ func (p *NameService) getNameInBuffer(name string) *NameRegister {
 // 跟base数据库同步
 func (p *NameService) UpdateDB() {
 	//common.Log.Infof("NameService->UpdateDB start...")
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	startTime := time.Now()
 
 	buckDB := NewBuckStore(p.db)

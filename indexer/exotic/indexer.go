@@ -132,7 +132,7 @@ func (p *ExoticIndexer) updateExoticTicker(height int) {
 		return
 	}
 
-	exoticmap := p.GetMoreExoticRangesToHeight(p.exoticSyncHeight+1, height)
+	exoticmap := p.getMoreExoticRangesToHeight(p.exoticSyncHeight+1, height)
 	for name, ranges := range exoticmap {
 		tickinfo := p.exoticTickerMap[string(name)]
 		if tickinfo == nil {
@@ -165,7 +165,7 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block) {
 	common.Log.Infof("updateExoticTicker in %v", time.Since(startTime))
 }
 
-func (p *ExoticIndexer) GetMoreExoticRangesToHeight(startHeight, endHeight int) map[string][]*common.Range {
+func (p *ExoticIndexer) getMoreExoticRangesToHeight(startHeight, endHeight int) map[string][]*common.Range {
 	if p.baseIndexer.GetHeight() < 0 {
 		return nil
 	}

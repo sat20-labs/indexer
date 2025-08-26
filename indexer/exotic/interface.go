@@ -8,6 +8,9 @@ import (
 )
 
 func (p *ExoticIndexer) GetExoticsWithRanges(ranges []*common.Range) []*common.ExoticRange {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	result := []*common.ExoticRange{}
 	if p.exoticTickerMap == nil {
 		return nil
@@ -44,6 +47,8 @@ func (p *ExoticIndexer) GetExoticsWithRanges(ranges []*common.Range) []*common.E
 }
 
 func (p *ExoticIndexer) HasExoticInRanges(ranges []*common.Range) bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
 	if p.exoticTickerMap == nil {
 		return false
@@ -76,6 +81,9 @@ func (p *ExoticIndexer) GetExoticsWithType(ranges []*common.Range, typ string) [
 }
 
 func (p *ExoticIndexer) GetExoticsWithRanges2(ranges []*common.Range) map[string][]*common.Range {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	
 	res := make(map[string][]*common.Range)
 
 	if p.exoticTickerMap == nil {

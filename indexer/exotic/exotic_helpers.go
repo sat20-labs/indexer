@@ -55,6 +55,9 @@ func (p *ExoticIndexer) getRangesForBlocks(blocks []int, txn common.ReadBatch) [
 
 // 速度很慢，最好是在跑完数据才更新
 func (p *ExoticIndexer) InitRarityDB(height int) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	start := time.Now()
 	bs := NewBuckStore(p.db, string(Uncommon))
 	syncHeight := bs.GetLastKey()

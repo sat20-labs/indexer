@@ -653,14 +653,14 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 		select {
 		case <-stopChan:
 			common.Log.Errorf("BaseIndexer.SyncToBlock-> Graceful shutdown received")
-			stopBlockFetcherChan <- struct{}{}
+			close(stopBlockFetcherChan)
 			return -1
 		default:
 			block := <-b.blocksChan
 
 			if block == nil {
 				common.Log.Errorf("BaseIndexer.SyncToBlock-> fetch block failed %d", i)
-				stopBlockFetcherChan <- struct{}{}
+				close(stopBlockFetcherChan)
 				return -2
 			}
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> get block: cost: %v", time.Since(startTime))
@@ -673,7 +673,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			// detect reorgs
 			if i > 0 && block.PrevBlockHash != b.lastHash {
 				common.Log.WithField("BaseIndexer.SyncToBlock-> height", i).Warn("reorg detected")
-				stopBlockFetcherChan <- struct{}{}
+				close(stopBlockFetcherChan)
 				return b.handleReorg(block)
 			}
 
@@ -719,7 +719,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 	//b.forceUpdateDB()
 
 	common.Log.Infof("BaseIndexer.SyncToBlock-> already sync to block %d-%d\n", b.lastHeight, b.stats.SyncHeight)
-	stopBlockFetcherChan <- struct{}{}
+	close(stopBlockFetcherChan)
 	return 0
 }
 
@@ -864,16 +864,17 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 		return -2
 	}
 
+	b.stats.ChainTip = int(count)
+
 	if count == uint64(b.lastHeight) {
 		return 0
 	}
 
-	runInStep := true 
+	runInStep := false 
 	if runInStep {
 		count = uint64(b.lastHeight) + 1
 	}
 
-	b.stats.ChainTip = int(count)
 	return b.syncToBlock(int(count), stopChan)
 }
 
