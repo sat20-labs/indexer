@@ -37,7 +37,7 @@ type BaseIndexer struct {
 	utxoIndex   *common.UTXOIndex
 	delUTXOs    []*UtxoValue // utxo->address,utxoid
 
-	addressIdMap map[string]*AddressStatus
+	addressToIdMap map[string]*AddressStatus
 
 	lastHeight       int // 内存数据同步区块
 	lastHash         string
@@ -69,7 +69,7 @@ func NewBaseIndexer(
 		db:               basicDB,
 		stats:            &SyncStats{},
 		periodFlushToDB:  periodFlushToDB,
-		keepBlockHistory: 12,
+		keepBlockHistory: 6,
 		blocksChan:       make(chan *common.Block, BLOCK_PREFETCH),
 		chaincfgParam:    chaincfgParam,
 		maxIndexHeight:   maxIndexHeight,
@@ -79,7 +79,7 @@ func NewBaseIndexer(
 		indexer.keepBlockHistory = 72 // testnet4的分岔很多也很长
 	}
 
-	indexer.addressIdMap = make(map[string]*AddressStatus, 0)
+	indexer.addressToIdMap = make(map[string]*AddressStatus, 0)
 	indexer.prevBlockHashMap = make(map[int]string)
 
 	return indexer
@@ -125,9 +125,9 @@ func (b *BaseIndexer) Clone() *BaseIndexer {
 	newInst.delUTXOs = make([]*UtxoValue, len(b.delUTXOs))
 	copy(newInst.delUTXOs, b.delUTXOs)
 
-	newInst.addressIdMap = make(map[string]*AddressStatus)
-	for k, v := range b.addressIdMap {
-		newInst.addressIdMap[k] = v
+	newInst.addressToIdMap = make(map[string]*AddressStatus)
+	for k, v := range b.addressToIdMap {
+		newInst.addressToIdMap[k] = v
 	}
 	newInst.blockVector = make([]*common.BlockValueInDB, len(b.blockVector))
 	copy(newInst.blockVector, b.blockVector)
@@ -523,7 +523,7 @@ func (b *BaseIndexer) UpdateDB() {
 	b.blockVector = make([]*common.BlockValueInDB, 0)
 	b.utxoIndex = common.NewUTXOIndex()
 	b.delUTXOs = make([]*UtxoValue, 0)
-	b.addressIdMap = make(map[string]*AddressStatus)
+	b.addressToIdMap = make(map[string]*AddressStatus)
 }
 
 func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue, txn common.ReadBatch) {
@@ -653,12 +653,14 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 		select {
 		case <-stopChan:
 			common.Log.Errorf("BaseIndexer.SyncToBlock-> Graceful shutdown received")
+			stopBlockFetcherChan <- struct{}{}
 			return -1
 		default:
 			block := <-b.blocksChan
 
 			if block == nil {
 				common.Log.Errorf("BaseIndexer.SyncToBlock-> fetch block failed %d", i)
+				stopBlockFetcherChan <- struct{}{}
 				return -2
 			}
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> get block: cost: %v", time.Since(startTime))
@@ -717,6 +719,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 	//b.forceUpdateDB()
 
 	common.Log.Infof("BaseIndexer.SyncToBlock-> already sync to block %d-%d\n", b.lastHeight, b.stats.SyncHeight)
+	stopBlockFetcherChan <- struct{}{}
 	return 0
 }
 
@@ -752,10 +755,6 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 		Timestamp: block.Timestamp.Unix(),
 		TxAmount:  len(block.Transactions),
 	}
-	firstblock := block.Height
-	if len(b.blockVector) > 0 {
-		firstblock = b.blockVector[0].Height
-	}
 
 	addedUtxoCount := 0
 	deledUtxoCount := 0
@@ -776,11 +775,11 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 			deledUtxoCount++
 			delete(b.utxoIndex.Index, utxoKey)
 			utxoid := common.GetUtxoId(inputUtxo)
-			if inputUtxo.Height < firstblock {
-				value := &UtxoValue{Utxo: utxoKey, Address: inputUtxo.Address,
-					UtxoId: utxoid, Value: inputUtxo.Value}
-				b.delUTXOs = append(b.delUTXOs, value)
-			}
+			
+			value := &UtxoValue{Utxo: utxoKey, Address: inputUtxo.Address,
+				UtxoId: utxoid, Value: inputUtxo.Value}
+			b.delUTXOs = append(b.delUTXOs, value)
+			
 			satsInput += inputUtxo.Value
 
 			input.Address = inputUtxo.Address
@@ -903,7 +902,7 @@ func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn common.ReadBatch) erro
 			common.Log.Errorf("failed to get address by id %d, utxo: %s, utxoId: %d, err: %v", addressId, utxostr, utxo.UtxoId, err)
 			return err
 		}
-		b.addressIdMap[address] = &AddressStatus{AddressId: addressId, Op: 0}
+		b.addressToIdMap[address] = &AddressStatus{AddressId: addressId, Op: 0}
 		addresses.Addresses = append(addresses.Addresses, address)
 	}
 	addresses.Type = int(utxo.AddressType)
@@ -978,7 +977,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 
 		for _, output := range tx.Outputs {
 			for _, address := range output.Address.Addresses {
-				_, ok := b.addressIdMap[address]
+				_, ok := b.addressToIdMap[address]
 				if !ok {
 					addressMap[address] = common.INVALID_ID
 					// addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
@@ -1064,7 +1063,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			return addresses[i] < addresses[j]
 		})
 		for _, address := range addresses {
-			s, ok := b.addressIdMap[address]
+			s, ok := b.addressToIdMap[address]
 			if !ok {
 				addressId, bExist := b.getAddressIdFromTxn(address, true, txn)
 				op := 1
@@ -1072,7 +1071,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 					op = 0
 				}
 				s = &AddressStatus{addressId, op}
-				b.addressIdMap[address] = s
+				b.addressToIdMap[address] = s
 			}
 			addressIdMap[s.AddressId] = address
 		}
@@ -1499,7 +1498,7 @@ func (p *BaseIndexer) GetBlockInBuffer(height int) *common.BlockValueInDB {
 }
 
 func (p *BaseIndexer) getAddressId(address string) (uint64, int) {
-	value, ok := p.addressIdMap[address]
+	value, ok := p.addressToIdMap[address]
 	if !ok {
 		common.Log.Errorf("can't find addressId %s", address)
 		return common.INVALID_ID, -1

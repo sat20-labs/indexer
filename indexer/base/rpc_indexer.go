@@ -24,7 +24,7 @@ type RpcIndexer struct {
 	// 接收前端api访问的实例，隔离内存访问
 	mutex              sync.RWMutex
 	addressValueMap    map[string]*common.AddressValueInDB
-	addressIdMap       map[uint64]string
+	idToAddressMap       map[uint64]string
 	deletedUtxoMap     map[uint64]bool
 	bSearching         bool
 	satSearchingStatus map[int64]*SatSearchingStatus
@@ -35,7 +35,7 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 		BaseIndexer:        *base.Clone(),
 		bSearching:         false,
 		addressValueMap:    make(map[string]*common.AddressValueInDB),
-		addressIdMap:       make(map[uint64]string),
+		idToAddressMap:       make(map[uint64]string),
 		deletedUtxoMap:     make(map[uint64]bool),
 		satSearchingStatus: make(map[int64]*SatSearchingStatus),
 	}
@@ -46,9 +46,9 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 // 仅用于前端RPC数据查询时，更新地址数据
 func (b *RpcIndexer) UpdateServiceInstance() {
 	b.addressValueMap = b.prefechAddressV2()
-	b.addressIdMap = make(map[uint64]string)
+	b.idToAddressMap = make(map[uint64]string)
 	for k, v := range b.addressValueMap {
-		b.addressIdMap[v.AddressId] = k
+		b.idToAddressMap[v.AddressId] = k
 	}
 	for _, v := range b.delUTXOs {
 		b.deletedUtxoMap[v.UtxoId] = true
@@ -236,7 +236,7 @@ func (b *RpcIndexer) GetUtxoByID(id uint64) (string, error) {
 func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 
 	b.mutex.RLock()
-	addrStr, ok := b.addressIdMap[id]
+	addrStr, ok := b.idToAddressMap[id]
 	b.mutex.RUnlock()
 	if ok {
 		return addrStr, nil
@@ -250,7 +250,7 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	b.addressIdMap[id] = address
+	b.idToAddressMap[id] = address
 
 
 	return address, err
