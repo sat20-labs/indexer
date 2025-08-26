@@ -22,9 +22,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-base32"
 	"github.com/sat20-labs/indexer/dkvs/kaddht"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+// 	"go.opentelemetry.io/otel"
+// 	"go.opentelemetry.io/otel/attribute"
+// 	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -72,8 +72,8 @@ func (d *Dkvs) asyncPut(key string, value []byte) (err error) {
 
 func (d *Dkvs) putKeyToLocalNode(ctx context.Context, key string, value []byte, opts ...routing.Option) (err error) {
 	dht := d.idht
-	ctx, span := d.startSpan(ctx, "IpfsDHT.PutValue", trace.WithAttributes(attribute.String("Key", key)))
-	defer span.End()
+	// ctx, span := d.startSpan(ctx, "IpfsDHT.PutValue", trace.WithAttributes(attribute.String("Key", key)))
+	// defer span.End()
 
 	Logger.Infof("putting value", "key", kaddht.LoggableRecordKeyString(key))
 	Logger.Debugf("putting value {dskey: %v}", d.mkDsKey(key))
@@ -170,9 +170,9 @@ func (d *Dkvs) putLocal(ctx context.Context, key string, rec *recpb.Record) erro
 	return d.dhtDatastore.Put(ctx, d.mkDsKey(key), data)
 }
 
-func (d *Dkvs) startSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return otel.Tracer("go-libp2p-kad-dht").Start(ctx, fmt.Sprintf("KademliaDHT.%s", name), opts...)
-}
+// func (d *Dkvs) startSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
+// 	return otel.Tracer("go-libp2p-kad-dht").Start(ctx, fmt.Sprintf("KademliaDHT.%s", name), opts...)
+// }
 
 func (d *Dkvs) putAllUnsyncKeyToNetwork(peerID peer.ID) error {
 	lock.Lock() //加锁防止多线程同时操作putAllKeyToPeers
