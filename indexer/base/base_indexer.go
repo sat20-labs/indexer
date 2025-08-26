@@ -864,8 +864,6 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 		return -2
 	}
 
-	b.stats.ChainTip = int(count)
-
 	if count == uint64(b.lastHeight) {
 		return 0
 	}
@@ -874,6 +872,8 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	if runInStep {
 		count = uint64(b.lastHeight) + 1
 	}
+	b.stats.ChainTip = int(count)
+
 
 	return b.syncToBlock(int(count), stopChan)
 }

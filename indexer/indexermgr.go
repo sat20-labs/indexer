@@ -214,14 +214,6 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 			go func() {
 				ret := b.compiling.SyncToChainTip(stopIndexerChan)
 				if ret == 0 {
-					if b.maxIndexHeight > 0 {
-						if b.maxIndexHeight <= b.compiling.GetHeight() {
-							b.checkSelf()
-							common.Log.Infof("reach expected height, set exit flag")
-							bWantExit = true
-						}
-					}
-
 					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
 						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
 						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
@@ -229,6 +221,14 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						b.updateDB()
 						if b.maxIndexHeight <= 0 {
 							b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
+						}
+					}
+
+					if b.maxIndexHeight > 0 {
+						if b.maxIndexHeight <= b.compiling.GetHeight() {
+							b.checkSelf()
+							common.Log.Infof("reach expected height, set exit flag")
+							bWantExit = true
 						}
 					}
 

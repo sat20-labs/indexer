@@ -106,8 +106,14 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 	for k := range another.utxoMap {
 		delete(p.utxoMap, k)
 	}
-	for k := range another.satMap {
-		delete(p.satMap, k)
+	for k, v := range another.satMap {
+		nv, ok := p.satMap[k]
+		if ok {
+			if nv.UtxoId == v.UtxoId {
+				// 没有变化就删除
+				delete(p.satMap, k)
+			}
+		}
 	}
 	// p.nftAdded = p.nftAdded[len(another.nftAdded):]
 	p.nftAdded = append([]*common.Nft(nil), p.nftAdded[len(another.nftAdded):]...)
@@ -718,7 +724,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	}
 
 	common.Log.Infof("wrong address %d", len(wrongAddress))
-	common.Log.Infof("wrong name %d", len(wrongIds))
+	common.Log.Infof("wrong id %d", len(wrongIds))
 	common.Log.Infof("wrong sat %d", len(wrongSats))
 	common.Log.Infof("wrong utxo1 %d, utxo2 %d", len(wrongUtxo1), len(wrongUtxo2))
 	for i, value := range wrongAddress {
@@ -731,7 +737,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		if i > 10 {
 			break
 		}
-		common.Log.Infof("wrong name %d: %d", i, value)
+		common.Log.Infof("wrong id %d: %d", i, value)
 	}
 	for i, value := range wrongSats {
 		if i > 10 {
