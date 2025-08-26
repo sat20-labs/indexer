@@ -9,6 +9,4 @@ log/*
 .env
 !example.env
 !example.yaml
-# build execute file
-indexer-*
 nohup.out
