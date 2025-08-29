@@ -621,12 +621,12 @@ func IsOrdxFT(name *AssetName) bool {
 	return name.Protocol == PROTOCOL_NAME_ORDX && name.Type == ASSET_TYPE_FT
 }
 
-// amt的资产需要多少聪
+// amt的资产需要多少聪(聪网上，不足一聪的资产，不占用聪)
 func GetBindingSatNum(amt *Decimal, n uint32) int64 {
 	if n == 0 {
 		return 0
 	}
-	return (amt.Int64() + int64(n) - 1) / int64(n)
+	return amt.Int64() / int64(n)
 }
 
 // amt的资产需要多少聪
@@ -634,5 +634,5 @@ func GetBindingSatNumV2(amt int64, n uint32) int64 {
 	if n == 0 {
 		return 0
 	}
-	return (amt + int64(n) - 1) / int64(n)
+	return amt / int64(n)
 }
