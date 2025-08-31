@@ -50,6 +50,7 @@ func (s *DbWrite) FlushToDB() {
 	count := s.logs.Count()
 	if count != 0 {
 		wb := s.Db.NewWriteBatch()
+		defer wb.Close()
 		for log := range s.logs.IterBuffered() {
 			totalBytes += int64(len(log.Key))
 			totalBytes += int64(unsafe.Sizeof(log.Val))
