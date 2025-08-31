@@ -17,6 +17,23 @@ func (p *NameService) HasNameInSat(sat int64) bool {
 	return false
 }
 
+
+// fast
+func (p *NameService) HasNamesInUtxo(utxoId uint64) bool {
+	nfts := p.nftIndexer.GetNftsWithUtxo(utxoId)
+	for _, nft := range nfts {
+		switch nft.Base.TypeName {
+		case common.ASSET_TYPE_NS:
+			name := string(nft.Base.UserData)
+			reg := p.GetNameRegisterInfo(name)
+			if reg != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // fast
 func (p *NameService) GetNamesWithUtxo(utxoId uint64) []*NameRegister {
 	result := make([]*NameRegister, 0)

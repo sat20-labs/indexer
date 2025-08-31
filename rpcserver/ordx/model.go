@@ -155,16 +155,20 @@ func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo
 func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
 	result := make([]*common.AssetsInUtxo, 0)
 	assetName := common.NewAssetNameFromString(name)
+	//t1 := time.Now()
 	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV3(address, assetName)
 	if err != nil {
 		return nil, 0, err
 	}
+	//common.Log.Infof("GetAssetUTXOsInAddressWithTickV3 takes %v", time.Since(t1))
+	//t1 = time.Now()
 	for _, txOut := range outputMap {
 		if s.indexer.IsUtxoSpent(txOut.OutPoint) {
 			continue
 		}
 		result = append(result, txOut)
 	}
+	//common.Log.Infof("filtering takes %v", time.Since(t1))
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Value > result[j].Value

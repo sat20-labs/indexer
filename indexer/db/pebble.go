@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/bloom"
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -26,7 +27,7 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 
 		o = &pebble.Options{
 			Cache:         cache,
-			MaxOpenFiles:  10000,      // 多SST场景减少频繁打开
+			MaxOpenFiles:  50000,      // 多SST场景减少频繁打开
 			MemTableSize:  256 << 20,  // 256MB：增大写缓冲，减少 flush 频率
 			// 当 memtable 压力大时阻断写入，防止 L0 过度堆积
 			MemTableStopWritesThreshold: 4,
@@ -43,8 +44,9 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 				lvls := make([]pebble.LevelOptions, 7)
 				for i := range lvls {
 					lvls[i].TargetFileSize = 64 << 20  // 64 MiB；可逐层×2
-					lvls[i].BlockSize = 16 << 10       // 32 KiB（小 value 可降至 16 KiB 试验）
-					// 其余默认即可；表级 Bloom 由 Pebble 管
+					lvls[i].BlockSize = 8 << 10       // 8 KiB（小 value， 适合点查）
+					lvls[i].FilterPolicy = bloom.FilterPolicy(10) // 10 bits/entry
+					lvls[i].FilterType = pebble.TableFilter
 				}
 				// 逐层放大 TargetFileSize（非必须，但对大数据集更友好）
 				for i := 1; i < len(lvls); i++ { 

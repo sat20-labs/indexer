@@ -56,8 +56,11 @@ func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
 		return true
 	}
 
-	result = b.nft.HasNftInUtxo(utxoId)
-	if result {
+	// result = b.nft.HasNftInUtxo(utxoId)
+	// if result {
+	// 	return true
+	// }
+	if b.HasNameInUtxo(utxoId) {
 		return true
 	}
 
@@ -200,9 +203,13 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 		if b.RunesIndexer.IsExistAsset(utxoId) {
 			continue
 		}
-		if b.nft.HasNftInUtxo(utxoId) {
+		// if b.nft.HasNftInUtxo(utxoId) {
+		// 	continue
+		// }
+		if b.HasNameInUtxo(utxoId) {
 			continue
 		}
+		
 		plainUtxoMap[utxoId] = v
 	}
 	exAssets, plainUtxos := b.getExoticSummaryByAddress(plainUtxoMap)
@@ -267,7 +274,9 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
 	result := make(map[common.TickerName]*common.Decimal)
 
+	//t1 := time.Now()
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
+	//common.Log.Infof("RunesIndexer.GetUtxoAssets takes %v", time.Since(t1))
 	if len(runesAssets) > 0 {
 		for _, v := range runesAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
@@ -307,7 +316,13 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[
 			if b.ftIndexer.HasAssetInUtxo(utxoId) {
 				continue
 			}
-			if b.nft.HasNftInUtxo(utxoId) {
+			if b.RunesIndexer.IsExistAsset(utxoId) {
+				continue
+			}
+			// if b.nft.HasNftInUtxo(utxoId) {
+			// 	continue
+			// }
+			if b.HasNameInUtxo(utxoId) {
 				continue
 			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}

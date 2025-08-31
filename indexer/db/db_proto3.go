@@ -23,9 +23,11 @@ func GetValueFromDB2WithProto3(key []byte, target protoreflect.ProtoMessage, db 
 }
 
 func GetValueFromDBWithProto3(key []byte, ldb common.KVDB, target protoreflect.ProtoMessage) error {
-    return ldb.View(func(txn common.ReadBatch) error {
-		return GetValueFromTxnWithProto3(key, txn, target)
-	})
+    data, err := ldb.Read(key)
+    if err != nil {
+        return err
+    }
+    return proto.Unmarshal(data, target)
 }
 
 func GetValueFromTxnWithProto3(key []byte, txn common.ReadBatch, target protoreflect.ProtoMessage) error {

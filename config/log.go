@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
@@ -17,24 +16,22 @@ import (
 
 func InitLog(conf *YamlConf) error {
 	var writers []io.Writer
-	logPath := ""
+	var logPath string
 	var lvl logrus.Level
 	if conf != nil {
 		logPath = conf.Log.Path
 		var err error
 		lvl, err = logrus.ParseLevel(conf.Log.Level)
 		if err != nil {
-			return fmt.Errorf("failed to parse log level: %s", err)
+			lvl = logrus.InfoLevel
 		}
 	} else {
-		return fmt.Errorf("cfg is not set")
+		logPath = "./log/unknown"
+		lvl = logrus.InfoLevel
 	}
 	
 	exePath, _ := os.Executable()
 	executableName := filepath.Base(exePath)
-	if strings.Contains(executableName, "debug") {
-		executableName = "debug"
-	}
 	fileHook, err := rotatelogs.New(
 		logPath+"/"+executableName+".%Y%m%d%H%M.log",
 		rotatelogs.WithLinkName(logPath+"/"+executableName+".log"),

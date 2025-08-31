@@ -2,7 +2,7 @@ package indexer
 
 import (
 	"fmt"
-
+	
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
@@ -45,10 +45,13 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *co
 
 // return: utxoId->asset
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
+	//t1 := time.Now()
 	utxos, err := b.rpcService.GetUTXOs(address)
 	if err != nil {
 		return nil, err
 	}
+	// common.Log.Infof("GetUTXOs takes %v", time.Since(t1))
+	// t1 = time.Now()
 
 	result := make(map[uint64]*common.AssetsInUtxo)
 	for utxoId := range utxos {
@@ -75,6 +78,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 			}
 		}
 	}
+	//common.Log.Infof("populating takes %v", time.Since(t1))
 
 	return result, nil
 }
@@ -152,7 +156,9 @@ func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
 }
 
 func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
+	//t1 := time.Now()
 	info, err := b.rpcService.GetUtxoInfo(utxo)
+	//common.Log.Infof("rpcService.GetUtxoInfo takes %v", time.Since(t1))
 	if err != nil {
 		return nil
 	}
@@ -163,7 +169,10 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	assetsInUtxo.Value = info.Value
 	assetsInUtxo.PkScript = info.PkScript
 
+	//t1 = time.Now()
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
+	//common.Log.Infof("GetAssetsWithUtxo takes %v", time.Since(t1))
+	//t1 = time.Now()
 	for k, v := range assetmap {
 		var offsets common.AssetOffsets
 		value := int64(0)
@@ -194,6 +203,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 
 		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
 	}
+	//common.Log.Infof("filling assetsInUtxo takes %v", time.Since(t1))
 
 	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	for k, v := range assetmap2 {
@@ -272,9 +282,13 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		if b.RunesIndexer.IsExistAsset(utxoId) {
 			continue
 		}
-		if b.nft.HasNftInUtxo(utxoId) {
+		if b.HasNameInUtxo(utxoId) {
 			continue
 		}
+		// 不考虑nft
+		// if b.nft.HasNftInUtxo(utxoId) {
+		// 	continue
+		// }
 		plainUtxoMap[utxoId] = v
 	}
 	result[common.ASSET_ALL_SAT] = common.NewDefaultDecimal(totalSats)
@@ -366,7 +380,13 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 			if b.ftIndexer.HasAssetInUtxo(utxoId) {
 				continue
 			}
-			if b.nft.HasNftInUtxo(utxoId) {
+			if b.RunesIndexer.IsExistAsset(utxoId) {
+				continue
+			}
+			// if b.nft.HasNftInUtxo(utxoId) {
+			// 	continue
+			// }
+			if b.HasNameInUtxo(utxoId) {
 				continue
 			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}

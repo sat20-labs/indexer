@@ -296,6 +296,10 @@ func (b *IndexerMgr) GetNamesWithSat(sat int64) []*common.NameInfo {
 	return result
 }
 
+func (b *IndexerMgr) HasNameInUtxo(utxoId uint64) bool {
+	return b.ns.HasNamesInUtxo(utxoId)
+}
+
 func (b *IndexerMgr) getNamesWithUtxo(utxoId uint64) map[string]map[string][]*common.Range {
 	result := make(map[string]map[string][]*common.Range)
 	names := b.ns.GetNamesWithUtxo(utxoId)
