@@ -424,7 +424,7 @@ func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValue, 
 	value := &common.AddressValue{}
 	value.Utxos = make(map[uint64]int64)
 	if addressValueInDB == nil {
-		common.Log.Infof("RpcIndexer.getUtxosWithAddress-> No address %s found in db", address)
+		//common.Log.Infof("RpcIndexer.getUtxosWithAddress-> No address %s found in db", address)
 		return value, nil
 	}
 
