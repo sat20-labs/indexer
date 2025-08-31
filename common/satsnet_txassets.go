@@ -30,6 +30,13 @@ func NewAssetNameFromString(name string) *AssetName {
 			Ticker: parts[0],
 		}
 	}
+	if len(parts) == 2 {
+		return &AssetName{
+			Protocol: parts[0],
+			Type: ASSET_TYPE_FT,
+			Ticker: parts[1],
+		}
+	}
 	if len(parts) == 4 {
 		// runes
 		return &AssetName{
