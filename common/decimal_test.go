@@ -22,6 +22,10 @@ func TestDecimal(t *testing.T) {
 		fmt.Printf("d3  Floor: %v\n", d3.Floor())
 		fmt.Printf("d3  Round: %v\n", d3.Round())
 		fmt.Printf("d3  Abs: %v\n", d3.Abs())
+		fmt.Printf("d1  Sqrt: %v\n", d1.Sqrt())
+		fmt.Printf("d2  Sqrt: %v\n", d2.Sqrt())
+		fmt.Printf("d2  Sqrt: %v\n", DecimalSqrt(d2))
+		fmt.Printf("d2      : %v\n", DecimalSqrt(d2).Mul(d2.Sqrt()))
 	}
 
 	{

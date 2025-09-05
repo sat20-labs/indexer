@@ -372,6 +372,31 @@ func DecimalDiv(a, b *Decimal) *Decimal {
 	return n.Div(b)
 }
 
+// Sqrt 计算定点数的平方根，保持 Precision 精度
+func (d *Decimal) Sqrt() *Decimal {
+	if d == nil {
+		return nil
+	}
+	// scale = 10^Precision
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(d.Precision)), nil)
+
+	// 放大：Value * (10^Precision)，保证平方根后仍有足够的小数精度
+	scaledVal := new(big.Int).Mul(d.Value, scale)
+
+	// 开平方
+	sqrtVal := new(big.Int).Sqrt(scaledVal)
+
+	return &Decimal{
+		Precision: d.Precision,
+		Value:     sqrtVal,
+	}
+}
+
+func DecimalSqrt(a *Decimal) *Decimal {
+	n := a.Clone()
+	return n.Sqrt()
+}
+
 func (d *Decimal) Cmp(other *Decimal) int {
 	if d == nil && other == nil {
 		return 0
