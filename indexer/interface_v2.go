@@ -553,3 +553,53 @@ func (b *IndexerMgr) UnlockOrdinals(utxo string, pubkey, sig []byte) error {
 
 	return b.nft.DisableNftsInUtxo(info.UtxoId, []byte(buf))
 }
+
+// 获取哪些因为存在铭文而被锁定的utxo
+func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsInUtxo, error) {
+	//t1 := time.Now()
+	utxos, err := b.rpcService.GetUTXOs(address)
+	if err != nil {
+		return nil, err
+	}
+	// common.Log.Infof("GetUTXOs takes %v", time.Since(t1))
+	// t1 = time.Now()
+
+	result := make([]*common.AssetsInUtxo, 0)
+	for utxoId := range utxos {
+		utxo, err := b.rpcService.GetUtxoByID(utxoId)
+		if err != nil {
+			continue
+		}
+
+		// 如果有其他资产存在，会优先识别为其他资产，而不是铭文
+		if b.HasNameInUtxo(utxoId) {
+			continue
+		}
+		if b.ftIndexer.HasAssetInUtxo(utxoId) {
+			continue
+		}
+		if b.RunesIndexer.IsExistAsset(utxoId) {
+			continue
+		}
+		_, rngs, err := b.GetOrdinalsWithUtxoId(utxoId)
+		if err == nil {
+			if b.exotic.HasExoticInRanges(rngs) {
+				continue
+			}
+		}
+		
+		// 只剩下铭文的可能性
+		if !b.nft.HasNftInUtxo(utxoId) {
+			continue
+		}
+		info := b.GetTxOutputWithUtxoV3(utxo)
+		if info == nil {
+			continue
+		}
+		// 没有其他资产了，只有nft
+		result = append(result, info)
+	}
+	//common.Log.Infof("populating takes %v", time.Since(t1))
+
+	return result, nil
+}

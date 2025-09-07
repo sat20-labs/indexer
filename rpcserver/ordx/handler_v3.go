@@ -149,6 +149,27 @@ func (s *Handle) unlockOrdinals(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func (s *Handle) getLockedUtxos(c *gin.Context) {
+	resp := &rpcwire.TxOutputListRespV3{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+
+	address := c.Param("address")
+	result, err := s.model.GetLockedUtxoInAddress(address)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	} else {
+		resp.Data = result
+	}
+	
+	c.JSON(http.StatusOK, resp)
+}
+
 // @Summary Get Holder List v3
 // @Description Get a list of holders for a specific ticker
 // @Tags ordx.tick

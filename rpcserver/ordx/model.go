@@ -156,6 +156,10 @@ func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) error {
 	return s.indexer.UnlockOrdinals(req.Utxo, req.PubKey, req.Sig)
 }
 
+func (s *Model) GetLockedUtxoInAddress(address string) ([]*common.AssetsInUtxo, error) {
+	return s.indexer.GetLockedUTXOsInAddress(address)
+}
+
 
 func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
 	result := make([]*common.AssetsInUtxo, 0)

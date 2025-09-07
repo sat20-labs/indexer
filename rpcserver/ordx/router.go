@@ -105,6 +105,7 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/v3/utxo/info/:utxo", s.handle.getUtxoInfoV3)
 	r.POST(proxy+"/v3/utxos/info", s.handle.getUtxoInfoListV3)
 	r.POST(proxy+"/v3/utxo/unlock", s.handle.unlockOrdinals)
+	r.GET(proxy+"/v3/utxos/locked/:address", s.handle.getLockedUtxos)
 	// protocol: ordx/runes/brc20
 	r.GET(proxy+"/v3/tick/all/:protocol", s.handle.getTickerList)
 	r.GET(proxy+"/v3/tick/info/:ticker", s.handle.getTickerInfo)
