@@ -269,7 +269,7 @@ func (p *NftIndexer) GetAllNftsWithInscriptionAddress(addressId uint64) []int64 
 	return result
 }
 
-func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, pubkey []byte) error {
+func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, proof []byte) error {
 	sats := p.GetBoundSatsWithUtxo(utxoId)
 	// 实际上是将上面这所有的聪disable了
 
@@ -278,7 +278,7 @@ func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, pubkey []byte) error {
 
 	for _, sat := range sats {
 		p.disabledSats[sat] = true
-		saveDisabledSatToDB(sat, pubkey, p.db)
+		saveDisabledSatToDB(sat, proof, p.db)
 	}
 	return nil
 }

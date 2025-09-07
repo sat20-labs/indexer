@@ -1,8 +1,9 @@
 package indexer
 
 import (
+	"encoding/hex"
 	"fmt"
-	
+
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
@@ -548,5 +549,7 @@ func (b *IndexerMgr) UnlockOrdinals(utxo string, pubkey, sig []byte) error {
 		return fmt.Errorf("not owner")
 	}
 
-	return b.nft.DisableNftsInUtxo(info.UtxoId, pubkey)
+	buf := fmt.Sprintf("%s-%s-%s", utxo, hex.EncodeToString(pubkey), hex.EncodeToString(sig))
+
+	return b.nft.DisableNftsInUtxo(info.UtxoId, []byte(buf))
 }
