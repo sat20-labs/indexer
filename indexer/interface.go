@@ -40,27 +40,57 @@ func (b *IndexerMgr) GetHolderAmountWithTick(name string) int {
 	return len(am)
 }
 
+func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool {
+	// 不考虑nft
+	if b.nft.HasNftInUtxo(utxoId) {
+		return true
+	}
+	
+	if b.HasNameInUtxo(utxoId) {
+		return true
+	}
+
+	if b.ftIndexer.HasAssetInUtxo(utxoId) {
+		return true
+	}
+	if b.RunesIndexer.IsExistAsset(utxoId) {
+		return true
+	}
+
+	if !excludingExotic {
+		_, rngs, err := b.GetOrdinalsWithUtxoId(utxoId)
+		if err == nil {
+			if b.exotic.HasExoticInRanges(rngs) {
+				return true
+			}
+		}
+	} 
+	
+	return false
+}
+
 func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
 	utxoId, rngs, err := b.rpcService.GetOrdinalsWithUtxo(utxo)
 	if err != nil {
 		return false
 	}
 
-	result := b.ftIndexer.HasAssetInUtxo(utxoId)
+	result := b.nft.HasNftInUtxo(utxoId)
+	if result {
+		return true
+	}
+	
+	if b.HasNameInUtxo(utxoId) {
+		return true
+	}
+
+	result = b.ftIndexer.HasAssetInUtxo(utxoId)
 	if result {
 		return true
 	}
 
 	result = b.RunesIndexer.IsExistAsset(utxoId)
 	if result {
-		return true
-	}
-
-	// result = b.nft.HasNftInUtxo(utxoId)
-	// if result {
-	// 	return true
-	// }
-	if b.HasNameInUtxo(utxoId) {
 		return true
 	}
 
@@ -197,16 +227,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 
 	plainUtxoMap := make(map[uint64]int64)
 	for utxoId, v := range utxos {
-		if b.ftIndexer.HasAssetInUtxo(utxoId) {
-			continue
-		}
-		if b.RunesIndexer.IsExistAsset(utxoId) {
-			continue
-		}
-		// if b.nft.HasNftInUtxo(utxoId) {
-		// 	continue
-		// }
-		if b.HasNameInUtxo(utxoId) {
+		if b.HasAssetInUtxoId(utxoId, false) {
 			continue
 		}
 		
@@ -312,17 +333,7 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[
 	exo := b.getExoticsWithUtxo(utxoId)
 	if len(exo) > 0 {
 		for k, v := range exo {
-			// 排除哪些已经被铸造成其他资产的稀有聪
-			if b.ftIndexer.HasAssetInUtxo(utxoId) {
-				continue
-			}
-			if b.RunesIndexer.IsExistAsset(utxoId) {
-				continue
-			}
-			// if b.nft.HasNftInUtxo(utxoId) {
-			// 	continue
-			// }
-			if b.HasNameInUtxo(utxoId) {
+			if b.HasAssetInUtxoId(utxoId, false) {
 				continue
 			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}

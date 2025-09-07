@@ -25,9 +25,9 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *co
 			continue
 		}
 
-		if ticker == nil {
+		if ticker == nil { // 返回所有
 			result[utxoId] = info
-		} else if common.IsPlainAsset(ticker) {
+		} else if common.IsPlainAsset(ticker) { // 只返回白聪
 			if len(info.Assets) == 0 {
 				result[utxoId] = info
 			}
@@ -43,6 +43,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *co
 	return result, nil
 }
 
+// 跟上面一样，只是结果转换为适合直接转换为json的结构
 // return: utxoId->asset
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
 	//t1 := time.Now()
@@ -64,9 +65,9 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 			continue
 		}
 
-		if ticker == nil {
+		if ticker == nil { // 返回所有
 			result[utxoId] = info
-		} else if common.IsPlainAsset(ticker) {
+		} else if common.IsPlainAsset(ticker) { // 只返回白聪
 			if len(info.Assets) == 0 {
 				result[utxoId] = info
 			}
@@ -276,19 +277,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	plainUtxoMap := make(map[uint64]int64)
 	for utxoId, v := range utxos {
 		totalSats += v
-		if b.ftIndexer.HasAssetInUtxo(utxoId) {
+		if b.HasAssetInUtxoId(utxoId, false) {
 			continue
 		}
-		if b.RunesIndexer.IsExistAsset(utxoId) {
-			continue
-		}
-		if b.HasNameInUtxo(utxoId) {
-			continue
-		}
-		// 不考虑nft
-		// if b.nft.HasNftInUtxo(utxoId) {
-		// 	continue
-		// }
 		plainUtxoMap[utxoId] = v
 	}
 	result[common.ASSET_ALL_SAT] = common.NewDefaultDecimal(totalSats)
@@ -376,17 +367,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	exo := b.getExoticsWithUtxo(utxoId)
 	if len(exo) > 0 {
 		for k, v := range exo {
-			// 排除哪些已经被铸造成其他资产的稀有聪
-			if b.ftIndexer.HasAssetInUtxo(utxoId) {
-				continue
-			}
-			if b.RunesIndexer.IsExistAsset(utxoId) {
-				continue
-			}
-			// if b.nft.HasNftInUtxo(utxoId) {
-			// 	continue
-			// }
-			if b.HasNameInUtxo(utxoId) {
+			if b.HasAssetInUtxoId(utxoId, false) {
 				continue
 			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
@@ -537,4 +518,37 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 
 func (b *IndexerMgr) IsUtxoSpent(utxo string) bool {
 	return b.miniMempool.IsSpent(utxo)
+}
+
+// 某个用户将某个utxo中的所有铭文都解锁，不再生效，这个操作在该索引器中永久生效，但数据没上链
+func (b *IndexerMgr) UnlockOrdinals(utxo string, pubkey, sig []byte) error {
+	err := common.VerifySignOfMessage([]byte(utxo), sig, pubkey)
+	if err != nil {
+		common.Log.Errorf("verify signature of utxo %s failed, %v", utxo, err)
+		return err
+	}
+
+	// 确保目前该utxo没有被花费，并且在该地址下
+	if b.IsUtxoSpent(utxo) {
+		return fmt.Errorf("utxo is spent")
+	}
+	addr, err := common.GetP2TRAddressFromPubkey(pubkey, b.GetChainParam())
+	if err != nil {
+		return err
+	}
+	info, err := b.rpcService.GetUtxoInfo(utxo)
+	if err != nil {
+		return err
+	}
+	addr2, err := common.PkScriptToAddr(info.PkScript, b.GetChainParam())
+	if err != nil {
+		return err
+	}
+	if addr != addr2 {
+		return fmt.Errorf("not owner")
+	}
+
+	// TODO 未完成
+	b.nft.DisableNftsInUtxo(info.UtxoId)
+	return nil
 }

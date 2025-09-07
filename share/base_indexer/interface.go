@@ -133,4 +133,5 @@ type Indexer interface {
 
 	// mempool
 	IsUtxoSpent(utxo string) bool
+	UnlockOrdinals(utxo string, pubkey, sig []byte) error
 }

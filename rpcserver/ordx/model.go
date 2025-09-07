@@ -152,6 +152,11 @@ func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo
 	return result, nil
 }
 
+func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) error {
+	return s.indexer.UnlockOrdinals(req.Utxo, req.PubKey, req.Sig)
+}
+
+
 func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
 	result := make([]*common.AssetsInUtxo, 0)
 	assetName := common.NewAssetNameFromString(name)

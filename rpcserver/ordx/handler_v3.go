@@ -125,6 +125,30 @@ func (s *Handle) getUtxoInfoListV3(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+
+func (s *Handle) unlockOrdinals(c *gin.Context) {
+	resp := &rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		}
+
+	var req rpcwire.UnlockOrdinalsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	err := s.model.UnlockOrdinals(&req)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
 // @Summary Get Holder List v3
 // @Description Get a list of holders for a specific ticker
 // @Tags ordx.tick

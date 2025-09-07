@@ -402,6 +402,13 @@ type UtxosReq struct {
 	Utxos []string `json:"utxos"`
 }
 
+
+type UnlockOrdinalsReq struct {
+	Utxo   string  `json:"utxo"`
+	PubKey []byte  `json:"pubKey"`
+	Sig    []byte  `json:"sig"`
+}
+
 type NftStatusData struct {
 	Version string     `json:"version"`
 	Total   uint64     `json:"total"`

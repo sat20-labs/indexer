@@ -251,3 +251,12 @@ func (p *NftIndexer) GetAllNftsWithInscriptionAddress(addressId uint64) []int64 
 
 	return result
 }
+
+
+func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64)  {
+	// sats := p.GetBoundSatsWithUtxo(utxoId)
+
+	// 方案1：将所有nfts从数据库中抹去，方便 HasNftInUtxo 的快速检查，但后面就无法检查这些nft到底是如何没了的
+	// 方案2：仅仅是设置标志位，但 HasNftInUtxo 会很难做
+
+}
