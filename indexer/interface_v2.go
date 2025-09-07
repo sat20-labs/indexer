@@ -548,7 +548,5 @@ func (b *IndexerMgr) UnlockOrdinals(utxo string, pubkey, sig []byte) error {
 		return fmt.Errorf("not owner")
 	}
 
-	// TODO 未完成
-	b.nft.DisableNftsInUtxo(info.UtxoId)
-	return nil
+	return b.nft.DisableNftsInUtxo(info.UtxoId, pubkey)
 }

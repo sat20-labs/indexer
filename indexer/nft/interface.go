@@ -9,12 +9,29 @@ func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	_, ok := p.utxoMap[utxoId]
-	if ok {
-		return true
+	sats, ok := p.utxoMap[utxoId]
+	if !ok {
+		var value NftsInUtxo
+		err := loadUtxoValueFromDB(utxoId, &value, p.db)
+		if err != nil {
+			return false
+		}
+		sats = value.Sats
+	}
+	if len(sats) == 0 {
+		return false
 	}
 
-	return hasNftInUtxo(utxoId, p.db)
+	// 过滤disabled的sat
+	disableCount := 0
+	for _, sat := range sats {
+		_, ok := p.disabledSats[sat]
+		if ok {
+			disableCount++
+		}
+	}
+
+	return disableCount != len(sats)
 }
 
 func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
@@ -66,9 +83,9 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 	defer p.mutex.RUnlock()
 
 	value := &NftsInUtxo{}
-	
+
 	loadUtxoValueFromDB(utxoId, value, p.db)
-	
+
 	//if err != nil {
 	// 还没有保存到数据库
 	// return nil
@@ -99,7 +116,7 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	
+
 	result := make([]*common.Nft, 0)
 	for _, sat := range sats {
 		info := p.getNftsWithSat(sat)
@@ -252,11 +269,16 @@ func (p *NftIndexer) GetAllNftsWithInscriptionAddress(addressId uint64) []int64 
 	return result
 }
 
+func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, pubkey []byte) error {
+	sats := p.GetBoundSatsWithUtxo(utxoId)
+	// 实际上是将上面这所有的聪disable了
 
-func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64)  {
-	// sats := p.GetBoundSatsWithUtxo(utxoId)
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	// 方案1：将所有nfts从数据库中抹去，方便 HasNftInUtxo 的快速检查，但后面就无法检查这些nft到底是如何没了的
-	// 方案2：仅仅是设置标志位，但 HasNftInUtxo 会很难做
-
+	for _, sat := range sats {
+		p.disabledSats[sat] = true
+		saveDisabledSatToDB(sat, pubkey, p.db)
+	}
+	return nil
 }

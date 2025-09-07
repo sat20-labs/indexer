@@ -15,6 +15,8 @@ const (
 	DB_PREFIX_INSC     = "i-"  // inscriptionId -> sat
 	DB_PREFIX_INSCADDR = "a-"  // addressId -> sat
 	DB_PREFIX_CF       = "cf-"
+
+	DB_PREFIX_DISABLED_SAT = "ds-" // disabled sat
 )
 
 type TransferAction struct {

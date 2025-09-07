@@ -97,6 +97,10 @@ func GetInscriptionAddressKey(addrId uint64, nftId int64) string {
 	return fmt.Sprintf("%s%d-%d", DB_PREFIX_INSCADDR, addrId, nftId)
 }
 
+func GetDisabledSatKey(sat int64) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_DISABLED_SAT, sat)
+}
+
 func ParseSatKey(input string) (int64, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_NFT) {
 		return -1, fmt.Errorf("invalid string format, %s", input)
@@ -134,4 +138,44 @@ func ParseAddressKey(input string) (uint64, int64, error) {
 		return common.INVALID_ID, -1, fmt.Errorf("invalid string format, %s", input)
 	}
 	return addressId, nftId, nil
+}
+
+func ParseDisabledSatKey(input string) (int64, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_DISABLED_SAT) {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	str := strings.TrimPrefix(input, DB_PREFIX_DISABLED_SAT)
+	sat, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	return sat, nil
+}
+
+func loadDisabledSatFromDB(sat int64, ldb common.KVDB) ([]byte, error) {
+	key := GetDisabledSatKey(sat)
+	var value []byte
+	err := db.GetValueFromDB([]byte(key), &value, ldb)
+	return value, err
+}
+
+func loadAllDisalbedSatsFromDB(ldb common.KVDB) map[int64]bool {
+	result := make(map[int64]bool)
+	ldb.BatchRead([]byte(DB_PREFIX_DISABLED_SAT), false, func(k, v []byte) error {
+
+		sat, err := ParseDisabledSatKey(string(k))
+		if err != nil {
+			return nil
+		}
+
+		result[sat] = true
+		return nil
+	})
+
+	return result
+}
+
+func saveDisabledSatToDB(sat int64, value []byte, ldb common.KVDB) error {
+	key := GetDisabledSatKey(sat)
+	return db.GobSetDB([]byte(key), value, ldb)
 }

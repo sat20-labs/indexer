@@ -25,6 +25,7 @@ type NftIndexer struct {
 	db       common.KVDB
 	status   *common.NftStatus
 	bEnabled bool
+	disabledSats map[int64]bool // 所有disabled的satoshi
 
 	baseIndexer *base.BaseIndexer
 	mutex       sync.RWMutex
@@ -56,9 +57,11 @@ func NewNftIndexer(db common.KVDB) *NftIndexer {
 func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 	p.baseIndexer = baseIndexer
 	p.status = initStatusFromDB(p.db)
+	p.disabledSats = loadAllDisalbedSatsFromDB(p.db)
 }
 
 func (p *NftIndexer) reset() {
+	//p.disabledSats = make(map[int64]bool)
 	p.satTree = indexer.NewSatRBTress()
 	p.utxoMap = make(map[uint64][]int64)
 	p.satMap = make(map[int64]*SatInfo)
@@ -71,6 +74,8 @@ func (p *NftIndexer) Clone() *NftIndexer {
 	defer p.mutex.RUnlock()
 
 	newInst := NewNftIndexer(p.db)
+
+	newInst.disabledSats = p.disabledSats // 仅在rpc中使用
 	newInst.utxoMap = make(map[uint64][]int64)
 	for k, v := range p.utxoMap {
 		nv := make([]int64, len(v))
@@ -337,7 +342,7 @@ func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int
 	sats := make([]int64, 0)
 	i := 0
 	for i < len(inputSats) {
-		// 当个遍历，在sat很多，range也很多的时候，性能很低，远远低于 SatRBTree
+		// 单个遍历，在sat很多，range也很多的时候，性能很低，远远低于 SatRBTree
 		sat := inputSats[i]
 		if common.IsSatInRanges(sat, output.Ordinals) {
 			sats = append(sats, sat)
