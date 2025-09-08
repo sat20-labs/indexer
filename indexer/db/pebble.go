@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"sort"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/bloom"
@@ -298,62 +297,6 @@ func (p *pebbleReadBatch) GetRef(key []byte) ([]byte, error) {
 		return p.it.Value(), nil
 	} 
 	return nil, common.ErrKeyNotFound
-}
-
-func (p *pebbleReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-
-	results := make([][]byte, len(keys))
-	for i, k := range keys {
-		if ok := p.it.SeekGE(k); ok && bytes.Equal(p.it.Key(), k) {
-			// 必须拷贝，避免底层 buffer 复用
-			val := append([]byte{}, p.it.Value()...)
-			results[i] = val
-		} else {
-			results[i] = nil
-		}
-	}
-	return results, nil
-}
-
-func (p *pebbleReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, error) {
-	
-	sortedKeys := make([][]byte, len(keys))
-	copy(sortedKeys, keys)
-	sort.Slice(sortedKeys, func(i, j int) bool {
-		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
-	})
-
-	result := make(map[string][]byte, len(keys))
-	i := 0
-	for p.it.Next() && i < len(sortedKeys) {
-		key := sortedKeys[i]
-		for p.it.Valid() && bytes.Compare(p.it.Key(), key) >= 0 {
-			if bytes.Equal(p.it.Key(), key) {
-				// 命中 key
-				valCopy := append([]byte(nil), p.it.Value()...) 
-				result[string(key)] = valCopy
-				i++
-				if i >= len(sortedKeys) {
-					break
-				}
-				key = sortedKeys[i]
-			} else if bytes.Compare(p.it.Key(), key) > 0 {
-				// 数据库 key 比当前目标 key 大，说明该 key 不存在
-				i++
-				if i < len(sortedKeys) {
-					key = sortedKeys[i]
-				}
-			}
-		}
-	}
-
-	if err := p.it.Error(); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func (p *pebbleDB) View(fn func(txn common.ReadBatch) error) error {

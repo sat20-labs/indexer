@@ -197,36 +197,6 @@ package db
 // 	return val, err
 // }
 
-// func (br *badgerReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
-// 	results := make([][]byte, len(keys))
-// 	for i, k := range keys {
-// 		val, err := br.Get(k)
-// 		if err != nil {
-// 			results[i] = nil
-// 		} else {
-// 			results[i] = val
-// 		}
-// 	}
-// 	return results, nil
-// }
-
-// func (br *badgerReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, error) {
-// 	result := make(map[string][]byte, len(keys))
-// 	for _, k := range keys {
-// 		v, _ := br.Get(k)
-// 		if v != nil {
-// 			result[string(k)] = v
-// 		}
-// 	}
-// 	return result, nil
-// }
-
-// func (b *badgerDB) View(fn func(txn common.ReadBatch) error) error {
-// 	return b.db.View(func(txn *badger.Txn) error {
-// 		return fn(&badgerReadBatch{txn: txn})
-// 	})
-// }
-
 // func (b *badgerDB) Update(fn func(any) error) error {
 // 	return b.db.Update(func(txn *badger.Txn) error {
 // 		return fn(txn)

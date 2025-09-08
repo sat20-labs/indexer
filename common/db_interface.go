@@ -10,8 +10,6 @@ var (
 type ReadBatch interface {
 	Get(key []byte) ([]byte, error)    // 获得数据的新copy
 	GetRef(key []byte) ([]byte, error) // 数据的引用，不能持久使用
-	MultiGet(keys [][]byte) ([][]byte, error) // 需要key排序才能提高性能，获得数据的新copy
-	MultiGetSorted(keys [][]byte) (map[string][]byte, error) // 获得数据的新copy
 }
 
 type WriteBatch interface {

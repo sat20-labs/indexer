@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -79,70 +78,6 @@ func (p *levelDB) get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	return append([]byte{}, val...), nil
-}
-
-// 需要keys提前排序，提高性能
-func (p *levelDB) multiGet(keys [][]byte) ([][]byte, error) {
-    snap, err := p.db.GetSnapshot()
-    if err != nil {
-        return nil, err
-    }
-    defer snap.Release()
-
-    it := snap.NewIterator(nil, nil)
-    defer it.Release()
-
-    results := make([][]byte, len(keys))
-    for i, k := range keys {
-        if it.Seek(k) && bytes.Equal(it.Key(), k) {
-            results[i] = append([]byte{}, it.Value()...) // 按需 copy
-        } else {
-            results[i] = nil
-        }
-    }
-    return results, nil
-}
-
-func MultiGetSorted(db *leveldb.DB, keys [][]byte) (map[string][]byte, error) {
-	// 复制 keys 并排序，避免修改调用者的 slice
-	sortedKeys := make([][]byte, len(keys))
-	copy(sortedKeys, keys)
-	sort.Slice(sortedKeys, func(i, j int) bool {
-		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
-	})
-
-	result := make(map[string][]byte, len(keys))
-
-	iter := db.NewIterator(nil, nil)
-	defer iter.Release()
-
-	i := 0
-	for iter.Next() && i < len(sortedKeys) {
-		key := sortedKeys[i]
-		for iter.Valid() && bytes.Compare(iter.Key(), key) >= 0 {
-			if bytes.Equal(iter.Key(), key) {
-				// 命中 key
-				valCopy := append([]byte(nil), iter.Value()...) // 避免复用 iter.Value()
-				result[string(key)] = valCopy
-				i++
-				if i >= len(sortedKeys) {
-					break
-				}
-				key = sortedKeys[i]
-			} else if bytes.Compare(iter.Key(), key) > 0 {
-				// 数据库 key 比当前目标 key 大，说明该 key 不存在
-				i++
-				if i < len(sortedKeys) {
-					key = sortedKeys[i]
-				}
-			}
-		}
-	}
-
-	if err := iter.Error(); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func (p *levelDB) put(key, value []byte) error {
@@ -326,60 +261,6 @@ func (p *levelDBReadBatch) GetRef(key []byte) ([]byte, error) {
 		return p.it.Value(), nil
 	} 
 	return nil, common.ErrKeyNotFound
-}
-
-func (p *levelDBReadBatch) MultiGet(keys [][]byte) ([][]byte, error) {
-	
-    // it := p.snap.NewIterator(nil, nil)
-    // defer it.Release()
-
-    results := make([][]byte, len(keys))
-    for i, k := range keys {
-        if p.it.Seek(k) && bytes.Equal(p.it.Key(), k) {
-            results[i] = append([]byte{}, p.it.Value()...) // 按需 copy
-        } else {
-            results[i] = nil
-        }
-    }
-    return results, nil
-}
-
-func (p *levelDBReadBatch) MultiGetSorted(keys [][]byte) (map[string][]byte, error) {
-	
-	sortedKeys := make([][]byte, len(keys))
-	copy(sortedKeys, keys)
-	sort.Slice(sortedKeys, func(i, j int) bool {
-		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
-	})
-
-	result := make(map[string][]byte, len(keys))
-	i := 0
-	for p.it.Next() && i < len(sortedKeys) {
-		key := sortedKeys[i]
-		for p.it.Valid() && bytes.Compare(p.it.Key(), key) >= 0 {
-			if bytes.Equal(p.it.Key(), key) {
-				// 命中 key
-				valCopy := append([]byte(nil), p.it.Value()...)
-				result[string(key)] = valCopy
-				i++
-				if i >= len(sortedKeys) {
-					break
-				}
-				key = sortedKeys[i]
-			} else if bytes.Compare(p.it.Key(), key) > 0 {
-				// 数据库 key 比当前目标 key 大，说明该 key 不存在
-				i++
-				if i < len(sortedKeys) {
-					key = sortedKeys[i]
-				}
-			}
-		}
-	}
-
-	if err := p.it.Error(); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 // View 在一致性快照中执行只读操作
