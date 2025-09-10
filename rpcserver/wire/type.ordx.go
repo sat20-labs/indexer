@@ -405,8 +405,8 @@ type UtxosReq struct {
 
 type UnlockOrdinalsReq struct {
 	Utxos   []string  `json:"utxos"`
-	PubKey  []byte  	  `json:"pubKey"`
-	Sig     []byte     `json:"sig"`
+	PubKey  string    `json:"pubKey"`
+	Sig     string    `json:"sig"`
 }
 
 type FailedUtxoInfo struct {

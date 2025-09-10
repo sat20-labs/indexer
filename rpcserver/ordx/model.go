@@ -1,6 +1,7 @@
 package ordx
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"sync"
@@ -153,7 +154,15 @@ func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo
 }
 
 func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) (map[string]error, error)  {
-	return s.indexer.UnlockOrdinals(req.Utxos, req.PubKey, req.Sig)
+	pubkey, err := hex.DecodeString(req.PubKey)
+	if err != nil {
+		return nil, err
+	}
+	sig, err := hex.DecodeString(req.Sig)
+	if err != nil {
+		return nil, err
+	}
+	return s.indexer.UnlockOrdinals(req.Utxos, pubkey, sig)
 }
 
 func (s *Model) GetLockedUtxoInAddress(address string) ([]*common.AssetsInUtxo, error) {
