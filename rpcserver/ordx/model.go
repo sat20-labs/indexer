@@ -152,8 +152,8 @@ func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo
 	return result, nil
 }
 
-func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) error {
-	return s.indexer.UnlockOrdinals(req.Utxo, req.PubKey, req.Sig)
+func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) (map[string]error, error)  {
+	return s.indexer.UnlockOrdinals(req.Utxos, req.PubKey, req.Sig)
 }
 
 func (s *Model) GetLockedUtxoInAddress(address string) ([]*common.AssetsInUtxo, error) {

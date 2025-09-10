@@ -127,10 +127,12 @@ func (s *Handle) getUtxoInfoListV3(c *gin.Context) {
 
 
 func (s *Handle) unlockOrdinals(c *gin.Context) {
-	resp := &rpcwire.BaseResp{
+	resp := &rpcwire.UnlockOrdinalsResp{
+		BaseResp: rpcwire.BaseResp{
 			Code: 0,
 			Msg:  "ok",
-		}
+		},
+	}
 
 	var req rpcwire.UnlockOrdinalsReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -140,10 +142,16 @@ func (s *Handle) unlockOrdinals(c *gin.Context) {
 		return
 	}
 
-	err := s.model.UnlockOrdinals(&req)
+	result, err := s.model.UnlockOrdinals(&req)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
+	}
+	for k, v := range result {
+		resp.FailedUtxos = append(resp.FailedUtxos, &rpcwire.FailedUtxoInfo{
+			Utxo: k,
+			Reason: v.Error(),
+		})
 	}
 
 	c.JSON(http.StatusOK, resp)

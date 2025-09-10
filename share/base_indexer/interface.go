@@ -133,6 +133,6 @@ type Indexer interface {
 
 	// mempool
 	IsUtxoSpent(utxo string) bool
-	UnlockOrdinals(utxo string, pubkey, sig []byte) error
+	UnlockOrdinals(utxos []string, pubkey, sig []byte) (map[string]error, error)
 	GetLockedUTXOsInAddress(address string) ([]*common.AssetsInUtxo, error)
 }

@@ -404,9 +404,19 @@ type UtxosReq struct {
 
 
 type UnlockOrdinalsReq struct {
-	Utxo   string  `json:"utxo"`
-	PubKey []byte  `json:"pubKey"`
-	Sig    []byte  `json:"sig"`
+	Utxos   []string  `json:"utxos"`
+	PubKey  []byte  	  `json:"pubKey"`
+	Sig     []byte     `json:"sig"`
+}
+
+type FailedUtxoInfo struct {
+	Utxo       string  `json:"utxo"`
+	Reason     string  `json:"reason"`    
+}
+
+type UnlockOrdinalsResp struct {
+	BaseResp
+	FailedUtxos   []*FailedUtxoInfo  `json:"failedUtxos"`
 }
 
 type NftStatusData struct {

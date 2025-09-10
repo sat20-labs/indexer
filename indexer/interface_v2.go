@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/btcsuite/btcd/wire"
@@ -522,36 +523,53 @@ func (b *IndexerMgr) IsUtxoSpent(utxo string) bool {
 }
 
 // 某个用户将某个utxo中的所有铭文都解锁，不再生效，这个操作在该索引器中永久生效，但数据没上链
-func (b *IndexerMgr) UnlockOrdinals(utxo string, pubkey, sig []byte) error {
-	err := common.VerifySignOfMessage([]byte(utxo), sig, pubkey)
+func (b *IndexerMgr) UnlockOrdinals(utxos []string, pubkey, sig []byte) (map[string]error, error) {
+
+	jsonBytes, err := json.Marshal(utxos)
 	if err != nil {
-		common.Log.Errorf("verify signature of utxo %s failed, %v", utxo, err)
-		return err
+		return nil, err
 	}
 
-	// 确保目前该utxo没有被花费，并且在该地址下
-	if b.IsUtxoSpent(utxo) {
-		return fmt.Errorf("utxo is spent")
+	err = common.VerifySignOfMessage(jsonBytes, sig, pubkey)
+	if err != nil {
+		common.Log.Errorf("verify signature of utxos %v failed, %v", utxos, err)
+		return nil, err
 	}
+
 	addr, err := common.GetP2TRAddressFromPubkey(pubkey, b.GetChainParam())
 	if err != nil {
-		return err
-	}
-	info, err := b.rpcService.GetUtxoInfo(utxo)
-	if err != nil {
-		return err
-	}
-	addr2, err := common.PkScriptToAddr(info.PkScript, b.GetChainParam())
-	if err != nil {
-		return err
-	}
-	if addr != addr2 {
-		return fmt.Errorf("not owner")
+		return nil, err
 	}
 
-	buf := fmt.Sprintf("%s-%s-%s", utxo, hex.EncodeToString(pubkey), hex.EncodeToString(sig))
+	failed := make(map[string]error)
+	for _, utxo := range utxos {
+		// 确保目前该utxo没有被花费，并且在该地址下
+		if b.IsUtxoSpent(utxo) {
+			failed[utxo] = fmt.Errorf("spent")
+			continue
+		}
+		info, err := b.rpcService.GetUtxoInfo(utxo)
+		if err != nil {
+			failed[utxo] = err
+			continue
+		}
+		addr2, err := common.PkScriptToAddr(info.PkScript, b.GetChainParam())
+		if err != nil {
+			failed[utxo] = err
+			continue
+		}
+		if addr != addr2 {
+			failed[utxo] = fmt.Errorf("not owner")
+			continue
+		}
 
-	return b.nft.DisableNftsInUtxo(info.UtxoId, []byte(buf))
+		buf := fmt.Sprintf("%s-%s-%s", utxo, hex.EncodeToString(pubkey), hex.EncodeToString(sig))
+		err = b.nft.DisableNftsInUtxo(info.UtxoId, []byte(buf))
+		if err != nil {
+			failed[utxo] = err
+		}
+	}
+	return failed, nil
 }
 
 // 获取哪些因为存在铭文而被锁定的utxo
