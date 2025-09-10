@@ -26,6 +26,9 @@ func TestDecimal(t *testing.T) {
 		fmt.Printf("d2  Sqrt: %v\n", d2.Sqrt())
 		fmt.Printf("d2  Sqrt: %v\n", DecimalSqrt(d2))
 		fmt.Printf("d2      : %v\n", DecimalSqrt(d2).Mul(d2.Sqrt()))
+		fmt.Printf("d3  precision=20: %v\n", DecimalSqrt(d2).NewPrecision(20))
+		fmt.Printf("d3  precision=10: %v\n", DecimalSqrt(d2).NewPrecision(10))
+		fmt.Printf("d3  precision=2: %v\n", DecimalSqrt(d2).NewPrecision(2))
 	}
 
 	{

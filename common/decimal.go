@@ -240,6 +240,44 @@ func alignPrecision(a, b *Decimal) (aVal, bVal *big.Int, precision int) {
     }
 }
 
+func (d *Decimal) NewPrecision(precision int) *Decimal {
+	if d == nil {
+		return nil
+	}
+	if d.Precision == precision {
+		return d.Clone()
+	}
+	val := new(big.Int).Set(d.Value)
+	if d.Precision > precision {
+        factor := precisionFactor[d.Precision-precision]
+        val = val.Div(val, factor)
+    } else if d.Precision < precision {
+        factor := precisionFactor[precision-d.Precision]
+        val = val.Mul(val, factor)
+    }
+    return &Decimal{Precision: precision, Value: val}
+}
+
+func (d *Decimal) SetPrecision(precision int) *Decimal {
+	if d == nil {
+		return nil
+	}
+	if d.Precision == precision {
+		return d
+	}
+	val := new(big.Int).Set(d.Value)
+	if d.Precision > precision {
+        factor := precisionFactor[d.Precision-precision]
+        val = val.Div(val, factor)
+    } else if d.Precision < precision {
+        factor := precisionFactor[precision-d.Precision]
+        val = val.Mul(val, factor)
+    }
+	d.Precision = precision
+	d.Value = val
+    return d
+}
+
 func (d *Decimal) Add(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil
