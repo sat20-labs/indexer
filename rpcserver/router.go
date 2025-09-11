@@ -11,10 +11,10 @@ import (
 
 	"github.com/didip/tollbooth/v7/limiter"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/logger"
+	//"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	"github.com/rs/zerolog"
+	//"github.com/rs/zerolog"
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/rpcserver/base"
@@ -65,7 +65,7 @@ func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
 
 func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile string, apiConf *config.API) error {
 	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
+	engine := gin.Default()
 	var writers []io.Writer
 	if rpcLogFile != "" {
 		exePath, _ := os.Executable()
@@ -87,16 +87,19 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	}
 	writers = append(writers, os.Stdout)
 	gin.DefaultWriter = io.MultiWriter(writers...)
-	r.Use(logger.SetLogger(
-		logger.WithLogger(logger.Fn(func(c *gin.Context, l zerolog.Logger) zerolog.Logger {
-			if c.Request.Header["Authorization"] == nil {
-				return l
-			}
-			return l.With().
-				Str("Authorization", c.Request.Header["Authorization"][0]).
-				Logger()
-		})),
-	))
+
+	// 记录每一个请求，数据太多
+	// engine.Use(logger.SetLogger(
+	// 	logger.WithLogger(logger.Fn(func(c *gin.Context, l zerolog.Logger) zerolog.Logger {
+	// 		if c.Request.Header["Authorization"] == nil {
+	// 			return l
+	// 		}
+	// 		return l.With().
+	// 			Str("Authorization", c.Request.Header["Authorization"][0]).
+	// 			Logger()
+	// 	})),
+	// ))
+	engine.Use(gin.Recovery())
 
 	config := cors.Config{
 		AllowOrigins: []string{"*", "sat20.org", "ordx.market", "localhost"},
@@ -108,11 +111,11 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	}
 	config.AllowOrigins = []string{"*"}
 	config.OptionsResponseStatusCode = 200
-	r.Use(cors.New(config))
+	engine.Use(cors.New(config))
 
 	// doc
 	InitApiDoc(swaggerHost, swaggerSchemes, rpcProxy)
-	r.GET(rpcProxy+"/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	engine.GET(rpcProxy+"/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// api config
 	// err := s.apidoc.InitApiConf(apiConf)
@@ -126,7 +129,7 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	// }
 
 	// common header
-	r.Use(func(c *gin.Context) {
+	engine.Use(func(c *gin.Context) {
 		c.Writer.Header().Set(VARY, "Origin")
 		c.Writer.Header().Add(VARY, "Access-Control-Request-Method")
 		c.Writer.Header().Add(VARY, "Access-Control-Request-Headers")
@@ -162,13 +165,13 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	// )
 
 	// Compression middleware
-	r.Use(CompressionMiddleware())
+	engine.Use(CompressionMiddleware())
 
 	// router
-	s.basicService.InitRouter(r, rpcProxy)
-	s.ordxService.InitRouter(r, rpcProxy)
-	s.ordService.InitRouter(r, rpcProxy)
-	s.btcdService.InitRouter(r, rpcProxy)
+	s.basicService.InitRouter(engine, rpcProxy)
+	s.ordxService.InitRouter(engine, rpcProxy)
+	s.ordService.InitRouter(engine, rpcProxy)
+	s.btcdService.InitRouter(engine, rpcProxy)
 
 	parts := strings.Split(rpcUrl, ":")
 	var port string
@@ -184,7 +187,7 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 		return err
 	}
 
-	go r.Run(rpcUrl)
+	go engine.Run(rpcUrl)
 	return nil
 }
 
