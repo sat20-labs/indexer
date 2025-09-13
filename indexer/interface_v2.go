@@ -369,7 +369,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	exo := b.getExoticsWithUtxo(utxoId)
 	if len(exo) > 0 {
 		for k, v := range exo {
-			if b.HasAssetInUtxoId(utxoId, false) {
+			if b.HasAssetInUtxoId(utxoId, true) {
 				continue
 			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
