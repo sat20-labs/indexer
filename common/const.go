@@ -35,15 +35,11 @@ const (
 	TESTNET_CORENODE_STAKING_ASSET_NAME string = "ordx:f:dogcoin"
 	TESTNET_CORENODE_STAKING_ASSET_AMOUNT int64 = 1000
 
-	// 0 invalid
-	// 1-99 boostrap
-	// 100-999 core
-	// 1000-99999 normal miner
-	MIN_BOOTSTRAP_NODEID = 1
-	MAX_BOOTSTRAP_NODEID = 9
-	MIN_CORE_NODEID      = 100
-	MAX_CORE_NODEID      = 999
-	MIN_NORMAL_NODEID    = 100000
+	NODE_TYPE_NORMAL    int = 0 // 普通聪网节点，只同步数据，不挖矿
+	NODE_TYPE_LIGHT     int = 1 // 轻节点，暂时没有实现
+	NODE_TYPE_MINER     int = 10 // 矿机，挖矿，不提供通道接入服务
+	NODE_TYPE_CORE      int = 11 // 核心节点，挖矿，提供通道接入服务
+	NODE_TYPE_BOOTSTRAP int = 20 // 引导节点
 )
 
 var ENABLE_TESTING bool = false
