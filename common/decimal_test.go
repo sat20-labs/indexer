@@ -15,7 +15,9 @@ func TestDecimal(t *testing.T) {
 		//d3 := DecimalMul(d1, d2)
 		d3 := DecimalMul(d2, d1)
 		d4 := DecimalMulV2(d2, d1)
-		fmt.Printf("d4  string: %s\n", d4.String())  
+		fmt.Printf("d4  string: %s\n", d4.String())
+		
+		fmt.Printf("d4  string: %s\n", d4.SetPrecision(2).String())
 		//d3,_ := NewDecimalFromString("-0.49", 10)
 		fmt.Printf("d3  string: %s\n", d3.String())  
 		fmt.Printf("d3  float64: %v\n", d3.Float64())  
