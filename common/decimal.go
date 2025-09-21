@@ -372,8 +372,15 @@ func DecimalMul(a, b *Decimal) *Decimal {
 	return n.Mul(b)
 }
 
+
 // 精度为a+b
-func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
+func DecimalMulV2(a, b *Decimal) *Decimal {
+	n := a.Clone()
+	return n.MulV2(b)
+}
+
+// 精度为a+b
+func (d *Decimal) MulV2(other *Decimal) *Decimal {
     if d == nil || other == nil {
         return nil
     }
