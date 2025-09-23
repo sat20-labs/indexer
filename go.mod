@@ -21,7 +21,6 @@ require (
 	github.com/emirpasic/gods v1.18.1
 	github.com/fxamacker/cbor/v2 v2.7.0
 	github.com/gin-contrib/cors v1.7.2
-	github.com/gin-contrib/logger v1.1.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/ipfs/boxo v0.24.3
@@ -40,7 +39,6 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pkg/errors v0.9.1
-	github.com/rs/zerolog v1.33.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/files v1.0.1
@@ -122,7 +120,6 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4 // indirect
 	github.com/libp2p/go-netroute v0.2.2 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
