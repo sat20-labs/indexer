@@ -93,12 +93,18 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 
 	satmap := make(map[int64]bool)
 	for _, sat := range value.Sats {
+		if _, ok := p.disabledSats[sat]; ok {
+			continue
+		}
 		satmap[sat] = true
 	}
 
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		for _, sat := range sats {
+			if _, ok := p.disabledSats[sat]; ok {
+				continue
+			}
 			satmap[sat] = true
 		}
 	}
@@ -119,6 +125,9 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 
 	result := make([]*common.Nft, 0)
 	for _, sat := range sats {
+		if _, ok := p.disabledSats[sat]; ok {
+			continue
+		}
 		info := p.getNftsWithSat(sat)
 		if info != nil {
 			for _, nft := range info.Nfts {
@@ -176,6 +185,9 @@ func (p *NftIndexer) GetNftsWithRanges(rngs []*common.Range) []int64 {
 		err := db.IterateRangeInDB(p.db, nil, startKey, endKey, func(key, value []byte) error {
 			sat, err := ParseSatKey(string(key))
 			if err == nil {
+				if _, ok := p.disabledSats[sat]; ok {
+					return nil
+				}
 				result = append(result, sat)
 			}
 			return err
@@ -196,6 +208,9 @@ func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 }
 
 func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
+	if _, ok := p.disabledSats[sat]; ok {
+		return nil
+	}
 	nfts := &common.NftsInSat{}
 	err := loadNftFromDB(sat, nfts, p.db)
 	nft := p.getNftInBuffer4(sat)
