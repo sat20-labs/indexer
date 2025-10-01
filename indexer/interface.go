@@ -41,7 +41,7 @@ func (b *IndexerMgr) GetHolderAmountWithTick(name string) int {
 }
 
 func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool {
-	// 不考虑nft
+	// 过滤disable的nft
 	if b.nft.HasNftInUtxo(utxoId) {
 		return true
 	}

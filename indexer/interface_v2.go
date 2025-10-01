@@ -32,6 +32,19 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *co
 		} else if common.IsPlainAsset(ticker) { // 只返回白聪
 			if len(info.Assets) == 0 {
 				result[utxoId] = info
+			} else {
+				// 如果都是nft，而且是被disable的，也算白聪
+				for _, asset := range info.Assets {
+					if asset.Name.Type != common.ASSET_TYPE_NFT {
+						continue
+					}
+				}
+				// 只有nft
+				if b.nft.HasNftInUtxo(utxoId) {
+					// 有其他没有被disabled的nft
+					continue
+				}
+				result[utxoId] = info
 			}
 		} else {
 			amt := info.GetAsset(ticker)
@@ -71,6 +84,19 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 			result[utxoId] = info
 		} else if common.IsPlainAsset(ticker) { // 只返回白聪
 			if len(info.Assets) == 0 {
+				result[utxoId] = info
+			} else {
+				// 如果都是nft，而且是被disable的，也算白聪
+				for _, asset := range info.Assets {
+					if asset.AssetName.Type != common.ASSET_TYPE_NFT {
+						continue
+					}
+				}
+				// 只有nft
+				if b.nft.HasNftInUtxo(utxoId) {
+					// 有其他没有被disabled的nft
+					continue
+				}
 				result[utxoId] = info
 			}
 		} else {
