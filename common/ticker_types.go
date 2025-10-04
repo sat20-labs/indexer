@@ -207,11 +207,3 @@ func (p* AssetsInUtxo) GetBindingSatAmout() int64 {
 	}
 	return offset.Size()
 }
-
-func (p* AssetsInUtxo) HasPlainSat() bool {
-	return p.GetPlainSat() > 0
-}
-
-func (p* AssetsInUtxo) GetPlainSat() int64 {
-	return p.Value - p.GetBindingSatAmout()
-}
