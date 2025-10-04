@@ -251,6 +251,9 @@ func (p *TxAssets) Find(asset *AssetName) (*AssetInfo, error) {
 
 // 这里必须假定每个聪都是单独染色，这个计算只适合聪网，聪网确保每一个聪只代表一种资产，跟btc主网不同
 func (p *TxAssets) GetBindingSatAmout() int64 {
+	if p == nil {
+		return 0
+	}
 	amount := int64(0)
 	for _, asset := range *p {
 		if asset.BindingSat != 0 {
@@ -258,6 +261,21 @@ func (p *TxAssets) GetBindingSatAmout() int64 {
 		}
 	}
 	return amount
+}
+
+// 是否存在一些n>0并且没有对应聪的资产
+func (p *TxAssets) GetUnboundAssetCount() int {
+	if p == nil {
+		return 0
+	}
+	c := 0
+	for _, asset := range *p {
+		if asset.BindingSat != 0 &&
+		asset.Amount.Int64()%int64(asset.BindingSat) != 0 {
+			c++
+		}
+	}
+	return c
 }
 
 func (p *TxAssets) IsZero() bool {
