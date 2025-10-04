@@ -470,9 +470,6 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 		}
 
 		for _, nft := range p.nftAdded {
-			if nft.Base.Sat < 0 {
-				continue
-			}
 			value, ok := nftmap[nft.Base.Sat]
 			base := nft.Base
 			if ok {
@@ -777,7 +774,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 
 	count := p.status.Count - uint64(len(p.nftAdded))
 	if count != uint64(len(nftsInT1)) || count != uint64(lastkey+1) {
-		common.Log.Errorf("name count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
+		common.Log.Errorf("nft count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
 		result = false
 	}
 
