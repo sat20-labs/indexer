@@ -201,8 +201,8 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 
 	if nft.Base.Sat < 0 {
 		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
-		nft.Base.Sat = -int64(p.status.Unbound)
 		p.status.Unbound++
+		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
 		return
 	}
 
@@ -470,6 +470,9 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 		}
 
 		for _, nft := range p.nftAdded {
+			if nft.Base.Sat < 0 {
+				continue
+			}
 			value, ok := nftmap[nft.Base.Sat]
 			base := nft.Base
 			if ok {
@@ -653,6 +656,9 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 
 		utxosInT2[utxoId] = true
 		for _, sat := range value.Sats {
+			if sat < 0 { // 不统计负数铭文
+				continue
+			}
 			satsInT2[uint64(sat)] = utxoId
 		}
 		return nil
