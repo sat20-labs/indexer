@@ -46,7 +46,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 	s.nft.UpdateTransfer(block)
 	s.ns.UpdateTransfer(block)
 	s.ftIndexer.UpdateTransfer(block)
-	//s.brc20Indexer.UpdateTransfer(block)
+	s.brc20Indexer.UpdateTransfer(block)
 	s.RunesIndexer.UpdateTransfer(block)
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
@@ -429,6 +429,12 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		// Limit:      lim,
 		// SelfMint:   selfmint,
 		// Max:        max,
+		Decimal:            uint8(18),
+		DeployTime:         nft.Base.BlockTime,
+		StartInscriptionId: nft.Base.InscriptionId,
+		EndInscriptionId:   "",
+		HolderCount:        0,
+		TransactionCount:   0,
 	}
 
 	if content.SelfMint == "true" {
@@ -436,28 +442,24 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	}
 
 	// dec
-	dec, err := strconv.ParseUint(content.Decimal, 10, 64)
-	if err != nil || dec > 18 {
-		// dec invalid
-		common.Log.Warnf("deploy, but dec invalid. ticker: %s, dec: %s",
-			content.Ticker,
-			content.Decimal,
-		)
-		return nil
+	if content.Decimal != "" {
+		dec, err := strconv.ParseUint(content.Decimal, 10, 64)
+		if err != nil || dec > common.MAX_PRECISION {
+			// dec invalid
+			common.Log.Warnf("deploy, but dec invalid. ticker: %s, dec: %s", content.Ticker, content.Decimal)
+			return nil
+		}
+		ticker.Decimal = uint8(dec)
 	}
-	ticker.Decimal = uint8(dec)
 
 	// max
 	max, err := common.NewDecimalFromString(content.Max, int(ticker.Decimal))
 	if err != nil {
 		// max invalid
-		common.Log.Warnf("deploy, but max invalid. ticker: %s, max: '%s'",
-			content.Ticker,
-			content.Max,
-		)
+		common.Log.Warnf("deploy, but max invalid. ticker: %s, max: '%s'", content.Ticker, content.Max)
 		return nil
 	}
-	if max.Sign() < 0 || max.IsOverflowInt64() {
+	if max.Sign() < 0 || max.IsOverflowUint64() {
 		common.Log.Warnf("deploy, but max invalid (range)")
 		return nil
 		// return
@@ -465,7 +467,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 
 	if max.Sign() == 0 {
 		if ticker.SelfMint {
-			ticker.Max = *max.GetMaxInt64()
+			ticker.Max = *max.GetMaxUint64()
 		} else {
 			common.Log.Warnf("deploy, but max invalid (0)")
 			return nil
@@ -474,23 +476,29 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 		ticker.Max = *max
 	}
 
+	// minted
+	minted, err := common.NewDecimalFromString("0", int(ticker.Decimal))
+	if err != nil {
+		// minted invalid
+		common.Log.Warnf("deploy, but minted invalid. ticker: %s, minted: '%s'", content.Ticker, minted.String())
+		return nil
+	}
+	ticker.Minted = *minted
+
 	// lim
 	lim, err := common.NewDecimalFromString(content.Lim, int(ticker.Decimal))
 	if err != nil {
 		// limit invalid
-		common.Log.Warnf("deploy, but limit invalid. ticker: %s, limit: '%s'",
-			content.Ticker,
-			content.Lim,
-		)
+		common.Log.Warnf("deploy, but limit invalid. ticker: %s, limit: '%s'", content.Ticker, content.Lim)
 		return nil
 	}
-	if lim.Sign() < 0 || lim.IsOverflowInt64() {
+	if lim.Sign() < 0 || lim.IsOverflowUint64() {
 		common.Log.Warnf("deploy, but lim invalid (range)")
 		return nil
 	}
 	if lim.Sign() == 0 {
 		if ticker.SelfMint {
-			ticker.Limit = *lim.GetMaxInt64()
+			ticker.Limit = *max
 		} else {
 			common.Log.Warnf("deploy, but lim invalid (0)")
 			return nil
@@ -504,31 +512,48 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 
 func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, out *common.Output,
 	content *common.BRC20MintContent, nft *common.Nft) *common.BRC20Mint {
-	inscriptionId := nft.Base.InscriptionId
-
-	deployTicker := s.brc20Indexer.GetTicker(content.Ticker)
-	if deployTicker == nil {
+	ticker := s.brc20Indexer.GetTicker(content.Ticker)
+	if ticker == nil {
 		common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
-			inscriptionId, content.Ticker)
+			nft.Base.InscriptionId, content.Ticker)
 		return nil
 	}
 
-	mint := &common.BRC20Mint{
-		Nft:  nft,
-		Name: content.Ticker,
+	if ticker.SelfMint {
+		if nft.Base.Parent != ticker.Nft.Base.InscriptionId {
+			return nil
+		}
 	}
 
+	mint := &common.BRC20Mint{Nft: nft, Name: content.Ticker}
+
+	// recover for decimal panic
+	defer func() {
+		if r := recover(); r != nil {
+			common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, panic: %v",
+				nft.Base.InscriptionId, content.Ticker, r)
+		}
+	}()
+
 	// check mint amount
-	amt, err := common.NewDecimalFromString(content.Amt, int(deployTicker.Decimal))
+	amt, err := common.NewDecimalFromString(content.Amt, int(ticker.Decimal))
 	if err != nil {
 		common.Log.Warnf("mint %s, but invalid amount(%s)", content.Ticker, content.Amt)
 		return nil
 	}
-	if amt.Sign() <= 0 || amt.Cmp(&deployTicker.Limit) > 0 {
-		common.Log.Warnf("mint %s, invalid amount(%s), limit(%s)", content.Ticker, content.Amt, deployTicker.Limit.String())
+
+	if amt.Sign() <= 0 || amt.Cmp(&ticker.Limit) > 0 {
+		common.Log.Warnf("mint %s, invalid amount(%s), limit(%s)", content.Ticker, content.Amt, ticker.Limit.String())
 		return nil
 	}
 
+	// check max
+	mintedAmt := ticker.Minted.Add(amt)
+	cmpResult := mintedAmt.Cmp(&ticker.Max)
+	if cmpResult > 0 {
+		common.Log.Warnf("mint %s, invalid amount(%s), max(%s)", content.Ticker, content.Amt, ticker.Max.String())
+		return nil
+	}
 	mint.Amt = *amt
 	return mint
 }
@@ -536,25 +561,26 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint int, out *common.Output,
 	content *common.BRC20TransferContent, nft *common.Nft) *common.BRC20Transfer {
 	inscriptionId := nft.Base.InscriptionId
-	deployTicker := s.brc20Indexer.GetTicker(content.Ticker)
-	if deployTicker == nil {
+	ticker := s.brc20Indexer.GetTicker(content.Ticker)
+	if ticker == nil {
 		common.Log.Warnf("IndexerMgr.handleBrc20TransferTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
 			inscriptionId, content.Ticker)
 		return nil
 	}
 
 	transfer := &common.BRC20Transfer{
-		Nft:  nft,
-		Name: content.Ticker,
+		Nft:    nft,
+		Name:   content.Ticker,
+		UtxoId: nft.UtxoId,
 	}
 
 	// check amount
-	amt, err := common.NewDecimalFromString(content.Amt, int(deployTicker.Decimal))
+	amt, err := common.NewDecimalFromString(content.Amt, int(ticker.Decimal))
 	if err != nil {
 		common.Log.Warnf("transfer, but invalid amount")
 		return nil
 	}
-	if amt.Sign() <= 0 || amt.Cmp(&deployTicker.Max) > 0 {
+	if amt.Sign() <= 0 || amt.Cmp(&ticker.Max) > 0 {
 		common.Log.Warnf("transfer, invalid amount(range)")
 		return nil
 	}
@@ -752,7 +778,9 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		if deployInfo == nil {
 			return
 		}
-
+		// if deployInfo.BRC20BaseContent.Ticker != "GC  " {
+		// 	return
+		// }
 		if len(deployInfo.Ticker) == 5 {
 			if deployInfo.SelfMint != "true" {
 				common.Log.Errorf("deploy, tick length 5, but not self_mint")
@@ -782,17 +810,17 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		if mintInfo == nil {
 			return
 		}
-
-		if !s.brc20Indexer.TickExisted(mintInfo.Ticker) {
-			common.Log.Warnf("ticker %s does not exist", mintInfo.Ticker)
-			return
-		}
+		// if mintInfo.BRC20BaseContent.Ticker != "GC  " {
+		// 	return
+		// } else {
+		// 	common.Log.Info("mint brc20 ticker is GC  ")
+		// }
 
 		mint := s.handleBrc20MintTicker(input, satpoint, out, mintInfo, nft)
 		if mint == nil {
 			return
 		}
-
+		common.Log.Infof("nft.Base.InscriptionId: %s, nft.Base.Id: %d", nft.Base.InscriptionId, nft.Base.Id)
 		s.brc20Indexer.UpdateInscribeMint(mint)
 
 	case "transfer":
@@ -800,6 +828,11 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		if transferInfo == nil {
 			return
 		}
+		// if transferInfo.BRC20BaseContent.Ticker != "GC  " {
+		// 	return
+		// } else {
+		// 	common.Log.Info("transfer brc20 ticker is GC  ")
+		// }
 
 		transfer := s.handleBrc20TransferTicker(input, satpoint, out, transferInfo, nft)
 		if transfer == nil {
@@ -869,7 +902,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		if domain != nil {
 			switch domain.Op {
 			case "reg": // https://docs.btcname.id/docs/overview/chapter-4-thinking-about-.btc-domain-name/calibration-rules
-			// 不支持该方式注册名字	
+			// 不支持该方式注册名字
 			//s.handleSnsName(domain.Name, nft)
 			case "update":
 				var updateInfo *common.OrdxUpdateContentV2
@@ -893,10 +926,11 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			}
 		}
 	case "brc-20":
-		if inscriptionId == 0 {
-			// TODO brc20 只处理tx中的第一个铭文？
-			// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
-		}
+		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		// if inscriptionId == 0 {
+		// TODO brc20 只处理tx中的第一个铭文？
+		// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		// }
 
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))
@@ -1170,5 +1204,5 @@ func (b *IndexerMgr) isLptTicker(name string) bool {
 	// }
 	// _, err :=  strconv.Atoi(num)
 	// return err == nil
-	
+
 }

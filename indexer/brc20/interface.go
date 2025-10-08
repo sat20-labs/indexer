@@ -13,17 +13,62 @@ func (p *BRC20Indexer) TickExisted(ticker string) bool {
 	return p.tickerMap[strings.ToLower(ticker)] != nil
 }
 
-
-func (p *BRC20Indexer) GetAllTickers() ([]string) {
+func (p *BRC20Indexer) GetAllTickers() []string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	ret := make([]string, 0)
 
-	for name, _ := range p.tickerMap {
+	for name := range p.tickerMap {
 		ret = append(ret, name)
 	}
 
 	return ret
+}
+
+type Brc20TickerOrder int
+
+const (
+	// 0: inscribe-mint  1: inscribe-transfer  2: transfer
+	BRC20_TICKER_ORDER_DEPLOYTIME_DESC Brc20TickerOrder = iota
+	BRC20_TICKER_ORDER_HOLDER_DESC
+	BRC20_TICKER_ORDER_TRANSACTION_DESC
+)
+
+func (p *BRC20Indexer) GetTickers(start, limit uint64, order Brc20TickerOrder) (ret []*BRC20TickInfo, total uint64) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	for _, ticker := range p.tickerMap {
+		ret = append(ret, ticker)
+	}
+
+	switch order {
+	case BRC20_TICKER_ORDER_DEPLOYTIME_DESC:
+		sort.Slice(ret, func(i, j int) bool {
+			return ret[i].Ticker.DeployTime > ret[j].Ticker.DeployTime
+		})
+	case BRC20_TICKER_ORDER_HOLDER_DESC:
+		sort.Slice(ret, func(i, j int) bool {
+			return ret[i].Ticker.HolderCount > ret[j].Ticker.HolderCount
+		})
+	case BRC20_TICKER_ORDER_TRANSACTION_DESC:
+		sort.Slice(ret, func(i, j int) bool {
+			return ret[i].Ticker.TransactionCount > ret[j].Ticker.TransactionCount
+		})
+	}
+
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i].Name < ret[j].Name
+	})
+	total = uint64(len(ret))
+	end := total
+	if start >= end {
+		return nil, 0
+	}
+	if start+limit < end {
+		end = start + limit
+	}
+	return ret[start:end], total
 }
 
 func (p *BRC20Indexer) GetTickerMap() (map[string]*common.BRC20Ticker, error) {
@@ -81,7 +126,7 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]*common.
 		}
 		info, ok := holderinfo.Tickers[tickerName]
 		if ok {
-			mp[holderinfo.AddressId] = &info.AvailableBalance
+			mp[holderinfo.AddressId] = &info.Balance
 		}
 	}
 
@@ -103,7 +148,7 @@ func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common
 
 	for k, v := range info.Tickers {
 		org := result[k]
-		result[k] = *org.Add(&v.AvailableBalance)
+		result[k] = *org.Add(&v.Balance)
 	}
 
 	return result

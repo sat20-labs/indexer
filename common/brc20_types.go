@@ -20,12 +20,20 @@ type BRC20Ticker struct {
 	Nft  *Nft
 	Id   int64
 	Name string
+	//saʦ sats
 
 	SelfMint bool    `json:"self_mint,omitempty"`
 	Limit    Decimal `json:"limit,omitempty"`
 	Max      Decimal `json:"max,omitempty"`
 
 	Decimal uint8 `json:"-"`
+
+	DeployTime         int64   `json:"deployTime,omitempty"`
+	Minted             Decimal `json:"minted,omitempty"`
+	StartInscriptionId string  `json:"startInscriptionId,omitempty"`
+	EndInscriptionId   string  `json:"endInscriptionId,omitempty"`
+	HolderCount        uint64  `json:"holders,omitempty"`
+	TransactionCount   uint64  `json:"transactionCount,omitempty"`
 }
 
 type BRC20BaseContent struct {
@@ -83,16 +91,22 @@ type TransferNFT struct {
 
 // key: mint时的inscriptionId。 value: 某个资产对应的数值
 type BRC20TickAbbrInfo struct {
-	AvailableBalance        Decimal
-	TransferableData        map[uint64]*TransferNFT // key:utxoId
-	InvalidTransferableData map[uint64]*TransferNFT // key:utxoId
+	Balance Decimal
+	// AvailableBalance Decimal
+	// TransferableBalance Decimal
+	TransferableData map[uint64]*TransferNFT // key:utxoId
+	// InvalidTransferableData map[uint64]*TransferNFT // key:utxoId
 }
 
 func NewBRC20TickAbbrInfo(amt Decimal) *BRC20TickAbbrInfo {
+	// balance := amt.Clone()
+	// balance.SetValue(0)
 	return &BRC20TickAbbrInfo{
-		AvailableBalance:        amt,
-		TransferableData:        make(map[uint64]*TransferNFT),
-		InvalidTransferableData: make(map[uint64]*TransferNFT),
+		Balance: amt,
+		// AvailableBalance:   amt,
+		// TransferableBalance: *balance,
+		TransferableData: make(map[uint64]*TransferNFT),
+		// InvalidTransferableData: make(map[uint64]*TransferNFT),
 	}
 }
 
@@ -112,15 +126,14 @@ func NewBRC20MintAbbrInfo2(base *InscribeBaseContent) *BRC20MintAbbrInfo {
 		Height:         int(base.BlockHeight)}
 }
 
-
 func (p *BRC20MintAbbrInfo) ToMintInfo() *MintInfo {
 	return &MintInfo{
 		Id: p.Id,
 		//Address: p.Address,
-		Amount: p.Amount.ToFormatString(),
-		Ordinals: nil,
-		Height: p.Height,
-		InscriptionId: p.InscriptionId,
+		Amount:         p.Amount.ToFormatString(),
+		Ordinals:       nil,
+		Height:         p.Height,
+		InscriptionId:  p.InscriptionId,
 		InscriptionNum: p.InscriptionNum,
 	}
 }

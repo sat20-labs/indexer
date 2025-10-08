@@ -10,6 +10,8 @@ import (
 
 func (s *BRC20Indexer) initTickInfoFromDB(tickerName string) *BRC20TickInfo {
 	tickinfo := newTickerInfo(tickerName)
+	ticker := s.getTickerFromDB(tickerName)
+	tickinfo.Ticker = ticker
 	s.loadMintInfoFromDB(tickinfo)
 	return tickinfo
 }
@@ -37,23 +39,28 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 
 		key := string(k)
 		addrId, ticker, err := parseHolderInfoKey(key)
+		ticker = strings.ToLower(ticker)
 		if err != nil {
-			common.Log.Errorln(key + " " + err.Error())
+			common.Log.Panicln(key + " " + err.Error())
 		} else {
-			var info common.BRC20TickAbbrInfo
+			var info HolderInfo
 			err = db.DecodeBytes(v, &info)
 			if err == nil {
-				holder, ok := holderMap[addrId]
-				if ok {
-					holder.Tickers[ticker] = &info
-				} else {
-					holder = &HolderInfo{
-						AddressId: addrId,
-						Tickers:   make(map[string]*common.BRC20TickAbbrInfo),
-					}
-					holder.Tickers[ticker] = &info
-					holderMap[addrId] = holder
+				if addrId != info.AddressId {
+					common.Log.Panicln("key addrId and value addrId not equal")
 				}
+				holderMap[addrId] = &info
+				// holder, ok := holderMap[addrId]
+				// if ok {
+				// 	holder.Tickers[ticker] = &info
+				// } else {
+				// 	holder = &HolderInfo{
+				// 		AddressId: addrId,
+				// 		Tickers:   make(map[string]*common.BRC20TickAbbrInfo),
+				// 	}
+				// 	holder.Tickers[ticker] = &info
+				// 	holderMap[addrId] = holder
+				// }
 
 				holders, ok := tickerToHolderMap[ticker]
 				if ok {
@@ -64,7 +71,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 				}
 				tickerToHolderMap[ticker] = holders
 
-				for _, nft := range info.TransferableData {
+				for _, nft := range info.Tickers[ticker].TransferableData {
 					transferNftMap[nft.UtxoId] = &TransferNftInfo{
 						AddressId:   addrId,
 						Ticker:      ticker,
@@ -72,7 +79,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 					}
 				}
 			} else {
-				common.Log.Errorln("DecodeBytes " + err.Error())
+				common.Log.Panicln("DecodeBytes " + err.Error())
 			}
 
 		}

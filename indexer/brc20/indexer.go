@@ -31,6 +31,15 @@ type HolderAction struct {
 	Action int // 0: inscribe-mint  1: inscribe-transfer  2: transfer
 }
 
+const (
+	// 0: inscribe-mint  1: inscribe-transfer  2: transfer
+	Action_InScribe_Mint int = iota
+	Action_InScribe_Transfer
+	Action_Transfer
+	// Action_Transfer_Send
+	// Action_TRansfer_Receive
+)
+
 type HolderInfo struct {
 	AddressId uint64
 	Tickers   map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
@@ -59,6 +68,7 @@ type BRC20Indexer struct {
 	// 其他辅助信息
 	holderActionList []*HolderAction                // 在同一个block中，状态变迁需要按顺序执行
 	tickerAdded      map[string]*common.BRC20Ticker // key: ticker
+	tickerUpdated    map[string]*common.BRC20Ticker // key: ticker
 }
 
 func NewIndexer(db common.KVDB) *BRC20Indexer {
@@ -96,15 +106,25 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 		newInst.tickerAdded[key] = value
 	}
 
+	newInst.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
+	for key, value := range s.tickerUpdated {
+		newInst.tickerUpdated[key] = value
+	}
+
 	newInst.tickerMap = make(map[string]*BRC20TickInfo, 0)
 	for key, value := range s.tickerMap {
-		if len(value.MintAdded) > 0 {
-			tick := BRC20TickInfo{}
-			tick.Name = value.Name
-			tick.MintAdded = make([]*common.BRC20Mint, len(value.MintAdded))
-			copy(tick.MintAdded, value.MintAdded)
-			newInst.tickerMap[key] = &tick
+		tick := BRC20TickInfo{}
+		tick.Id = value.Id
+		tick.Name = value.Name
+		tick.Ticker = value.Ticker
+		tick.MintAdded = make([]*common.BRC20Mint, len(value.MintAdded))
+		copy(tick.MintAdded, value.MintAdded)
+
+		tick.InscriptionMap = make(map[string]*common.BRC20MintAbbrInfo, 0)
+		for inscriptionId, mintAbbrInfo := range value.InscriptionMap {
+			tick.InscriptionMap[inscriptionId] = mintAbbrInfo
 		}
+		newInst.tickerMap[key] = &tick
 	}
 
 	// 保存holderActionList对应的数据，更新数据库需要
@@ -130,6 +150,9 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 		}
 	}
 
+	for key, value := range s.transferNftMap {
+		newInst.transferNftMap[key] = value
+	}
 	return newInst
 }
 
@@ -141,6 +164,10 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 
 	for key := range another.tickerAdded {
 		delete(s.tickerAdded, key)
+	}
+
+	for key := range another.tickerUpdated {
+		delete(s.tickerUpdated, key)
 	}
 
 	for key, value := range another.tickerMap {
@@ -176,6 +203,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 		s.holderActionList = make([]*HolderAction, 0)
 		s.tickerAdded = make(map[string]*common.BRC20Ticker, 0)
+		s.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
 
 		s.mutex.Unlock()
 	}

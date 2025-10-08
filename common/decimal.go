@@ -11,7 +11,7 @@ import (
 	"lukechampine.com/uint128"
 )
 
-const MAX_PRECISION = 18  // brc20
+const MAX_PRECISION = 18 // brc20
 
 var MAX_PRECISION_STRING = "18"
 
@@ -109,10 +109,9 @@ func NewDecimal(v int64, p int) *Decimal {
 	if p != 0 {
 		value = new(big.Int).Mul(value, precisionFactor[p])
 	}
-	
+
 	return &Decimal{Precision: p, Value: value}
 }
-
 
 // NewDecimalFromString creates a Decimal instance from a string
 func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
@@ -176,7 +175,6 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 	return &Decimal{Precision: int(maxPrecision), Value: value}, nil
 }
 
-
 func (d *Decimal) Clone() *Decimal {
 	if d == nil {
 		return nil
@@ -216,7 +214,7 @@ func NewDecimalFromFormatString(s string) (*Decimal, error) {
 		return NewDecimalFromString(parts[0], precision)
 	default:
 		return nil, fmt.Errorf("invalid format")
-	} 
+	}
 }
 
 func (d *Decimal) ToFormatString() string {
@@ -228,54 +226,16 @@ func (d *Decimal) ToFormatString() string {
 
 // alignPrecision 将两个 Decimal 对齐到同一精度，返回新值和目标精度
 func alignPrecision(a, b *Decimal) (aVal, bVal *big.Int, precision int) {
-    // 对齐到更高的精度
-    if a.Precision > b.Precision {
-        factor := precisionFactor[a.Precision-b.Precision]
-        bVal := new(big.Int).Mul(b.Value, factor)
-        return new(big.Int).Set(a.Value), bVal, a.Precision
-    } else {
-        factor := precisionFactor[b.Precision-a.Precision]
-        aVal := new(big.Int).Mul(a.Value, factor)
-        return aVal, new(big.Int).Set(b.Value), b.Precision
-    }
-}
-
-func (d *Decimal) NewPrecision(precision int) *Decimal {
-	if d == nil {
-		return nil
+	// 对齐到更高的精度
+	if a.Precision > b.Precision {
+		factor := precisionFactor[a.Precision-b.Precision]
+		bVal := new(big.Int).Mul(b.Value, factor)
+		return new(big.Int).Set(a.Value), bVal, a.Precision
+	} else {
+		factor := precisionFactor[b.Precision-a.Precision]
+		aVal := new(big.Int).Mul(a.Value, factor)
+		return aVal, new(big.Int).Set(b.Value), b.Precision
 	}
-	if d.Precision == precision {
-		return d.Clone()
-	}
-	val := new(big.Int).Set(d.Value)
-	if d.Precision > precision {
-        factor := precisionFactor[d.Precision-precision]
-        val = val.Div(val, factor)
-    } else if d.Precision < precision {
-        factor := precisionFactor[precision-d.Precision]
-        val = val.Mul(val, factor)
-    }
-    return &Decimal{Precision: precision, Value: val}
-}
-
-func (d *Decimal) SetPrecision(precision int) *Decimal {
-	if d == nil {
-		return nil
-	}
-	if d.Precision == precision {
-		return d
-	}
-	val := new(big.Int).Set(d.Value)
-	if d.Precision > precision {
-        factor := precisionFactor[d.Precision-precision]
-        val = val.Div(val, factor)
-    } else if d.Precision < precision {
-        factor := precisionFactor[precision-d.Precision]
-        val = val.Mul(val, factor)
-    }
-	d.Precision = precision
-	d.Value = val
-    return d
 }
 
 func (d *Decimal) Add(other *Decimal) *Decimal {
@@ -283,24 +243,24 @@ func (d *Decimal) Add(other *Decimal) *Decimal {
 		return nil
 	}
 	if d == nil {
-        // 缩放 other 到 d 的精度（d==nil时直接返回other的拷贝）
-        return other.Clone()
-    }
-    if other == nil {
-        return d.Clone()
-    }
-    // 对齐 other 到 d 的精度
-    aVal := new(big.Int).Set(d.Value)
-    bVal := new(big.Int).Set(other.Value)
-    if d.Precision > other.Precision {
-        factor := precisionFactor[d.Precision-other.Precision]
-        bVal = bVal.Mul(bVal, factor)
-    } else if d.Precision < other.Precision {
-        factor := precisionFactor[other.Precision-d.Precision]
-        bVal = bVal.Div(bVal, factor)
-    }
-    value := new(big.Int).Add(aVal, bVal)
-    return &Decimal{Precision: d.Precision, Value: value}
+		// 缩放 other 到 d 的精度（d==nil时直接返回other的拷贝）
+		return other.Clone()
+	}
+	if other == nil {
+		return d.Clone()
+	}
+	// 对齐 other 到 d 的精度
+	aVal := new(big.Int).Set(d.Value)
+	bVal := new(big.Int).Set(other.Value)
+	if d.Precision > other.Precision {
+		factor := precisionFactor[d.Precision-other.Precision]
+		bVal = bVal.Mul(bVal, factor)
+	} else if d.Precision < other.Precision {
+		factor := precisionFactor[other.Precision-d.Precision]
+		bVal = bVal.Div(bVal, factor)
+	}
+	value := new(big.Int).Add(aVal, bVal)
+	return &Decimal{Precision: d.Precision, Value: value}
 }
 
 // Add adds two Decimal instances and returns a new Decimal instance
@@ -314,25 +274,25 @@ func (d *Decimal) Sub(other *Decimal) *Decimal {
 		return nil
 	}
 	if d == nil {
-        neg := other.Clone()
-        neg.Value.Neg(neg.Value)
-        return neg
-    }
-    if other == nil {
-        return d.Clone()
-    }
-    // 对齐 other 到 d 的精度
-    aVal := new(big.Int).Set(d.Value)
-    bVal := new(big.Int).Set(other.Value)
-    if d.Precision > other.Precision {
-        factor := precisionFactor[d.Precision-other.Precision]
-        bVal = bVal.Mul(bVal, factor)
-    } else if d.Precision < other.Precision {
-        factor := precisionFactor[other.Precision-d.Precision]
-        bVal = bVal.Div(bVal, factor)
-    }
-    value := new(big.Int).Sub(aVal, bVal)
-    return &Decimal{Precision: d.Precision, Value: value}
+		neg := other.Clone()
+		neg.Value.Neg(neg.Value)
+		return neg
+	}
+	if other == nil {
+		return d.Clone()
+	}
+	// 对齐 other 到 d 的精度
+	aVal := new(big.Int).Set(d.Value)
+	bVal := new(big.Int).Set(other.Value)
+	if d.Precision > other.Precision {
+		factor := precisionFactor[d.Precision-other.Precision]
+		bVal = bVal.Mul(bVal, factor)
+	} else if d.Precision < other.Precision {
+		factor := precisionFactor[other.Precision-d.Precision]
+		bVal = bVal.Div(bVal, factor)
+	}
+	value := new(big.Int).Sub(aVal, bVal)
+	return &Decimal{Precision: d.Precision, Value: value}
 }
 
 // Sub subtracts two Decimal instances and returns a new Decimal instance
@@ -343,16 +303,16 @@ func DecimalSub(a, b *Decimal) *Decimal {
 
 // 精度跟a对齐
 func (d *Decimal) Mul(other *Decimal) *Decimal {
-    if d == nil || other == nil {
-        return nil
-    }
-    // 先相乘
-    value := new(big.Int).Mul(d.Value, other.Value)
-    // 缩放回a的精度
-    if other.Precision > 0 {
-        value = value.Div(value, precisionFactor[other.Precision])
-    }
-    return &Decimal{Precision: d.Precision, Value: value}
+	if d == nil || other == nil {
+		return nil
+	}
+	// 先相乘
+	value := new(big.Int).Mul(d.Value, other.Value)
+	// 缩放回a的精度
+	if other.Precision > 0 {
+		value = value.Div(value, precisionFactor[other.Precision])
+	}
+	return &Decimal{Precision: d.Precision, Value: value}
 }
 
 func (d *Decimal) MulBigInt(other *big.Int) *Decimal {
@@ -365,39 +325,31 @@ func (d *Decimal) MulBigInt(other *big.Int) *Decimal {
 	//return d
 }
 
-
 // 精度为a
 func DecimalMul(a, b *Decimal) *Decimal {
 	n := a.Clone()
 	return n.Mul(b)
 }
 
-
 // 精度为a+b
-func DecimalMulV2(a, b *Decimal) *Decimal {
-	n := a.Clone()
-	return n.MulV2(b)
-}
-
-// 精度为a+b
-func (d *Decimal) MulV2(other *Decimal) *Decimal {
-    if d == nil || other == nil {
-        return nil
-    }
-    value := new(big.Int).Mul(d.Value, other.Value)
-    precision := d.Precision + other.Precision
-    return &Decimal{Precision: precision, Value: value}
+func (d *Decimal) MulDecimalV2(other *Decimal) *Decimal {
+	if d == nil || other == nil {
+		return nil
+	}
+	value := new(big.Int).Mul(d.Value, other.Value)
+	precision := d.Precision + other.Precision
+	return &Decimal{Precision: precision, Value: value}
 }
 
 // 除法，精度为a
 func (d *Decimal) Div(other *Decimal) *Decimal {
-    if d == nil || other == nil || other.Sign() == 0 {
-        return nil
-    }
-    // 先将a的Value放大other.Precision倍，避免精度丢失
-    scaledA := new(big.Int).Mul(d.Value, precisionFactor[other.Precision])
-    value := new(big.Int).Div(scaledA, other.Value)
-    return &Decimal{Precision: d.Precision, Value: value}
+	if d == nil || other == nil || other.Sign() == 0 {
+		return nil
+	}
+	// 先将a的Value放大other.Precision倍，避免精度丢失
+	scaledA := new(big.Int).Mul(d.Value, precisionFactor[other.Precision])
+	value := new(big.Int).Div(scaledA, other.Value)
+	return &Decimal{Precision: d.Precision, Value: value}
 }
 
 func (d *Decimal) DivBigInt(other *big.Int) *Decimal {
@@ -409,7 +361,6 @@ func (d *Decimal) DivBigInt(other *big.Int) *Decimal {
 	//d.Value = value
 	//return d
 }
-
 
 // 精度为a
 func DecimalDiv(a, b *Decimal) *Decimal {
@@ -453,18 +404,18 @@ func (d *Decimal) Cmp(other *Decimal) int {
 		return -other.Value.Sign()
 	}
 	if d.Precision == other.Precision {
-        return d.Value.Cmp(other.Value)
-    }
-    // 精度不一致，调整到相同精度再比较
-    if d.Precision > other.Precision {
-        factor := precisionFactor[d.Precision-other.Precision]
-        otherVal := new(big.Int).Mul(other.Value, factor)
-        return d.Value.Cmp(otherVal)
-    } else {
-        factor := precisionFactor[other.Precision-d.Precision]
-        dVal := new(big.Int).Mul(d.Value, factor)
-        return dVal.Cmp(other.Value)
-    }
+		return d.Value.Cmp(other.Value)
+	}
+	// 精度不一致，调整到相同精度再比较
+	if d.Precision > other.Precision {
+		factor := precisionFactor[d.Precision-other.Precision]
+		otherVal := new(big.Int).Mul(other.Value, factor)
+		return d.Value.Cmp(otherVal)
+	} else {
+		factor := precisionFactor[other.Precision-d.Precision]
+		dVal := new(big.Int).Mul(d.Value, factor)
+		return dVal.Cmp(other.Value)
+	}
 }
 
 func (d *Decimal) Sign() int {
@@ -473,7 +424,6 @@ func (d *Decimal) Sign() int {
 	}
 	return d.Value.Sign()
 }
-
 
 func (d *Decimal) Abs() *Decimal {
 	if d == nil {
@@ -494,6 +444,16 @@ func (d *Decimal) IsOverflowInt64() bool {
 	return d.Value.Cmp(value) > 0
 }
 
+func (d *Decimal) IsOverflowUint64() bool {
+	if d == nil {
+		return false
+	}
+
+	integerPart := new(big.Int).SetUint64(math.MaxInt64)
+	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precision])
+	return d.Value.Cmp(value) > 0
+}
+
 func (d *Decimal) IsZero() bool {
 	return d.Sign() == 0
 }
@@ -510,6 +470,15 @@ func (d *Decimal) GetMaxInt64() *Decimal {
 		return nil
 	}
 	integerPart := new(big.Int).SetInt64(math.MaxInt64)
+	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precision])
+	return &Decimal{Precision: d.Precision, Value: value}
+}
+
+func (d *Decimal) GetMaxUint64() *Decimal {
+	if d == nil {
+		return nil
+	}
+	integerPart := new(big.Int).SetUint64(math.MaxUint64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precision])
 	return &Decimal{Precision: d.Precision, Value: value}
 }
@@ -559,6 +528,7 @@ func (d *Decimal) Floor() int64 {
 
 	return int64(math.Floor(d.Float64()))
 }
+
 // 4舍5入
 func (d *Decimal) Round() int64 {
 	if d == nil {
@@ -590,11 +560,11 @@ func NewDecimalFromUint128(n uint128.Uint128, precision int) *Decimal {
 
 func (d *Decimal) ToUint128() uint128.Uint128 {
 	if d == nil {
-        return uint128.Uint128{}
-    }
-    lo := d.Value.Uint64()
-    hi := new(big.Int).Rsh(d.Value, 64).Uint64()
-    return uint128.Uint128{Lo: lo, Hi: hi}
+		return uint128.Uint128{}
+	}
+	lo := d.Value.Uint64()
+	hi := new(big.Int).Rsh(d.Value, 64).Uint64()
+	return uint128.Uint128{Lo: lo, Hi: hi}
 }
 
 func decimalDigits(n uint64) int {

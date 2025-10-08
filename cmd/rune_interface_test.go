@@ -61,7 +61,7 @@ func TestInterfaceRune(t *testing.T) {
 	}
 }
 
-func TestGetHoldersWithTicks(t *testing.T) {
+func TestGetRuneHoldersWithTicks(t *testing.T) {
 	InitRuneTester()
 	// 11
 	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
@@ -75,7 +75,7 @@ func TestGetHoldersWithTicks(t *testing.T) {
 	}
 }
 
-func TestGetAllAddressBalances(t *testing.T) {
+func TestGetRunesAllAddressBalances(t *testing.T) {
 	InitRuneTester()
 	// 4
 	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
@@ -89,7 +89,7 @@ func TestGetAllAddressBalances(t *testing.T) {
 	}
 }
 
-func TestGetAllUtxoBalances(t *testing.T) {
+func TestGetRuneAllUtxoBalances(t *testing.T) {
 	InitRuneTester()
 	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestGetAllUtxoBalances(t *testing.T) {
 	}
 }
 
-func TestInterfaceAsset(t *testing.T) {
+func TestRuneInterfaceAsset(t *testing.T) {
 	InitRuneTester()
 	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
 	if err != nil {
@@ -140,7 +140,7 @@ func TestInterfaceAsset(t *testing.T) {
 	}
 }
 
-func TestGetAddressMintHistory(t *testing.T) {
+func TestGetRuneAddressMintHistory(t *testing.T) {
 	InitRuneTester()
 	// 10
 	firstRuneAddress := "tb1pfu2ff6ycy99t02zteumkm2jtk3uwm4skp50m7tevapcpkm8vaqqq73vxqr"
@@ -156,7 +156,7 @@ func TestGetAddressMintHistory(t *testing.T) {
 	}
 }
 
-func TestCheckRunesSummary(t *testing.T) {
+func TestRuneCheckRunesSummary(t *testing.T) {
 	InitRuneTester()
 	runeId, err := runesIndexer.GetRuneIdWithName(firstRuneName)
 	if err != nil {
@@ -189,7 +189,7 @@ func TestCheckRunesSummary(t *testing.T) {
 	}
 }
 
-func TestCheckAllRuneInfos(t *testing.T) {
+func TestRuneCheckAllRuneInfos(t *testing.T) {
 	InitRuneTester()
 	status, err := getStatusData()
 	if err != nil {
@@ -224,7 +224,7 @@ func TestCheckAllRuneInfos(t *testing.T) {
 	t.Logf("Total time for checking %d runes: %s", count, duration)
 }
 
-const OrdinalRpcURL = "http://192.168.10.102:81"
+const RuneOrdinalRpcURL = "http://192.168.10.102:81"
 
 type RuneData struct {
 	Entry struct {
@@ -254,7 +254,7 @@ type Terms struct {
 }
 
 func getRuneData(runeID uint64) (*RuneData, error) {
-	url := fmt.Sprintf("%s/rune/%d", OrdinalRpcURL, runeID)
+	url := fmt.Sprintf("%s/rune/%d", RuneOrdinalRpcURL, runeID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 }
 
 func getStatusData() (*StatusData, error) {
-	url := OrdinalRpcURL + "/status"
+	url := RuneOrdinalRpcURL + "/status"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

@@ -15,7 +15,6 @@ import (
 	"lukechampine.com/uint128"
 )
 
-
 func readBytes(raw []byte, pointer *int, n int) []byte {
 	value := raw[*pointer : *pointer+n]
 	*pointer += n
@@ -319,7 +318,7 @@ func ParseBrc20DeployContent(content string) *BRC20DeployContent {
 		Log.Warnf("invalid json: %s, %v", content, err)
 		return nil
 	}
-	ret.Ticker = strings.ToLower(ret.Ticker)
+	// ret.Ticker = strings.ToLower(ret.Ticker)
 
 	if len(ret.Ticker) != 4 && len(ret.Ticker) != 5 {
 		return nil
@@ -482,23 +481,22 @@ func ParseInscriptionId(input []byte) string {
 	return txid + "i" + strconv.Itoa(index)
 }
 
-
 // ordinals, tag 13
 // 长度要确保小于16
 func ParseRunesName(input []byte) uint128.Uint128 {
 	/*
-			To prevent front running an etching that has been broadcast but not mined, 
-			if a non-reserved rune name is being etched, the etching transaction must contain
-			a valid commitment to the name being etched.
-			A commitment consists of a data push of the rune name, encoded as a little-endian integer 
-			with trailing zero bytes elided, present in an input witness tapscript where the output 
-			being spent has at least six confirmations.
-			If a valid commitment is not present, the etching is ignored.
+		To prevent front running an etching that has been broadcast but not mined,
+		if a non-reserved rune name is being etched, the etching transaction must contain
+		a valid commitment to the name being etched.
+		A commitment consists of a data push of the rune name, encoded as a little-endian integer
+		with trailing zero bytes elided, present in an input witness tapscript where the output
+		being spent has at least six confirmations.
+		If a valid commitment is not present, the etching is ignored.
 	*/
 
 	// Reverse the byte slice
 	length := len(input)
-	
+
 	// runes name
 	// reverseBytes := make([]byte, length)
 	// for i := 0; i < length; i++ {
@@ -506,7 +504,7 @@ func ParseRunesName(input []byte) uint128.Uint128 {
 	// }
 	left := make([]byte, 16-length)
 	le128 := append(input, left...)
-	
+
 	return uint128.FromBytes(le128)
 }
 

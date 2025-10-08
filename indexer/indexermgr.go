@@ -372,7 +372,7 @@ func (b *IndexerMgr) updateDB() {
 	syncHeight := b.compiling.GetSyncHeight()
 	blocksInHistory := b.compiling.GetBlockHistory()
 
-	gap := complingHeight-syncHeight
+	gap := complingHeight - syncHeight
 	if gap < blocksInHistory {
 		common.Log.Infof("performUpdateDBInBuffer nothing to do at height %d-%d", complingHeight, syncHeight)
 	} else {
@@ -465,4 +465,8 @@ func (p *IndexerMgr) dbStatistic() bool {
 	//return p.searchName()
 
 	return false
+}
+
+func (b *IndexerMgr) GetBrc20Indexer() *brc20.BRC20Indexer {
+	return b.brc20Indexer
 }
