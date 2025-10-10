@@ -302,7 +302,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
 	for k, v := range brc20Asset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
-		result[tickName] = &v
+		result[tickName] = v
 	}
 
 	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address))

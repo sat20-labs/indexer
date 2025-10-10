@@ -217,27 +217,28 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
-	return true
 
-	//common.Log.Infof("BRC20Indexer->CheckSelf ...")
+	common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()
 	for name := range s.tickerMap {
-		//common.Log.Infof("checking ticker %s", name)
+		common.Log.Infof("checking ticker %s", name)
 		holdermap := s.GetHoldersWithTick(name)
-		var holderAmount common.Decimal
+		var holderAmount *common.Decimal
 		for _, amt := range holdermap {
-			holderAmount = *holderAmount.Add(amt)
+			holderAmount = holderAmount.Add(amt)
 		}
-
 		mintAmount, _ := s.GetMintAmount(name)
+		common.Log.Infof("ticker %s, minted %s", name, mintAmount.String())
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
 			return false
 		}
 	}
+	common.Log.Infof("total tickers %d", len(s.tickerMap))
 
 	// 需要高度到达一定高度才需要检查
-	if s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 828800 {
+	if (s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 828800) || 
+	(!s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 28865) {
 		// 需要区分主网和测试网
 		name := "ordi"
 		ticker := s.GetTicker(name)

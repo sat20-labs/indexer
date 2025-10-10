@@ -134,11 +134,11 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]*common.
 }
 
 // 获取某个地址下的资产 return: ticker->amount
-func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common.Decimal {
+func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*common.Decimal {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	result := make(map[string]common.Decimal, 0)
+	result := make(map[string]*common.Decimal, 0)
 
 	info, ok := p.holderMap[addrId]
 	if !ok {
@@ -148,7 +148,7 @@ func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]common
 
 	for k, v := range info.Tickers {
 		org := result[k]
-		result[k] = *org.Add(&v.Balance)
+		result[k] = org.Add(&v.Balance)
 	}
 
 	return result
@@ -222,17 +222,17 @@ func (p *BRC20Indexer) GetMintAmount(tick string) (*common.Decimal, int64) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	var amount common.Decimal
+	var amount *common.Decimal
 	tickinfo, ok := p.tickerMap[strings.ToLower(tick)]
 	if !ok {
-		return &amount, 0
+		return amount, 0
 	}
 
 	for _, info := range tickinfo.InscriptionMap {
-		amount = *amount.Add(&info.Amount)
+		amount = amount.Add(&info.Amount)
 	}
 
-	return &amount, int64(len(tickinfo.InscriptionMap))
+	return amount, int64(len(tickinfo.InscriptionMap))
 }
 
 func (p *BRC20Indexer) GetMint(tickerName, inscriptionId string) *common.BRC20Mint {

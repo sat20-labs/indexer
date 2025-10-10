@@ -772,6 +772,11 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		return
 	}
 
+	if common.GetOrdinalsSize(out.Ordinals) == 0 {
+		common.Log.Errorf("invalid brc20 inscription %s", nft.Base.InscriptionId)
+		return
+	}
+
 	switch brc20Content.Op {
 	case "deploy":
 		deployInfo := common.ParseBrc20DeployContent(content)
@@ -864,7 +869,8 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		if output == nil {
 			output = findOutputWithSat(block.Transactions[0], sat)
 			if output == nil {
-				common.Log.Panicf("processOrdProtocol: tx: %s, findOutputWithSat %d failed", tx.Txid, sat)
+				common.Log.Errorf("processOrdProtocol: tx: %s, findOutputWithSat %d failed", tx.Txid, sat)
+				return
 			}
 		}
 	} else {
