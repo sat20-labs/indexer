@@ -386,6 +386,13 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 			result[tickName] = common.NewDecimalFromUint128(v.Balance, 0)
 		}
 	}
+	brc20Assets := b.brc20Indexer.GetUtxoAssets(utxoId)
+	if len(brc20Assets) > 0 {
+		for _, v := range brc20Assets {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: v.Name}
+			result[tickName] = v.Amt
+		}
+	}
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: ""}
