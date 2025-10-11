@@ -15,7 +15,7 @@ import (
 
 var firstTestnet4Brc20Name = "box1"
 
-// var tickerName = "GC  " // box6
+var tickerName = "GC  " // box6
 var brc20Indexer *brc20.BRC20Indexer
 var indexerMgr *indexer.IndexerMgr
 
