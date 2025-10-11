@@ -16,8 +16,12 @@ func GetMintHistoryKey(tickname, inscriptionId string) string {
 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, strings.ToLower(tickname), inscriptionId)
 }
 
-func GetTransferHistoryKey(tickname string, utxo string) string {
-	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, strings.ToLower(tickname), utxo)
+// func GetTransferHistoryKey(tickname string, utxo string) string {
+// 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, strings.ToLower(tickname), utxo)
+// }
+
+func GetTransferHistoryKey(tickname string, utxoId uint64) string {
+	return fmt.Sprintf("%s%s-%d", DB_PREFIX_TRANSFER_HISTORY, strings.ToLower(tickname), utxoId)
 }
 
 func ParseTransferHistoryKey(input string) (string, string, error) {
@@ -84,4 +88,3 @@ func newTickerInfo(name string) *BRC20TickInfo {
 		MintAdded:      make([]*common.BRC20Mint, 0),
 	}
 }
-

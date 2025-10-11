@@ -569,9 +569,9 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 	}
 
 	transfer := &common.BRC20Transfer{
-		Nft:    nft,
-		Name:   content.Ticker,
-		UtxoId: nft.UtxoId,
+		Nft:  nft,
+		Name: content.Ticker,
+		// UtxoId: nft.UtxoId,
 	}
 
 	// check amount
@@ -783,7 +783,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		if deployInfo == nil {
 			return
 		}
-		// if deployInfo.BRC20BaseContent.Ticker != "GC  " {
+		// if deployInfo.BRC20BaseContent.Ticker != "box1" {
 		// 	return
 		// }
 		if len(deployInfo.Ticker) == 5 {
@@ -815,10 +815,10 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		if mintInfo == nil {
 			return
 		}
-		// if mintInfo.BRC20BaseContent.Ticker != "GC  " {
+		// if mintInfo.BRC20BaseContent.Ticker != "box1" {
 		// 	return
 		// } else {
-		// 	common.Log.Info("mint brc20 ticker is GC  ")
+		// 	common.Log.Info("mint brc20 ticker is box1")
 		// }
 
 		mint := s.handleBrc20MintTicker(input, satpoint, out, mintInfo, nft)
@@ -833,10 +833,10 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		if transferInfo == nil {
 			return
 		}
-		// if transferInfo.BRC20BaseContent.Ticker != "GC  " {
+		// if transferInfo.BRC20BaseContent.Ticker != "box1" {
 		// 	return
 		// } else {
-		// 	common.Log.Info("transfer brc20 ticker is GC  ")
+		// 	common.Log.Info("transfer brc20 ticker is box1")
 		// }
 
 		transfer := s.handleBrc20TransferTicker(input, satpoint, out, transferInfo, nft)

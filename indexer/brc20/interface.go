@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 func (p *BRC20Indexer) TickExisted(ticker string) bool {
@@ -274,4 +275,44 @@ func (p *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 	}
 
 	return result[start:end]
+}
+
+func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20TransferInfo) {
+	nfts := p.nftIndexer.GetNftsWithUtxo(utxoId)
+	for _, nft := range nfts {
+		transferInfo := common.ParseBrc20TransferContent(string(nft.Base.Content))
+		if transferInfo != nil && transferInfo.P == "brc-20" && transferInfo.Op == "transfer" {
+			// tickerName := strings.ToLower(transferInfo.Ticker)
+			// holder := p.holderMap[nft.OwnerAddressId]
+			// if holder != nil {
+			// tickAbbrInfo := holder.Tickers[tickerName]
+			// if tickAbbrInfo != nil {
+			// nftTransfer := tickAbbrInfo.TransferableData[utxoId]
+			// if nftTransfer == nil {
+			key := GetTransferHistoryKey(transferInfo.Ticker, nft.UtxoId)
+			var result common.BRC20TransferHistory
+			err := db.GetValueFromDB([]byte(key), &result, p.db)
+			if err == common.ErrKeyNotFound {
+				continue
+			} else if err != nil {
+				common.Log.Panicf("GetTickFromDB error: %v", err)
+				continue
+			}
+			ret = append(ret, &common.BRC20TransferInfo{
+				InscriptionId: nft.Base.InscriptionId,
+				Name:          result.Ticker,
+				Amt:           result.Amount,
+			})
+			// 	} else {
+			// 		ret = append(ret, &common.BRC20TransferInfo{
+			// 			InscriptionId: nft.Base.InscriptionId,
+			// 			Name : transferInfo.Ticker,
+			// 			Amt:   nftTransfer.Amount.String(),
+			// 		})
+			// 	}
+			// }
+		}
+	}
+
+	return
 }

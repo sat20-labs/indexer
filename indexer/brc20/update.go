@@ -56,8 +56,9 @@ func (p *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 	ticker.InscriptionMap[mint.Nft.Base.InscriptionId] = common.NewBRC20MintAbbrInfo(mint)
 
 	action := HolderAction{
-		Height:   int(mint.Nft.Base.BlockHeight),
-		Utxo:     mint.Nft.Base.InscriptionId,
+		Height: int(mint.Nft.Base.BlockHeight),
+		// Utxo:     mint.Nft.Base.InscriptionId,
+		UtxoId:   mint.Nft.UtxoId,
 		NftId:    mint.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
 		ToAddr:   mint.Nft.OwnerAddressId,
@@ -81,7 +82,7 @@ func (p *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 
 	nft := common.TransferNFT{
 		NftId:  transfer.Nft.Base.Id,
-		UtxoId: transfer.UtxoId,
+		UtxoId: transfer.Nft.UtxoId,
 		Amount: transfer.Amt,
 	}
 	transferInfo := &TransferNftInfo{
@@ -92,8 +93,9 @@ func (p *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 	p.addTransferNft(transferInfo)
 
 	action := HolderAction{
-		Height:   int(transfer.Nft.Base.BlockHeight),
-		Utxo:     transfer.Nft.Base.InscriptionId,
+		Height: int(transfer.Nft.Base.BlockHeight),
+		// Utxo:     transfer.Nft.Base.InscriptionId,
+		UtxoId:   transfer.Nft.UtxoId,
 		NftId:    transfer.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
 		ToAddr:   transfer.Nft.OwnerAddressId,
@@ -285,9 +287,11 @@ func (p *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, i
 			toAddressId := p.nftIndexer.GetBaseIndexer().GetAddressId(output.Address.Addresses[0])
 			p.addHolderBalance(transferNft.Ticker, toAddressId,
 				transferNft.TransferNft.Amount)
+
 			action := HolderAction{
-				Height:   output.Height,
-				Utxo:     common.ToUtxo(txId, int(output.N)),
+				Height: output.Height,
+				// Utxo:     common.ToUtxo(txId, int(output.N)),
+				UtxoId:   utxoId,
 				NftId:    transferNft.TransferNft.NftId,
 				FromAddr: transferNft.AddressId,
 				ToAddr:   toAddressId,
@@ -347,7 +351,7 @@ func (p *BRC20Indexer) UpdateDB() {
 			toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
 			value, ok := p.holderMap[action.ToAddr]
 			// tickerMinted := p.tickerMap[strings.ToLower(action.Ticker)].Ticker.Minted.String()
-			// common.Log.Infof("action.Ticker:%s, str:%s",  action.Ticker, tickerMinted)
+			// common.Log.Infof("action.Ticker:%s, str:%s", action.Ticker, tickerMinted)
 			if ok {
 				err := db.SetDB([]byte(toKey), value, wb)
 				if err != nil {
@@ -396,6 +400,25 @@ func (p *BRC20Indexer) UpdateDB() {
 			} else {
 				common.Log.Panicf("no find holder info in holderMap :%d", action.ToAddr)
 			}
+
+			// 保存历史记录
+			history := common.BRC20TransferHistory{
+				Height: action.Height,
+				// Utxo:     action.Utxo,
+				UtxoId:   action.UtxoId,
+				NftId:    action.NftId,
+				FromAddr: action.FromAddr,
+				ToAddr:   action.ToAddr,
+				Ticker:   action.Ticker,
+				Amount:   action.Amount.String(),
+			}
+
+			// key := GetTransferHistoryKey(action.Ticker, action.Utxo)
+			key := GetTransferHistoryKey(action.Ticker, action.UtxoId)
+			err := db.SetDB([]byte(key), &history, wb)
+			if err != nil {
+				common.Log.Panicf("Error setting %s in db %v", key, err)
+			}
 		}
 		// 更新holder数据
 		// if action.FromAddr != common.INVALID_ID {
@@ -429,24 +452,24 @@ func (p *BRC20Indexer) UpdateDB() {
 		// 	}
 		// }
 
-		if action.Action == Action_Transfer {
-			// 保存历史记录
-			history := common.BRC20TransferHistory{
-				Height:   action.Height,
-				Utxo:     action.Utxo,
-				NftId:    action.NftId,
-				FromAddr: action.FromAddr,
-				ToAddr:   action.ToAddr,
-				Ticker:   action.Ticker,
-				Amount:   action.Amount.String(),
-			}
+		// if action.Action == Action_Transfer {
+		// 	// 保存历史记录
+		// 	history := common.BRC20TransferHistory{
+		// 		Height:   action.Height,
+		// 		Utxo:     action.Utxo,
+		// 		NftId:    action.NftId,
+		// 		FromAddr: action.FromAddr,
+		// 		ToAddr:   action.ToAddr,
+		// 		Ticker:   action.Ticker,
+		// 		Amount:   action.Amount.String(),
+		// 	}
 
-			key := GetTransferHistoryKey(action.Ticker, action.Utxo)
-			err := db.SetDB([]byte(key), &history, wb)
-			if err != nil {
-				common.Log.Panicf("Error setting %s in db %v", key, err)
-			}
-		}
+		// 	key := GetTransferHistoryKey(action.Ticker, action.Utxo)
+		// 	err := db.SetDB([]byte(key), &history, wb)
+		// 	if err != nil {
+		// 		common.Log.Panicf("Error setting %s in db %v", key, err)
+		// 	}
+		// }
 	}
 
 	err := wb.Flush()

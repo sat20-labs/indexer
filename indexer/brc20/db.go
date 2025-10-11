@@ -148,7 +148,7 @@ func (s *BRC20Indexer) getMintFromDB(ticker, inscriptionId string) *common.BRC20
 		common.Log.Debugf("GetMintFromDB error: %v", err)
 		return nil
 	}
-	return nil
+	// return nil
 
 	return &result
 }

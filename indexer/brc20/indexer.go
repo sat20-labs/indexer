@@ -19,8 +19,9 @@ type BRC20TickInfo struct {
 }
 
 type HolderAction struct {
-	Height   int
-	Utxo     string
+	Height int
+	// Utxo     string
+	UtxoId   uint64
 	NftId    int64
 	FromAddr uint64
 	ToAddr   uint64
@@ -237,8 +238,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("total tickers %d", len(s.tickerMap))
 
 	// 需要高度到达一定高度才需要检查
-	if (s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 828800) || 
-	(!s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 28865) {
+	if (s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 828800) ||
+		(!s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 28865) {
 		// 需要区分主网和测试网
 		name := "ordi"
 		ticker := s.GetTicker(name)

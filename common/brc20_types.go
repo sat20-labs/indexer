@@ -10,10 +10,10 @@ type BRC20Mint struct {
 }
 
 type BRC20Transfer struct {
-	Nft    *Nft
-	UtxoId uint64
-	Name   string
-	Amt    Decimal `json:"amt"`
+	Nft *Nft
+	// UtxoId uint64
+	Name string
+	Amt  Decimal `json:"amt"`
 }
 
 type BRC20Ticker struct {
@@ -64,8 +64,9 @@ type BRC20TransferContent struct {
 
 type BRC20TransferHistory struct {
 	Height int
-	Utxo   string // transferring utxo
-	NftId  int64  // transfer nft
+	// Utxo   string // transferring utxo
+	UtxoId uint64
+	NftId  int64 // transfer nft
 
 	FromAddr uint64
 	ToAddr   uint64
@@ -136,4 +137,10 @@ func (p *BRC20MintAbbrInfo) ToMintInfo() *MintInfo {
 		InscriptionId:  p.InscriptionId,
 		InscriptionNum: p.InscriptionNum,
 	}
+}
+
+type BRC20TransferInfo struct {
+	InscriptionId string `json:"inscriptionId"`
+	Name          string `json:"name"`
+	Amt           string `json:"amt"`
 }
