@@ -22,6 +22,10 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *co
 		if err != nil {
 			continue
 		}
+		// 过滤已经被花费的utxo
+		if b.IsUtxoSpent(utxo) {
+			continue
+		}
 		info := b.GetTxOutputWithUtxo(utxo)
 		if info == nil {
 			continue
@@ -78,6 +82,10 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
 		if err != nil {
+			continue
+		}
+		// 过滤已经被花费的utxo
+		if b.IsUtxoSpent(utxo) {
 			continue
 		}
 		info := b.GetTxOutputWithUtxoV3(utxo)
@@ -274,20 +282,20 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 }
 
 func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.TickerName]*common.Decimal {
-	utxos, err := b.rpcService.GetUTXOs(address)
+	utxos, err := b.GetUTXOsWithAddress(address)
 	if err != nil {
 		return nil
 	}
 
 	result := make(map[common.TickerName]*common.Decimal)
-	nsAsset := b.GetSubNameSummaryWithAddress(address)
+	nsAsset := b.GetSubNameSummaryWithAddress(address) // TODO 已经广播的utxo没有过滤
 	for k, v := range nsAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
 	}
 
 	// 合集
-	nftAsset := b.GetNftAmountWithAddress(address)
+	nftAsset := b.GetNftAmountWithAddress(address) // TODO 已经广播的utxo没有过滤
 	for k, v := range nftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
@@ -305,7 +313,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		result[tickName] = &v
 	}
 
-	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address))
+	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address)) // TODO 已经广播的utxo没有过滤
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
 		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
@@ -622,6 +630,9 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
 		if err != nil {
+			continue
+		}
+		if b.IsUtxoSpent(utxo) {
 			continue
 		}
 

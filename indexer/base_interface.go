@@ -19,8 +19,25 @@ func (p *IndexerMgr) GetOrdinalsWithUtxoId(id uint64) (string, []*common.Range, 
 	return p.rpcService.GetOrdinalsWithUtxoId(id)
 }
 
+// 过滤已经被花费的utxo
 func (p *IndexerMgr) GetUTXOsWithAddress(address string) (map[uint64]int64, error) {
-	return p.rpcService.GetUTXOs(address)
+	mid, err := p.rpcService.GetUTXOs(address)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uint64]int64)
+	for k, v := range mid {
+		utxo, err := p.rpcService.GetUtxoByID(k)
+		if err != nil {
+			continue
+		}
+		// 过滤已经被花费的utxo
+		if p.IsUtxoSpent(utxo) {
+			continue
+		}
+		result[k] = v
+	}
+	return result, nil
 }
 
 func (p *IndexerMgr) GetSyncHeight() int {
