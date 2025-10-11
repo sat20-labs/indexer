@@ -8,6 +8,17 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+
+type Brc20TickerOrder int
+
+const (
+	// 0: inscribe-mint  1: inscribe-transfer  2: transfer
+	BRC20_TICKER_ORDER_DEPLOYTIME_DESC Brc20TickerOrder = iota
+	BRC20_TICKER_ORDER_HOLDER_DESC
+	BRC20_TICKER_ORDER_TRANSACTION_DESC
+)
+
+
 func (p *BRC20Indexer) TickExisted(ticker string) bool {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -25,15 +36,6 @@ func (p *BRC20Indexer) GetAllTickers() []string {
 
 	return ret
 }
-
-type Brc20TickerOrder int
-
-const (
-	// 0: inscribe-mint  1: inscribe-transfer  2: transfer
-	BRC20_TICKER_ORDER_DEPLOYTIME_DESC Brc20TickerOrder = iota
-	BRC20_TICKER_ORDER_HOLDER_DESC
-	BRC20_TICKER_ORDER_TRANSACTION_DESC
-)
 
 func (p *BRC20Indexer) GetTickers(start, limit uint64, order Brc20TickerOrder) (ret []*BRC20TickInfo, total uint64) {
 	p.mutex.RLock()
@@ -295,13 +297,21 @@ func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20Transfer
 			if err == common.ErrKeyNotFound {
 				continue
 			} else if err != nil {
-				common.Log.Panicf("GetTickFromDB error: %v", err)
+				common.Log.Errorf("GetTickFromDB error: %v", err)
+				continue
+			}
+			ticker := p.GetTicker(result.Ticker)
+			if ticker == nil {
+				continue
+			}
+			amt, err := common.NewDecimalFromString(result.Amount, int(ticker.Decimal))
+			if err != nil {
 				continue
 			}
 			ret = append(ret, &common.BRC20TransferInfo{
 				InscriptionId: nft.Base.InscriptionId,
 				Name:          result.Ticker,
-				Amt:           result.Amount,
+				Amt:           amt,
 			})
 			// 	} else {
 			// 		ret = append(ret, &common.BRC20TransferInfo{

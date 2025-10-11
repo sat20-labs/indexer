@@ -305,6 +305,14 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.Tick
 		}
 	}
 
+	brc20Assets := b.brc20Indexer.GetUtxoAssets(utxoId)
+	if len(brc20Assets) > 0 {
+		for _, v := range brc20Assets {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: v.Name}
+			result[tickName] = v.Amt
+		}
+	}
+
 	return result
 }
 
