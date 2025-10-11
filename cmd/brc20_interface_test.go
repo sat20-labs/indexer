@@ -13,7 +13,7 @@ import (
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
-var firstTestnet4Brc20Name = "GC  "
+var firstTestnet4Brc20Name = "box1"
 
 // var tickerName = "GC  " // box6
 var brc20Indexer *brc20.BRC20Indexer
@@ -47,7 +47,7 @@ func printBrc20Ticker(t *testing.T, ticker *common.BRC20Ticker) {
 
 	nftInfo := indexerMgr.GetNftInfoWithInscriptionId(ticker.StartInscriptionId)
 	deployAddress := indexerMgr.GetAddressById(nftInfo.OwnerAddressId)
-	// deployTime := time.Unix(int64(nftInfo.Base.BlockTime), 0).Format("2006-01-02 15:04:05")
+	deployTime := time.Unix(int64(ticker.DeployTime), 0).Format("2006-01-02 15:04:05")
 
 	completedTime := ""
 	if ticker.EndInscriptionId != "" {
@@ -57,7 +57,7 @@ func printBrc20Ticker(t *testing.T, ticker *common.BRC20Ticker) {
 
 	t.Logf(format, ticker.Name,
 		ticker.Nft.Base.InscriptionId, ticker.Max.String(), ticker.Minted.String(), ticker.Limit.String(), ticker.Decimal, ticker.SelfMint, deployAddress,
-		ticker.DeployTime, completedTime, ticker.StartInscriptionId, ticker.EndInscriptionId,
+		deployTime, completedTime, ticker.StartInscriptionId, ticker.EndInscriptionId,
 		ticker.HolderCount, ticker.TransactionCount,
 	)
 
@@ -73,11 +73,11 @@ func TestInterfaceBrc20(t *testing.T) {
 	isExist := brc20Indexer.TickExisted(firstTestnet4Brc20Name)
 	t.Logf("brc20 ticker IsExist: %+v\n", isExist)
 	// 3
-	tickers, total := brc20Indexer.GetTickers(0, 1000, brc20.BRC20_TICKER_ORDER_DEPLOYTIME_DESC)
-	t.Logf("GetRuneInfos return brc20Info total count: %d\n", total)
-	for i, v := range tickers {
-		t.Logf("GetRuneInfos return brc20Info %d: %+v\n", i, v)
-	}
+	// tickers, total := brc20Indexer.GetTickers(0, 1000, brc20.BRC20_TICKER_ORDER_DEPLOYTIME_DESC)
+	// t.Logf("brc20Indexer return brc20Info total count: %d\n", total)
+	// for i, v := range tickers {
+	// 	t.Logf("brc20Indexer return brc20Info %d: %+v\n", i, v.Name)
+	// }
 }
 
 type HolderBalance struct {
@@ -135,4 +135,3 @@ func TestBrc20GetAddressMintHistory(t *testing.T) {
 	// 	t.Logf("GetAddressMintHistory return txids %d: %+v\n", i, v)
 	// }
 }
-
