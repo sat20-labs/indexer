@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -453,7 +454,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	}
 
 	// max
-	max, err := common.NewDecimalFromString(content.Max, int(ticker.Decimal))
+	max, err := ParseBrc20Amount(content.Max, int(ticker.Decimal))
 	if err != nil {
 		// max invalid
 		common.Log.Warnf("deploy, but max invalid. ticker: %s, max: '%s'", content.Ticker, content.Max)
@@ -486,7 +487,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	ticker.Minted = *minted
 
 	// lim
-	lim, err := common.NewDecimalFromString(content.Lim, int(ticker.Decimal))
+	lim, err := ParseBrc20Amount(content.Lim, int(ticker.Decimal))
 	if err != nil {
 		// limit invalid
 		common.Log.Warnf("deploy, but limit invalid. ticker: %s, limit: '%s'", content.Ticker, content.Lim)
@@ -536,7 +537,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 	}()
 
 	// check mint amount
-	amt, err := common.NewDecimalFromString(content.Amt, int(ticker.Decimal))
+	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
 	if err != nil {
 		common.Log.Warnf("mint %s, but invalid amount(%s)", content.Ticker, content.Amt)
 		return nil
@@ -575,7 +576,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 	}
 
 	// check amount
-	amt, err := common.NewDecimalFromString(content.Amt, int(ticker.Decimal))
+	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
 	if err != nil {
 		common.Log.Warnf("transfer, but invalid amount")
 		return nil
@@ -1211,4 +1212,14 @@ func (b *IndexerMgr) isLptTicker(name string) bool {
 	// _, err :=  strconv.Atoi(num)
 	// return err == nil
 
+}
+
+func ParseBrc20Amount(amt string, dec int) (*common.Decimal, error) {
+	if len(amt) > 0 {
+		if amt[0] == '+' || amt[0] == '-' {
+			return nil, fmt.Errorf("invalid amount: %s", amt)
+		}
+	}
+	ret, err := common.NewDecimalFromString(amt, dec)
+	return ret, err
 }
