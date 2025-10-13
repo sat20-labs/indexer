@@ -642,6 +642,9 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 		if b.RunesIndexer.IsExistAsset(utxoId) {
 			continue
 		}
+		if assets := b.brc20Indexer.GetUtxoAssets(utxoId); len(assets) > 0 {
+			continue
+		}
 		_, rngs, err := b.GetOrdinalsWithUtxoId(utxoId)
 		if err == nil {
 			if b.exotic.HasExoticInRanges(rngs) {
