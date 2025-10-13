@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -16,6 +17,18 @@ func TestDecimal(t *testing.T) {
 		d3 := DecimalMul(d2, d1)
 		d4 := DecimalMulV2(d2, d1)
 		fmt.Printf("d4  string: %s\n", d4.String())
+
+		buf, err := json.Marshal(d4)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("json: %s\n", string(buf))
+		var d5 Decimal
+		err = json.Unmarshal(buf, &d5)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("d5  string: %s\n", d5.String())
 		
 		fmt.Printf("d4  string: %s\n", d4.SetPrecision(2).String())
 		//d3,_ := NewDecimalFromString("-0.49", 10)
