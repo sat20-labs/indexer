@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -222,6 +223,36 @@ func (d *Decimal) ToFormatString() string {
 		return "0:0"
 	}
 	return fmt.Sprintf("%s:%d", d.String(), d.Precision)
+}
+
+// 实现自定义 JSON 序列化逻辑
+func (d *Decimal) MarshalJSON() ([]byte, error) {
+    return json.Marshal(map[string]interface{}{
+        "Precision": d.Precision,
+        "Value":     d.Value.String(),
+    })
+}
+
+// 实现自定义反序列化逻辑
+func (d *Decimal) UnmarshalJSON(data []byte) error {
+    var tmp struct {
+        Precision int `json:"Precision"`
+        Value     string `json:"Value"`
+    }
+
+    if err := json.Unmarshal(data, &tmp); err != nil {
+        return err
+    }
+
+	n := new(big.Int)
+    n, ok := n.SetString(tmp.Value, 10)
+    if !ok {
+        return fmt.Errorf("invalid value %s", tmp.Value)
+    }
+
+    d.Precision = tmp.Precision
+    d.Value = n
+    return nil
 }
 
 // alignPrecision 将两个 Decimal 对齐到同一精度，返回新值和目标精度
