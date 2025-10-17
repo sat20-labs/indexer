@@ -159,16 +159,16 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				}
 
 				// transfers
-				// if edict.ID.Cmp(zeroId) == 0 {
-				// 	if etchedRune == nil {
-				// 		common.Log.Panicf("RuneIndexer.index_runes-> etched rune not found")
-				// 	}
-				// } else {
+				if edict.ID.Cmp(zeroId) == 0 {
+					if etchedRune == nil {
+						common.Log.Panicf("RuneIndexer.index_runes-> etched rune not found")
+					}
+				} else {
 					runeEntry := s.idToEntryTbl.Get(id)
 					if runeEntry == nil {
 						common.Log.Panicf("RuneIndexer.index_runes-> rune entry not found")
 					}
-				//}
+				}
 
 				allocate := func(balance *runestone.Lot, amount *runestone.Lot, output uint32) {
 					if amount.Value.Cmp(uint128.Zero) > 0 {
