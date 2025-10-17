@@ -3,7 +3,6 @@ package runes
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/OLProtocol/go-bitcoind"
@@ -74,15 +73,15 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	}
 	sinceTime := time.Since(startTime)
 	txCount := len(block.Transactions)
-	format := "RuneIndexer.UpdateTransfer-> handle block succ, height:%d, tx count:%d, update holder count:%d, remove holder count:%d, block took time:%v, tx took avg time:%v"
-	common.Log.Infof(format, block.Height, txCount, s.HolderUpdateCount, s.HolderRemoveCount, sinceTime, sinceTime/time.Duration(txCount))
+	format := "RuneIndexer.UpdateTransfer-> handle block succ, tx count:%d, update holder count:%d, remove holder count:%d, block took time:%v"
+	common.Log.Infof(format, txCount, s.HolderUpdateCount, s.HolderRemoveCount, sinceTime)
 	s.update()
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
-	if tx.Txid == "9ad1ba215e80ff9a31ef2d261365c5268686fad84493ef8461b5ef4338983d1e" {
-		common.Log.Trace("RuneIndexer.index_runes-> location tx")
-	}
+	// if tx.Txid == "9ad1ba215e80ff9a31ef2d261365c5268686fad84493ef8461b5ef4338983d1e" {
+	// 	common.Log.Trace("RuneIndexer.index_runes-> location tx")
+	// }
 	var artifact *runestone.Artifact
 	artifact, err = parseArtifact(tx)
 	if err != nil {
@@ -92,6 +91,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	} else {
 		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
 	}
+	// if artifact != nil && artifact.Runestone != nil && artifact.Runestone.Edicts != nil {
+	// 	common.Log.Infof("%v", artifact.Runestone.Etching)
+	// }
 
 	unallocated := s.unallocated(tx)
 
@@ -101,7 +103,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		allocated[uint32(outputIndex)] = make(table.RuneIdLotMap)
 	}
 
-	var bornedRuneEntry *runestone.RuneEntry
 	var mintAmount *runestone.Lot
 	var outIndex *uint32
 	var mintRuneId *runestone.RuneId
@@ -113,7 +114,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			var err error
 			mintAmount, err = s.mint(mintRuneId)
 			if err == nil && mintAmount != nil {
-				unallocated.GetOrDefault(mintRuneId).AddAssign(mintAmount)
+				unallocated.GetOrDefault(mintRuneId).AddAssign(mintAmount) // 铸造
 				mintRuneEntry := s.idToEntryTbl.Get(mintRuneId)
 				if mintRuneEntry == nil {
 					common.Log.Panicf("RuneIndexer.index_runes-> mintRuneEntry is nil")
@@ -129,7 +130,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					premine = artifact.Runestone.Etching.Premine
 				}
 				premineAmount := runestone.NewLot(premine)
-				unallocated.GetOrDefault(etchedId).AddAssign(premineAmount)
+				unallocated.GetOrDefault(etchedId).AddAssign(premineAmount) // 预分配
 			}
 
 			zeroId := runestone.RuneId{Block: uint64(0), Tx: uint32(0)}
@@ -158,16 +159,16 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				}
 
 				// transfers
-				if edict.ID.Cmp(zeroId) == 0 {
-					if etchedRune == nil {
-						common.Log.Panicf("RuneIndexer.index_runes-> etched rune not found")
-					}
-				} else {
+				// if edict.ID.Cmp(zeroId) == 0 {
+				// 	if etchedRune == nil {
+				// 		common.Log.Panicf("RuneIndexer.index_runes-> etched rune not found")
+				// 	}
+				// } else {
 					runeEntry := s.idToEntryTbl.Get(id)
 					if runeEntry == nil {
 						common.Log.Panicf("RuneIndexer.index_runes-> rune entry not found")
 					}
-				}
+				//}
 
 				allocate := func(balance *runestone.Lot, amount *runestone.Lot, output uint32) {
 					if amount.Value.Cmp(uint128.Zero) > 0 {
@@ -177,6 +178,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				}
 
 				if output == uint32(len(tx.Outputs)) {
+					// 广播分配
 					// find non-OP_RETURN outputs
 					var destinations []uint32
 					for outputIndex, output := range tx.Outputs {
@@ -186,6 +188,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					}
 					if len(destinations) > 0 {
 						if amount.Value.Cmp(uint128.Zero) == 0 {
+							// 平均分配
 							destinationsLen := uint128.From64(uint64(len(destinations)))
 							amount := balance.Div(&destinationsLen)
 							remainder := balance.Rem(&destinationsLen).Value.Big().Uint64()
@@ -199,6 +202,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 								}
 							}
 						} else {
+							// 按指定量分配
 							for _, output := range destinations {
 								var lot *runestone.Lot
 								if balance.Cmp(&amount.Value) > 0 {
@@ -211,6 +215,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 						}
 					}
 				} else {
+					// 单一分配
 					// Get the allocatable amount
 					var value *runestone.Lot
 					if amount.Value.Cmp(uint128.Zero) == 0 {
@@ -229,8 +234,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		if etchedRune != nil {
 			s.runeToIdTbl.Insert(etchedRune, etchedId)
-			bornedRuneEntry = s.create_rune_entry(tx, artifact, etchedId, etchedRune)
-			s.idToEntryTbl.Insert(etchedId, bornedRuneEntry)
+			newRuneEntry := s.create_rune_entry(tx, artifact, etchedId, etchedRune)
+			s.idToEntryTbl.Insert(etchedId, newRuneEntry)
 		}
 	}
 
@@ -262,18 +267,18 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			outIndex = pointer
 			find = true
 		} else if (*pointer) >= uint32(len(allocated)) {
-			common.Log.Panicf("RuneIndexer.index_runes-> pointer out of range")
+			common.Log.Panicf("RuneIndexer.index_runes-> pointer out of range") // 无效的符文，前面应该已经设置为Cenotaph
 		}
 		if find {
 			for id, balance := range unallocated {
 				if balance.Value.Cmp(uint128.Zero) > 0 {
-					allocated[*outIndex].GetOrDefault(&id).AddAssign(balance)
+					allocated[*outIndex].GetOrDefault(&id).AddAssign(balance) // 
 				}
 			}
 		} else {
 			for id, balance := range unallocated {
 				if balance.Value.Cmp(uint128.Zero) > 0 {
-					burned.GetOrDefault(&id).AddAssign(balance)
+					burned.GetOrDefault(&id).AddAssign(balance) // 没有有效的输出，直接烧了
 				}
 			}
 		}
@@ -289,9 +294,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	}
 	type RuneBalanceArray []*RuneIdOutpointAddressToBalance
 	runeBalanceArray := make(RuneBalanceArray, 0)
-
-	type RuneIdToAddressRuneIdToMintHistoryMap map[runestone.RuneId]table.AddressRuneIdToMintHistory
-	runeIdToAddressRuneIdToMintHistoryMap := make(RuneIdToAddressRuneIdToMintHistoryMap)
 
 	// update outpoint balances
 	for vout, balances := range allocated {
@@ -311,7 +313,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			continue
 		}
 		// Sort balanceArray by id so tests can assert balanceArray in a fixed order
-		outpoint := &table.OutPoint{Txid: tx.Txid, Vout: vout, UtxoId: common.GetUtxoId(tx.Outputs[vout])}
+		outpoint := &table.OutPoint{UtxoId: common.GetUtxoId(tx.Outputs[vout])}
 		address, err := parseTxVoutScriptAddress(tx, int(vout), *s.chaincfgParam)
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
@@ -319,8 +321,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		}
 		addressId := s.BaseIndexer.GetAddressId(string(address))
 		outpointToBalancesValue := &table.OutpointToBalancesValue{
-			Utxo:       fmt.Sprintf("%s:%d", tx.Txid, vout),
-			Address:    string(address),
+			UtxoId:     outpoint.UtxoId,
 			AddressId:  addressId,
 			RuneIdLots: balances.GetSortArray(),
 		}
@@ -329,11 +330,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		// update runeIdToOutputMap and runeIdToAddressMap
 		for runeId, balance := range balances {
 			if balance.Value.Cmp(uint128.Zero) > 0 {
-				runeIdToAddressRuneIdToMintHistoryMap[runeId] = table.AddressRuneIdToMintHistory{
-					Address: address, RuneId: &runeId, OutPoint: outpoint,
-					AddressId: addressId,
-				}
-
 				runeBalanceArray = append(runeBalanceArray, &RuneIdOutpointAddressToBalance{
 					RuneId:    &runeId,
 					OutPoint:  outpoint,
@@ -351,13 +347,13 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		s.burnedMap.GetOrDefault(&id).AddAssign(amount)
 	}
 
-	if artifact != nil && artifact.Runestone == nil {
-		return
-	}
+	// if artifact != nil && artifact.Runestone == nil { 有默认的转移
+	// 	return
+	// }
 
-	if len(burned) > 0 {
-		return
-	}
+	// if len(burned) > 0 { // 有燃烧的符文，不影响其他正常转移的符文
+	// 	return
+	// }
 
 	// add for balances and holder count
 	for _, runeBalance := range runeBalanceArray {
@@ -370,29 +366,22 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		s.runeIdOutpointToBalanceTbl.Insert(runeIdToOutpointToBalance)
 
 		// update addressOutpointToBalance
-		addressOutpointToBalance := &table.AddressOutpointToBalance{
-			AddressId: runeBalance.AddressId,
-			OutPoint:  runeBalance.OutPoint,
-			Address:   runeBalance.Address,
-			RuneId:    runeBalance.RuneId,
-			Balance:   runeBalance.Balance,
-		}
-		oldAddressOutpointToBalance := s.addressOutpointToBalancesTbl.Get(addressOutpointToBalance)
-		if oldAddressOutpointToBalance != nil {
-			addressOutpointToBalance.Balance.AddAssign(&oldAddressOutpointToBalance.Balance)
-		}
-
+		// addressOutpointToBalance := &table.AddressOutpointToBalance{
+		// 	AddressId: runeBalance.AddressId,
+		// 	OutPoint:  runeBalance.OutPoint,
+		// 	RuneId:    runeBalance.RuneId,
+		// 	Balance:   runeBalance.Balance,
+		// }
+		
 		runeIdAddressToCountKey := &table.RuneIdAddressToCount{
 			RuneId:    runeBalance.RuneId,
 			AddressId: runeBalance.AddressId,
-			Address:   runeBalance.Address,
 		}
 		runeIdAddressToCountValue := s.runeIdAddressToCountTbl.Remove(runeIdAddressToCountKey)
 		if runeIdAddressToCountValue == nil {
 			runeIdAddressToCountValue = &table.RuneIdAddressToCount{
 				RuneId:    runeBalance.RuneId,
 				AddressId: runeBalance.AddressId,
-				Address:   runeBalance.Address,
 				Count:     0,
 			}
 		}
@@ -407,7 +396,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		} else {
 			common.Log.Tracef("update addressid %d, block %d, HolderCount: %d", runeBalance.AddressId, runeBalance.RuneId.Block, runeIdAddressToCountValue.Count)
 		}
-		s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
+		//s.addressOutpointToBalancesTbl.Insert(addressOutpointToBalance)
 	}
 
 	// clean and sub for balances
@@ -424,7 +413,6 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			value = &table.RuneIdAddressToBalance{
 				RuneId:    runeBalance.RuneId,
 				AddressId: runeBalance.AddressId,
-				Address:   runeBalance.Address,
 				Balance:   runeBalance.Balance,
 			}
 		}
@@ -432,34 +420,26 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	}
 
 	// update runeIdToMintHistory
-	if mintAmount != nil {
+	if mintAmount != nil && artifact.Runestone != nil {
 		if outIndex == nil {
 			common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
 		}
-		utxo := fmt.Sprintf("%s:%d", tx.Txid, *outIndex)
 		output := tx.Outputs[*outIndex]
 		utxoId := common.GetUtxoId(output)
 		address, err := parseTxVoutScriptAddress(tx, int(*outIndex), *s.chaincfgParam)
 		if err != nil {
-			common.Log.Debugf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
+			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
 				tx.Txid, outIndex, s.chaincfgParam.Net, err)
 		} else {
 			addressId := s.BaseIndexer.GetAddressId(string(address))
 			v := &table.RuneIdToMintHistory{
 				RuneId:    mintRuneId,
-				Utxo:      table.Utxo(utxo),
 				UtxoId:    utxoId,
-				Address:   string(address),
 				AddressId: addressId,
+				Amount:    *mintAmount,
 			}
 			s.runeIdToMintHistoryTbl.Insert(v)
 		}
-	}
-
-	// update addressRuneIdToMintHistory
-	for r, h := range runeIdToAddressRuneIdToMintHistoryMap {
-		v := &table.AddressRuneIdToMintHistory{RuneId: &r, Address: h.Address, OutPoint: h.OutPoint, AddressId: h.AddressId}
-		s.addressRuneIdToMintHistoryTbl.Insert(v)
 	}
 
 	return
@@ -529,10 +509,8 @@ type RuneIdOutPointAddressId struct {
 
 func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) {
 	ret1 = make(table.RuneIdLotMap)
-	for j, input := range tx.Inputs {
+	for _, input := range tx.Inputs {
 		outpoint := &table.OutPoint{
-			Txid:   input.Txid,
-			Vout:   uint32(input.Vout),
 			UtxoId: input.UtxoId,
 		}
 		oldValue := s.outpointToBalancesTbl.Remove(outpoint)
@@ -552,7 +530,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 				runeIdAddressToCountKey := &table.RuneIdAddressToCount{
 					RuneId:    &val.RuneId,
 					AddressId: oldValue.AddressId,
-					Address:   runestone.Address(oldValue.Address),
+					//Address:   runestone.Address(oldValue.Address),
 				}
 				runeIdAddressToCountValue := s.runeIdAddressToCountTbl.Remove(runeIdAddressToCountKey)
 				if runeIdAddressToCountValue != nil {
@@ -560,7 +538,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 						oldRuneEntry := s.idToEntryTbl.Remove(&val.RuneId)
 						common.Log.Tracef("remove addressid %d, block %d, HolderCount: %d", oldValue.AddressId, val.RuneId.Block, oldRuneEntry.HolderCount-1)
 						if oldRuneEntry.HolderCount == 0 {
-							common.Log.Errorf("unallocated-> oldRuneEntry.HolderCount == 0")
+							common.Log.Panic("unallocated-> oldRuneEntry.HolderCount == 0")
 						}
 						oldRuneEntry.HolderCount--
 						s.HolderRemoveCount++
@@ -571,40 +549,34 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 					}
 				}
 
-				addressOutpointToBalance := &table.AddressOutpointToBalance{
-					AddressId: oldValue.AddressId,
-					OutPoint:  outpoint,
-				}
-				s.addressOutpointToBalancesTbl.Remove(addressOutpointToBalance)
-
-				addressRuneIdToMintHistory := &table.AddressRuneIdToMintHistory{
-					AddressId: oldValue.AddressId,
-					Address:   runestone.Address(oldValue.Address),
-					RuneId:    &val.RuneId,
-					OutPoint:  outpoint,
-				}
-				s.addressRuneIdToMintHistoryTbl.Remove(addressRuneIdToMintHistory)
+				// addressOutpointToBalance := &table.AddressOutpointToBalance{
+				// 	AddressId: oldValue.AddressId,
+				// 	OutPoint:  outpoint,
+				// }
+				// s.addressOutpointToBalancesTbl.Remove(addressOutpointToBalance)
 
 				key := &table.RuneIdAddressToBalance{RuneId: &val.RuneId, AddressId: oldValue.AddressId}
 				oldruneIdAddressToBalanceValue := s.runeIdAddressToBalanceTbl.Get(key)
-
-				if oldruneIdAddressToBalanceValue != nil {
-					var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
-					if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
-						amount = uint128.Zero
-					} else {
-						amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
-					}
-					if amount.Cmp(uint128.Zero) != 0 {
-						oldruneIdAddressToBalanceValue.Balance.Value = amount
-						s.runeIdAddressToBalanceTbl.Insert(oldruneIdAddressToBalanceValue)
-					} else {
-						s.runeIdAddressToBalanceTbl.Remove(oldruneIdAddressToBalanceValue)
-					}
+				if oldruneIdAddressToBalanceValue == nil {
+					common.Log.Panicf("address %s has missing rune %s in tx %s", input.Address.Addresses[0], val.RuneId.String(), tx.Txid)
 				}
+				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
+				if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
+					//amount = uint128.Zero
+					common.Log.Panicf("address %s has incorrect rune value in tx %s", input.Address.Addresses[0], tx.Txid)
+				} else {
+					amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
+				}
+				if !amount.IsZero() {
+					oldruneIdAddressToBalanceValue.Balance.Value = amount
+					s.runeIdAddressToBalanceTbl.Insert(oldruneIdAddressToBalanceValue)
+				} else {
+					s.runeIdAddressToBalanceTbl.Remove(oldruneIdAddressToBalanceValue)
+				}
+				
 			}
 		}
-		j++
+
 	}
 	return
 }

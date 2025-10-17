@@ -165,7 +165,7 @@ func (b *IndexerMgr) Init() {
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling, b.rpcService)
+	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling)
 	b.RunesIndexer.Init()
 	b.miniMempool.init()
 
@@ -333,10 +333,11 @@ func (b *IndexerMgr) checkSelf() {
 		b.nft.CheckSelf(b.baseDB) &&
 		b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
 		b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) &&
-		b.RunesIndexer.CheckSelf() &&
+		b.RunesIndexer.CheckSelf(b.rpcService) &&
 		b.ns.CheckSelf(b.baseDB) {
 		common.Log.Infof("IndexerMgr.checkSelf succeed. %v", time.Since(start))
 	} else {
+		b.closeDB()
 		common.Log.Panic("IndexerMgr.checkSelf failed.")
 	}
 }
@@ -465,4 +466,8 @@ func (p *IndexerMgr) dbStatistic() bool {
 	//return p.searchName()
 
 	return false
+}
+
+func (p *IndexerMgr) GetRpcService() *base_indexer.RpcIndexer {
+	return p.rpcService
 }

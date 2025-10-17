@@ -14,7 +14,6 @@ import (
 type RuneIdAddressToCount struct {
 	RuneId    *runestone.RuneId
 	AddressId uint64
-	Address   runestone.Address
 	Count     uint64
 }
 
@@ -31,17 +30,11 @@ func RuneIdAddressToCountFromString(str string) (*RuneIdAddressToCount, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !IsLessStorage {
-		ret.Address = runestone.Address(parts[3])
-	}
 	return ret, nil
 }
 
 func (s *RuneIdAddressToCount) Key() string {
 	ret := s.RuneId.Hex() + "-" + fmt.Sprintf("%x", s.AddressId)
-	if !IsLessStorage {
-		ret += "-" + string(s.Address)
-	}
 	return ret
 }
 
@@ -82,9 +75,6 @@ func (s *RuneIdAddressToCountTable) Get(v *RuneIdAddressToCount) (ret *RuneIdAdd
 
 func (s *RuneIdAddressToCountTable) Insert(v *RuneIdAddressToCount) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_COUNT + v.Key())
-	if IsLessStorage {
-		v.Address = ""
-	}
 	s.Cache.Set(tblKey, v.ToPb())
 }
 
@@ -96,7 +86,6 @@ func (s *RuneIdAddressToCountTable) Remove(v *RuneIdAddressToCount) (ret *RuneId
 		ret.FromPb(pbVal)
 		ret.RuneId = v.RuneId
 		ret.AddressId = v.AddressId
-		ret.Address = v.Address
 	}
 	return
 }

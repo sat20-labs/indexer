@@ -15,7 +15,6 @@ import (
 
 type Indexer struct {
 	dbWrite                       *store.DbWrite
-	RpcService                    *base.RpcIndexer
 	BaseIndexer                   *base.BaseIndexer
 	isUpdateing                   bool
 	chaincfgParam                 *chaincfg.Params
@@ -26,24 +25,24 @@ type Indexer struct {
 	burnedMap                     table.RuneIdLotMap
 	HolderUpdateCount             int
 	HolderRemoveCount             int
-	idToEntryTbl                  *table.RuneIdToEntryTable
-	runeToIdTbl                   *table.RuneToIdTable
-	outpointToBalancesTbl         *table.OutpointToBalancesTable
-	runeIdAddressToBalanceTbl     *table.RuneIdAddressToBalanceTable
-	runeIdOutpointToBalanceTbl    *table.RuneIdOutpointToBalanceTable
-	addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable
-	runeIdAddressToCountTbl       *table.RuneIdAddressToCountTable
-	runeIdToMintHistoryTbl        *table.RuneToMintHistoryTable
-	addressRuneIdToMintHistoryTbl *table.AddressRuneIdToMintHistoryTable
+	idToEntryTbl                  *table.RuneIdToEntryTable // RuneId->RuneEntry
+	runeToIdTbl                   *table.RuneToIdTable // Rune->RuneId
+	outpointToBalancesTbl         *table.OutpointToBalancesTable // utxoId->该utxo包含的所有符文资产数据
+	runeIdAddressToBalanceTbl     *table.RuneIdAddressToBalanceTable // RuneId+AddressId -> Balance
+	runeIdOutpointToBalanceTbl    *table.RuneIdOutpointToBalanceTable // RuneId+utxoId -> 该utxo包含该符文的资产数量
+	runeIdToMintHistoryTbl        *table.RuneToMintHistoryTable // runeId+addressId -> utxoId + amount
+	runeIdAddressToCountTbl       *table.RuneIdAddressToCountTable // runeId+addressId -> utxo的数量
+
+	//addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable // addressId+utxoId -> runeId+balance  TODO 这个没用
+	
 }
 
-func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIndexer, rpcService *base.RpcIndexer) *Indexer {
+func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIndexer) *Indexer {
 	logs := cmap.New[*store.DbLog]()
 	dbWrite := store.NewDbWrite(db, &logs)
 	table.IsLessStorage = true
 	return &Indexer{
 		BaseIndexer:                   baseIndexer,
-		RpcService:                    rpcService,
 		dbWrite:                       dbWrite,
 		chaincfgParam:                 param,
 		burnedMap:                     nil,
@@ -53,10 +52,9 @@ func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIn
 		outpointToBalancesTbl:         table.NewOutpointToBalancesTable(store.NewCache[pb.OutpointToBalances](dbWrite)),
 		runeIdAddressToBalanceTbl:     table.NewRuneIdAddressToBalanceTable(store.NewCache[pb.RuneIdAddressToBalance](dbWrite)),
 		runeIdOutpointToBalanceTbl:    table.NewRuneIdOutpointToBalancesTable(store.NewCache[pb.RuneBalance](dbWrite)),
-		addressOutpointToBalancesTbl:  table.NewAddressOutpointToBalancesTable(store.NewCache[pb.AddressOutpointToBalance](dbWrite)),
+		//addressOutpointToBalancesTbl:  table.NewAddressOutpointToBalancesTable(store.NewCache[pb.AddressOutpointToBalance](dbWrite)),
 		runeIdAddressToCountTbl:       table.NewRuneIdAddressToCountTable(store.NewCache[pb.RuneIdAddressToCount](dbWrite)),
 		runeIdToMintHistoryTbl:        table.NewRuneIdToMintHistoryTable(store.NewCache[pb.RuneIdToMintHistory](dbWrite)),
-		addressRuneIdToMintHistoryTbl: table.NewAddressRuneIdToMintHistoryTable(store.NewCache[pb.AddressRuneIdToMintHistory](dbWrite)),
 	}
 }
 
@@ -102,10 +100,12 @@ func (s *Indexer) Init() {
 		})
 	}
 	s.minimumRune = runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(s.Status.Height))
+
+	s.height = s.Status.Height
 }
 
 func (s *Indexer) Clone() *Indexer {
-	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, s.BaseIndexer, s.RpcService)
+	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, s.BaseIndexer)
 	cloneIndex.height = s.height
 	cloneIndex.Status.Version = s.Status.Version
 	cloneIndex.Status.Height = s.Status.Height
@@ -123,7 +123,7 @@ func (s *Indexer) Subtract(backupIndexer *Indexer) {
 	backupIndexer.dbWrite.Subtract(s.dbWrite)
 }
 
-func (s *Indexer) CheckSelf() bool {
+func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 	common.Log.Infof("total runes: %d", len(s.GetAllRuneIds()))
 
 	var firstRuneName = ""
@@ -167,6 +167,268 @@ func (s *Indexer) CheckSelf() bool {
 	if utxoBalances.Total.Add(runeInfo.Burned).Cmp(totalUtxoBalance) != 0 {
 		common.Log.Errorf("all utxo(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
 		return false
+	}
+
+	if s.chaincfgParam.Net == wire.TestNet4 && s.height >= 74056 {
+		expectedmap1 := map[string]string {
+			// tb1p425q0pyngj5hcge7pu9krhpcu50p5hrpy93ajqt97a3xvzy0lzpsg9v22z
+			// "BESTINSLOT•XYZ": "80643.79667061",
+			// "BTC•PEPE•MATRIX": "13992.64702742",
+			// "CAT•CAT•CUTE•UTE": "152147.49",
+			// "NO•AMOUNT•RUNES": "2443",
+			// "OPEN•YOUR•MOUTH": "195",
+			// "STA•STA•TEST•ONE": "12951.51",
+			// "STA•STA•TEST•TWO": "70435.6803",
+			// "BITCOIN•TESTNET": "80156",
+			// "CAT•CAT•CAT•HELLO": "1622.09",
+			// "DOTSWAP•DOTSWAP": "10354",
+			// "THIRD•IS•TEST•CAT": "1883.6376",
+			// "THIRD•IS•TEST•DOG": "27874.45",
+			// "XV•TEST•THIRD•TWO": "135794.2295",
+			// "GOD•GOD•GOD•GOD•GOD": "24853.963",
+			// "HAVE•HAVE•TESTSIA": "90258.09",
+			// "HAVE•HAVE•TESTSIB": "10009.43",
+			// "SHE•SHE•SHE•SHE•SHE": "97146",
+			// "THIRD•IS•TEST•BIRD": "62533.612268",
+			// "XV•TEST•THIED•FOUR": "928515.06",
+			// "YKO•DDD•DDD•DDD•DDD": "3463.722",
+			// "YKO•KKK•KKK•KKK•KKK": "3797.06607392735198461365",
+			// "YKO•KOT•GGG•GGG•GGG": "729.21",
+			// "THANKS•FOR•YOUR•HELP": "6532",
+			// "THIRD•THIRD•TEST•TEO": "200522.39632",
+			// "HAPPY•HAPPY•FAMILY•WU": "329886.03",
+			// "SATRUN•GIVE•ME•CHANCE": "34",
+			// "YKO•MARCH•BBBBBBBBBB": "1987",
+			// "YKO•MATCH•LOGO•AAAAAAAA": "202934.48",
+			// "JASON•HAPPY•HAPPY•ACE•ACE": "2357.8367",
+
+			// tb1pa3usf65w59zu4g6m264kadzuj38atzwvmgrz3kkdrckt8eq6aexqrckesw
+			"THE•BEST•RUNE": "100",
+			"ABSTRACT•PENGU": "10",
+			"A•CHILL•IGBO•GUY": "4014690.361835",
+			"ARCH•MEMECOINS": "1118063.204118",
+			"BADAITOKENSSS": "131583676.373756",
+			"BCVDSF•FEWQF•EE": "3439175.555718",
+			"BESTINSLOT•XYZ": "72222.20424707",
+			"BITCOIN•PIZZAS": "130030643784792",
+			"BTC•PEPE•MATRIX": "1000",
+			"BULLL•RUN•COINS": "63130529.385838",
+			"CONANGTOCNGAN": "4147728.554485",
+			"DOGE•MEME•RUNES": "28000",
+			"HOT•SEX•JIIIIII": "1708031.262792",
+			"LUCKY•CAT•LUCKY": "3000",
+			"MEMO•SMALL•FISH": "59990.828322",
+			"MYFUNNYDOGSSS": "10",
+			"NIPHERMEDAVEE": "124978015.93439",
+			"OCUMPYZXUZBUK": "846677880979761810.3",
+			"PIZZA•NINJA•CAT": "0.00325",
+			"REAL•TRUMP•COIN": "75955.557441",
+			"RRRQQQEEE•SSSS": "183.41",
+			"RUNE•X•BTC•X•RUNE": "0.00448",
+			"SMARTMONEYDAY": "4681769.245579",
+			"TEST•RUNES•TEST": "1236",
+			"TIMISLATTTWTF": "950",
+			"AKANMU•MEMECOIN": "7889926.299141",
+			"BITCOIN•TESTNET": "592464960349789",
+			"COIN•APACHE•COIN": "14535720.358472",
+			"FLOWEBRS•BTC•WEB": "68384.899373",
+			"JENNIELOVELOVE": "5763426.908152",
+			"MARK•GOONER•BERG": "36625406.269916",
+			"MMMJJJLLL•TESTA": "1394.16",
+			"ORDINAL•MAXI•BIZ": "85994586.88366",
+			"PEPE•GOOD•LOVELY": "52199.705069",
+			"PUPS•WORLD•PEACE": "6408413.483880729890266286",
+			"TESTNETRNES•BBB": "619.51",
+			"TESTNETRNES•CCC": "2198",
+			"THE•DONALD•TRUMP": "83867462.419347",
+			"TWT•COIN•HUPPPPP": "58851825.458757",
+			"YONNNAAAYONNAA": "111530.340927",
+			"ZEENCRYPTO•COIN": "16742755.007761",
+			"ARCH•NETWORK•COIN": "23",
+			"ARSENAL•BEST•TEAM": "1000",
+			"BASED•ANGELS•RUNE": "104962.4",
+			"BULL•RUN•FUN•TOKEN": "10760440.26101",
+			"CATTLEYCATCATTY": "1294118.810031",
+			"CHACHING•BTC•BANK": "32930",
+			"CHIBI•LOVELY•GIRL": "843115.427765",
+			"CHIMERA•PROTOCOL": "500000",
+			"DONALD•TRUMP•MAGA": "99000",
+			"FARMKRU•MEMECOIN": "3033157.73444",
+			"FIRST•SMART•NIGGA": "500",
+			"GDGDGDGDGDGDFGD": "24215",
+			"KOLOBOK•MEMECOIN": "3868091.083352",
+			"LIL•BABY•MEME•COIN": "15388.684779",
+			"LOBO•THE•WOLF•RUNE": "78405",
+			"MAGIC•AGENT•MONEY": "20001",
+			"MELANIA•OFFICIAL": "21111444.766182",
+			"SATURN•TEST•TOKEN": "554194",
+			"TESTNET•RUNE•BUSD": "300412.656813",
+			"THEGREATGANOFUI": "22910642.778334",
+			"THIS•IS•FIRST•RUNE": "2915.7",
+			"THIS•IS•THIRD•RUNE": "5247.2",
+			"TRUE•OGFUNYKYBIT": "2859271.341631",
+			"TRUMP•AND•MELANIA": "12",
+			"BILLION•DOLLAR•CAT": "2608356",
+			"BTCS•BTCS•BTCS•BTCS": "86373909",
+			"BURNING•LIQUIDITY": "1",
+			"DSOTSWAPTEST•TEST": "1492",
+			"DUOLINGO•MEMECOIN": "77904823.450582",
+			"EVERY•THING•NA•TIME": "71720.205681",
+			"GOD•OVER•ALL•POWERS": "14602900.820283",
+			"NIGGA•COIN•FOR•IYOU": "439100.72662",
+			"PAINTBALL•FOREVER": "3342423",
+			"STAR•OF•THE•SEA•COIN": "1",
+			"THIS•IS•SECOND•RUNE": "1766.2",
+			"FUNKY•BIT•CASINO•TWO": "48123.562002",
+			"GRASSOFFICIALCOIN": "2.569859",
+			"MULTICOLORED•STONE": "20000",
+			"TETETETETETETTCCC": "1213",
+			"FRACTAL•TESTNET•FOUR": "145487125621",
+			"FUNKYBIT•BITCOIN•DOG": "3661487.034886",
+			"MEME•BACKED•CURRENCY": "1",
+			"NYARURIAITHE•FUTURE": "33527990.901646",
+			"SATOSHI•NAKAMOTO•HAT": "41552859.314773",
+			"YOU•CANT•STOP•FREEDOM": "1233677.41367248",
+			"ZEOS•WANTS•TRUMP•DOWN": "236293863.587324",
+			"ARCH•FORSWAP•MEMECOIN": "43387.041771",
+			"ELITECHADONLYFORLORD": "2315021.88401",
+			"OKAYYYY•OKAYYYY•OKAYYYY": "30.09",
+			"STRATEGIC•BITCOIN•RESERVE": "500",
+
+		}
+
+		expectedmap2 := map[string]string {
+			// tb1p9hz7n8w66hzgyn5yaefunm6ah2cqxv8dfyvg0mt26wsv345g4c5sfw3w7r
+			"BIMA•USBD•BOOM": "10000",
+			"ADURAGBEMMMMY": "7536550.777762",
+			"BBW•ART•PEGED•VB": "120083.718079",
+			"BERA•TO•THE•MOON": "14159708.466192",
+			"BESTINSLOT•XYZ": "257030.71004138",
+			"BITCOIN•PIZZAS": "286522261380320",
+			"BTC•PEPE•MATRIX": "893971.03021618",
+			"DOGE•MEME•RUNES": "192425",
+			"DRACORAYYYYYY": "825000",
+			"ELON•TRUMP•COIN": "10574352.231961",
+			"JUSTBULLIOOON": "500",
+			"MELANIATRUUMP": "6821916.177824",
+			"MEMEBTCGSDOIT": "114216.281003",
+			"MONAD•OFFICIAL": "10000",
+			"OCUMPYZXUZBUK": "242525025613467397",
+			"OFFICIAL•CRASH": "100000",
+			"PIZZA•NINJA•CAT": "46285.480124",
+			"PRINT•THE•MONEY": "147",
+			"RUNE•X•BTC•X•RUNE": "43175.4076031",
+			"SOSOSOSOSCATT": "6146533.701417",
+			"TEST•RUNES•TEST": "5319",
+			"BAILEYOQ•OGO•OMO": "4810113.300165",
+			"BITCOIN•TESTNET": "2413604042942496",
+			"BURNA•BOY•ODOGWU": "200",
+			"CRYPTOWORLDSSS": "1000",
+			"GCHO•VHJ•HGCKVGH": "106942950.826744",
+			"HEMAN•TO•THE•MOON": "414826",
+			"ICE•AGE•NUT•SCRAT": "8098595.110416",
+			"LILILITESTAAAA": "165.15",
+			"MOON•ALIEN•TOKEN": "74093.194272",
+			"MYMUMISTHEBEST": "1",
+			"NISHANTRAJPOOT": "972330.373758",
+			"NULESMALLZCOIN": "150000000",
+			"OLAJUWONGEORGE": "25878267.13472",
+			"PUPS•WORLD•PEACE": "2543075.933021217080210508",
+			"RAHUL•KUMAR•JAIN": "1224818.850663",
+			"SI•TITID•KOINMUA": "16705.02989",
+			"TESTNETRNES•BBB": "283.22",
+			"TESTNETRNES•CCC": "1179",
+			"THE•FUNKYBIT•DOG": "3910648.293622",
+			"BASED•ANGELS•RUNE": "208000",
+			"BERAARCHNETWORK": "16632964.08638",
+			"BIG•MONEY•AIRDROP": "2779.389303",
+			"BTC•PUNK•MEMECOIN": "16735170.919915",
+			"CHACHING•BTC•BANK": "1451543",
+			"CHIMERA•PROTOCOL": "333865",
+			"CLOWN•CLOWN•CLOWN": "5238864.855103",
+			"DEVIL•KING•TRENER": "3967257.785371",
+			"FOX•UTRFUTFUYJHF": "655381.316812",
+			"GDGDGDGDGDGDFGD": "5183",
+			"HAVE•HAVE•TESTSIA": "10307.64",
+			"HAVE•HAVE•TESTSIC": "8377024.19",
+			"JFMJFMJFMHHHAAA": "0.44",
+			"LOBO•THE•WOLF•RUNE": "120721.31",
+			"MAGIC•AGENT•MONEY": "555345.288",
+			"OFFICIAL•ZACHXBT": "82014.108046",
+			"PIGGY•PIGGY•PIGGY": "22078895.823769",
+			"SHE•SHE•SHE•SHE•SHE": "10647",
+			"SOLANA•ON•BITCOIN": "310000",
+			"TESTNET•RUNE•BUSD": "94359.437791",
+			"THIS•IS•FIRST•RUNE": "2984.8",
+			"THIS•IS•THIRD•RUNE": "3775.4",
+			"WOLRDWOLFAPTAPT": "100000",
+			"BILLION•DOLLAR•CAT": "644573",
+			"BITCOIN•CAT•BITCAT": "1456375.383132",
+			"BTCS•BTCS•BTCS•BTCS": "17307068",
+			"CAT•CAT•CAT•CAT•CATA": "10680430.954335",
+			"DSOTSWAPTEST•TEST": "1293",
+			"DUOLINGO•MEMECOIN": "371946.534984",
+			"OFFICIAL•CREO•COIN": "100182806.093868",
+			"OFFICIAL•ELONMUSK": "50000",
+			"ORDINALS•BANK•BANK": "17408.11264",
+			"SUBMITMERIGHTNOW": "5781271.329454",
+			"THIS•IS•SECOND•RUNE": "1678.2",
+			"GORILLA•MOVERZ•LABS": "14108.384222",
+			"OZIRTSANIYEVSVETY": "12630619.074722",
+			"PIZZA•PET•ON•BITCOIN": "5392097.479065",
+			"PUDGY•PENGUINS•MEME": "98737625.647675",
+			"TETETETETETETTCCC": "331",
+			"VIKINGS•IN•THE•HOUSE": "400000",
+			"FRACTAL•TESTNET•FOUR": "59644416923",
+			"KENECHUKWUTHEGREAT": "16277.954755",
+			"MEME•BACKED•CURRENCY": "148831.9844",
+			"SONICPEPEGRINPOWER": "166928.030751",
+			"YOU•CANT•STOP•FREEDOM": "1474646.19180866",
+			"SMATOKENDEVELOPMENT": "24898.981422",
+			"TRUMP•ELON•VANCE•CHARLIE": "134454.705701",
+			"COSMOCOSMOS•COSMO•COSMOS": "9978215.8148",
+			"DO•NOT•TELL•ME•SO•MUCH•THING": "215",
+			"DOG•GO•TO•THE•MOON•SATOSHINET•TE": "51215",
+		}
+
+		// address := "tb1pa3usf65w59zu4g6m264kadzuj38atzwvmgrz3kkdrckt8eq6aexqrckesw" // 70499
+		//address := "tb1p9hz7n8w66hzgyn5yaefunm6ah2cqxv8dfyvg0mt26wsv345g4c5sfw3w7r" // 74056
+		//address := "tb1p425q0pyngj5hcge7pu9krhpcu50p5hrpy93ajqt97a3xvzy0lzpsg9v22z" // 104225
+
+		checkAmount := func(address string, expectedmap map[string]string) bool {
+			addressId := rpc.GetAddressId(address)
+			utxos, err := rpc.GetUTXOs(address)
+			if err != nil {
+				common.Log.Errorf("GetUTXOs failed, %v", err)
+				return false
+			}
+			assets := s.GetAddressAssets(addressId, utxos)
+			for r, b := range expectedmap {
+				asset, ok := assets[r]
+				if !ok {
+					common.Log.Errorf("can't find rune %s", r)
+					return false
+				}
+				amt := common.NewDecimalFromUint128(asset.Balance, int(asset.Divisibility))
+				if amt.String() != b {
+					common.Log.Errorf("rune %s amount %s incorrect. expected %s", r, asset.Balance.String(), b)
+					return false
+				}
+			}
+			return true
+		}
+
+		address1 := "tb1pa3usf65w59zu4g6m264kadzuj38atzwvmgrz3kkdrckt8eq6aexqrckesw" // 70499
+		if !checkAmount(address1, expectedmap1) {
+			return false
+		}
+		common.Log.Infof("address %s checked!", address1)
+
+		address2 := "tb1p9hz7n8w66hzgyn5yaefunm6ah2cqxv8dfyvg0mt26wsv345g4c5sfw3w7r" // 74056
+		if !checkAmount(address2, expectedmap2) {
+			return false
+		}
+		common.Log.Infof("address %s checked!", address2)
 	}
 
 	common.Log.Infof("runes checked.")

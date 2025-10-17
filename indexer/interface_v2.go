@@ -313,7 +313,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		result[tickName] = &v
 	}
 
-	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address)) // TODO 已经广播的utxo没有过滤
+	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address), utxos) // TODO 已经广播的utxo没有过滤
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
 		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))

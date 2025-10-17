@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
@@ -195,64 +193,28 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 	return result, len(result), nil
 }
 
-type TickHolders struct {
-	LastTimestamp        int64
-	Total                uint64
-	HoldersAddressAmount []*rpcwire.HolderV3
-}
-
-const tickHoldersCacheDuration = 10 * time.Minute
-
-var (
-	runeHoldersCache cmap.ConcurrentMap[string, *TickHolders]
-)
-
-func init() {
-	runeHoldersCache = cmap.New[*TickHolders]()
-}
-
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*rpcwire.HolderV3, uint64, error) {
 	result := make([]*rpcwire.HolderV3, 0)
-	needUpdate := false
+	
+	assetName := common.NewAssetNameFromString(tickName)
+	holders := s.indexer.GetHoldersWithTickV2(assetName)
 
-	if runeHolders, exist := runeHoldersCache.Get(tickName); exist {
-		if time.Since(time.Unix(runeHolders.LastTimestamp, 0)) < tickHoldersCacheDuration {
-			result = runeHolders.HoldersAddressAmount
-		} else {
-			needUpdate = true
+	result = make([]*rpcwire.HolderV3, 0, len(holders))
+	for address, amt := range holders {
+		ordxMintInfo := &rpcwire.HolderV3{
+			Wallet:       s.indexer.GetAddressById(address),
+			TotalBalance: amt.String(),
 		}
-	} else {
-		needUpdate = true
+		result = append(result, ordxMintInfo)
 	}
-
-	if needUpdate {
-		assetName := common.NewAssetNameFromString(tickName)
-		holders := s.indexer.GetHoldersWithTickV2(assetName)
-
-		result = make([]*rpcwire.HolderV3, 0, len(holders))
-		for address, amt := range holders {
-			ordxMintInfo := &rpcwire.HolderV3{
-				Wallet:       s.indexer.GetAddressById(address),
-				TotalBalance: amt.String(),
-			}
-			result = append(result, ordxMintInfo)
-		}
-		sort.Slice(result, func(i, j int) bool {
-			a, _ := common.NewDecimalFromString(result[i].TotalBalance, 20)
-			b, _ := common.NewDecimalFromString(result[j].TotalBalance, 20)
-			return a.Cmp(b) > 0
-		})
-
-		total := uint64(len(result))
-		runeHolders := &TickHolders{
-			LastTimestamp:        time.Now().Unix(),
-			Total:                total,
-			HoldersAddressAmount: result,
-		}
-		runeHoldersCache.Set(tickName, runeHolders)
-	}
+	sort.Slice(result, func(i, j int) bool {
+		a, _ := common.NewDecimalFromString(result[i].TotalBalance, 20)
+		b, _ := common.NewDecimalFromString(result[j].TotalBalance, 20)
+		return a.Cmp(b) > 0
+	})
 
 	total := uint64(len(result))
+	
 	end := total
 	if start >= end {
 		return nil, 0, nil

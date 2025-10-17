@@ -78,8 +78,7 @@ message RuneIdLot {
 }
 
 message OutpointToBalancesValue {
-    string utxo = 1;
-    string Address = 2;
+    uint64 UtxoId = 1;
 	uint64 AddressId = 3;
     repeated RuneIdLot rune_id_lots = 4;
 }
@@ -87,24 +86,23 @@ message OutpointToBalances { OutpointToBalancesValue value = 1; }
 message RuneIdToAddress {}
 message RuneIdToOutpoint {}
 message RuneIdToMintHistory {
-    string Address = 1;
-    uint64 AddressId = 2;
+    uint64 UtxoId = 1;
+    Lot Amount = 2;
 }
 message AddressRuneIdToMintHistory {}
 message RuneBalance {
     Lot Balance = 1;
 }
 message RuneAddressBalance {
-    string Address = 1;
     uint64 AddressId = 2;
     Lot Balance = 3;
 }
 message RuneIdAddressToBalance {
-    string Address = 1;
+    uint64 AddressId = 1;
     Lot Balance = 2; 
 }
 message AddressOutpointToBalance {
-    string Address = 1;
+    uint64 AddressId = 1;
     RuneId runeId = 2;
     Lot Balance = 3;
 }

@@ -12,25 +12,12 @@ import (
 )
 
 type AddressLot struct {
-	Address string
-	Amount  *uint128.Uint128
+	AddressId uint64
+	Amount    *uint128.Uint128
 }
 type AddressIdToAddressLotMap map[uint64]*AddressLot
 
-// type RuneHolders struct {
-// 	LastTimestamp        int64
-// 	HoldersAddressAmount map[uint64]*common.Decimal
-// }
 
-// const tickHoldersInfoCacheDuration = 10 * time.Minute
-
-// var (
-// 	runeHoldersCache cmap.ConcurrentMap[string, *RuneHolders]
-// )
-
-// func init() {
-// 	runeHoldersCache = cmap.New[*RuneHolders]()
-// }
 
 // key: addressId, value: amount
 func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
@@ -63,7 +50,7 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 	for _, balance := range balances {
 		if addressIdToAddressLotMap[balance.AddressId] == nil {
 			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
-				Address: string(balance.Address),
+				AddressId: balance.AddressId,
 				Amount:  &uint128.Uint128{Lo: 0, Hi: 0},
 			}
 		}
@@ -126,7 +113,7 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 	for _, balance := range balances {
 		if addressIdToAddressLotMap[balance.AddressId] == nil {
 			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
-				Address: string(balance.Address),
+				AddressId: balance.AddressId,
 				Amount:  &uint128.Uint128{Lo: 0, Hi: 0},
 			}
 		}
@@ -140,7 +127,6 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 	for addressId, addressLot := range addressIdToAddressLotMap {
 		addressLot := &AddressBalance{
 			AddressId:    addressId,
-			Address:      addressLot.Address,
 			Balance:      *addressLot.Amount,
 			Divisibility: r.Divisibility,
 		}
@@ -233,53 +219,21 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 *
 desc: 根据地址获取该地址所有ticker和持有的数量
 */
-func (s *Indexer) GetAddressAssets(addressId uint64) []*AddressAsset {
-	type RuneBalance struct {
-		RuneEntry *runestone.RuneEntry
-		Balance   uint128.Uint128
-	}
-	type SpaceRuneLotMap map[runestone.SpacedRune]*RuneBalance
-	spaceRuneLotMap := make(SpaceRuneLotMap)
-
-	balances, err := s.addressOutpointToBalancesTbl.GetBalances(addressId)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressAssets-> GetBalances(%d) err:%v", addressId, err)
-	}
-	for _, balance := range balances {
-		runeEntry := s.idToEntryTbl.Get(balance.RuneId)
-		sr := runeEntry.SpacedRune
-		// common.Log.Tracef("runeEntry.SpacedRune: %v", sr.String())
-		if spaceRuneLotMap[sr] == nil {
-			spaceRuneLotMap[sr] = &RuneBalance{
-				Balance:   uint128.Uint128{Lo: 0, Hi: 0},
-				RuneEntry: runeEntry,
+func (s *Indexer) GetAddressAssets(addressId uint64, utxos map[uint64]int64) map[string]*AddressAsset {
+	assetMap := make(map[string]*AddressAsset)
+	for utxoId := range utxos {
+		assets := s.GetUtxoAssets(utxoId)
+		for _, asset := range assets {
+			old, ok := assetMap[asset.Rune]
+			if ok {
+				old.Balance = old.Balance.Add(asset.Balance)
+			} else {
+				assetMap[asset.Rune] = asset
 			}
 		}
-		amount := spaceRuneLotMap[sr].Balance.Add(balance.Balance.Value)
-		spaceRuneLotMap[sr].Balance = amount
 	}
 
-	total := uint64(len(spaceRuneLotMap))
-	ret := make([]*AddressAsset, total)
-	var i = 0
-	for spacedRune, runeBalance := range spaceRuneLotMap {
-		runeEntry := runeBalance.RuneEntry
-		amount := runeBalance.Balance
-		symbol := defaultRuneSymbol
-		if runeEntry.Symbol != nil {
-			symbol = *runeEntry.Symbol
-		}
-		addressLot := &AddressAsset{
-			Rune:         spacedRune.String(),
-			RuneId:       runeEntry.RuneId.String(),
-			Balance:      amount,
-			Divisibility: runeEntry.Divisibility,
-			Symbol:       symbol,
-		}
-		ret[i] = addressLot
-		i++
-	}
-	return ret
+	return assetMap
 }
 
 /*

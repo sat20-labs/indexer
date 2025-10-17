@@ -15,7 +15,6 @@ import (
 type RuneIdAddressToBalance struct {
 	RuneId    *runestone.RuneId
 	AddressId uint64
-	Address   runestone.Address
 	Balance   runestone.Lot
 }
 
@@ -47,7 +46,7 @@ func (s *RuneIdAddressToBalance) ToPb() *pb.RuneIdAddressToBalance {
 				Lo: s.Balance.Value.Lo,
 			},
 		},
-		Address: string(s.Address),
+		AddressId: s.AddressId,
 	}
 	return pbValue
 }
@@ -70,7 +69,7 @@ func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneI
 			common.Log.Panicf("RuneIdAddressToBalanceTable.Get-> RuneIdAddressToBalanceFromString(%s) err:%v", string(tblKey), err)
 			return nil
 		}
-		ret.Address = runestone.Address(pbVal.Address)
+		ret.AddressId = (pbVal.AddressId)
 		ret.Balance = runestone.Lot{
 			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
@@ -94,7 +93,7 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *runestone.RuneId) (ret
 				return nil, err
 			}
 			ret[i] = runeIdAddressOutpointToBalance
-			ret[i].Address = runestone.Address(v.Address)
+			ret[i].AddressId = (v.AddressId)
 			ret[i].Balance = runestone.Lot{
 				Value: uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}}
 			i++
@@ -105,9 +104,6 @@ func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *runestone.RuneId) (ret
 
 func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + v.Key())
-	if IsLessStorage {
-		v.Address = ""
-	}
 	s.Cache.Set(tblKey, v.ToPb())
 }
 

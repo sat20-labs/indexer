@@ -11,7 +11,6 @@ import (
 
 type AddressRuneIdToMintHistory struct {
 	AddressId uint64
-	Address   runestone.Address
 	RuneId    *runestone.RuneId
 	OutPoint  *OutPoint
 }
@@ -32,9 +31,6 @@ func AddressRuneIdToMintHistoryFromString(str string) (*AddressRuneIdToMintHisto
 	if err != nil {
 		return nil, err
 	}
-	if !IsLessStorage {
-		ret.Address = runestone.Address(parts[4])
-	}
 	return ret, nil
 }
 
@@ -44,9 +40,6 @@ func (s *AddressRuneIdToMintHistory) ToPb() *pb.AddressRuneIdToMintHistory {
 
 func (s *AddressRuneIdToMintHistory) Key() (ret string) {
 	ret = strconv.FormatUint(s.AddressId, 16) + "-" + s.RuneId.Hex() + "-" + s.OutPoint.Hex()
-	if !IsLessStorage {
-		ret += "-" + string(s.Address)
-	}
 	return
 }
 
