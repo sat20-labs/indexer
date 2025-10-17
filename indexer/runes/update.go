@@ -421,25 +421,27 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 	// update runeIdToMintHistory
 	if mintAmount != nil && artifact.Runestone != nil {
-		if outIndex == nil {
-			common.Log.Panicf("RuneIndexer.index_runes-> mintOutIndex is nil")
-		}
-		output := tx.Outputs[*outIndex]
-		utxoId := common.GetUtxoId(output)
-		address, err := parseTxVoutScriptAddress(tx, int(*outIndex), *s.chaincfgParam)
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
-				tx.Txid, outIndex, s.chaincfgParam.Net, err)
-		} else {
-			addressId := s.BaseIndexer.GetAddressId(string(address))
-			v := &table.RuneIdToMintHistory{
-				RuneId:    mintRuneId,
-				UtxoId:    utxoId,
-				AddressId: addressId,
-				Amount:    *mintAmount,
+		if outIndex != nil {
+			// 有效的输出
+			output := tx.Outputs[*outIndex]
+			utxoId := common.GetUtxoId(output)
+			address, err := parseTxVoutScriptAddress(tx, int(*outIndex), *s.chaincfgParam)
+			if err != nil {
+				common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
+					tx.Txid, outIndex, s.chaincfgParam.Net, err)
+			} else {
+				addressId := s.BaseIndexer.GetAddressId(string(address))
+				v := &table.RuneIdToMintHistory{
+					RuneId:    mintRuneId,
+					UtxoId:    utxoId,
+					AddressId: addressId,
+					Amount:    *mintAmount,
+				}
+				s.runeIdToMintHistoryTbl.Insert(v)
 			}
-			s.runeIdToMintHistoryTbl.Insert(v)
-		}
+		} //else {
+			// burned
+		//}
 	}
 
 	return
