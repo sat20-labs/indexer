@@ -169,6 +169,191 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 		return false
 	}
 
+	checkAmount := func(address string, expectedmap map[string]string) bool {
+		addressId := rpc.GetAddressId(address)
+		utxos, err := rpc.GetUTXOs(address)
+		if err != nil {
+			common.Log.Errorf("GetUTXOs failed, %v", err)
+			return false
+		}
+		assets := s.GetAddressAssets(addressId, utxos)
+
+		if len(assets) != len(expectedmap) {
+			common.Log.Errorf("assets account different, have %d but expected %d", len(assets), len(expectedmap))
+			return false
+		}
+		for r, b := range expectedmap {
+			asset, ok := assets[r]
+			if !ok {
+				common.Log.Errorf("can't find rune %s", r)
+				return false
+			}
+			amt := common.NewDecimalFromUint128(asset.Balance, int(asset.Divisibility))
+			if amt.String() != b {
+				common.Log.Errorf("rune %s amount %s incorrect. expected %s", r, asset.Balance.String(), b)
+				return false
+			}
+		}
+		return true
+	}
+
+	if s.chaincfgParam.Net == wire.MainNet && s.height == 919482 {
+		expectedmap1 := map[string]string{
+			// bc1p50n9sksy5gwe6fgrxxsqfcp6ndsfjhykjqef64m8067hfadd9efqrhpp9k DOG
+			"USDT•TETHER": "1000000",
+			"LOBO•THE•WOLF": "20000000",
+			"WE•ALL•LOVE•PI": "62831853071795",
+			"WZRD•BITCOIN": "19999",
+			"BITCOIN•PENIS": "9999999.999",
+			"BTC•NINJA•SATS": "1",
+			"CZ•CZ•CZ•CZ•CZ•CZ": "1999",
+			"DOBERMAN•COIN": "44.444",
+			"DOG•OF•BITCOIN": "2000",
+			"FLOKI•INU•COIN": "3333333333.333",
+			"GANGSTERS•CAT": "1000000",
+			"HACHIKO•RUNES": "8888",
+			"MOON•CAT•RUNES": "333.333",
+			"ORDI•CATS•ARMY": "33.333",
+			"ORDI•ETHEREUM": "10",
+			"ORDI•GOLD•COIN": "750",
+			"RESTAURANTES": "8",
+			"SATOSHI•RUNES": "10",
+			"SHIBA•FRACTAL": "4444444.444",
+			"SHIBA•ON•OPNET": "1777",
+			"SHIB•SHIBA•INU": "9999999.999",
+			"STACKING•SATS": "2100",
+			"TOTOMATO•MEME": "210000000",
+			"AMERICAN•RUNES": "210000",
+			"BABY•SHIBA•COIN": "555.555",
+			"BITCOIN•ESTATE": "100",
+			"BTC•TRUMP•RUNES": "888",
+			"BTICH•GO•TO•MARS": "100000",
+			"DOGECOIN•CHAIN": "8888888.888",
+			"DOGE•TROLL•COIN": "1333.332",
+			"MACKEREL•PACKS": "100000",
+			"MOTOSWAP•RUNES": "100",
+			"OFFICIAL•TRAMP": "1000",
+			"ORDI•ALIEN•COIN": "22.222",
+			"PAPA•RAZZI•MEME": "1200000",
+			"RUNES•X•BITCOIN": "156544705",
+			"SSSSS•BTC•SSSSS": "299.999",
+			"BABY•DOGE•CRYPTO": "222.222",
+			"BITCOIN•IN•GREEN": "2000000",
+			"BITCOIN•RHODIUM": "100",
+			"BITCOIN•SWAP•NET": "9004",
+			"DOG•FRACTAL•COIN": "2111.111",
+			"DOG•GO•TO•THE•MOON": "4320806228.54329",
+			"JOKER•RUNES•COIN": "21000",
+			"LIQUIDIUM•TOKEN": "53941.88",
+			"NICOLAS•PI•RUNES": "1300",
+			"NIKOLA•TESLA•GOD": "20",
+			"OKX•NETWORK•SATS": "4444444.444",
+			"PI•PROTOCOL•SATS": "39876543210.987",
+			"SATOSHI•FRACTAL": "1188.888",
+			"THE•BITCOIN•CHIP": "6900",
+			"ANONYMOUS•PLANET": "10000000",
+			"ANSEM•WIF•NO•HANDS": "1000",
+			"BULLX•BULLX•BULLX": "1400",
+			"DOGE•BILLIONAIRE": "1000000",
+			"DOGS•DAO•MEMECOIN": "1000000",
+			"FIRST•CAT•ON•CHAIN": "1000",
+			"FISH•FRACTAL•COIN": "8888.888",
+			"GOLD•BITCOIN•COIN": "111.111",
+			"MOONVEMBER•TRUMP": "1000000",
+			"PROTO•RUNES•STATE": "6000",
+			"RSIC•GENESIS•RUNE": "888",
+			"WUKONG•MAGIC•BOOK": "1.111",
+			"ZBIT•BLUE•BITCOIN": "1",
+			"BITCOIN•PALLADIUM": "100",
+			"BITCOINS•IN•CHARGE": "500000",
+			"BLACKGOO•BLACKGOO": "99999",
+			"EPIC•EPIC•EPIC•EPIC": "2000",
+			"FIRA•ROBOWORLD•CUP": "8888888.888",
+			"FRACTAL•BITCOIN•PI": "26179938780",
+			"MAGIC•EDEN•NETWORK": "85555555.554",
+			"ORDI•OXBT•SATS•RATS": "1000000",
+			"PIXEL•UNDERGROUND": "5555",
+			"WONDERLANDWABBIT": "25000",
+			"DOGETOSHI•PEPEMOTO": "1000000",
+			"FOUR•HUNDRED•TWENTY": "10",
+			"FRACTAL•BITCOIN•MAP": "4444444.444",
+			"OKX•METAVERSE•RUNES": "150",
+			"OKX•NETWORK•BITCOIN": "12",
+			"SATOSHI•BITCOIN•SAT": "1000000000",
+			"THE•MILLIONARE•COIN": "10",
+			"UNISAT•NETWORK•DOGS": "333.333",
+			"UNISAT•NETWORK•SATS": "42222.222",
+			"BASED•INTERNET•PANDA": "5000",
+			"BITCOIN•FRACTAL•COIN": "0.00001",
+			"DOGE•FRACTAL•BITCOIN": "515151.515",
+			"FRACTAL•BITCOIN•SATS": "11111.111",
+			"BITCOIN•RUNESTONE•DOG": "100000",
+			"FRACTAL•BITCOIN•RUNES": "900000",
+			"FROM•BITCOIN•WITH•LOVE": "888",
+			"TROLL•TRUMP•PRESIDENT": "1777777777.776",
+			"FRACTAL•PROTOCOL•RUNES": "444.444",
+			"INTERGALACTIC•BITCOIN": "1",
+			"CATS•MEMECOIN•ON•BITCOIN": "493547142.85715",
+			"FRANKLIN•TEMPLETON•RUNES": "7777777777.777",
+			"FRACTAL•BITCOIN•TO•THE•MOON": "10101010.101",
+			"TWO•IN•THE•PINK•ONE•IN•THE•STINK": "743906250",
+		}
+
+		// bc1qvdnml9vy93twyhpz23dcdscey44d0w242zvfzg UG
+		expectedmap2 := map[string]string{
+			"KANGAROON": "12500000",
+			"APE•SEASON•COIN": "3000000",
+			"BITCOIN•ROBOTS": "150000000000",
+			"DOPE•ASS•TICKER": "240807000",
+			"HYPER•AGI•AGENT": "750000000",
+			"THE•PROTO•RUNES": "4000",
+			"UNCOMMON•GOODS": "2475686",
+			"UNCOMMON•RUNES": "1500000",
+			"WARREN•BUFFETT": "750000",
+			"BTC•RUNES•UP•UP•UP": "200",
+			"DOG•LOOKING•DOWN": "777",
+			"GREED•FRAGMENTS": "1846",
+			"NICOLAS•PI•RUNES": "300",
+			"NON•STOP•NYAN•CAT": "476700000000",
+			"SATOSHI•IS•A•CHAD": "750000",
+			"SGN•SHO•GA•NAI•SGN": "27500000",
+			"TAPROOT•WIZORDS": "2902000000",
+			"THE•BILL•CLINTON": "151515151",
+			"THE•DOLAND•TREMP": "1000",
+			"DOGS•DAO•MEMECOIN": "3472000000",
+			"DOPE•ASS•RUNE•COIN": "189000",
+			"MR•MONOPOLY•COINS": "1000",
+			"REAL•DONALD•TRUMP": "100000",
+			"RSIC•GENESIS•RUNE": "8880",
+			"YOU•MAY•ETCH•MY•ASS": "750000",
+			"EPIC•EPIC•EPIC•EPIC": "58500",
+			"JESUS•IS•MY•SAVIOUR": "750000",
+			"QUANTUM•CAT•WIF•CAP": "1050000000000",
+			"RUNESTONE•WIZARDS": "375000",
+			"THE•CASEY•RODARMOR": "75000000",
+			"WONDERLANDWABBIT": "25000",
+			"BUSH•DID•NINE•ELEVEN": "91100000",
+			"FAKE•INTERNET•MONEY": "2976000",
+			"WHERE•LAMBO•GORILLA": "1000000",
+			"MAGA•THE•DONALD•TRUMP": "1108",
+			"AMAZING•PYRAMID•NUMBER": "13614",
+			"SHADOW•WIZARD•MONEY•GANG": "3570",
+			"DEGENERATE•ORDINALS•GAMBLERS": "42075000",
+		}
+
+		address1 := "bc1p50n9sksy5gwe6fgrxxsqfcp6ndsfjhykjqef64m8067hfadd9efqrhpp9k" 
+		if !checkAmount(address1, expectedmap1) {
+			return false
+		}
+		common.Log.Infof("address %s checked!", address1)
+
+		address2 := "bc1qvdnml9vy93twyhpz23dcdscey44d0w242zvfzg"
+		if !checkAmount(address2, expectedmap2) {
+			return false
+		}
+		common.Log.Infof("address %s checked!", address2)
+	}
+
 	if s.chaincfgParam.Net == wire.TestNet4 && s.height >= 74056 {
 		expectedmap1 := map[string]string {
 			// tb1p425q0pyngj5hcge7pu9krhpcu50p5hrpy93ajqt97a3xvzy0lzpsg9v22z
@@ -394,29 +579,6 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 		// address := "tb1pa3usf65w59zu4g6m264kadzuj38atzwvmgrz3kkdrckt8eq6aexqrckesw" // 70499
 		//address := "tb1p9hz7n8w66hzgyn5yaefunm6ah2cqxv8dfyvg0mt26wsv345g4c5sfw3w7r" // 74056
 		//address := "tb1p425q0pyngj5hcge7pu9krhpcu50p5hrpy93ajqt97a3xvzy0lzpsg9v22z" // 104225
-
-		checkAmount := func(address string, expectedmap map[string]string) bool {
-			addressId := rpc.GetAddressId(address)
-			utxos, err := rpc.GetUTXOs(address)
-			if err != nil {
-				common.Log.Errorf("GetUTXOs failed, %v", err)
-				return false
-			}
-			assets := s.GetAddressAssets(addressId, utxos)
-			for r, b := range expectedmap {
-				asset, ok := assets[r]
-				if !ok {
-					common.Log.Errorf("can't find rune %s", r)
-					return false
-				}
-				amt := common.NewDecimalFromUint128(asset.Balance, int(asset.Divisibility))
-				if amt.String() != b {
-					common.Log.Errorf("rune %s amount %s incorrect. expected %s", r, asset.Balance.String(), b)
-					return false
-				}
-			}
-			return true
-		}
 
 		address1 := "tb1pa3usf65w59zu4g6m264kadzuj38atzwvmgrz3kkdrckt8eq6aexqrckesw" // 70499
 		if !checkAmount(address1, expectedmap1) {
