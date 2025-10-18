@@ -71,7 +71,6 @@ func (r RuneId) Next(block uint128.Uint128, tx uint128.Uint128) (*RuneId, error)
 	return runeId, nil
 }
 
-// TODO 以后重新编译数据时，可以改成 %d:%d
 func (r RuneId) Hex() string {
 	return fmt.Sprintf("%x:%x", r.Block, r.Tx)
 }

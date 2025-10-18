@@ -58,50 +58,64 @@ func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIn
 	}
 }
 
+func (s *Indexer) setDefaultRune() {
+	firstRuneValue, err := uint128.FromString("2055900680524219742")
+	if err != nil {
+		common.Log.Panicf("RuneIndexer.Init-> uint128.FromString(2055900680524219742) err: %v", err)
+	}
+	r := runestone.Rune{
+		Value: firstRuneValue,
+	}
+	id := &runestone.RuneId{Block: 1, Tx: 0}
+	etching := "0000000000000000000000000000000000000000000000000000000000000000"
+	s.runeToIdTbl.SetToDB(&r, id)
+
+	symbol := defaultRuneSymbol
+	startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)
+	endHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 5)
+	s.idToEntryTbl.SetToDB(id, &runestone.RuneEntry{
+		RuneId:       *id,
+		Burned:       uint128.Uint128{},
+		Divisibility: 0,
+		Etching:      etching,
+		Parent:       nil,
+		Terms: &runestone.Terms{
+			Amount: &uint128.Uint128{Hi: 0, Lo: 1},
+			Cap:    &uint128.Max,
+			Height: [2]*uint64{&startHeight, &endHeight},
+			Offset: [2]*uint64{nil, nil},
+		},
+		Mints:      uint128.Uint128{},
+		Number:     0,
+		Premine:    uint128.Uint128{},
+		SpacedRune: *runestone.NewSpacedRune(r, 128),
+		Symbol:     &symbol,
+		Timestamp:  0,
+		Turbo:      true,
+	})
+}
+
 func (s *Indexer) Init() {
 	isExist := s.Status.Init()
 	if !isExist && s.chaincfgParam.Net == wire.MainNet {
-		firstRuneValue, err := uint128.FromString("2055900680524219742")
-		if err != nil {
-			common.Log.Panicf("RuneIndexer.Init-> uint128.FromString(2055900680524219742) err: %v", err)
-		}
-		r := runestone.Rune{
-			Value: firstRuneValue,
-		}
-		id := &runestone.RuneId{Block: 1, Tx: 0}
-		etching := "0000000000000000000000000000000000000000000000000000000000000000"
-		s.runeToIdTbl.SetToDB(&r, id)
+		s.setDefaultRune()
 
 		s.Status.Number = 1
-		s.Status.UpdateDb()
-
-		symbol := defaultRuneSymbol
-		startHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 4)
-		endHeight := uint64(runestone.SUBSIDY_HALVING_INTERVAL * 5)
-		s.idToEntryTbl.SetToDB(id, &runestone.RuneEntry{
-			RuneId:       *id,
-			Burned:       uint128.Uint128{},
-			Divisibility: 0,
-			Etching:      etching,
-			Parent:       nil,
-			Terms: &runestone.Terms{
-				Amount: &uint128.Uint128{Hi: 0, Lo: 1},
-				Cap:    &uint128.Max,
-				Height: [2]*uint64{&startHeight, &endHeight},
-				Offset: [2]*uint64{nil, nil},
-			},
-			Mints:      uint128.Uint128{},
-			Number:     0,
-			Premine:    uint128.Uint128{},
-			SpacedRune: *runestone.NewSpacedRune(r, 128),
-			Symbol:     &symbol,
-			Timestamp:  0,
-			Turbo:      true,
-		})
+		s.Status.UpdateDb()		
 	}
 	s.minimumRune = runestone.MinimumAtHeight(s.chaincfgParam.Net, uint64(s.Status.Height))
 
 	s.height = s.Status.Height
+
+	id := &runestone.RuneId{Block: 1, Tx: 0}
+	rune := s.idToEntryTbl.Get(id)
+	if rune == nil {
+		s.setDefaultRune()
+		rune = s.idToEntryTbl.Get(id)
+		if rune == nil {
+			common.Log.Panicf("rune %s is not existing", id.String())
+		}
+	}
 }
 
 func (s *Indexer) Clone() *Indexer {
