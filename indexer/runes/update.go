@@ -154,7 +154,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					id = &edict.ID
 				}
 				balance := unallocated.Get(id)
-				if balance == nil {
+				if balance == nil || 
+				balance.Value.IsZero() { // 可能在上一个分配指令中就全部分配出去了 tx = 665f669d03dd4517c8ad2d1aac809a0c3b7878ae7b98bdb4842358fcbfac1849
 					continue
 				}
 
@@ -208,7 +209,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 								if balance.Cmp(&amount.Value) > 0 {
 									lot = runestone.NewLot(&amount.Value)
 								} else {
-									lot = balance
+									lot = balance.Clone()
 								}
 								allocate(balance, lot, output)
 							}
@@ -300,11 +301,11 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if len(balances) == 0 {
 			continue
 		}
-		// for _, balance := range balances {
-		// 	if balance.Value.Cmp(uint128.Zero) == 0 {
-		// 		common.Log.Panicf("RuneIndexer.index_runes-> balance is zero")
-		// 	}
-		// }
+		for _, balance := range balances {
+			if balance.Value.Cmp(uint128.Zero) == 0 {
+				common.Log.Panicf("RuneIndexer.index_runes-> balance is zero")
+			}
+		}
 		// increment burned balances
 		if tx.Outputs[vout].Address.PkScript[0] == txscript.OP_RETURN {
 			for id, balance := range balances {
@@ -518,6 +519,9 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 		oldValue := s.outpointToBalancesTbl.Remove(outpoint)
 		if oldValue != nil {
 			for _, val := range oldValue.RuneIdLots {
+				if val.Lot.Value.IsZero() {
+					common.Log.Panicf("unallocated input rune is zero. tx %s", tx.Txid)
+				}
 				if ret1[val.RuneId] == nil {
 					ret1[val.RuneId] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
 				}
