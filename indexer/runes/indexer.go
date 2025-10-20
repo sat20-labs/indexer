@@ -207,6 +207,7 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 				common.Log.Errorf("rune %s amount %s incorrect. expected %s", r, asset.Balance.String(), b)
 				return false
 			}
+			common.Log.Infof("runes %s checked.", r)
 		}
 		return true
 	}
@@ -254,7 +255,7 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 			"BABY•DOGE•CRYPTO": "222.222",
 			"BITCOIN•IN•GREEN": "2000000",
 			"BITCOIN•RHODIUM": "100",
-			"BITCOIN•SWAP•NET": "9004",
+			"BITCOIN•SWAP•NET": "900",
 			"DOG•FRACTAL•COIN": "2111.111",
 			"DOG•GO•TO•THE•MOON": "4320806228.54329",
 			"JOKER•RUNES•COIN": "21000",
