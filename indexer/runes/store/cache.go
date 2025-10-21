@@ -106,7 +106,12 @@ func (s *DbWrite) Clone(clone *DbWrite) *DbWrite {
 
 func (s *DbWrite) Subtract(dbWrite *DbWrite) {
 	for log := range s.logs.IterBuffered() {
-		if log.Val.TimeStamp <= s.cloneTimeStamp {
+		// 只有该key对应的timestamp不改变，才能删除
+		newlog, ok := dbWrite.logs.Get(log.Key)
+		if !ok {
+			common.Log.Panicf("log %s not found", log.Key)
+		}
+		if newlog.TimeStamp == log.Val.TimeStamp {
 			dbWrite.logs.Remove(log.Key)
 		}
 	}
