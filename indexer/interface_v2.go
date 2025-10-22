@@ -267,6 +267,16 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	return &assetsInUtxo
 }
 
+func genBTCTicker() *common.TickerInfo {
+	return &common.TickerInfo{
+			AssetName:    common.ASSET_PLAIN_SAT,
+			DisplayName:  "BTC",
+			MaxSupply:    "21000000000000000", //  sats
+			Divisibility: 0,
+			N:            1,
+		}
+}
+
 func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo {
 	var result *common.TickerInfo
 	switch tickerName.Protocol {
@@ -276,6 +286,11 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 		return b.GetBRC20TickerV2(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesTickerV2(tickerName.Ticker)
+	case "":
+		if tickerName.Ticker == "" {
+			result = genBTCTicker()
+			result.AssetName = *tickerName
+		}
 	}
 
 	return result
