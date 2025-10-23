@@ -157,7 +157,7 @@ func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, amt commo
 		tickinfo := common.NewBRC20TickAbbrInfo(amt)
 		tickers := make(map[string]*common.BRC20TickAbbrInfo)
 		tickers[ticker] = tickinfo
-		info = &HolderInfo{AddressId: address, Tickers: tickers}
+		info = &HolderInfo{ /*AddressId: address,*/ Tickers: tickers}
 		p.holderMap[address] = info
 		p.tickerMap[ticker].Ticker.HolderCount++
 		p.tickerUpdated[ticker] = p.tickerMap[ticker].Ticker
@@ -192,7 +192,7 @@ func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt commo
 
 	info, ok := p.holderMap[address]
 	if ok {
-		info.AddressId = address
+		// info.AddressId = address
 		tickinfo, ok := info.Tickers[tickerName]
 		if ok {
 			cmp := tickinfo.Balance.Cmp(&amt)
@@ -348,7 +348,8 @@ func (p *BRC20Indexer) UpdateDB() {
 	for _, action := range p.holderActionList {
 		switch action.Action {
 		case Action_InScribe_Mint:
-			toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+			// toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+			toKey := GetHolderInfoKey(action.ToAddr)
 			value, ok := p.holderMap[action.ToAddr]
 			// tickerMinted := p.tickerMap[strings.ToLower(action.Ticker)].Ticker.Minted.String()
 			// common.Log.Infof("action.Ticker:%s, str:%s", action.Ticker, tickerMinted)
@@ -361,7 +362,8 @@ func (p *BRC20Indexer) UpdateDB() {
 				common.Log.Panicf("no find holder info in holderMap :%d", action.ToAddr)
 			}
 		case Action_InScribe_Transfer:
-			toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+			// toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+			toKey := GetHolderInfoKey(action.ToAddr)
 			value, ok := p.holderMap[action.ToAddr]
 			if ok {
 				err := db.SetDB([]byte(toKey), value, wb)
@@ -375,7 +377,8 @@ func (p *BRC20Indexer) UpdateDB() {
 			if action.FromAddr == common.INVALID_ID {
 				common.Log.Panic("action.FromAddr == common.INVALID_ID when action.Action == Action_Transfer")
 			}
-			fromKey := GetHolderInfoKey(action.FromAddr, action.Ticker)
+			// fromKey := GetHolderInfoKey(action.FromAddr, action.Ticker)
+			fromKey := GetHolderInfoKey(action.FromAddr)
 			value, ok := p.holderMap[action.FromAddr]
 			if ok {
 				err := db.SetDB([]byte(fromKey), value, wb)
@@ -390,7 +393,8 @@ func (p *BRC20Indexer) UpdateDB() {
 				}
 			}
 
-			toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+			// toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
+			toKey := GetHolderInfoKey(action.ToAddr)
 			value, ok = p.holderMap[action.ToAddr]
 			if ok {
 				err := db.SetDB([]byte(toKey), value, wb)

@@ -38,44 +38,33 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 		// 设置前缀扫描选项
 
 		key := string(k)
-		addrId, ticker, err := parseHolderInfoKey(key)
-		ticker = strings.ToLower(ticker)
+		addrId, err := parseHolderInfoKey(key)
 		if err != nil {
 			common.Log.Panicln(key + " " + err.Error())
 		} else {
 			var info HolderInfo
 			err = db.DecodeBytes(v, &info)
 			if err == nil {
-				if addrId != info.AddressId {
-					common.Log.Panicln("key addrId and value addrId not equal")
-				}
-				holderMap[addrId] = &info
-				// holder, ok := holderMap[addrId]
-				// if ok {
-				// 	holder.Tickers[ticker] = &info
-				// } else {
-				// 	holder = &HolderInfo{
-				// 		AddressId: addrId,
-				// 		Tickers:   make(map[string]*common.BRC20TickAbbrInfo),
-				// 	}
-				// 	holder.Tickers[ticker] = &info
-				// 	holderMap[addrId] = holder
+				// if addrId != info.AddressId {
+				// 	common.Log.Panicln("key addrId and value addrId not equal")
 				// }
+				holderMap[addrId] = &info
+				for ticker, tickAbbrInfo := range info.Tickers {
+					holders, ok := tickerToHolderMap[ticker]
+					if ok {
+						holders[addrId] = true
+					} else {
+						holders = make(map[uint64]bool)
+						holders[addrId] = true
+					}
+					tickerToHolderMap[ticker] = holders
 
-				holders, ok := tickerToHolderMap[ticker]
-				if ok {
-					holders[addrId] = true
-				} else {
-					holders = make(map[uint64]bool)
-					holders[addrId] = true
-				}
-				tickerToHolderMap[ticker] = holders
-
-				for _, nft := range info.Tickers[ticker].TransferableData {
-					transferNftMap[nft.UtxoId] = &TransferNftInfo{
-						AddressId:   addrId,
-						Ticker:      ticker,
-						TransferNft: nft,
+					for _, nft := range tickAbbrInfo.TransferableData {
+						transferNftMap[nft.UtxoId] = &TransferNftInfo{
+							AddressId:   addrId,
+							Ticker:      ticker,
+							TransferNft: nft,
+						}
 					}
 				}
 			} else {

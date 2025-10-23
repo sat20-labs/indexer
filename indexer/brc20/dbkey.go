@@ -59,26 +59,43 @@ func ParseMintHistoryKey(input string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-func GetHolderInfoKey(addrId uint64, ticker string) string {
-	return fmt.Sprintf("%s%d-%s", DB_PREFIX_TICKER_HOLDER, addrId, ticker)
+// func GetHolderInfoKey(addrId uint64, ticker string) string {
+// 	return fmt.Sprintf("%s%d-%s", DB_PREFIX_TICKER_HOLDER, addrId, ticker)
+// }
+
+func GetHolderInfoKey(addrId uint64) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_TICKER_HOLDER, addrId)
 }
 
-func parseHolderInfoKey(input string) (uint64, string, error) {
+// func parseHolderInfoKey(input string) (uint64, string, error) {
+// 	if !strings.HasPrefix(input, DB_PREFIX_TICKER_HOLDER) {
+// 		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
+// 	}
+// 	str := strings.TrimPrefix(input, DB_PREFIX_TICKER_HOLDER)
+// 	parts := strings.Split(str, "-")
+// 	if len(parts) != 2 {
+// 		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
+// 	}
+
+// 	addrId, err := strconv.ParseUint(parts[0], 10, 64)
+// 	if err != nil {
+// 		return common.INVALID_ID, "", err
+// 	}
+
+// 	return addrId, parts[1], nil
+// }
+
+func parseHolderInfoKey(input string) (uint64, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TICKER_HOLDER) {
-		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
+		return common.INVALID_ID, fmt.Errorf("invalid string format")
 	}
 	str := strings.TrimPrefix(input, DB_PREFIX_TICKER_HOLDER)
-	parts := strings.Split(str, "-")
-	if len(parts) != 2 {
-		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
-	}
-
-	addrId, err := strconv.ParseUint(parts[0], 10, 64)
+	addrId, err := strconv.ParseUint(str, 10, 64)
 	if err != nil {
-		return common.INVALID_ID, "", err
+		return common.INVALID_ID, err
 	}
 
-	return addrId, parts[1], nil
+	return addrId, nil
 }
 
 func newTickerInfo(name string) *BRC20TickInfo {

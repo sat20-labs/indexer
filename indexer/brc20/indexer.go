@@ -42,8 +42,8 @@ const (
 )
 
 type HolderInfo struct {
-	AddressId uint64
-	Tickers   map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
+	// AddressId uint64
+	Tickers map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
 }
 
 type TransferNftInfo struct {
@@ -135,13 +135,13 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 
 		value, ok := s.holderMap[action.FromAddr]
 		if ok {
-			info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+			info := HolderInfo{ /*AddressId: value.AddressId,*/ Tickers: value.Tickers}
 			newInst.holderMap[action.FromAddr] = &info
 		}
 
 		value, ok = s.holderMap[action.ToAddr]
 		if ok {
-			info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+			info := HolderInfo{ /*AddressId: value.AddressId,*/ Tickers: value.Tickers}
 			newInst.holderMap[action.ToAddr] = &info
 		}
 

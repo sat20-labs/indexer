@@ -8,7 +8,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-
 type Brc20TickerOrder int
 
 const (
@@ -17,7 +16,6 @@ const (
 	BRC20_TICKER_ORDER_HOLDER_DESC
 	BRC20_TICKER_ORDER_TRANSACTION_DESC
 )
-
 
 func (p *BRC20Indexer) TickExisted(ticker string) bool {
 	p.mutex.RLock()
@@ -124,12 +122,12 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]*common.
 	for addrId := range holders {
 		holderinfo, ok := p.holderMap[addrId]
 		if !ok {
-			common.Log.Errorf("can't find holder with utxo %d", addrId)
+			common.Log.Panicf("can't find holder with utxo %d", addrId)
 			continue
 		}
 		info, ok := holderinfo.Tickers[tickerName]
 		if ok {
-			mp[holderinfo.AddressId] = &info.Balance
+			mp[addrId] = &info.Balance
 		}
 	}
 
