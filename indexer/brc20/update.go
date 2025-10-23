@@ -359,7 +359,11 @@ func (p *BRC20Indexer) UpdateDB() {
 					common.Log.Panicf("Error setting %s in db %v", toKey, err)
 				}
 			} else {
-				common.Log.Panicf("no find holder info in holderMap :%d", action.ToAddr)
+				err := wb.Delete([]byte(toKey))
+				if err != nil {
+					common.Log.Panicf("Error deleting db %s: %v\n", toKey, err)
+				}
+				// common.Log.Panicf("no find holder info in holderMap :%d", action.ToAddr)
 			}
 		case Action_InScribe_Transfer:
 			// toKey := GetHolderInfoKey(action.ToAddr, action.Ticker)
@@ -371,7 +375,11 @@ func (p *BRC20Indexer) UpdateDB() {
 					common.Log.Panicf("Error setting %s in db %v", toKey, err)
 				}
 			} else {
-				common.Log.Panicf("no find holder info in holderMap :%d", action.ToAddr)
+				err := wb.Delete([]byte(toKey))
+				if err != nil {
+					common.Log.Panicf("Error deleting db %s: %v\n", toKey, err)
+				}
+				// common.Log.Infof("no find holder info in holderMap :%d", action.ToAddr)
 			}
 		case Action_Transfer:
 			if action.FromAddr == common.INVALID_ID {
@@ -402,7 +410,11 @@ func (p *BRC20Indexer) UpdateDB() {
 					common.Log.Panicf("Error setting %s in db %v", toKey, err)
 				}
 			} else {
-				common.Log.Panicf("no find holder info in holderMap :%d", action.ToAddr)
+				err := wb.Delete([]byte(toKey))
+				if err != nil {
+					common.Log.Panicf("Error deleting db %s: %v\n", toKey, err)
+				}
+				// common.Log.Infof("no find holder info in holderMap :%d", action.ToAddr)
 			}
 
 			// 保存历史记录
