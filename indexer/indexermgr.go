@@ -165,7 +165,7 @@ func (b *IndexerMgr) Init() {
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling, b.rpcService)
+	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling)
 	b.RunesIndexer.Init()
 	b.miniMempool.init()
 
@@ -212,51 +212,51 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		if !isRunning {
 			isRunning = true
 			go func() {
-				ret := b.compiling.SyncToChainTip(stopIndexerChan)
-				if ret == 0 {
+					ret := b.compiling.SyncToChainTip(stopIndexerChan)
+					if ret == 0 {
 					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
-						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
-						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
-						b.compiling.SetUpdateDBCallback(nil)
-						b.updateDB()
-						if b.maxIndexHeight <= 0 {
+							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
+							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
+							b.compiling.SetUpdateDBCallback(nil)
+							b.updateDB()
+							if b.maxIndexHeight <= 0 {
 							b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
+							}
 						}
-					}
 
-					if b.maxIndexHeight > 0 {
-						if b.maxIndexHeight <= b.compiling.GetHeight() {
-							b.checkSelf()
-							common.Log.Infof("reach expected height, set exit flag")
+						if b.maxIndexHeight > 0 {
+							if b.maxIndexHeight <= b.compiling.GetHeight() {
+								b.checkSelf()
+								common.Log.Infof("reach expected height, set exit flag")
+								bWantExit = true
+							}
+						}
+
+						b.dbgc()
+						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
+						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
+						// 	period := 1000
+						// 	if b.compiling.GetSyncHeight()%period == 0 {
+						// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
+						// 		b.checkSelf()
+						// 	}
+						// }
+						if b.dbStatistic() {
+							bWantExit = true
+						}
+
+					} else if ret > 0 {
+						// handle reorg
+						b.handleReorg(ret)
+						b.compiling.SyncToChainTip(stopIndexerChan)
+					} else {
+						if ret == -1 {
+							common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
 							bWantExit = true
 						}
 					}
 
-					b.dbgc()
-					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
-					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
-					// 	period := 1000
-					// 	if b.compiling.GetSyncHeight()%period == 0 {
-					// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
-					// 		b.checkSelf()
-					// 	}
-					// }
-					if b.dbStatistic() {
-						bWantExit = true
-					}
-
-				} else if ret > 0 {
-					// handle reorg
-					b.handleReorg(ret)
-					b.compiling.SyncToChainTip(stopIndexerChan)
-				} else {
-					if ret == -1 {
-						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
-						bWantExit = true
-					}
-				}
-
-				isRunning = false
+					isRunning = false
 			}()
 		}
 	}
@@ -333,10 +333,11 @@ func (b *IndexerMgr) checkSelf() {
 		b.nft.CheckSelf(b.baseDB) &&
 		b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
 		b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) &&
-		b.RunesIndexer.CheckSelf() &&
+		b.RunesIndexer.CheckSelf(b.rpcService) &&
 		b.ns.CheckSelf(b.baseDB) {
 		common.Log.Infof("IndexerMgr.checkSelf succeed. %v", time.Since(start))
 	} else {
+		b.closeDB()
 		common.Log.Panic("IndexerMgr.checkSelf failed.")
 	}
 }
@@ -416,7 +417,7 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.nftBackupDB = b.nft.Clone()
 	b.brc20BackupDB = b.brc20Indexer.Clone()
 	b.runesBackupDB = b.RunesIndexer.Clone()
-	common.Log.Infof("prepareDBBuffer backup instance at %d", b.compilingBackupDB.GetHeight())
+	common.Log.Infof("prepareDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
@@ -427,6 +428,8 @@ func (b *IndexerMgr) cleanDBBuffer() {
 	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
 	b.RunesIndexer.Subtract(b.runesBackupDB)
+
+	common.Log.Infof("cleanDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) updateServiceInstance() {
@@ -469,4 +472,8 @@ func (p *IndexerMgr) dbStatistic() bool {
 
 func (b *IndexerMgr) GetBrc20Indexer() *brc20.BRC20Indexer {
 	return b.brc20Indexer
+}
+
+func (p *IndexerMgr) GetRpcService() *base_indexer.RpcIndexer {
+	return p.rpcService
 }

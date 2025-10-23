@@ -94,12 +94,12 @@ func NewDefaultDecimal(v int64) *Decimal {
 }
 
 // v 是乘10的p次方后的值，也就是需要往前点p个小数点才是真正的值
-// func NewDecimal(v int64, p int) *Decimal {
-// 	if p > MAX_PRECISION {
-// 		p = MAX_PRECISION
-// 	}
-// 	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
-// }
+func NewDecimalWithScale(v int64, p int) *Decimal {
+	if p > MAX_PRECISION {
+		p = MAX_PRECISION
+	}
+	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
+}
 
 // v是整数部分的值，小数点不动 （跟NewDecimalFromString类似）
 func NewDecimal(v int64, p int) *Decimal {

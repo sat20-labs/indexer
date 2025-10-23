@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
@@ -13,17 +12,11 @@ import (
 )
 
 type OutPoint struct {
-	Txid   string
-	Vout   uint32
 	UtxoId uint64
 }
 
 func (s *OutPoint) Hex() string {
-	if IsLessStorage {
-		return fmt.Sprintf("%x", s.UtxoId)
-	} else {
-		return fmt.Sprintf("%s:%x:%x", s.Txid, s.Vout, s.UtxoId)
-	}
+	return fmt.Sprintf("%x", s.UtxoId)
 }
 
 func (s *OutPoint) Key() string {
@@ -36,29 +29,11 @@ func OutPointFromUtxoId(utxoId uint64) *OutPoint {
 
 func OutPointFromString(str string) (*OutPoint, error) {
 	outpoint := &OutPoint{}
-	if IsLessStorage {
-		utxoId, err := strconv.ParseUint(str, 16, 64)
-		if err != nil {
-			return nil, err
-		}
-		outpoint.UtxoId = utxoId
-	} else {
-		parts := strings.Split(str, ":")
-		if len(parts) != 3 {
-			return nil, fmt.Errorf("invalid outpoint format")
-		}
-		outpoint.Txid = parts[0]
-		vout, err := strconv.ParseUint(parts[1], 16, 32)
-		if err != nil {
-			return nil, err
-		}
-		outpoint.Vout = uint32(vout)
-		utxoId, err := strconv.ParseUint(parts[2], 16, 64)
-		if err != nil {
-			return nil, err
-		}
-		outpoint.UtxoId = utxoId
+	utxoId, err := strconv.ParseUint(str, 16, 64)
+	if err != nil {
+		return nil, err
 	}
+	outpoint.UtxoId = utxoId
 	return outpoint, nil
 }
 
@@ -101,17 +76,15 @@ func (s RuneIdLotMap) GetSortArray() (ret []*RuneIdLot) {
 }
 
 type OutpointToBalancesValue struct {
-	Utxo       string
+	UtxoId     uint64
 	AddressId  uint64
-	Address    string
 	RuneIdLots []*RuneIdLot
 }
 
 func (s *OutpointToBalancesValue) ToPb() *pb.OutpointToBalances {
 	pbValue := &pb.OutpointToBalances{
 		Value: &pb.OutpointToBalancesValue{
-			Utxo:       s.Utxo,
-			Address:    s.Address,
+			UtxoId:       s.UtxoId,
 			AddressId:  s.AddressId,
 			RuneIdLots: make([]*pb.RuneIdLot, len(s.RuneIdLots)),
 		},
@@ -136,8 +109,7 @@ func (s *OutpointToBalancesValue) ToPb() *pb.OutpointToBalances {
 }
 
 func (s *OutpointToBalancesValue) FromPb(pbValue *pb.OutpointToBalances) {
-	s.Utxo = pbValue.Value.Utxo
-	s.Address = pbValue.Value.Address
+	s.UtxoId = pbValue.Value.UtxoId
 	s.AddressId = pbValue.Value.AddressId
 	for _, pbRuneIdLot := range pbValue.Value.RuneIdLots {
 		runeId := runestone.RuneId{
@@ -177,10 +149,6 @@ func (s *OutpointToBalancesTable) Get(key *OutPoint) (ret OutpointToBalancesValu
 
 func (s *OutpointToBalancesTable) Insert(key *OutPoint, value *OutpointToBalancesValue) (ret *OutpointToBalancesValue) {
 	tblKey := []byte(store.OUTPOINT_TO_BALANCES + key.Key())
-	if IsLessStorage {
-		value.Utxo = ""
-		value.Address = ""
-	}
 	pbVal := s.Cache.Set(tblKey, value.ToPb())
 	if pbVal != nil {
 		ret = &OutpointToBalancesValue{}

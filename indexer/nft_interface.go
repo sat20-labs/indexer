@@ -59,7 +59,7 @@ func (b *IndexerMgr) getNftWithAddressInBuffer(address string) []*common.Nft {
 }
 
 func (b *IndexerMgr) initAddressToNftMap(address string) []*common.Nft {
-	utxoMap, err := b.rpcService.GetUTXOs(address)
+	utxoMap, err := b.GetUTXOsWithAddress(address)
 	if err != nil {
 		common.Log.Warnf("GetNftsWithAddress %s failed. %v", address, err)
 		return nil

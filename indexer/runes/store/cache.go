@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"strings"
 	"sync/atomic"
 	"unsafe"
@@ -48,6 +47,8 @@ func (s *DbWrite) clearLogs() {
 func (s *DbWrite) FlushToDB() {
 	var totalBytes int64
 	count := s.logs.Count()
+	updateCount := 0
+	remmoveCount := 0
 	if count != 0 {
 		wb := s.Db.NewWriteBatch()
 		defer wb.Close()
@@ -56,44 +57,31 @@ func (s *DbWrite) FlushToDB() {
 			totalBytes += int64(unsafe.Sizeof(log.Val))
 			totalBytes += int64(len(log.Val.Val))
 			if log.Val.Type == PUT {
-				wb.Put([]byte(log.Key), log.Val.Val)
-			}
-		}
-
-		isFinishUpdate := false
-		for {
-			if isFinishUpdate {
-				break
-			}
-
-			for log := range s.logs.IterBuffered() {
-				if log.Val.Type == DEL && log.Val.ExistInDb {
+				err := wb.Put([]byte(log.Key), log.Val.Val)
+				if err != nil {
+					common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update Put %s err:%s", log.Key, err.Error())
+				}
+				updateCount++
+			} else if log.Val.Type == DEL {
+				if log.Val.ExistInDb {
 					err := wb.Delete([]byte(log.Key))
 					if err != nil {
-						common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update err:%s", err.Error())
+						common.Log.Panicf("DbWrite.FlushToDB-> storeDb.Update Delete %s err:%s", log.Key, err.Error())
 					}
+					remmoveCount++
 					log.Val.ExistInDb = false
 				}
 			}
-			isFinishUpdate = true
 		}
 
 		err := wb.Flush()
 		if err != nil {
 			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
 		}
+		s.clearLogs()
 	}
-	s.clearLogs()
+	
 
-	updateCount := 0
-	remmoveCount := 0
-	for v := range s.logs.IterBuffered() {
-		if v.Val.Type == DEL {
-			remmoveCount++
-		} else if v.Val.Type == PUT {
-			updateCount++
-		}
-	}
 	common.Log.Infof("DbWrite.FlushToDB-> logs count:%d, update count:%d, remove count:%d, total bytes:%d",
 		count, updateCount, remmoveCount, totalBytes)
 }
@@ -118,7 +106,12 @@ func (s *DbWrite) Clone(clone *DbWrite) *DbWrite {
 
 func (s *DbWrite) Subtract(dbWrite *DbWrite) {
 	for log := range s.logs.IterBuffered() {
-		if log.Val.TimeStamp <= s.cloneTimeStamp {
+		// 只有该key对应的timestamp不改变，才能删除
+		newlog, ok := dbWrite.logs.Get(log.Key)
+		if !ok {
+			common.Log.Panicf("log %s not found", log.Key)
+		}
+		if newlog.TimeStamp == log.Val.TimeStamp {
 			dbWrite.logs.Remove(log.Key)
 		}
 	}
@@ -137,8 +130,8 @@ func NewCache[T any](dbWrite *DbWrite) *Cache[T] {
 func (s *Cache[T]) Get(key []byte) (ret *T) {
 	keyStr := string(key)
 	logs := s.dbWrite.logs
-	count := logs.Count()
-	if count != 0 {
+	// count := logs.Count()
+	// if count != 0 {
 		log, ok := logs.Get(keyStr)
 		if ok {
 			if log.Type == DEL {
@@ -153,7 +146,7 @@ func (s *Cache[T]) Get(key []byte) (ret *T) {
 			ret = &out
 			return
 		}
-	}
+	//}
 
 	var raw []byte
 	ret, raw = s.GetFromDB(key)
@@ -301,11 +294,13 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 		var out T
 		msg, ok := any(&out).(proto.Message)
 		if !ok {
-			return fmt.Errorf("type %T does not implement proto.Message", out)
+			common.Log.Errorf("IsExistFromDB type %T does not implement proto.Message", out)
+			return nil
 		}
 		err := proto.Unmarshal(v, msg)
 		if err != nil {
-			return err
+			common.Log.Errorf("IsExistFromDB %s Unmarshal failed, %v", string(keyPrefix), err)
+			return nil
 		}
 		ret = cb(k, &out)
 		if ret {
@@ -325,7 +320,7 @@ func (s *Cache[T]) IsExistFromDB(keyPrefix []byte, cb func(key []byte, value *T)
 func (s *Cache[T]) GetFromDB(key []byte) (ret *T, raw []byte) {
 
 	v, err := s.dbWrite.Db.Read(key)
-	if err != nil && err != common.ErrKeyNotFound {
+	if err != nil {
 		return
 	}
 

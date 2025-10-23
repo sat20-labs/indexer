@@ -250,6 +250,7 @@ func (p *TxAssets) Find(asset *AssetName) (*AssetInfo, error) {
 }
 
 // 这里必须假定每个聪都是单独染色，这个计算只适合聪网，聪网确保每一个聪只代表一种资产，跟btc主网不同
+// 不足一聪的，不占聪，只适合聪网。主网的每一聪，都是完整的资产绑定，不可能缺少一部分资产。
 func (p *TxAssets) GetBindingSatAmout() int64 {
 	if p == nil {
 		return 0

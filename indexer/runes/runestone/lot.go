@@ -25,6 +25,15 @@ func NewLot(value *uint128.Uint128) *Lot {
 	return &Lot{Value: *value}
 }
 
+func (l *Lot) Clone() *Lot {
+	if l == nil {
+		return nil
+	}
+	return &Lot{
+		Value: l.Value,
+	}
+}
+
 func (l Lot) N() *uint128.Uint128 {
 	return &l.Value
 }

@@ -52,6 +52,57 @@ func (s *Service) sendRawTx(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (s *Service) sendRawTxs(c *gin.Context) {
+	resp := &rpcwire.SendRawTxsResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+	var req rpcwire.SendRawTxsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	result, err := bitcoin_rpc.ShareBitconRpc.TestTx(req.SignedTxHex)
+	if err != nil {
+	    resp.Code = -1
+		resp.Msg = err.Error()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	var reject bool
+	for _, r := range result {
+		if r.Allowed {
+			resp.Data = append(resp.Data, r.TxId)
+		} else {
+			resp.Data = append(resp.Data, r.RejectReason)
+			reject = true
+		}
+	}
+	if reject {
+		resp.Code = -1
+		resp.Msg = "reject"
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	for i, signedTx := range req.SignedTxHex {
+		_, err := bitcoin_rpc.ShareBitconRpc.SendTx(signedTx)
+		if err != nil {
+			resp.Code = -i
+			resp.Msg = err.Error()
+			c.JSON(http.StatusOK, resp)
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
 func (s *Service) testRawTx(c *gin.Context) {
 	resp := &rpcwire.TestRawTxResp{
 		BaseResp: rpcwire.BaseResp{

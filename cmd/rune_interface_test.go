@@ -9,6 +9,7 @@ import (
 
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
+	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/runes"
 	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/base_indexer"
@@ -18,6 +19,7 @@ import (
 var firstRuneName = "BESTINSLOT•XYZ"
 
 var runesIndexer *runes.Indexer
+var rpcService *base.RpcIndexer
 
 func InitRuneTester() {
 	if runesIndexer == nil {
@@ -36,6 +38,7 @@ func InitRuneTester() {
 		base_indexer.InitBaseIndexer(indexerMgr)
 		indexerMgr.Init()
 		runesIndexer = indexerMgr.RunesIndexer
+		rpcService = indexerMgr.GetRpcService()
 		table.IsLessStorage = false
 	}
 }
@@ -111,15 +114,16 @@ func TestRuneInterfaceAsset(t *testing.T) {
 	}
 	// 6
 	firstRuneAddress := "tb1pn9dzakm6egrv90c9gsgs63axvmn6ydwemrpuwljnmz9qdk38ueqsqae936"
-	addressId := runesIndexer.RpcService.GetAddressId(firstRuneAddress)
-	addressAssets := runesIndexer.GetAddressAssets(addressId)
+	addressId := rpcService.GetAddressId(firstRuneAddress)
+	utxos, _ := rpcService.GetUTXOs(firstRuneAddress)
+	addressAssets := runesIndexer.GetAddressAssets(addressId, utxos)
 	for i, v := range addressAssets {
 		t.Logf("GetAddressAssets return addressAssets %d: %+v\n", i, v)
 	}
 
 	// 7
 	utxo := "d2f8fe663c83550fee4039027fc4d5053066c10b638180137f43b997cc427108:0"
-	utxoInfo, err := runesIndexer.RpcService.GetUtxoInfo(utxo)
+	utxoInfo, err := rpcService.GetUtxoInfo(utxo)
 	if err != nil {
 		t.Errorf("RpcService.GetUtxoInfo error: %s", err.Error())
 	}
@@ -148,7 +152,7 @@ func TestGetRuneAddressMintHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRuneIdWithName err:%s", err.Error())
 	}
-	addressId := runesIndexer.RpcService.GetAddressId(firstRuneAddress)
+	addressId := rpcService.GetAddressId(firstRuneAddress)
 	mintHistorys, total := runesIndexer.GetAddressMintHistory(runeId.Hex(), addressId, 0, 10)
 	t.Logf("GetAddressMintHistory return txids total count: %d\n", total)
 	for i, v := range mintHistorys {

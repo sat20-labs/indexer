@@ -102,39 +102,13 @@ desc: 根据地址获取指定nuneid的铸造历史 (新增数据表)
 实现: 通过address和runeid得到所有utxo(一个txid(1/n个utxo)即一个铸造历史)
 */
 func (s *Indexer) GetAddressMintHistory(runeId string, addressId uint64, start, limit uint64) ([]*MintHistory, uint64) {
-	runeInfo := s.GetRuneInfo(runeId)
-	if runeInfo == nil {
-		common.Log.Errorf("%s not found", runeId)
-		return nil, 0
-	}
-	runeId = runeInfo.Id
 
-	id, err := runestone.RuneIdFromString(runeId)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> runestone.SpacedRuneFromString(%s) err:%s", runeId, err.Error())
-	}
-	mintHistorys, err := s.addressRuneIdToMintHistoryTbl.GetList(addressId, id)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAddressMintHistory-> addressRuneIdToMintHistoryTbl.GetList(%d, %s) err:%v", addressId, id.Hex(), err)
-	}
-	if len(mintHistorys) == 0 {
-		return nil, 0
-	}
+	all := s.GetAllMintHistory(runeId)
 
-	runeEntry := s.idToEntryTbl.Get(id)
-	if runeEntry == nil {
-		common.Log.Errorf("RuneIndexer.GetAddressMintHistory-> idToEntryTbl.Get(%s) rune not found, runeIdStr: %s", id.Hex(), runeId)
-		return nil, 0
-	}
-
-	ret := make([]*MintHistory, len(mintHistorys))
-	for i, mintHistory := range mintHistorys {
-		ret[i] = &MintHistory{
-			UtxoId:    mintHistory.OutPoint.UtxoId,
-			Amount:    *runeEntry.Terms.Amount,
-			AddressId: mintHistory.AddressId,
-			Height:    runeEntry.RuneId.Block,
-			Number:    runeEntry.Number,
+	ret := make([]*MintHistory, 0)
+	for _, item := range all {
+		if item.AddressId == addressId {
+			ret = append(ret, item)
 		}
 	}
 

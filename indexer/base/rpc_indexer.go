@@ -24,8 +24,9 @@ type RpcIndexer struct {
 	// 接收前端api访问的实例，隔离内存访问
 	mutex              sync.RWMutex
 	addressValueMap    map[string]*common.AddressValueInDB
-	idToAddressMap       map[uint64]string
+	idToAddressMap     map[uint64]string
 	deletedUtxoMap     map[uint64]bool
+	addedUtxoMap       map[uint64]string
 	bSearching         bool
 	satSearchingStatus map[int64]*SatSearchingStatus
 }
@@ -35,8 +36,9 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 		BaseIndexer:        *base.Clone(),
 		bSearching:         false,
 		addressValueMap:    make(map[string]*common.AddressValueInDB),
-		idToAddressMap:       make(map[uint64]string),
+		idToAddressMap:     make(map[uint64]string),
 		deletedUtxoMap:     make(map[uint64]bool),
+		addedUtxoMap:       make(map[uint64]string),
 		satSearchingStatus: make(map[int64]*SatSearchingStatus),
 	}
 
@@ -52,6 +54,9 @@ func (b *RpcIndexer) UpdateServiceInstance() {
 	}
 	for _, v := range b.delUTXOs {
 		b.deletedUtxoMap[v.UtxoId] = true
+	}
+	for k, v := range b.utxoIndex.Index {
+		b.addedUtxoMap[common.GetUtxoId(v)] = k
 	}
 }
 
@@ -221,10 +226,9 @@ func (b *RpcIndexer) getAddressValue2(address string) *common.AddressValueInDB {
 func (b *RpcIndexer) GetUtxoByID(id uint64) (string, error) {
 	utxo, err := db.GetUtxoByID(b.db, id)
 	if err != nil {
-		for key, value := range b.utxoIndex.Index {
-			if common.GetUtxoId(value) == id {
-				return key, nil
-			}
+		utxo, ok := b.addedUtxoMap[id]
+		if ok {
+			return utxo, nil
 		}
 		common.Log.Errorf("RpcIndexer->GetUtxoByID %d failed, err: %v", id, err)
 	}

@@ -7,16 +7,15 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/store"
+	"lukechampine.com/uint128"
 )
 
-type Utxo string
 
 type RuneIdToMintHistory struct {
 	RuneId    *runestone.RuneId
-	Utxo      Utxo
 	UtxoId    uint64
-	Address   string
 	AddressId uint64
+	Amount    runestone.Lot
 }
 
 func RuneIdToMintHistoryFromString(key string) (*RuneIdToMintHistory, error) {
@@ -27,29 +26,28 @@ func RuneIdToMintHistoryFromString(key string) (*RuneIdToMintHistory, error) {
 	if err != nil {
 		return nil, err
 	}
-	utxoId, err := strconv.ParseUint(parts[2], 16, 64)
+	addressId, err := strconv.ParseUint(parts[2], 16, 64)
 	if err != nil {
 		return nil, err
 	}
-	ret.UtxoId = utxoId
-	if !IsLessStorage {
-		ret.Utxo = Utxo(parts[3])
-	}
+	ret.AddressId = addressId
 	return ret, nil
 }
 
 func (s *RuneIdToMintHistory) ToPb() *pb.RuneIdToMintHistory {
 	return &pb.RuneIdToMintHistory{
-		Address:   s.Address,
-		AddressId: s.AddressId,
+		UtxoId: s.UtxoId,
+		Amount: &pb.Lot{
+			Value: &pb.Uint128{
+				Hi: s.Amount.Value.Hi,
+				Lo: s.Amount.Value.Lo,
+			},
+		},
 	}
 }
 
 func (s *RuneIdToMintHistory) Key() (ret string) {
-	ret = s.RuneId.Hex() + "-" + strconv.FormatUint(s.UtxoId, 16)
-	if !IsLessStorage {
-		ret += "-" + string(s.Utxo)
-	}
+	ret = s.RuneId.Hex() + "-" + strconv.FormatUint(s.AddressId, 16)
 	return
 }
 
@@ -73,8 +71,13 @@ func (s *RuneToMintHistoryTable) GetList(runeId *runestone.RuneId) (ret []*RuneI
 			if err != nil {
 				return nil, err
 			}
-			runeIdToMintHistory.Address = v.Address
-			runeIdToMintHistory.AddressId = v.AddressId
+			runeIdToMintHistory.UtxoId = v.UtxoId
+			runeIdToMintHistory.Amount = runestone.Lot{
+				Value: uint128.Uint128{
+						Hi: v.Amount.Value.Hi,
+						Lo: v.Amount.Value.Lo,
+					},
+				}
 			ret[i] = runeIdToMintHistory
 			i++
 		}
@@ -84,10 +87,6 @@ func (s *RuneToMintHistoryTable) GetList(runeId *runestone.RuneId) (ret []*RuneI
 
 func (s *RuneToMintHistoryTable) Insert(v *RuneIdToMintHistory) (ret RuneIdToMintHistory) {
 	tblKey := []byte(store.RUNEID_TO_MINT_HISTORYS + v.Key())
-	if IsLessStorage {
-		v.Utxo = ""
-		v.Address = ""
-	}
 	pbVal := s.Cache.Set(tblKey, v.ToPb())
 	if pbVal != nil {
 		ret = *v

@@ -196,9 +196,9 @@ type TxOutput struct {
 	UtxoId      uint64
 	OutPointStr string
 	OutValue    wire.TxOut
-	//Sats        TxRanges  废弃。需要时重新获取
 	Assets  TxAssets
 	Offsets map[AssetName]AssetOffsets
+	SatBindingMap map[int64]*AssetInfo // 用于brc20，key是sat的offset, 只有brc20才赋值
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }
@@ -210,6 +210,7 @@ func NewTxOutput(value int64) *TxOutput {
 		OutValue:    wire.TxOut{Value: value},
 		Assets:      nil,
 		Offsets:     make(map[AssetName]AssetOffsets),
+		SatBindingMap: make(map[int64]*AssetInfo),
 	}
 }
 
@@ -225,6 +226,12 @@ func (p *TxOutput) Clone() *TxOutput {
 	for i, u := range p.Offsets {
 		n.Offsets[i] = u.Clone()
 	}
+
+	n.SatBindingMap = make(map[int64]*AssetInfo)
+	for k, v := range p.SatBindingMap {
+		n.SatBindingMap[k] = v.Clone()
+	}
+
 	return n
 }
 
@@ -301,7 +308,10 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 			offset.Insert(off)
 		}
 	}
-	return offset.Size()
+	n := int64(len(p.SatBindingMap))
+	// 每个brc20的transfer nft，都看作是占用330聪
+	
+	return offset.Size() - n + n * 330
 }
 
 func (p *TxOutput) Append(another *TxOutput) error {
@@ -334,6 +344,10 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		}
 		p.Offsets[asset.Name] = existingOffsets
 	}
+	for k, v := range another.SatBindingMap {
+		p.SatBindingMap[k+value] = v
+	}
+
 	p.OutValue.Value += another.OutValue.Value
 
 	p.UtxoId = INVALID_ID
@@ -386,7 +400,52 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 				part2.Offsets[asset.Name] = offset2
 			}
 		} else {
-			part1.Assets.Add(&asset)
+			newOffsets, ok := p.Offsets[asset.Name]
+			if ok {
+				// brc20 
+				offset1, offset2 := newOffsets.Cut(offset)
+				satmap1 := make(map[int64]*AssetInfo)
+				satmap2 := make(map[int64]*AssetInfo)
+				for k, v := range p.SatBindingMap {
+					if k < offset {
+						satmap1[k] = v
+					} else {
+						satmap2[k-offset] = v
+					}
+				}
+
+				if len(satmap1) > 0 {
+					var amt *Decimal
+					for _, asset := range satmap1 {
+						amt = amt.Add(&asset.Amount)
+					}
+					asset := AssetInfo{
+						Name:       asset.Name,
+						Amount:     *amt,
+						BindingSat: asset.BindingSat,
+					}
+					part1.Assets.Add(&asset)
+					part1.Offsets[asset.Name] = offset1
+					part1.SatBindingMap = satmap1
+				}
+
+				if len(satmap2) > 0 {
+					var amt *Decimal
+					for _, asset := range satmap2 {
+						amt = amt.Add(&asset.Amount)
+					}
+					asset := AssetInfo{
+						Name:       asset.Name,
+						Amount:     *amt,
+						BindingSat: asset.BindingSat,
+					}
+					part2.Assets.Add(&asset)
+					part2.Offsets[asset.Name] = offset2
+					part2.SatBindingMap = satmap2
+				}
+			} else {
+				part1.Assets.Add(&asset) // runes
+			}
 		}
 	}
 
@@ -396,6 +455,11 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
+	if value == 0 && amt.Sign() == 0 {
+		return nil, nil, fmt.Errorf("should provide at least one asset amount")
+	}
+
+	var offset int64
 	if value == 0 {
 		// 按照资产数量确定value
 		if name == nil || *name == ASSET_PLAIN_SAT {
@@ -410,6 +474,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 			}
 			n := asset.BindingSat
 			if n != 0 {
+				// ordx
 				if amt.Int64()%int64(n) != 0 {
 					return nil, nil, fmt.Errorf("amt must be times of %d", n)
 				}
@@ -421,102 +486,94 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 				tmp := offsets.Clone()
 				satsNum := GetBindingSatNum(amt, n)
 				offset1, offset2 := tmp.Split(satsNum)
-				value = offset1[len(offset1)-1].End
-				if value < 330 {
+				offset = offset1[len(offset1)-1].End
+				if offset < 330 {
 					if len(offset2) == 0 {
-						value = 330
+						offset = 330
 					} else {
-						if offset2[0].Start + value < 330 {
-							return nil, nil, fmt.Errorf("no 330 plain sat, %d", offset2[0].Start + value)
+						if offset2[0].Start + offset < 330 {
+							return nil, nil, fmt.Errorf("no 330 plain sat, %d", offset2[0].Start + offset)
 						} else {
-							value = 330
+							offset = 330
 						}
 					}
 				}
 			} else {
-				value = 330
+				if len(p.SatBindingMap) == 0 {
+					// runes
+					offset = 330
+				} else {
+					// brc20
+					offsets := p.Offsets[asset.Name]
+					if offsets == nil {
+						return nil, nil, fmt.Errorf("can't find offset for asset %s", asset.Name.String())
+					}
+					var requiredAmt *Decimal
+					for _, off := range offsets {
+						info, ok := p.SatBindingMap[off.Start]
+						if !ok {
+							return nil, nil, fmt.Errorf("can't find sat %d binding map", off.Start)
+						}
+						requiredAmt = requiredAmt.Add(&info.Amount)
+						if requiredAmt.Cmp(amt) >= 0 {
+							offset = off.Start + 330 // brc20 transfer 铭文的一般大小
+							break
+						}
+					}
+					if requiredAmt.Cmp(amt) != 0 {
+						return nil, nil, fmt.Errorf("no accurate asset")
+					}
+				}
 			}
 		}
+	} else {
+		offset = value
 	}
 
-	if p.Value() < value {
+	if p.Value() < offset {
 		return nil, nil, fmt.Errorf("output value too small")
 	}
 	if len(p.Assets) > 1 {
 		return nil, nil, fmt.Errorf("only one asset can be processed in mainnet utxo")
 	}
 
-	var value1, value2 int64
-	value1 = value
-	value2 = p.Value() - value1
-	part1 := NewTxOutput(value1)
-	part2 := NewTxOutput(value2)
-
-	if name == nil || *name == ASSET_PLAIN_SAT {
-		if p.Value() < amt.Int64() {
-			return nil, nil, fmt.Errorf("amount too large")
-		}
-		part2.Assets = p.Assets
-		for k, v := range p.Offsets {
-			_, part2.Offsets[k] = v.Cut(value1)
-		}
-		return part1, part2, nil
-	}
-
-	asset, err := p.Assets.Find(name)
+	part1, part2, err := p.Cut(offset)
 	if err != nil {
 		return nil, nil, err
 	}
-	n := asset.BindingSat
-	if n != 0 {
-		if amt.Int64()%int64(n) != 0 {
-			return nil, nil, fmt.Errorf("amt must be times of %d", n)
+
+	if amt.Sign() != 0 {
+		if !IsPlainAsset(name) {
+			asset1, err := part1.Assets.Find(name)
+			if err != nil {
+				return nil, nil, err
+			}
+			if amt.Cmp(&asset1.Amount) != 0 {
+				// 如果是非聪绑定资产，需要对结果微调下
+				if asset1.BindingSat == 0 && len(part1.SatBindingMap) == 0 {
+					info := AssetInfo{
+						Name: *name,
+						Amount: *amt,
+						BindingSat: asset1.BindingSat,
+					}
+					part2 = part1.Clone()
+					part2.OutValue.Value = 0
+					part2.Assets.Subtract(&info)
+					part1.Assets = TxAssets{info}
+				} else {
+					return nil, nil, fmt.Errorf("can't split the accurate asset")
+				}
+			}
 		}
-		requiredValue := GetBindingSatNum(amt, asset.BindingSat)
-		if requiredValue > value {
-			return nil, nil, fmt.Errorf("value too small")
-		}
 	}
-
-	if asset.Amount.Cmp(amt) < 0 {
-		return nil, nil, fmt.Errorf("amount too large")
-	}
-	asset1 := asset.Clone()
-	asset1.Amount = *amt.Clone()
-	assets2 := p.Assets.Clone()
-	assets2.Subtract(asset1)
-
-	part1.Assets = TxAssets{*asset1}
-	part2.Assets = assets2
-
-	if !IsBindingSat(name) {
-		// runes：no offsets
-		part2.Offsets = p.Offsets
-		return part1, part2, nil
-	}
-
-	offsets, ok := p.Offsets[*name]
-	if !ok {
-		return nil, nil, fmt.Errorf("can't find asset offset")
-	}
-	if asset.Amount.Cmp(amt) == 0 {
-		part1.Offsets[*name] = offsets.Clone()
-		if part2.Value() == 0 {
-			part2 = nil
-		}
-		return part1, part2, nil
-	}
-	offset1, offset2 := offsets.Split(GetBindingSatNum(amt, n))
-	part1.Offsets[*name] = offset1
-	part2.Offsets[*name] = offset2
-
 	return part1, part2, nil
 }
 
+// 只用于计算ordx资产的偏移，其他资产直接返回0
 func (p *TxOutput) GetAssetOffset(name *AssetName, amt *Decimal) (int64, error) {
 
 	if !IsBindingSat(name) {
-		return 330, nil
+		return 0, fmt.Errorf("not ordx asset")
 	}
 
 	if IsPlainAsset(name) {
@@ -579,6 +636,7 @@ func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
 		OutValue:    *tx.TxOut[index],
 		Offsets:     make(map[AssetName]AssetOffsets),
+		SatBindingMap: make(map[int64]*AssetInfo),
 	}
 }
 

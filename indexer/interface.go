@@ -103,7 +103,7 @@ func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
 
 // return: utxoId->asset amount
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *common.TickerName) (map[uint64]int64, error) {
-	utxos, err := b.rpcService.GetUTXOs(address)
+	utxos, err := b.GetUTXOsWithAddress(address)
 	if err != nil {
 		common.Log.Errorf("GetUTXOs %s failed. %v", address, err)
 		return nil, err
@@ -201,7 +201,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 
 // return: ticker -> amount
 func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerName]int64 {
-	utxos, err := b.rpcService.GetUTXOs(address)
+	utxos, err := b.GetUTXOsWithAddress(address)
 	if err != nil {
 		return nil
 	}
@@ -251,9 +251,10 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	return result
 }
 
+// 只返回跟聪绑定的资产
 // return: ticker -> []utxoId
 func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerName][]uint64 {
-	utxos, err := b.rpcService.GetUTXOs(address)
+	utxos, err := b.GetUTXOsWithAddress(address)
 	if err != nil {
 		return nil
 	}
@@ -291,6 +292,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 	return result
 }
 
+// 返回跟聪不绑定的资产
 // return: ticker -> assets(amt)
 func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
 	result := make(map[common.TickerName]*common.Decimal)

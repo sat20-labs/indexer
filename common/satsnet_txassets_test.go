@@ -344,3 +344,136 @@ func TestAssetOffsets_Append(t *testing.T) {
 		})
 	}
 }
+
+
+
+func TestAssetOffsets_Cut(t *testing.T) {
+	tests := []struct {
+		name     string
+		offsets  AssetOffsets
+		value    int64
+		expectedL AssetOffsets
+		expectedR AssetOffsets
+	}{
+		{
+			name: "cut inside one range",
+			offsets: AssetOffsets{
+				{Start: 0, End: 10},
+			},
+			value: 5,
+			expectedL: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+			expectedR: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+		},
+		{
+			name: "cut at boundary",
+			offsets: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 10},
+			},
+			value: 5,
+			expectedL: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+			expectedR: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+		},
+		{
+			name: "cut beyond first range",
+			offsets: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 15},
+			},
+			value: 7,
+			expectedL: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 7},
+			},
+			expectedR: AssetOffsets{
+				{Start: 0, End: 8},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			left, right := tt.offsets.Cut(tt.value)
+			if !reflect.DeepEqual(left, tt.expectedL) {
+				t.Errorf("Cut() left wrong:\n got: %+v\nwant: %+v", left, tt.expectedL)
+			}
+			if !reflect.DeepEqual(right, tt.expectedR) {
+				t.Errorf("Cut() right wrong:\n got: %+v\nwant: %+v", right, tt.expectedR)
+			}
+		})
+	}
+}
+
+func TestAssetOffsets_Split(t *testing.T) {
+	tests := []struct {
+		name     string
+		offsets  AssetOffsets
+		amt      int64
+		expectedL AssetOffsets
+		expectedR AssetOffsets
+	}{
+		{
+			name: "split inside range",
+			offsets: AssetOffsets{
+				{Start: 0, End: 10},
+			},
+			amt: 5,
+			expectedL: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+			expectedR: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+		},
+		{
+			name: "split across two ranges",
+			offsets: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 10, End: 20},
+			},
+			amt: 15,
+			expectedL: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 10, End: 15},
+			},
+			expectedR: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+		},
+		{
+			name: "split exactly at boundary",
+			offsets: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 10},
+			},
+			amt: 5,
+			expectedL: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+			expectedR: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			left, right := tt.offsets.Split(tt.amt)
+			if !reflect.DeepEqual(left, tt.expectedL) {
+				t.Errorf("Split() left wrong:\n got: %+v\nwant: %+v", left, tt.expectedL)
+			}
+			if !reflect.DeepEqual(right, tt.expectedR) {
+				t.Errorf("Split() right wrong:\n got: %+v\nwant: %+v", right, tt.expectedR)
+			}
+		})
+	}
+}
+

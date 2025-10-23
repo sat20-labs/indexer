@@ -14,7 +14,7 @@ import (
 
 type AddressOutpointToBalance struct {
 	AddressId uint64
-	Address   runestone.Address
+	//Address   runestone.Address
 	OutPoint  *OutPoint
 	RuneId    *runestone.RuneId
 	Balance   runestone.Lot
@@ -47,7 +47,7 @@ func (s *AddressOutpointToBalance) ToPb() *pb.AddressOutpointToBalance {
 				Lo: s.Balance.Value.Lo,
 			},
 		},
-		Address: string(s.Address),
+		AddressId: s.AddressId,
 		RuneId:  &pb.RuneId{Block: s.RuneId.Block, Tx: s.RuneId.Tx},
 	}
 	return pbValue
@@ -73,7 +73,7 @@ func (s *AddressOutpointToBalancesTable) Get(v *AddressOutpointToBalance) (ret *
 		if pbVal.RuneId != nil {
 			ret.RuneId = &runestone.RuneId{Block: pbVal.RuneId.Block, Tx: pbVal.RuneId.Tx}
 		}
-		ret.Address = runestone.Address(pbVal.Address)
+		ret.AddressId = pbVal.AddressId
 		ret.Balance = runestone.Lot{
 			Value: uint128.Uint128{
 				Hi: pbVal.Balance.Value.Hi,
@@ -99,7 +99,7 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 			if err != nil {
 				return nil, err
 			}
-			addressOutpointToBalance.Address = runestone.Address(v.Address)
+			addressOutpointToBalance.AddressId = v.AddressId
 			addressOutpointToBalance.RuneId = &runestone.RuneId{Block: v.RuneId.Block, Tx: v.RuneId.Tx}
 			addressOutpointToBalance.Balance = *lot
 			ret[i] = addressOutpointToBalance
@@ -111,9 +111,6 @@ func (s *AddressOutpointToBalancesTable) GetBalances(addressId uint64) (ret []*A
 
 func (s *AddressOutpointToBalancesTable) Insert(v *AddressOutpointToBalance) {
 	tblKey := []byte(store.ADDRESS_OUTPOINT_TO_BALANCE + v.Key())
-	if IsLessStorage {
-		v.Address = ""
-	}
 	s.Cache.Set(tblKey, v.ToPb())
 }
 

@@ -29,7 +29,7 @@ func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, er
 	var msgTx wire.MsgTx
 	for _, output := range transaction.Outputs {
 		pkScript := output.Address.PkScript
-		msgTx.AddTxOut(wire.NewTxOut(0, pkScript))
+		msgTx.AddTxOut(wire.NewTxOut(output.Value, pkScript))
 	}
 	runestone := &runestone.Runestone{}
 	ret, err = runestone.DecipherFromTx(&msgTx)

@@ -146,7 +146,6 @@ func (s *RuneInfo) BlockHeight() int {
 
 type AddressBalance struct {
 	AddressId    uint64
-	Address      string
 	Balance      uint128.Uint128
 	Divisibility uint8
 }
@@ -282,13 +281,7 @@ func (s *AddressAsset) UnmarshalJSON(data []byte) error {
 	return err
 }
 
-type UtxoAsset struct {
-	Rune         string
-	RuneId       string
-	Balance      uint128.Uint128
-	Divisibility uint8
-	Symbol       rune
-}
+type UtxoAsset = AddressAsset
 
 type MintHistory struct {
 	UtxoId    uint64
