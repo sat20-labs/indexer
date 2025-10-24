@@ -58,7 +58,7 @@ func (p *IndexerMgr) FilterRarepizza() bool {
 	var newInscriptionList []Inscription
 	mintInfos := p.ftIndexer.GetMintHistory("rarepizza", 0, 200000)
 	for _, info := range mintInfos {
-		if info.Amount != 1000 {
+		if info.Amount.Int64() != 1000 {
 			continue
 		}
 		nft := p.GetNftInfoWithInscriptionId(info.InscriptionId)

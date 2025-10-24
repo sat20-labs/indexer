@@ -139,6 +139,18 @@ func (p *BRC20MintAbbrInfo) ToMintInfo() *MintInfo {
 	}
 }
 
+func (p *BRC20MintAbbrInfo) ToMintAbbrInfo() *MintAbbrInfo {
+	return &MintAbbrInfo{
+		Id: p.Id,
+		Address: p.Address,
+		Amount:         p.Amount.Clone(),
+		Ordinals:       nil,
+		Height:         p.Height,
+		InscriptionId:  p.InscriptionId,
+		InscriptionNum: p.InscriptionNum,
+	}
+}
+
 type BRC20TransferInfo struct {
 	InscriptionId string `json:"inscriptionId"`
 	Name          string `json:"name"`

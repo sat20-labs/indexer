@@ -5,69 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
 
-// return: utxoId->asset
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV2(address string, ticker *common.AssetName) (map[uint64]*common.TxOutput, error) {
-	utxos, err := b.rpcService.GetUTXOs(address)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[uint64]*common.TxOutput)
-	for utxoId := range utxos {
-		utxo, err := b.rpcService.GetUtxoByID(utxoId)
-		if err != nil {
-			continue
-		}
-		// 过滤已经被花费的utxo
-		if b.IsUtxoSpent(utxo) {
-			continue
-		}
-		info := b.GetTxOutputWithUtxo(utxo)
-		if info == nil {
-			continue
-		}
-
-		if ticker == nil { // 返回所有
-			result[utxoId] = info
-		} else if common.IsPlainAsset(ticker) { // 只返回白聪
-			if len(info.Assets) == 0 {
-				result[utxoId] = info
-			} else {
-				// 如果都是nft，而且是被disable的，也算白聪
-				hasOtherAsset := false
-				for _, asset := range info.Assets {
-					if asset.Name.Type != common.ASSET_TYPE_NFT {
-						hasOtherAsset = true
-						break
-					}
-				}
-				if hasOtherAsset {
-					continue
-				}
-				// 只有nft
-				if b.nft.HasNftInUtxo(utxoId) {
-					// 有其他没有被disabled的nft
-					continue
-				}
-				result[utxoId] = info
-			}
-		} else {
-			amt := info.GetAsset(ticker)
-			if amt.Sign() == 0 {
-				continue
-			}
-			result[utxoId] = info
-		}
-	}
-
-	return result, nil
-}
-
-// 跟上面一样，只是结果转换为适合直接转换为json的结构
 // return: utxoId->asset
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
 	//t1 := time.Now()
@@ -130,78 +70,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	return result, nil
 }
 
-func (b *IndexerMgr) GetTxOutputWithUtxo(utxo string) *common.TxOutput {
-	info, err := b.rpcService.GetUtxoInfo(utxo)
-	if err != nil {
-		return nil
-	}
-
-	var assets common.TxAssets
-	offsetmap := make(map[common.AssetName]common.AssetOffsets)
-
-	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
-	for k, v := range assetmap {
-		var offsets common.AssetOffsets
-		value := int64(0)
-		for _, rngs := range v {
-			for _, rng := range rngs {
-				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets.Insert(&common.OffsetRange{Start: start, End: start + rng.Size})
-				value += rng.Size
-			}
-		}
-
-		n := 1
-		if common.IsOrdxFT(&k) {
-			ticker := b.GetTicker(k.Ticker)
-			if ticker != nil {
-				n = ticker.N
-				value = value * int64(ticker.N)
-			}
-		}
-
-		asset := common.AssetInfo{
-			Name:       k,
-			Amount:     *common.NewDefaultDecimal(value),
-			BindingSat: uint32(n),
-		}
-
-		if assets == nil {
-			assets = common.TxAssets{asset}
-		} else {
-			assets.Add(&asset)
-		}
-
-		offsetmap[k] = offsets
-	}
-
-	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
-	for k, v := range assetmap2 {
-		asset := common.AssetInfo{
-			Name:       k,
-			Amount:     *v,
-			BindingSat: 0,
-		}
-
-		if assets == nil {
-			assets = common.TxAssets{asset}
-		} else {
-			assets.Add(&asset)
-		}
-	}
-
-	return &common.TxOutput{
-		UtxoId:      info.UtxoId,
-		OutPointStr: utxo,
-		OutValue: wire.TxOut{
-			Value:    common.GetOrdinalsSize(info.Ordinals),
-			PkScript: info.PkScript,
-		},
-		Assets:  assets,
-		Offsets: offsetmap,
-	}
-}
-
 func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	//t1 := time.Now()
 	info, err := b.rpcService.GetUtxoInfo(utxo)
@@ -259,6 +127,10 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 			Amount:     v.String(),
 			Precision:  v.Precision,
 			BindingSat: 0,
+		}
+		if k.Protocol == common.PROTOCOL_NAME_BRC20 {
+			asset.Offsets = []*common.OffsetRange{{Start:0, End:1}}
+			asset.OffsetToAmts = []*common.OffsetToAmount{{Offset: 0, Amount: v.String()}}
 		}
 
 		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
@@ -384,7 +256,7 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 		}
 
 	case common.PROTOCOL_NAME_BRC20:
-		return b.brc20Indexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
+		return b.brc20Indexer.GetMintHistoryWithAddressV2(addressId, tick.Ticker, start, limit)
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 	}
@@ -668,7 +540,7 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 		if b.RunesIndexer.IsExistAsset(utxoId) {
 			continue
 		}
-		if assets := b.brc20Indexer.GetUtxoAssets(utxoId); len(assets) > 0 {
+		if b.brc20Indexer.IsExistAsset(utxoId) {
 			continue
 		}
 		_, rngs, err := b.GetOrdinalsWithUtxoId(utxoId)

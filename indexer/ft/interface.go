@@ -507,7 +507,7 @@ func (p *FTIndexer) GetMintAmountWithAddressId(addressId uint64, tick string) (i
 	amount := int64(0)
 	for _, info := range tickinfo.InscriptionMap {
 		if info.Address == addressId {
-			amount += info.Amount
+			amount += info.Amount.Int64()
 		}
 	}
 
@@ -526,7 +526,7 @@ func (p *FTIndexer) GetMintAmount(tick string) (int64, int64) {
 
 	amount := int64(0)
 	for _, info := range tickinfo.InscriptionMap {
-		amount += info.Amount
+		amount += info.Amount.Int64()
 	}
 
 	return amount, int64(len(tickinfo.InscriptionMap))

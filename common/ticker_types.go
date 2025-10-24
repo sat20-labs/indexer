@@ -1,8 +1,6 @@
 package common
 
-import (
-	"fmt"
-)
+import "github.com/btcsuite/btcd/wire"
 
 const (
 	TICKER_STATUS_INVALID 	int = -1
@@ -50,7 +48,7 @@ type RBTreeValue_Mint struct {
 type MintAbbrInfo struct {
 	Id            int64
 	Address       uint64
-	Amount        int64
+	Amount        *Decimal
 	Ordinals      []*Range
 	InscriptionId string
 	InscriptionNum int64
@@ -66,7 +64,7 @@ type TickAbbrInfo struct {
 func NewMintAbbrInfo(mint *Mint) *MintAbbrInfo {
 	info := NewMintAbbrInfo2(mint.Base)
 	info.Id = mint.Id
-	info.Amount = mint.Amt
+	info.Amount = NewDefaultDecimal(mint.Amt)
 	info.Ordinals = mint.Ordinals
 	return info
 }
@@ -75,7 +73,7 @@ func (p *MintAbbrInfo) ToMintInfo() *MintInfo {
 	return &MintInfo{
 		Id: p.Id,
 		//Address: p.Address,
-		Amount: fmt.Sprintf("%d", p.Amount),
+		Amount: p.Amount.String(),
 		Ordinals: p.Ordinals,
 		Height: p.Height,
 		InscriptionId: p.InscriptionId,
@@ -86,7 +84,7 @@ func (p *MintAbbrInfo) ToMintInfo() *MintInfo {
 func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 	return &MintAbbrInfo{
 		Address: base.InscriptionAddress,
-		Amount: 1, 
+		Amount: NewDefaultDecimal(1), 
 		InscriptionId: base.InscriptionId, 
 		InscriptionNum: base.Id,
 		Height: int(base.BlockHeight)}
@@ -141,12 +139,18 @@ type MintHistory struct {
 	Items    []*MintInfo   `json:"Items,omitempty"`
 }
 
+type OffsetToAmount struct {
+	Offset int64	`json:"Offset"`
+	Amount string 	`json:"Amount"`
+}
+
 type DisplayAsset struct {
 	AssetName             `json:"Name"`
 	Amount  string        `json:"Amount"`
 	Precision int         `json:"Precision"`
 	BindingSat int        `json:"BindingSat"`
-	Offsets []*OffsetRange `json:"Offsets"`
+	Offsets []*OffsetRange `json:"Offsets,omitempty"`
+	OffsetToAmts []*OffsetToAmount `json:"OffsetToAmts,omitempty"` // brc20 transfer nft, offset->decimal
 }
 
 func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
@@ -160,10 +164,6 @@ func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
 		Amount: *amount,
 		BindingSat: uint32(p.BindingSat),
 	}
-}
-
-func (p *DisplayAsset) GetBindingSatNum() int64 {
-	return p.ToAssetInfo().GetBindingSatNum()
 }
 
 type AssetsInUtxo struct {
@@ -182,28 +182,30 @@ func (p *AssetsInUtxo) ToTxAssets() TxAssets {
 	return assets
 }
 
-// 需要考虑一个聪多种资产的情况
-// 如果聪网的数据，并没有offset数据
-func (p* AssetsInUtxo) GetBindingSatAmout() int64 {
-	if p.Assets == nil {
-		return 0
+func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
+	if p == nil {
+		return nil
 	}
-	fromL2 := false
-	bindingSatNum := int64(0)
-	offset := make(AssetOffsets, 0)
-	for _, asset := range p.Assets {
-		for _, off := range asset.Offsets {
-			offset.Insert(off)
-		}
-		if asset.BindingSat > 0 && len(asset.Offsets) == 0 {
-			// 来自聪网的数据
-			fromL2 = true
-			dAmt, _ := NewDecimalFromString(asset.Amount, 0)
-			bindingSatNum += GetBindingSatNum(dAmt, uint32(asset.BindingSat))
+	assets := make(TxAssets, 0, len(p.Assets))
+	offsets := make(map[AssetName]AssetOffsets)
+	satBindingMap := make(map[int64]*AssetInfo)
+	for _, v := range p.Assets {
+		assetInfo := v.ToAssetInfo()
+		assets = append(assets, *assetInfo)
+		offsets[v.AssetName] = v.Offsets
+		for _, offset := range v.OffsetToAmts {
+			satBindingMap[offset.Offset] = assetInfo
 		}
 	}
-	if fromL2 {
-		return bindingSatNum
+	return &TxOutput{
+		UtxoId: p.UtxoId,
+		OutPointStr: p.OutPoint,
+		OutValue: wire.TxOut{
+			Value: p.Value,
+			PkScript: p.PkScript,
+		},
+		Assets: assets,
+		Offsets: offsets,
+		SatBindingMap: satBindingMap,
 	}
-	return offset.Size()
 }

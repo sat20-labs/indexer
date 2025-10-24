@@ -186,7 +186,7 @@ func (p *BRC20Indexer) GetMintHistory(tick string, start, limit int) []*common.B
 }
 
 // return: 按铸造时间排序的铸造历史
-func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start, limit int) ([]*common.MintInfo, int) {
+func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start, limit int) ([]*common.MintAbbrInfo, int) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -195,10 +195,10 @@ func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, 
 		return nil, 0
 	}
 
-	result := make([]*common.MintInfo, 0)
+	result := make([]*common.MintAbbrInfo, 0)
 	for _, info := range tickinfo.InscriptionMap {
 		if info.Address == addressId {
-			result = append(result, info.ToMintInfo())
+			result = append(result, info.ToMintAbbrInfo())
 		}
 	}
 
@@ -216,6 +216,15 @@ func (p *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, 
 	}
 
 	return result[start:end], total
+}
+
+func (p *BRC20Indexer) GetMintHistoryWithAddressV2(addressId uint64, tick string, start, limit int) ([]*common.MintInfo, int) {
+	m, total := p.GetMintHistoryWithAddress(addressId, tick, start, limit)
+	result := make([]*common.MintInfo, len(m))
+	for i, v := range m {
+		result[i] = v.ToMintInfo()
+	}
+	return result, total
 }
 
 // return: mint的总量和次数
@@ -323,4 +332,9 @@ func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20Transfer
 	}
 
 	return
+}
+
+func (p *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
+	ret := p.GetUtxoAssets(utxoId)
+	return len(ret) != 0
 }

@@ -103,6 +103,7 @@ func (s *Model) GetTickerInfo(tickerName string) (*common.TickerInfo, error) {
 	return s.getTickerInfo(tickerName)
 }
 
+// ordx FT
 func (s *Model) GetAddressMintHistory(tickerName, address string, start, limit int) (*rpcwire.MintHistory, error) {
 
 	var ticker common.TickerName
@@ -121,7 +122,7 @@ func (s *Model) GetAddressMintHistory(tickerName, address string, start, limit i
 		ordxMintInfo := &rpcwire.MintHistoryItem{
 			MintAddress:    address,
 			HolderAddress:  s.indexer.GetHolderAddress(mintInfo.InscriptionId),
-			Balance:        mintInfo.Amount,
+			Balance:        mintInfo.Amount.Int64(),
 			InscriptionID:  mintInfo.InscriptionId,
 			InscriptionNum: mintInfo.InscriptionNum,
 		}
@@ -131,6 +132,7 @@ func (s *Model) GetAddressMintHistory(tickerName, address string, start, limit i
 	return &result, nil
 }
 
+// ordx
 func (s *Model) GetMintHistory(tickerName string, start, limit int) (*rpcwire.MintHistory, error) {
 	result := rpcwire.MintHistory{Ticker: tickerName}
 	mintmap := s.indexer.GetMintHistory(tickerName, start, limit)
@@ -138,7 +140,7 @@ func (s *Model) GetMintHistory(tickerName string, start, limit int) (*rpcwire.Mi
 		ordxMintInfo := &rpcwire.MintHistoryItem{
 			MintAddress:    s.indexer.GetAddressById(mintInfo.Address),
 			HolderAddress:  s.indexer.GetHolderAddress(mintInfo.InscriptionId),
-			Balance:        mintInfo.Amount,
+			Balance:        mintInfo.Amount.Int64(),
 			InscriptionID:  mintInfo.InscriptionId,
 			InscriptionNum: mintInfo.InscriptionNum,
 		}

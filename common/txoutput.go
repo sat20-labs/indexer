@@ -235,6 +235,42 @@ func (p *TxOutput) Clone() *TxOutput {
 	return n
 }
 
+func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
+	if p == nil {
+		return nil
+	}
+
+	assetOffsetMap := make(map[AssetName][]*OffsetToAmount)
+	for offset, asset := range p.SatBindingMap {
+		o := OffsetToAmount{
+			Offset: offset,
+			Amount: asset.Amount.String(),
+		}
+		offsetToAmts := assetOffsetMap[asset.Name]
+		assetOffsetMap[asset.Name] = append(offsetToAmts, &o)
+	}
+
+	assets := make([]*DisplayAsset, 0)
+	for _, asset := range p.Assets {
+		display := DisplayAsset{
+			AssetName: asset.Name,
+			Amount: asset.Amount.String(),
+			Precision: asset.Amount.Precision,
+			BindingSat: int(asset.BindingSat),
+			Offsets: p.Offsets[asset.Name],
+			OffsetToAmts: assetOffsetMap[asset.Name],
+		}
+		assets = append(assets, &display)
+	}
+	return &AssetsInUtxo{
+		UtxoId: p.UtxoId,
+		OutPoint: p.OutPointStr,
+		Value: p.OutValue.Value,
+		PkScript: p.OutValue.PkScript,
+		Assets: assets,
+	}
+}
+
 func (p *TxOutput) Height() int {
 	if p.UtxoId == INVALID_ID {
 		return -1

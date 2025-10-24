@@ -41,7 +41,7 @@ func (b *IndexerMgr) GetHolderAmountWithTick(name string) int {
 }
 
 func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool {
-	// 过滤disable的nft
+	// 过滤disable的nft，TODO brc20 的transfer nft，是否需要自动disable？
 	if b.nft.HasNftInUtxo(utxoId) {
 		return true
 	}
@@ -54,6 +54,9 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 		return true
 	}
 	if b.RunesIndexer.IsExistAsset(utxoId) {
+		return true
+	}
+	if b.brc20Indexer.IsExistAsset(utxoId) {
 		return true
 	}
 
@@ -493,7 +496,7 @@ func (b *IndexerMgr) GetMintHistoryWithAddress(address string, tick *common.Tick
 		}
 
 	case common.PROTOCOL_NAME_BRC20:
-		//return b.brc20Indexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
+		return b.brc20Indexer.GetMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 	case common.PROTOCOL_NAME_RUNES:
 
 	}
