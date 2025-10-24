@@ -194,7 +194,13 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 		assets = append(assets, *assetInfo)
 		offsets[v.AssetName] = v.Offsets
 		for _, offset := range v.OffsetToAmts {
-			satBindingMap[offset.Offset] = assetInfo
+			piece := assetInfo.Clone()
+			amt, err := NewDecimalFromString(offset.Amount, assetInfo.Amount.Precision)
+			if err != nil {
+				continue
+			}
+			piece.Amount = *amt
+			satBindingMap[offset.Offset] = piece
 		}
 	}
 	return &TxOutput{

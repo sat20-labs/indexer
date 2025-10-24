@@ -235,7 +235,8 @@ func (p *TxOutput) Clone() *TxOutput {
 	return n
 }
 
-func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
+// brc20 专属
+func (p *TxOutput) getAssetOffsetMap() map[AssetName][]*OffsetToAmount {
 	if p == nil {
 		return nil
 	}
@@ -249,7 +250,15 @@ func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
 		offsetToAmts := assetOffsetMap[asset.Name]
 		assetOffsetMap[asset.Name] = append(offsetToAmts, &o)
 	}
+	return assetOffsetMap
+}
 
+func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
+	if p == nil {
+		return nil
+	}
+
+	assetOffsetMap := p.getAssetOffsetMap()
 	assets := make([]*DisplayAsset, 0)
 	for _, asset := range p.Assets {
 		display := DisplayAsset{
