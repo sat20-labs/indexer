@@ -40,12 +40,17 @@ func parseTxVoutScriptAddress(transaction *common.Transaction, voutIndex int, pa
 	output := transaction.Outputs[voutIndex]
 	pkScript := output.Address.PkScript
 	var addresses []btcutil.Address
-	_, addresses, _, err = txscript.ExtractPkScriptAddrs(pkScript, &param)
+	var scyptClass txscript.ScriptClass
+	scyptClass, addresses, _, err = txscript.ExtractPkScriptAddrs(pkScript, &param)
 	if err != nil {
 		return
 	}
 	if len(addresses) == 0 {
-		return "UNKNOWN", nil
+		address = "UNKNOWN"
+		if scyptClass == txscript.NullDataTy {
+			address = "OP_RETURN"
+		}
+		return address, nil
 	}
 	// if len(addresses) > 1 {
 	// 	// assign to first address

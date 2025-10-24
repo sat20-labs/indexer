@@ -1,15 +1,54 @@
 package common
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/assert"
+	"github.com/btcsuite/btcd/txscript"
 )
 
+
+func GetTxRawData(txID string, network string) (string, error) {
+	url := ""
+	switch network {
+	case ChainTestnet:
+		url = fmt.Sprintf("https://mempool.space/testnet/api/tx/%s/hex", txID)
+	case ChainTestnet4:
+		url = fmt.Sprintf("https://mempool.space/testnet4/api/tx/%s/hex", txID)
+	case ChainMainnet:
+		url = fmt.Sprintf("https://mempool.space/api/tx/%s/hex", txID)
+	default:
+		return "", fmt.Errorf("unsupported network: %s", network)
+	}
+
+	response, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
+
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
+	}
+
+	respBytes, err := io.ReadAll(response.Body)
+	response.Body.Close()
+	if err != nil {
+		err = fmt.Errorf("error reading json reply: %v", err)
+		return "", err
+	}
+
+	return string(respBytes), nil
+}
 
 func GetRawData(txID string, network string) ([][]byte, error) {
 	url := ""
@@ -749,5 +788,55 @@ func TestParser_ord21(t *testing.T) {
 
 	if len(fields) != 1 {
 		assert.True(t, false)
+	}
+}
+
+func TestParser_addr(t *testing.T) {
+	// input 0, output 0
+	rawData, err := GetTxRawData("5ef85719338c250fef9ab2a8552e96dafd22ea4cc1f94775dc6018bbcb0086be", "testnet4")
+	if err != nil {
+		Log.Info(err)
+		assert.True(t, false)
+	}
+
+	txBytes, err := hex.DecodeString(string(rawData))
+	if err != nil {
+		t.Fatalf("error decoding hex string: %v", err)
+	}
+	tx := wire.NewMsgTx(wire.TxVersion)
+
+	// 3. 从字节切片中解析交易
+	err = tx.Deserialize(bytes.NewReader(txBytes))
+	if err != nil {
+		t.Fatalf("error deserializing transaction: %v", err)
+	}
+
+
+	for i, v := range tx.TxOut {
+		scyptClass, addrs, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, &chaincfg.TestNet4Params)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addrsString := make([]string, len(addrs))
+		for i, x := range addrs {
+			if scyptClass == txscript.MultiSigTy {
+				addrsString[i] = hex.EncodeToString(x.ScriptAddress()) // pubkey
+			} else {
+				addrsString[i] = x.EncodeAddress()
+			}
+		}
+		if len(addrsString) != 0 {
+			fmt.Printf("%d address %v\n", i, addrsString)
+		}
+		
+		
+		if len(addrs) == 0 {
+			address := "UNKNOWN"
+			if scyptClass == txscript.NullDataTy {
+				address = "OP_RETURN"
+			}
+			fmt.Printf("%d address %s\n", i, address)
+		}
 	}
 }

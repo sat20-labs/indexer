@@ -74,9 +74,6 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 
 			if len(addrs) == 0 {
 				address := "UNKNOWN"
-				if scyptClass == txscript.NonStandardTy {
-					scyptClass = txscript.NullDataTy
-				}
 				if scyptClass == txscript.NullDataTy {
 					address = "OP_RETURN"
 				}
