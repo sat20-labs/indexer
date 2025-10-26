@@ -13,7 +13,7 @@ import (
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
-var firstTestnet4Brc20Name = "box1"
+var firstTestnet4Brc20Name = "GC  "
 
 var tickerName = "GC  " // box6
 var brc20Indexer *brc20.BRC20Indexer

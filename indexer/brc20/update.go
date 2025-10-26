@@ -150,37 +150,37 @@ func (p *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 // 增加该address下的资产数据
 func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, amt common.Decimal) {
-	ticker = strings.ToLower(ticker)
+	tickerName := strings.ToLower(ticker)
 
 	info, ok := p.holderMap[address]
 	if !ok {
 		tickinfo := common.NewBRC20TickAbbrInfo(amt)
 		tickers := make(map[string]*common.BRC20TickAbbrInfo)
-		tickers[ticker] = tickinfo
+		tickers[tickerName] = tickinfo
 		info = &HolderInfo{ /*AddressId: address,*/ Tickers: tickers}
 		p.holderMap[address] = info
-		p.tickerMap[ticker].Ticker.HolderCount++
-		p.tickerUpdated[ticker] = p.tickerMap[ticker].Ticker
+		p.tickerMap[tickerName].Ticker.HolderCount++
+		p.tickerUpdated[tickerName] = p.tickerMap[tickerName].Ticker
 	} else {
 		// info.AddressId = address
-		tickinfo, ok := info.Tickers[ticker]
+		tickinfo, ok := info.Tickers[tickerName]
 		if !ok {
+			p.tickerMap[tickerName].Ticker.HolderCount++
+			p.tickerUpdated[tickerName] = p.tickerMap[tickerName].Ticker
+
 			tickinfo := common.NewBRC20TickAbbrInfo(amt)
-			info.Tickers[ticker] = tickinfo
+			info.Tickers[tickerName] = tickinfo
 		} else {
 			tickinfo.Balance = *tickinfo.Balance.Add(&amt)
 		}
 	}
 
-	holders, ok := p.tickerToHolderMap[ticker]
+	holders, ok := p.tickerToHolderMap[tickerName]
 	if !ok {
 		holders = make(map[uint64]bool, 0)
-		holders[address] = true
-		p.tickerToHolderMap[ticker] = holders
-	} else {
-		holders[address] = true
-		p.tickerToHolderMap[ticker] = holders
 	}
+	holders[address] = true
+	p.tickerToHolderMap[tickerName] = holders
 }
 
 var err_no_find_holder = fmt.Errorf("no find holder")
@@ -189,7 +189,6 @@ var err_no_enough_balance = fmt.Errorf("not enough balance")
 // 减少该address下的资产数据
 func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt common.Decimal) error {
 	tickerName := strings.ToLower(ticker)
-
 	info, ok := p.holderMap[address]
 	if ok {
 		// info.AddressId = address
@@ -203,7 +202,11 @@ func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt commo
 				if cmp == 0 {
 					holders := p.tickerToHolderMap[tickerName]
 					delete(holders, address)
-					p.tickerToHolderMap[tickerName] = holders
+					if len(holders) == 0 {
+						delete(p.tickerToHolderMap, tickerName)
+					} else {
+						p.tickerToHolderMap[tickerName] = holders
+					}
 					p.tickerMap[tickerName].Ticker.HolderCount--
 					p.tickerUpdated[tickerName] = p.tickerMap[tickerName].Ticker
 

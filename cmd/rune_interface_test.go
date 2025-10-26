@@ -118,7 +118,7 @@ func TestRuneInterfaceAsset(t *testing.T) {
 	utxos, _ := rpcService.GetUTXOs(firstRuneAddress)
 	addressAssets := runesIndexer.GetAddressAssets(addressId, utxos)
 	for i, v := range addressAssets {
-		t.Logf("GetAddressAssets return addressAssets %d: %+v\n", i, v)
+		t.Logf("GetAddressAssets return addressAssets %s: %+v\n", i, v)
 	}
 
 	// 7
