@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -314,4 +315,14 @@ func IsOpReturn(pkScript []byte) bool {
 	}
 
 	return true
+}
+
+func IsValidTx(err string) bool {
+	if strings.Contains(err, "transaction already exists in blockchain") ||
+	strings.Contains(err, "database contains entry for spent tx output") ||
+	strings.Contains(err, "already have transaction in mempool") || 
+	strings.Contains(err, "Transaction outputs already in utxo set") {
+		return true
+	}
+	return false
 }

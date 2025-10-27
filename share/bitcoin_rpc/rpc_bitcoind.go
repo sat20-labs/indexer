@@ -1,10 +1,14 @@
 package bitcoin_rpc
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
 	"github.com/OLProtocol/go-bitcoind"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/sat20-labs/indexer/common"
 )
 
 
@@ -47,12 +51,50 @@ func (p *BitcoindRPC) TestTx(signedTxs []string) ([]bitcoind.TransactionTestResu
 	if err != nil {
 		return nil, err
 	}
+
+	for _, r := range resp {
+		if !r.Allowed {
+			if common.IsValidTx(r.RejectReason) {
+				common.Log.Infof("TestMempoolAccept %s has broadcasted. %s", r.TxId, r.RejectReason)
+				// 修改结果
+				r.Allowed = true
+				r.RejectReason = ""
+				continue
+			}
+		}
+	}
+
 	return resp, nil
 }
 
+func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
+	txBytes, err := hex.DecodeString(txHex)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding hex string: %v", err)
+	}
+
+	msgTx := wire.NewMsgTx(wire.TxVersion)
+	err = msgTx.Deserialize(bytes.NewReader(txBytes))
+	if err != nil {
+		return nil, fmt.Errorf("error deserializing transaction: %v", err)
+	}
+
+	return msgTx, nil
+}
 
 func (p *BitcoindRPC) SendTx(signedTxHex string) (string, error) {
-	return p.bitcoind.SendRawTransaction(signedTxHex, 0)
+	txId, err := p.bitcoind.SendRawTransaction(signedTxHex, 0)
+	if err != nil {
+		if common.IsValidTx(err.Error()) {
+			tx, err := DecodeMsgTx(signedTxHex)
+			if err != nil {
+				common.Log.Errorf("DecodeMsgTx failed, %v", err)
+				return "", err
+			}
+			return tx.TxID(), nil
+		}
+	}
+	return txId, err
 }
 
 func (p *BitcoindRPC) GetTx(txid string) (*bitcoind.RawTransaction, error) {
