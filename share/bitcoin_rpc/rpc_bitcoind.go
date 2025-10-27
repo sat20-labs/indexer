@@ -52,14 +52,19 @@ func (p *BitcoindRPC) TestTx(signedTxs []string) ([]bitcoind.TransactionTestResu
 		return nil, err
 	}
 
-	for _, r := range resp {
+	for i, r := range resp {
 		if !r.Allowed {
 			if common.IsValidTx(r.RejectReason) {
 				common.Log.Infof("TestMempoolAccept %s has broadcasted. %s", r.TxId, r.RejectReason)
+				tx, err := DecodeMsgTx(signedTxs[i])
+				if err != nil {
+					common.Log.Errorf("DecodeMsgTx failed, %v", err)
+					continue
+				}
 				// 修改结果
+				r.TxId = tx.TxID()
 				r.Allowed = true
 				r.RejectReason = ""
-				continue
 			}
 		}
 	}
