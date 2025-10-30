@@ -45,6 +45,10 @@ func (p *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 	ticker.Ticker.TransactionCount++
 	mintedAmt := ticker.Ticker.Minted.Add(&mint.Amt)
 	ticker.Ticker.Minted = *mintedAmt
+	// if strings.ToLower(mint.Name) == "ordi" {
+	// 	balanceStr := ticker.Ticker.Minted.String()
+	// 	common.Log.Infof("minted:%s, inscriptionId:%s, id:%d", balanceStr, mint.Nft.Base.InscriptionId, mint.Nft.Base.Id)
+	// }
 	cmpResult := mintedAmt.Cmp(&ticker.Ticker.Max)
 	if cmpResult == 0 {
 		ticker.Ticker.EndInscriptionId = mint.Nft.Base.InscriptionId
@@ -75,7 +79,23 @@ func (p *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	addressId := transfer.Nft.OwnerAddressId
+	holder := p.holderMap[addressId]
+	if holder == nil {
+		return
+	}
+
 	tickerName := strings.ToLower(transfer.Name)
+	tickAbbrInfo := holder.Tickers[tickerName]
+	if tickAbbrInfo == nil {
+		return
+	}
+	if transfer.Amt.Cmp(tickAbbrInfo.AvailableBalance) > 0 {
+		return
+	}
+	tickAbbrInfo.AvailableBalance = tickAbbrInfo.AvailableBalance.Sub(&transfer.Amt)
+	tickAbbrInfo.TransferableBalance = tickAbbrInfo.TransferableBalance.Add(&transfer.Amt)
+
 	ticker := p.tickerMap[tickerName]
 	ticker.Ticker.TransactionCount++
 	p.tickerUpdated[tickerName] = ticker.Ticker
@@ -153,25 +173,23 @@ func (p *BRC20Indexer) addHolderBalance(ticker string, address uint64, amt commo
 	tickerName := strings.ToLower(ticker)
 
 	info, ok := p.holderMap[address]
+	zeroAmt, _ := common.NewDecimalFromString("0", int(p.tickerMap[tickerName].Ticker.Decimal))
 	if !ok {
-		tickinfo := common.NewBRC20TickAbbrInfo(amt)
 		tickers := make(map[string]*common.BRC20TickAbbrInfo)
-		tickers[tickerName] = tickinfo
+		tickers[tickerName] = common.NewBRC20TickAbbrInfo(&amt, zeroAmt)
 		info = &HolderInfo{ /*AddressId: address,*/ Tickers: tickers}
 		p.holderMap[address] = info
 		p.tickerMap[tickerName].Ticker.HolderCount++
 		p.tickerUpdated[tickerName] = p.tickerMap[tickerName].Ticker
 	} else {
 		// info.AddressId = address
-		tickinfo, ok := info.Tickers[tickerName]
+		tickAbbrInfo, ok := info.Tickers[tickerName]
 		if !ok {
 			p.tickerMap[tickerName].Ticker.HolderCount++
 			p.tickerUpdated[tickerName] = p.tickerMap[tickerName].Ticker
-
-			tickinfo := common.NewBRC20TickAbbrInfo(amt)
-			info.Tickers[tickerName] = tickinfo
+			info.Tickers[tickerName] = common.NewBRC20TickAbbrInfo(&amt, zeroAmt)
 		} else {
-			tickinfo.Balance = *tickinfo.Balance.Add(&amt)
+			tickAbbrInfo.AvailableBalance = tickAbbrInfo.AvailableBalance.Add(&amt)
 		}
 	}
 
@@ -189,17 +207,19 @@ var err_no_enough_balance = fmt.Errorf("not enough balance")
 // 减少该address下的资产数据
 func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt common.Decimal) error {
 	tickerName := strings.ToLower(ticker)
-	info, ok := p.holderMap[address]
+	holdInfo, ok := p.holderMap[address]
 	if ok {
 		// info.AddressId = address
-		tickinfo, ok := info.Tickers[tickerName]
+		tickAbbrInfo, ok := holdInfo.Tickers[tickerName]
 		if ok {
-			cmp := tickinfo.Balance.Cmp(&amt)
-			if cmp >= 0 {
-				tickinfo.Balance = *tickinfo.Balance.Sub(&amt)
-				balanceStr := tickinfo.Balance.String()
-				common.Log.Infof("%s", balanceStr)
-				if cmp == 0 {
+			if tickAbbrInfo.TransferableBalance.Cmp(&amt) >= 0 {
+				tickAbbrInfo.TransferableBalance = tickAbbrInfo.TransferableBalance.Sub(&amt)
+				// balanceStr := tickinfo.TransferableBalance.String()
+				// common.Log.Infof("%s", balanceStr)
+
+				balance := tickAbbrInfo.AvailableBalance.Add(tickAbbrInfo.TransferableBalance)
+				balanceIsZero := balance.IsZero()
+				if balanceIsZero {
 					holders := p.tickerToHolderMap[tickerName]
 					delete(holders, address)
 					if len(holders) == 0 {
@@ -210,8 +230,8 @@ func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt commo
 					p.tickerMap[tickerName].Ticker.HolderCount--
 					p.tickerUpdated[tickerName] = p.tickerMap[tickerName].Ticker
 
-					delete(info.Tickers, tickerName)
-					if len(info.Tickers) == 0 {
+					delete(holdInfo.Tickers, tickerName)
+					if len(holdInfo.Tickers) == 0 {
 						delete(p.holderMap, address)
 					}
 				}
@@ -231,7 +251,8 @@ func (p *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 		tickerName := strings.ToLower(nft.Ticker)
 		tickInfo, ok := holder.Tickers[tickerName]
 		if ok {
-			delete(tickInfo.TransferableData, nft.TransferNft.UtxoId)
+			tickInfo.TransferableData[nft.TransferNft.UtxoId].IsInvalid = true
+			// delete(tickInfo.TransferableData, nft.TransferNft.UtxoId)
 		} else {
 			common.Log.Panic("can't find ticker info")
 		}
@@ -243,27 +264,28 @@ func (p *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 func (p *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	p.transferNftMap[nft.TransferNft.UtxoId] = nft
 
-	bValid := false
+	// bValid := false
 	holder, ok := p.holderMap[nft.AddressId]
 	if ok {
 		tickerName := strings.ToLower(nft.Ticker)
-		tickInfo, ok := holder.Tickers[tickerName]
+		tickAbbrInfo, ok := holder.Tickers[tickerName]
 		if ok {
-			tickInfo.TransferableData[nft.TransferNft.UtxoId] = nft.TransferNft
-			bValid = true
+			tickAbbrInfo.TransferableData[nft.TransferNft.UtxoId] = nft.TransferNft
+			// bValid = true
 		}
 	}
 
-	if !bValid {
-		// 异常路径：没有可用余额，先将transfer铭文保存起来，以后可能可以用（TODO 要看BRC20协议是否这样处理）
-		availableBalance := common.NewDecimal(0, nft.TransferNft.Amount.Precision)
-		// 仅为了创建tickInfo
-		p.addHolderBalance(nft.Ticker, nft.AddressId, *availableBalance)
+	// if !bValid {
+	// TODO:
+	// 异常路径：没有可用余额，先将transfer铭文保存起来，以后可能可以用（TODO 要看BRC20协议是否这样处理）
+	// availableBalance := common.NewDecimal(0, nft.TransferNft.Amount.Precision)
+	// 仅为了创建tickInfo
+	// p.addHolderBalance(nft.Ticker, nft.AddressId, *availableBalance)
 
-		// holder = p.holderMap[nft.AddressId]
-		// tickInfo := holder.Tickers[strings.ToLower(nft.Ticker)]
-		// tickInfo.InvalidTransferableData[nft.TransferNft.UtxoId] = nft.TransferNft
-	}
+	// holder = p.holderMap[nft.AddressId]
+	// tickInfo := holder.Tickers[strings.ToLower(nft.Ticker)]
+	// tickInfo.InvalidTransferableData[nft.TransferNft.UtxoId] = nft.TransferNft
+	// }
 }
 
 func (p *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {

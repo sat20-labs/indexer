@@ -8,6 +8,7 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 type BRC20TickInfo struct {
@@ -152,6 +153,9 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	}
 
 	for key, value := range s.transferNftMap {
+		if newInst.transferNftMap == nil {
+			newInst.transferNftMap = make(map[uint64]*TransferNftInfo)
+		}
 		newInst.transferNftMap[key] = value
 	}
 	return newInst
@@ -218,7 +222,6 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
-
 	common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()
 	for name := range s.tickerMap {
@@ -259,17 +262,206 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			common.Log.Errorf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
 			return false
 		}
-
-		// if holderAmount != 156271012 {
-		// 	common.Log.Panicf("%s amount incorrect. %d", name, holderAmount)
-		// }
-
 	}
 
-	// 检查holderinfo？
-	// for utxo, holderInfo := range s.holderInfo {
+	// special tickers
+	type TickerInfo struct {
+		Name               string
+		InscriptionId      string
+		Max                string
+		Minted             string
+		Limit              string
+		Decimal            uint8
+		SelfMint           bool
+		DeployAddress      string
+		DeployTime         string
+		CompletedTime      string
+		StartInscriptionId string
+		EndInscriptionId   string
+		HolderCount        uint64
+		TransactionCount   uint64
+		Top10Holders       map[string]map[string]string // address -> ticker -> balance
+	}
 
-	// }
+	var specialTickers [1]TickerInfo
+	var checkHeight int
+	if s.nftIndexer.GetBaseIndexer().IsMainnet() {
+		checkHeight = 921406
+		tickerInfo1 := TickerInfo{
+			Name:               "sats",
+			InscriptionId:      "9b664bdd6f5ed80d8d88957b63364c41f3ad4efb8eee11366aa16435974d9333i0",
+			Max:                "2100000000000000",
+			Minted:             "2100000000000000",
+			Limit:              "100000000",
+			Decimal:            18,
+			SelfMint:           false,
+			DeployAddress:      "bc1prtawdt82wfgrujx6d0heu0smxt4yykq440t447wan88csf3mc7csm3ulcn",
+			DeployTime:         "2023-03-09 13:32:14",
+			CompletedTime:      "2023-09-24 18:52:12",
+			StartInscriptionId: "9b664bdd6f5ed80d8d88957b63364c41f3ad4efb8eee11366aa16435974d9333i0",
+			EndInscriptionId:   "5d417bdd264635c441a4327711f4635c085092aa359b5a03dde4b16687fe8dadi0",
+			HolderCount:        54377,
+			TransactionCount:   21867973,
+			Top10Holders: map[string]map[string]string{
+				"bc1p8w6zr5e2q60s0r8al4tvmsfer77c0eqc8j55gk8r7hzv39zhs2lqa8p0k6": {
+					"GDP ":  "103000000000000000",
+					"F财":    "88888888888888901",
+					"vitas": "10000000000000000",
+					"sats":  "972376769384044",
+					// ...
+				},
+				"bc1qggf48ykykz996uv5vsp5p9m9zwetzq9run6s64hm6uqfn33nhq0ql9t85q": {
+					"FC2 ": "666666666666666666",
+					"GDP ": "101000000000000000",
+					"S@AI": "99999999999999000",
+					"sats": "402841653528669.71358",
+					// ...
+				},
+				"bc1qn2cpj0hrl37wqh5q94kwrlhtj2lx8ahtw7ef5rg35tswxsqtvufqfmmrq2": {
+					"sats": "68084860391688.3432",
+					"ordi": "992.5413",
+					"WPCD": "5",
+					// ...
+				},
+			},
+		}
+		specialTickers[0] = tickerInfo1
+	} else {
+		checkHeight = 108237
+		tickerInfo1 := TickerInfo{
+			Name:               "ordi",
+			InscriptionId:      "3b84bfba456be05287c0888bcbf5df778c8946ff6b057fd0836cc65c12546f12i0",
+			Max:                "2400000000",
+			Minted:             "1211700992", // unisat: 1211670992
+			Limit:              "10000",
+			Decimal:            18,
+			SelfMint:           false,
+			DeployAddress:      "tb1pmm586mlhs35e8ns08trdejpzv02rupx0hp9j8arumg5c29dyrfnq2trqcw",
+			DeployTime:         "2024-06-06 14:43:56",
+			CompletedTime:      "",
+			StartInscriptionId: "3b84bfba456be05287c0888bcbf5df778c8946ff6b057fd0836cc65c12546f12i0",
+			EndInscriptionId:   "",
+			HolderCount:        142,    // unisat: 138
+			TransactionCount:   121633, // unisat: 121636
+			Top10Holders: map[string]map[string]string{
+				"tb1p6eahny66039p30ntrp9ke0qpyyffgnkekf69js6d2qcjf8cdmu0shx273f": {
+					"ordi": "230000000",
+					"Usdt": "4239000",
+					// "pizza5": "0",
+				},
+				"tb1pgw439hxzr7vj0gzfqx69wl3plem4ne26kj7ktnuzj3lkpw5mmp3qhz7yv4": {
+					"ordi": "230000000",
+					"Usdt": "4302000",
+					"Test": "2000000",
+					"GC  ": "100000",
+				},
+				"tb1pc2nqm8k0kwnctkr2amchtcys4fq4elkq8ezhtsrntlkfc92z5tssh68xzl": {
+					"ordi": "190000000",
+				},
+				"tb1qy6zm520mnla9894t4jqvwe9s2sjsn2sfude0r0": {
+					"ordi": "50260000",
+				},
+				"tb1plzvdzn3sagtlavxsrdv9kp65empk80j0ksmazzqdc6nqkarj238s4r5qwx": {
+					"⚽ ":   "98010000", // unisat: 98020000
+					"ordi": "50000000",
+					"sats": "42000000",
+					"CTRA": "12400000",
+					"cats": "2000000",
+					"Test": "2000000",
+					"doge": "1000000",
+					"rats": "412000",
+				},
+				"tb1p5cymzvgf87fgeuzfexwxgvlmuuq309gegfh4q6np8g4qq6lnlk3qpzf2rs": {
+					"brc20": "1113000000",
+					"ordi":  "50000000",
+					"Usdt":  "7910000",
+					"Test":  "3000000",
+					"GC  ":  "9200",
+				},
+				"tb1qmtlvgn8fl8ug2kgu26r6j9gykxm90tv5v4f6zx": {
+					"ordi": "40000000",
+				},
+				"tb1qn5pvsgw32gshn365n93wzw606hfy9k6cuvkxmn": {
+					"ordi": "30000000",
+				},
+				"tb1qw3qp3d0m0ykl2v7yj4uvrp4gsw8pwqmghul8w8": {
+					"ordi": "30000000",
+				},
+				"tb1qw65mlex2hpv2py2pucysfrfe59h3acde3vtya9": {
+					"ordi": "20260000",
+				},
+			},
+		}
+		specialTickers[0] = tickerInfo1
+	}
+
+	if checkHeight <= height {
+		for _, specialTicker := range specialTickers {
+			ticker := s.GetTicker(specialTicker.Name)
+			if specialTicker.InscriptionId != ticker.Nft.Base.InscriptionId {
+				return false
+			}
+			if specialTicker.TransactionCount != ticker.TransactionCount {
+				return false
+			}
+			if specialTicker.Max != ticker.Max.String() {
+				return false
+			}
+			if specialTicker.Minted != ticker.Minted.String() {
+				return false
+			}
+			if specialTicker.Limit != ticker.Limit.String() {
+				return false
+			}
+			if specialTicker.Decimal != ticker.Decimal {
+				return false
+			}
+			if specialTicker.SelfMint != ticker.SelfMint {
+				return false
+			}
+
+			startNftInfo := base_indexer.ShareBaseIndexer.GetNftInfoWithInscriptionId(ticker.StartInscriptionId)
+			deployAddress := base_indexer.ShareBaseIndexer.GetAddressById(startNftInfo.OwnerAddressId)
+			if specialTicker.DeployAddress != deployAddress {
+				return false
+			}
+			deployTime := time.Unix(ticker.DeployTime, 0).Format("2006-01-02 15:04:05")
+			if specialTicker.DeployTime != deployTime {
+				return false
+			}
+
+			endNftInfo := base_indexer.ShareBaseIndexer.GetNftInfoWithInscriptionId(ticker.EndInscriptionId)
+			if endNftInfo != nil {
+				completedTime := time.Unix(endNftInfo.Base.BlockTime, 0).Format("2006-01-02 15:04:05")
+				if specialTicker.CompletedTime != completedTime {
+					return false
+				}
+			}
+
+			if specialTicker.StartInscriptionId != ticker.StartInscriptionId {
+				return false
+			}
+			if specialTicker.EndInscriptionId != ticker.EndInscriptionId {
+				return false
+			}
+			if specialTicker.HolderCount != ticker.HolderCount {
+				return false
+			}
+			if specialTicker.TransactionCount != ticker.TransactionCount {
+				return false
+			}
+
+			for address, holder := range specialTicker.Top10Holders {
+				addressId := s.nftIndexer.GetBaseIndexer().GetAddressId(address)
+				assertSummarys := s.GetAssetSummaryByAddress(addressId)
+				for tickerName, amt := range assertSummarys {
+					if holder[tickerName] != amt.String() {
+						return false
+					}
+				}
+			}
+		}
+	}
 
 	// 最后才设置dbver
 	s.setDBVersion()

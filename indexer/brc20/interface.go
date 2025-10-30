@@ -127,7 +127,9 @@ func (p *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]*common.
 		}
 		info, ok := holderinfo.Tickers[tickerName]
 		if ok {
-			mp[addrId] = &info.Balance
+			balance := info.AvailableBalance.Clone()
+			balance = balance.Add(info.TransferableBalance)
+			mp[addrId] = balance
 		}
 	}
 
@@ -149,7 +151,8 @@ func (p *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*commo
 
 	for k, v := range info.Tickers {
 		org := result[k]
-		result[k] = org.Add(&v.Balance)
+		balance := v.AvailableBalance.Add(v.TransferableBalance)
+		result[k] = org.Add(balance)
 	}
 
 	return result
@@ -338,3 +341,4 @@ func (p *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
 	ret := p.GetUtxoAssets(utxoId)
 	return len(ret) != 0
 }
+

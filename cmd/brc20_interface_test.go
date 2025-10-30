@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
-var firstTestnet4Brc20Name = "GC  "
+var firstTestnet4Brc20Name = "ordi"
 
 var tickerName = "GC  " // box6
 var brc20Indexer *brc20.BRC20Indexer
@@ -39,6 +38,8 @@ func InitBrc20Tester() {
 	}
 }
 
+
+
 func printBrc20Ticker(t *testing.T, ticker *common.BRC20Ticker) {
 	format := "print brc20 ticker:\nName: “%s”\n"
 	format += "inscription: %s\nSupply: %s\nMinted: %s\nLimit per mint: %s\nDecimal: %d\nSelf-issuance: %v\nDeploy By: %s\n"
@@ -47,12 +48,12 @@ func printBrc20Ticker(t *testing.T, ticker *common.BRC20Ticker) {
 
 	nftInfo := indexerMgr.GetNftInfoWithInscriptionId(ticker.StartInscriptionId)
 	deployAddress := indexerMgr.GetAddressById(nftInfo.OwnerAddressId)
-	deployTime := time.Unix(int64(ticker.DeployTime), 0).Format("2006-01-02 15:04:05")
+	deployTime := time.Unix(ticker.DeployTime, 0).Format("2006-01-02 15:04:05")
 
 	completedTime := ""
 	if ticker.EndInscriptionId != "" {
 		nftInfo = indexerMgr.GetNftInfoWithInscriptionId(ticker.EndInscriptionId)
-		completedTime = time.Unix(int64(nftInfo.Base.BlockTime), 0).Format("2006-01-02 15:04:05")
+		completedTime = time.Unix(nftInfo.Base.BlockTime, 0).Format("2006-01-02 15:04:05")
 	}
 
 	t.Logf(format, ticker.Name,
@@ -81,17 +82,16 @@ func TestInterfaceBrc20(t *testing.T) {
 }
 
 type HolderBalance struct {
-	Address string
-	Balance *common.Decimal
+	AddressId uint64
+	Balance   *common.Decimal
 }
 
 func getHolderBalances(tickerName string, start, limit uint64) (ret []*HolderBalance, total uint64) {
 	holders := brc20Indexer.GetHoldersWithTick(tickerName)
 	for addressId, balance := range holders {
-		address := indexerMgr.GetAddressById(addressId)
 		ret = append(ret, &HolderBalance{
-			Address: address,
-			Balance: balance,
+			AddressId: addressId,
+			Balance:   balance,
 		})
 	}
 	sort.Slice(ret, func(i, j int) bool {
@@ -113,10 +113,16 @@ func getHolderBalances(tickerName string, start, limit uint64) (ret []*HolderBal
 func TestGetBrc20HoldersBalance(t *testing.T) {
 	InitBrc20Tester()
 	// 4
-	holders, total := getHolderBalances(firstTestnet4Brc20Name, 0, 1000)
-	t.Logf("GetHoldersWithTicks return holders total count: %d\n", total)
+	holders, total := getHolderBalances(firstTestnet4Brc20Name, 0, 10)
+	t.Logf("getHolderBalances return holders total count: %d\n", total)
 	for _, v := range holders {
-		fmt.Printf("holder %s: %s\n", v.Address, v.Balance.String())
+		address := indexerMgr.GetAddressById(v.AddressId)
+		t.Logf("holder %s: %s\n", address, v.Balance.String())
+
+		assertSummarys := brc20Indexer.GetAssetSummaryByAddress(v.AddressId)
+		for tickerName, amt := range assertSummarys {
+			t.Logf("asset %s: %s\n", tickerName, amt.String())
+		}
 	}
 }
 

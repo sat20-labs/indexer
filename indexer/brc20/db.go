@@ -42,14 +42,14 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 		if err != nil {
 			common.Log.Panicln(key + " " + err.Error())
 		} else {
-			var info HolderInfo
-			err = db.DecodeBytes(v, &info)
+			var holdInfo HolderInfo
+			err = db.DecodeBytes(v, &holdInfo)
 			if err == nil {
 				// if addrId != info.AddressId {
 				// 	common.Log.Panicln("key addrId and value addrId not equal")
 				// }
-				holderMap[addrId] = &info
-				for ticker, tickAbbrInfo := range info.Tickers {
+				holderMap[addrId] = &holdInfo
+				for ticker, tickAbbrInfo := range holdInfo.Tickers {
 					holders, ok := tickerToHolderMap[ticker]
 					if ok {
 						holders[addrId] = true

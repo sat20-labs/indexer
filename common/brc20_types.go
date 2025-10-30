@@ -85,28 +85,25 @@ type BRC20MintAbbrInfo struct {
 }
 
 type TransferNFT struct {
-	NftId  int64
-	UtxoId uint64
-	Amount Decimal
+	NftId     int64
+	UtxoId    uint64
+	Amount    Decimal
+	IsInvalid bool
 }
 
 // key: mint时的inscriptionId。 value: 某个资产对应的数值
 type BRC20TickAbbrInfo struct {
-	Balance Decimal
-	// AvailableBalance Decimal
-	// TransferableBalance Decimal
-	TransferableData map[uint64]*TransferNFT // key:utxoId
+	AvailableBalance    *Decimal
+	TransferableBalance *Decimal
+	TransferableData    map[uint64]*TransferNFT // key:utxoId
 	// InvalidTransferableData map[uint64]*TransferNFT // key:utxoId
 }
 
-func NewBRC20TickAbbrInfo(amt Decimal) *BRC20TickAbbrInfo {
-	// balance := amt.Clone()
-	// balance.SetValue(0)
+func NewBRC20TickAbbrInfo(availableAmt, transferableAmt *Decimal) *BRC20TickAbbrInfo {
 	return &BRC20TickAbbrInfo{
-		Balance: amt,
-		// AvailableBalance:   amt,
-		// TransferableBalance: *balance,
-		TransferableData: make(map[uint64]*TransferNFT),
+		AvailableBalance:    availableAmt.Clone(),
+		TransferableBalance: transferableAmt.Clone(),
+		TransferableData:    make(map[uint64]*TransferNFT),
 		// InvalidTransferableData: make(map[uint64]*TransferNFT),
 	}
 }
@@ -141,8 +138,8 @@ func (p *BRC20MintAbbrInfo) ToMintInfo() *MintInfo {
 
 func (p *BRC20MintAbbrInfo) ToMintAbbrInfo() *MintAbbrInfo {
 	return &MintAbbrInfo{
-		Id: p.Id,
-		Address: p.Address,
+		Id:             p.Id,
+		Address:        p.Address,
 		Amount:         p.Amount.Clone(),
 		Ordinals:       nil,
 		Height:         p.Height,
@@ -152,7 +149,7 @@ func (p *BRC20MintAbbrInfo) ToMintAbbrInfo() *MintAbbrInfo {
 }
 
 type BRC20TransferInfo struct {
-	InscriptionId string `json:"inscriptionId"`
-	Name          string `json:"name"`
+	InscriptionId string   `json:"inscriptionId"`
+	Name          string   `json:"name"`
 	Amt           *Decimal `json:"amt"`
 }
