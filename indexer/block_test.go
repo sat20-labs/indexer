@@ -195,7 +195,7 @@ func TestParser_ord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields, err := common.ParseInscription(rawData)
+	fields, _, err := common.ParseInscription(rawData)
 	if err != nil {
 		t.Fatal(err)
 	}

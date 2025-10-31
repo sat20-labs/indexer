@@ -129,7 +129,7 @@ func TestParser(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -144,7 +144,7 @@ func TestParser_Satpoint(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -174,7 +174,7 @@ func TestParser_specialmetadata(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -196,7 +196,7 @@ func TestParser_specialmedia(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -217,7 +217,7 @@ func TestParser_specialprotocol(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -239,7 +239,7 @@ func TestParser_specialcase1(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -261,7 +261,7 @@ func TestParser_specialcase2(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -283,7 +283,7 @@ func TestParser_metadata_deploy(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -310,7 +310,7 @@ func TestParser_metadata_mint(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -346,7 +346,7 @@ func TestParser_ord1(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -366,7 +366,7 @@ func TestParser_ord2(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	insc, _ := ParseInscription(rawData)
+	insc, _, _ := ParseInscription(rawData)
 
 	if len(insc) > 0 {
 		assert.True(t, false)
@@ -380,7 +380,7 @@ func TestParser_ord3(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -399,7 +399,7 @@ func TestParser_ord4(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -444,7 +444,7 @@ func TestParser_ord5(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -503,7 +503,7 @@ func TestParser_ord6(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -520,7 +520,7 @@ func TestParser_nested(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if len(fields) != 0 {
 		Log.Info(err)
 		assert.True(t, false)
@@ -534,7 +534,7 @@ func TestParser_ord7(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -550,7 +550,7 @@ func TestParser_ord8(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -568,7 +568,7 @@ func TestParser_ord9(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -586,7 +586,7 @@ func TestParser_ord10(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -604,7 +604,7 @@ func TestParser_ord11(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -622,7 +622,7 @@ func TestParser_ord12(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, _ := ParseInscription(rawData)
+	fields, _, _ := ParseInscription(rawData)
 
 	if len(fields) != 1 {
 		assert.True(t, false)
@@ -636,7 +636,7 @@ func TestParser_ord13(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -654,7 +654,7 @@ func TestParser_ord14(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -672,7 +672,7 @@ func TestParser_ord15(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -690,7 +690,7 @@ func TestParser_ord16(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -708,7 +708,7 @@ func TestParser_ord17(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -726,7 +726,7 @@ func TestParser_ord18(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -744,7 +744,7 @@ func TestParser_ord19(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -762,7 +762,7 @@ func TestParser_ord20(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)
@@ -780,7 +780,7 @@ func TestParser_ord21(t *testing.T) {
 		Log.Info(err)
 		assert.True(t, false)
 	}
-	fields, err := ParseInscription(rawData)
+	fields, _, err := ParseInscription(rawData)
 	if err != nil {
 		Log.Info(err)
 		assert.True(t, false)

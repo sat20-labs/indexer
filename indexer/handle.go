@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
 )
@@ -25,13 +26,13 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 		id := 0
 		for _, input := range tx.Inputs {
 
-			inscriptions, err := common.ParseInscription(input.Witness)
+			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
 			if err != nil {
 				continue
 			}
 
-			for _, insc := range inscriptions {
-				s.handleOrd(input, insc, id, tx, block)
+			for i, insc := range inscriptions {
+				s.handleOrd(input, insc, id, envelopes[i], tx, block)
 				id++
 				count++
 			}
@@ -853,7 +854,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 }
 
 func (s *IndexerMgr) handleOrd(input *common.Input,
-	fields map[int][]byte, inscriptionId int, tx *common.Transaction, block *common.Block) {
+	fields map[int][]byte, inscriptionId int, envelope []byte, tx *common.Transaction, block *common.Block) {
 
 	satpoint := 0
 	if fields[common.FIELD_POINT] != nil {
@@ -933,6 +934,11 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			}
 		}
 	case "brc-20":
+		if brc20.IsCursed(envelope, inscriptionId, block.Height) {
+			common.Log.Infof("%s inscription is cursed", nft.Base.InscriptionId)
+			return 
+		}
+
 		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
 		// if inscriptionId == 0 {
 		// TODO brc20 只处理tx中的第一个铭文？

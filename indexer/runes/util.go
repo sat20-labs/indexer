@@ -15,7 +15,7 @@ import (
 
 func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.InscriptionId) {
 	for _, input := range transaction.Inputs {
-		_, err := common.ParseInscription(input.Witness)
+		_, _, err := common.ParseInscription(input.Witness)
 		if err == nil {
 			inscriptionId := runestone.InscriptionId(transaction.Txid + "i0")
 			ret = &inscriptionId

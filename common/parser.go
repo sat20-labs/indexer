@@ -21,21 +21,21 @@ func readBytes(raw []byte, pointer *int, n int) []byte {
 	return value
 }
 
-func getBeginPosition(raw []byte) int {
+func getBeginPosition(raw []byte) (int, int) {
 	inscriptionMark := []byte{0, txscript.OP_IF, 3, 111, 114, 100}                         // "0063036f7264"
 	inscriptionMark2 := []byte{0, txscript.OP_IF, txscript.OP_PUSHDATA1, 3, 111, 114, 100} // "00634c036f7264"
 
 	position := bytes.Index(raw, inscriptionMark)
 	if position >= 0 {
-		return int(position + len(inscriptionMark))
+		return int(position + len(inscriptionMark)), len(inscriptionMark)
 	}
 
 	position = bytes.Index(raw, inscriptionMark2)
 	if position >= 0 {
-		return int(position + len(inscriptionMark2))
+		return int(position + len(inscriptionMark2)), len(inscriptionMark2)
 	}
 
-	return -1
+	return -1, 0
 }
 
 // 从跳过信封头开始
@@ -188,17 +188,18 @@ func getContentLength(raw []byte, pos *int) int {
 	return total
 }
 
-func ParseInscription(txWitness [][]byte) ([]map[int][]byte, error) {
+func ParseInscription(txWitness [][]byte) ([]map[int][]byte, [][]byte, error) {
 	// 规则：一个信封，就是一次铭刻。
 	// 无效情况：1. 存在不支持的指令；2.信封内部嵌套信封
 	// 可能存在任何一个witness
 
 	result := make([]map[int][]byte, 0)
+	envelopes := make([][]byte, 0)
 	for _, raw := range txWitness {
 
 		pos := int(0)
 		for pos < len(raw) {
-			begin := getBeginPosition(raw[pos:])
+			begin, skip := getBeginPosition(raw[pos:])
 			if begin < 0 {
 				break
 			}
@@ -212,6 +213,7 @@ func ParseInscription(txWitness [][]byte) ([]map[int][]byte, error) {
 			pos = end + 1
 
 			envelope := raw[begin:pos]
+			envelopes = append(envelopes, raw[begin-skip:pos])
 
 			fields := make(map[int][]byte)
 			length := end - begin
@@ -260,7 +262,7 @@ func ParseInscription(txWitness [][]byte) ([]map[int][]byte, error) {
 
 	}
 
-	return result, nil
+	return result, envelopes, nil
 }
 
 func GetBasicContent(content string) *OrdxBaseContent {
