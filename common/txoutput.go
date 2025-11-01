@@ -548,7 +548,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 					// runes
 					offset = 330
 				} else {
-					// brc20
+					// brc20，资产需要跟随transfer铭文走，transfer铭文由Offsets定位，其数量由SatBindingMap确定
 					offsets := p.Offsets[asset.Name]
 					if offsets == nil {
 						return nil, nil, fmt.Errorf("can't find offset for asset %s", asset.Name.String())
