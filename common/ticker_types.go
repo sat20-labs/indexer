@@ -192,7 +192,9 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 	for _, v := range p.Assets {
 		assetInfo := v.ToAssetInfo()
 		assets = append(assets, *assetInfo)
-		offsets[v.AssetName] = v.Offsets
+		if len(v.Offsets) != 0 {
+			offsets[v.AssetName] = v.Offsets
+		}
 		for _, offset := range v.OffsetToAmts {
 			piece := assetInfo.Clone()
 			amt, err := NewDecimalFromString(offset.Amount, assetInfo.Amount.Precision)
