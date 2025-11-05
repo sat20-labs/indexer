@@ -15,7 +15,7 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-func main() {
+func main2() {
 
 	const (
 		P2PKH int = iota

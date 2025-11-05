@@ -294,13 +294,22 @@ func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20Transfer
 	for _, nft := range nfts {
 		transferInfo := common.ParseBrc20TransferContent(string(nft.Base.Content))
 		if transferInfo != nil && transferInfo.P == "brc-20" && transferInfo.Op == "transfer" {
-			// tickerName := strings.ToLower(transferInfo.Ticker)
+			tickerName := strings.ToLower(transferInfo.Ticker)
 			// holder := p.holderMap[nft.OwnerAddressId]
 			// if holder != nil {
 			// tickAbbrInfo := holder.Tickers[tickerName]
 			// if tickAbbrInfo != nil {
 			// nftTransfer := tickAbbrInfo.TransferableData[utxoId]
 			// if nftTransfer == nil {
+			// }
+			for _, action := range p.holderActionList {
+				if tickerName == strings.ToLower(action.Ticker) && action.Action == Action_Transfer {
+					ret = append(ret, &common.BRC20TransferInfo{
+						InscriptionId: nft.Base.InscriptionId,
+						Name:          action.Ticker,
+						Amt:           action.Amount.Clone()})
+				}
+			}
 			key := GetTransferHistoryKey(transferInfo.Ticker, nft.UtxoId)
 			var result common.BRC20TransferHistory
 			err := db.GetValueFromDB([]byte(key), &result, p.db)
@@ -341,4 +350,3 @@ func (p *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
 	ret := p.GetUtxoAssets(utxoId)
 	return len(ret) != 0
 }
-
