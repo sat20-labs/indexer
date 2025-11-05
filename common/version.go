@@ -3,7 +3,8 @@ package common
 // 1.0.0  2025.02.03   支持STP
 // 1.0.1  2025.05.20   runes协议使用spacer name作为对外的索引
 // 1.0.3  2025.08.21   升级数据库
-const ORDX_INDEXER_VERSION = "1.0.3.3"
+// 1.0.4  2025.11.06   brc20
+const ORDX_INDEXER_VERSION = "1.0.4"
 
 
 // 1.1.0  2024.07.01-
