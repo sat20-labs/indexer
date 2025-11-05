@@ -111,7 +111,7 @@ type TxAssets []AssetInfo
 
 
 func (p *TxAssets) Clone() TxAssets {
-	if p == nil {
+	if p == nil || len(*p) == 0 {
 		return nil
 	}
 

@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -45,10 +44,10 @@ func (p *IndexerMgr) GetBRC20TickerV2(tickerName string) *common.TickerInfo {
 	
 	result.MaxSupply = ticker.Max.String()
 	minted, ms := p.brc20Indexer.GetMintAmount(tickerName)
-	result.TotalMinted = fmt.Sprintf("%d", minted)
+	result.TotalMinted = minted.String()
 	result.MintTimes = ms
 
-	result.Limit = fmt.Sprintf("%d", ticker.Limit)
+	result.Limit = ticker.Limit.String()
 	if ticker.SelfMint {
 		result.SelfMint = 100
 	} else {
