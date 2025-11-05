@@ -293,7 +293,7 @@ func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20Transfer
 	nfts := p.nftIndexer.GetNftsWithUtxo(utxoId)
 	for _, nft := range nfts {
 		transferInfo := common.ParseBrc20TransferContent(string(nft.Base.Content))
-		if transferInfo != nil && transferInfo.P == "brc-20" && transferInfo.Op == "transfer" {
+		if transferInfo != nil && transferInfo.P == "brc-20" /*&& transferInfo.Op == "transfer"*/ {
 			tickerName := strings.ToLower(transferInfo.Ticker)
 			// holder := p.holderMap[nft.OwnerAddressId]
 			// if holder != nil {
@@ -303,7 +303,7 @@ func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20Transfer
 			// if nftTransfer == nil {
 			// }
 			for _, action := range p.holderActionList {
-				if tickerName == strings.ToLower(action.Ticker) && action.Action == Action_Transfer {
+				if tickerName == strings.ToLower(action.Ticker) && nft.UtxoId == action.UtxoId /*&& action.Action == Action_Transfer*/ {
 					ret = append(ret, &common.BRC20TransferInfo{
 						InscriptionId: nft.Base.InscriptionId,
 						Name:          action.Ticker,

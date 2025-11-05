@@ -39,7 +39,7 @@ const (
 	url_0_23_0 = "127.0.0.1:81"
 	url_0_9    = "127.0.0.1:80"
 
-	start_inscriptin_number = 27544158 //348020
+	start_inscriptin_number = 28910951 //348020
 	// end_inscriptin_number   = 66796146
 	end_height = 837090
 )
