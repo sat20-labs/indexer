@@ -390,7 +390,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		p.Offsets[asset.Name] = existingOffsets
 	}
 	for k, v := range another.SatBindingMap {
-		p.SatBindingMap[k+value] = v
+		p.SatBindingMap[k+value] = v.Clone()
 	}
 
 	p.OutValue.Value += another.OutValue.Value
@@ -453,9 +453,9 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 				satmap2 := make(map[int64]*AssetInfo)
 				for k, v := range p.SatBindingMap {
 					if k < offset {
-						satmap1[k] = v
+						satmap1[k] = v.Clone()
 					} else {
-						satmap2[k-offset] = v
+						satmap2[k-offset] = v.Clone()
 					}
 				}
 
