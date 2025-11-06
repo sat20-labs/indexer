@@ -149,7 +149,7 @@ func (p *BRC20MintAbbrInfo) ToMintAbbrInfo() *MintAbbrInfo {
 }
 
 type BRC20TransferInfo struct {
-	InscriptionId string   `json:"inscriptionId"`
-	Name          string   `json:"name"`
-	Amt           *Decimal `json:"amt"`
+	NftId 		int64    `json:"nftId"`
+	Name        string   `json:"name"`
+	Amt         *Decimal `json:"amt"`
 }
