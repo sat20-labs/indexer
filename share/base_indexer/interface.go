@@ -102,7 +102,7 @@ type Indexer interface {
 	// new interface
 	GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *common.AssetsInUtxo
 	// return: utxo->asset amount
-	GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.TickerName) (map[uint64]*common.AssetsInUtxo, error)
+	GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.TickerName) ([]*common.AssetsInUtxo, error)
 	GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo
 	GetBindingSat(tickerName *common.TickerName) int
 

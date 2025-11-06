@@ -186,10 +186,6 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 	}
 	//common.Log.Infof("filtering takes %v", time.Since(t1))
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Value > result[j].Value
-	})
-
 	return result, len(result), nil
 }
 

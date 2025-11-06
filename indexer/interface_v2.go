@@ -4,12 +4,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/sat20-labs/indexer/common"
 )
 
 // return: utxoId->asset
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) (map[uint64]*common.AssetsInUtxo, error) {
+func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) ([]*common.AssetsInUtxo, error) {
 	//t1 := time.Now()
 	utxos, err := b.rpcService.GetUTXOs(address)
 	if err != nil {
@@ -18,7 +19,8 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	// common.Log.Infof("GetUTXOs takes %v", time.Since(t1))
 	// t1 = time.Now()
 
-	result := make(map[uint64]*common.AssetsInUtxo)
+	
+	mid := make([]*common.TxOutput, 0)
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
 		if err != nil {
@@ -28,21 +30,21 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 		if b.IsUtxoSpent(utxo) {
 			continue
 		}
-		info := b.GetTxOutputWithUtxoV3(utxo, true)
+		info := b.GetTxOutputWithUtxoV2(utxo, true)
 		if info == nil {
 			continue
 		}
 
 		if ticker == nil { // 返回所有
-			result[utxoId] = info
+			mid = append(mid, info)
 		} else if common.IsPlainAsset(ticker) { // 只返回白聪
 			if len(info.Assets) == 0 {
-				result[utxoId] = info
+				mid[utxoId] = info
 			} else {
 				// 如果都是nft，而且是被disable的，也算白聪
 				hasOtherAsset := false
 				for _, asset := range info.Assets {
-					if asset.AssetName.Type != common.ASSET_TYPE_NFT {
+					if asset.Name.Type != common.ASSET_TYPE_NFT {
 						hasOtherAsset = true
 						break
 					}
@@ -55,22 +57,36 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 					// 有其他没有被disabled的nft
 					continue
 				}
-				result[utxoId] = info
+				mid = append(mid, info)
 			}
 		} else {
 			for _, asset := range info.Assets {
-				if asset.AssetName == *ticker {
-					result[utxoId] = info
+				if asset.Name == *ticker {
+					mid = append(mid, info)
 				}
 			}
 		}
 	}
 	//common.Log.Infof("populating takes %v", time.Since(t1))
+	sort.Slice(mid, func(i, j int) bool {
+		if common.IsPlainAsset(ticker) {
+			return mid[i].OutValue.Value > mid[j].OutValue.Value
+		}
+		a := mid[i].GetAsset(ticker)
+		b := mid[j].GetAsset(ticker)
+		return a.Cmp(b) > 0
+	})
+
+	result := make([]*common.AssetsInUtxo, len(mid))
+	for i, v := range mid {
+		result[i] = v.ToAssetsInUtxo()
+	}
 
 	return result, nil
 }
 
-func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *common.AssetsInUtxo {
+
+func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *common.TxOutput {
 	//t1 := time.Now()
 	info, err := b.rpcService.GetUtxoInfo(utxo)
 	//common.Log.Infof("rpcService.GetUtxoInfo takes %v", time.Since(t1))
@@ -78,11 +94,11 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *
 		return nil
 	}
 
-	var assetsInUtxo common.AssetsInUtxo
-	assetsInUtxo.UtxoId = info.UtxoId
-	assetsInUtxo.OutPoint = utxo
-	assetsInUtxo.Value = info.Value
-	assetsInUtxo.PkScript = info.PkScript
+	output := common.NewTxOutput(0)
+	output.UtxoId = info.UtxoId
+	output.OutPointStr = utxo
+	output.OutValue.Value = info.Value
+	output.OutValue.PkScript = info.PkScript
 
 	//t1 = time.Now()
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
@@ -108,15 +124,14 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *
 			}
 		}
 
-		asset := common.DisplayAsset{
-			AssetName:  k,
-			Amount:     fmt.Sprintf("%d", value),
-			Precision:  0,
-			BindingSat: n,
-			Offsets:    offsets,
+		asset := common.AssetInfo{
+			Name:       k,
+			Amount:     *common.NewDefaultDecimal(value),
+			BindingSat: uint32(n),
 		}
 
-		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
+		output.Assets = append(output.Assets, asset)
+		output.Offsets[k] = offsets
 	}
 	//common.Log.Infof("filling assetsInUtxo takes %v", time.Since(t1))
 
@@ -125,22 +140,32 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *
 		if excludingInvalid && v.Invalid {
 			continue
 		}
-		asset := common.DisplayAsset{
-			AssetName:  k,
-			Amount:     v.Amt.String(),
-			Precision:  v.Amt.Precision,
+		asset := common.AssetInfo{
+			Name:  k,
+			Amount:     *v.Amt.Clone(),
 			BindingSat: 0,
-			Invalid:    v.Invalid,
 		}
-		if !v.Invalid && k.Protocol == common.PROTOCOL_NAME_BRC20 {
-			asset.Offsets = []*common.OffsetRange{{Start:0, End:1}}
-			asset.OffsetToAmts = []*common.OffsetToAmount{{Offset: 0, Amount: v.Amt.String()}}
+		if k.Protocol == common.PROTOCOL_NAME_BRC20 {
+			output.Offsets[k] = []*common.OffsetRange{{Start:0, End:1}}
+			output.SatBindingMap[0] = asset.Clone()
+		}
+		if v.Invalid {
+			output.Invalids[k] = v.Invalid
 		}
 
-		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
+		output.Assets = append(output.Assets, asset)
+		
 	}
 
-	return &assetsInUtxo
+	return output
+}
+
+func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *common.AssetsInUtxo {
+	output := b.GetTxOutputWithUtxoV2(utxo, excludingInvalid)
+	if output == nil {
+		return nil
+	}
+	return output.ToAssetsInUtxo()
 }
 
 func genBTCTicker() *common.TickerInfo {
