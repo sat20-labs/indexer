@@ -28,7 +28,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 		if b.IsUtxoSpent(utxo) {
 			continue
 		}
-		info := b.GetTxOutputWithUtxoV3(utxo)
+		info := b.GetTxOutputWithUtxoV3(utxo, true)
 		if info == nil {
 			continue
 		}
@@ -70,7 +70,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	return result, nil
 }
 
-func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
+func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *common.AssetsInUtxo {
 	//t1 := time.Now()
 	info, err := b.rpcService.GetUtxoInfo(utxo)
 	//common.Log.Infof("rpcService.GetUtxoInfo takes %v", time.Since(t1))
@@ -122,6 +122,9 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 
 	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	for k, v := range assetmap2 {
+		if excludingInvalid && v.Invalid {
+			continue
+		}
 		asset := common.DisplayAsset{
 			AssetName:  k,
 			Amount:     v.Amt.String(),
@@ -553,7 +556,7 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 		if !b.nft.HasNftInUtxo(utxoId) {
 			continue
 		}
-		info := b.GetTxOutputWithUtxoV3(utxo)
+		info := b.GetTxOutputWithUtxoV3(utxo, true)
 		if info == nil {
 			continue
 		}

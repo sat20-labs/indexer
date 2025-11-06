@@ -130,7 +130,7 @@ func (s *Model) GetUtxoInfoV3(utxo string) (*common.AssetsInUtxo, error) {
 	if s.indexer.IsUtxoSpent(utxo) {
 		return nil, fmt.Errorf("utxo %s is spent", utxo)
 	}
-	ret := s.indexer.GetTxOutputWithUtxoV3(utxo)
+	ret := s.indexer.GetTxOutputWithUtxoV3(utxo, false)
 	if ret == nil {
 		return nil, fmt.Errorf("can't find utxo %s", utxo)
 	}

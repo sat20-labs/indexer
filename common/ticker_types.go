@@ -149,6 +149,8 @@ type DisplayAsset struct {
 	Amount  string        `json:"Amount"`
 	Precision int         `json:"Precision"`
 	BindingSat int        `json:"BindingSat"`
+
+	// 以下仅用在主网上，聪网不涉及
 	Offsets []*OffsetRange `json:"Offsets,omitempty"`
 	OffsetToAmts []*OffsetToAmount `json:"OffsetToAmts,omitempty"` // brc20 transfer nft, offset->decimal
 	Invalid     bool      `json:"invalid"` // 表示该Utxo的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后
