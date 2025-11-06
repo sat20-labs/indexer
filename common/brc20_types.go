@@ -152,4 +152,5 @@ type BRC20TransferInfo struct {
 	NftId 		int64    `json:"nftId"`
 	Name        string   `json:"name"`
 	Amt         *Decimal `json:"amt"`
+	Invalid     bool     `json:"invalid"`
 }

@@ -295,10 +295,14 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 	return result
 }
 
-// 返回跟聪不绑定的资产
+// 返回跟聪不绑定的资产，资产数据有可能仅用于显示
 // return: ticker -> assets(amt)
-func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
-	result := make(map[common.TickerName]*common.Decimal)
+type AssetInfoInUtxo struct {
+	Amt *common.Decimal
+	Invalid bool
+}
+func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*AssetInfoInUtxo {
+	result := make(map[common.TickerName]*AssetInfoInUtxo)
 
 	//t1 := time.Now()
 	runesAssets := b.RunesIndexer.GetUtxoAssets(utxoId)
@@ -306,15 +310,18 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.Tick
 	if len(runesAssets) > 0 {
 		for _, v := range runesAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
-			result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
+			result[tickName] = &AssetInfoInUtxo{
+				Amt: common.NewDecimalFromUint128(v.Balance, int(v.Divisibility)),
+			}
 		}
 	}
 
-	brc20Assets := b.brc20Indexer.GetUtxoAssets(utxoId)
-	if len(brc20Assets) > 0 {
-		for _, v := range brc20Assets {
-			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: v.Name}
-			result[tickName] = v.Amt
+	brc20Asset := b.brc20Indexer.GetUtxoAssets(utxoId)
+	if brc20Asset != nil {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: brc20Asset.Name}
+		result[tickName] =  &AssetInfoInUtxo{
+			Amt: brc20Asset.Amt,
+			Invalid: brc20Asset.Invalid,
 		}
 	}
 

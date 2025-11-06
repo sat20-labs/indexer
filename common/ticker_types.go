@@ -151,6 +151,7 @@ type DisplayAsset struct {
 	BindingSat int        `json:"BindingSat"`
 	Offsets []*OffsetRange `json:"Offsets,omitempty"`
 	OffsetToAmts []*OffsetToAmount `json:"OffsetToAmts,omitempty"` // brc20 transfer nft, offset->decimal
+	Invalid     bool      `json:"invalid"` // 表示该Utxo的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后
 }
 
 func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
@@ -189,6 +190,7 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 	assets := make(TxAssets, 0, len(p.Assets))
 	offsets := make(map[AssetName]AssetOffsets)
 	satBindingMap := make(map[int64]*AssetInfo)
+	invalids := make(map[AssetName]bool)
 	for _, v := range p.Assets {
 		assetInfo := v.ToAssetInfo()
 		assets = append(assets, *assetInfo)
@@ -204,6 +206,9 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 			piece.Amount = *amt
 			satBindingMap[offset.Offset] = piece
 		}
+		if v.Invalid {
+			invalids[v.AssetName] = v.Invalid
+		}
 	}
 	return &TxOutput{
 		UtxoId: p.UtxoId,
@@ -215,5 +220,6 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 		Assets: assets,
 		Offsets: offsets,
 		SatBindingMap: satBindingMap,
+		Invalids: invalids,
 	}
 }

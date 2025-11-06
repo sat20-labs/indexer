@@ -196,9 +196,10 @@ type TxOutput struct {
 	UtxoId      uint64
 	OutPointStr string
 	OutValue    wire.TxOut
-	Assets  TxAssets
-	Offsets map[AssetName]AssetOffsets
+	Assets  	TxAssets
+	Offsets 	map[AssetName]AssetOffsets
 	SatBindingMap map[int64]*AssetInfo // 用于brc20，key是sat的offset, 只有brc20才赋值
+	Invalids 	map[AssetName]bool // 表示该Utxo中对应的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后，默认都是有效的
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }
@@ -211,6 +212,7 @@ func NewTxOutput(value int64) *TxOutput {
 		Assets:      nil,
 		Offsets:     make(map[AssetName]AssetOffsets),
 		SatBindingMap: make(map[int64]*AssetInfo),
+		Invalids: 	make(map[AssetName]bool),
 	}
 }
 
@@ -230,6 +232,11 @@ func (p *TxOutput) Clone() *TxOutput {
 	n.SatBindingMap = make(map[int64]*AssetInfo)
 	for k, v := range p.SatBindingMap {
 		n.SatBindingMap[k] = v.Clone()
+	}
+
+	n.Invalids = make(map[AssetName]bool)
+	for k, v := range p.Invalids {
+		n.Invalids[k] = v
 	}
 
 	return n
@@ -268,6 +275,7 @@ func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
 			BindingSat: int(asset.BindingSat),
 			Offsets: p.Offsets[asset.Name],
 			OffsetToAmts: assetOffsetMap[asset.Name],
+			Invalid: p.Invalids[asset.Name],
 		}
 		assets = append(assets, &display)
 	}
@@ -369,6 +377,10 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	}
 	value := p.OutValue.Value
 	for _, asset := range another.Assets {
+		if invalid, ok := another.Invalids[asset.Name]; ok && invalid {
+			continue
+		}
+
 		p.Assets.Add(&asset)
 
 		offsets, ok := another.Offsets[asset.Name]
@@ -418,6 +430,10 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	part2 := NewTxOutput(value2)
 
 	for _, asset := range p.Assets {
+		if invalid, ok := p.Invalids[asset.Name]; ok && invalid {
+			continue
+		}
+
 		if asset.BindingSat > 0 {
 			// cut
 			newOffsets := p.Offsets[asset.Name]
@@ -502,6 +518,10 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 
 	if value == 0 && amt.Sign() == 0 {
 		return nil, nil, fmt.Errorf("should provide at least one asset amount")
+	}
+
+	if invalid, ok := p.Invalids[*name]; ok && invalid {
+		return nil, nil, fmt.Errorf("can't split an invalid asset")
 	}
 
 	var offset int64
@@ -667,11 +687,26 @@ func (p *TxOutput) GetAsset(assetName *AssetName) *Decimal {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
 		return NewDefaultDecimal(p.GetPlainSat())
 	}
+	if invalid, ok := p.Invalids[*assetName]; ok && invalid {
+		return nil
+	}
 	asset, err := p.Assets.Find(assetName)
 	if err != nil {
 		return nil
 	}
 	return asset.Amount.Clone()
+}
+
+func (p *TxOutput) GetAssetV2(assetName *AssetName) (*Decimal, bool) {
+	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
+		return NewDefaultDecimal(p.GetPlainSat()), true
+	}
+	invalid := p.Invalids[*assetName]
+	asset, err := p.Assets.Find(assetName)
+	if err != nil {
+		return nil, invalid
+	}
+	return asset.Amount.Clone(), invalid
 }
 
 // should fill out Assets parameters.

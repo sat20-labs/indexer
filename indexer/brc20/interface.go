@@ -288,19 +288,19 @@ func (p *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 	return result[start:end]
 }
 
-func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20TransferInfo) {
+func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferInfo) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	transferNft, ok := p.transferNftMap[utxoId]
 	if !ok {
 		return nil
 	}
-	info := &common.BRC20TransferInfo{
+	return &common.BRC20TransferInfo{
 		NftId: transferNft.TransferNft.NftId,
 		Name: transferNft.Ticker,
 		Amt: transferNft.TransferNft.Amount.Clone(),
+		Invalid: transferNft.TransferNft.IsInvalid,
 	}
-	return []*common.BRC20TransferInfo{info}
 
 	// nfts := p.nftIndexer.GetNftsWithUtxo(utxoId)
 	// for _, nft := range nfts {
@@ -360,5 +360,8 @@ func (p *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret []*common.BRC20Transfer
 
 func (p *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
 	ret := p.GetUtxoAssets(utxoId)
-	return len(ret) != 0
+	if ret == nil {
+		return false
+	}
+	return !ret.Invalid
 }

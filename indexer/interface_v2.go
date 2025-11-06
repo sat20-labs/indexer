@@ -124,13 +124,14 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string) *common.AssetsInUtxo {
 	for k, v := range assetmap2 {
 		asset := common.DisplayAsset{
 			AssetName:  k,
-			Amount:     v.String(),
-			Precision:  v.Precision,
+			Amount:     v.Amt.String(),
+			Precision:  v.Amt.Precision,
 			BindingSat: 0,
+			Invalid:    v.Invalid,
 		}
-		if k.Protocol == common.PROTOCOL_NAME_BRC20 {
+		if !v.Invalid && k.Protocol == common.PROTOCOL_NAME_BRC20 {
 			asset.Offsets = []*common.OffsetRange{{Start:0, End:1}}
-			asset.OffsetToAmts = []*common.OffsetToAmount{{Offset: 0, Amount: v.String()}}
+			asset.OffsetToAmts = []*common.OffsetToAmount{{Offset: 0, Amount: v.Amt.String()}}
 		}
 
 		assetsInUtxo.Assets = append(assetsInUtxo.Assets, &asset)
@@ -281,12 +282,10 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 			result[tickName] = common.NewDecimalFromUint128(v.Balance, 0)
 		}
 	}
-	brc20Assets := b.brc20Indexer.GetUtxoAssets(utxoId)
-	if len(brc20Assets) > 0 {
-		for _, v := range brc20Assets {
-			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: v.Name}
-			result[tickName] = v.Amt
-		}
+	brc20Asset := b.brc20Indexer.GetUtxoAssets(utxoId)
+	if brc20Asset != nil && !brc20Asset.Invalid {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: brc20Asset.Name}
+		result[tickName] = brc20Asset.Amt
 	}
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {

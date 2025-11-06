@@ -136,17 +136,22 @@ func (p *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	for _, tx := range block.Transactions[1:] {
 		hasTransfer := false
 		for _, input := range tx.Inputs {
-			nft, ok := p.transferNftMap[input.UtxoId]
+			nft, ok := p.transferNftMap[input.UtxoId] // transferNftMap 第一次转移时，先不删除，只设置标志位
 			if ok {
-				inputTransferNfts[nft.TransferNft.NftId] = nft
-				tickerName := strings.ToLower(nft.Ticker)
+				if !nft.TransferNft.IsInvalid {
+					inputTransferNfts[nft.TransferNft.NftId] = nft
+					tickerName := strings.ToLower(nft.Ticker)
 
-				ticker := p.tickerMap[tickerName]
-				ticker.Ticker.TransactionCount++
-				p.tickerUpdated[tickerName] = ticker.Ticker
+					ticker := p.tickerMap[tickerName]
+					ticker.Ticker.TransactionCount++
+					p.tickerUpdated[tickerName] = ticker.Ticker
 
-				hasTransfer = true
-				p.removeTransferNft(nft)
+					hasTransfer = true
+					nft.TransferNft.IsInvalid = true // 仅设置标志位
+				} else {
+					// remove
+					p.removeTransferNft(nft)
+				}
 			}
 		}
 
@@ -246,19 +251,21 @@ func (p *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt commo
 
 func (p *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 	delete(p.transferNftMap, nft.TransferNft.UtxoId)
-	holder, ok := p.holderMap[nft.AddressId]
-	if ok {
-		tickerName := strings.ToLower(nft.Ticker)
-		tickInfo, ok := holder.Tickers[tickerName]
-		if ok {
-			tickInfo.TransferableData[nft.TransferNft.UtxoId].IsInvalid = true
-			// delete(tickInfo.TransferableData, nft.TransferNft.UtxoId)
-		} else {
-			common.Log.Panic("can't find ticker info")
-		}
-	} else {
-		common.Log.Panic("can't find ticker info")
-	}
+	
+	// nft是同一个指针，不需要再查找
+	// holder, ok := p.holderMap[nft.AddressId]
+	// if ok {
+	// 	tickerName := strings.ToLower(nft.Ticker)
+	// 	tickInfo, ok := holder.Tickers[tickerName]
+	// 	if ok {
+	// 		tickInfo.TransferableData[nft.TransferNft.UtxoId].IsInvalid = true
+	// 		// delete(tickInfo.TransferableData, nft.TransferNft.UtxoId)
+	// 	} else {
+	// 		common.Log.Panic("can't find ticker info")
+	// 	}
+	// } else {
+	// 	common.Log.Panic("can't find ticker info")
+	// }
 }
 
 func (p *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
