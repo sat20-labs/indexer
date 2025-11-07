@@ -39,7 +39,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 			mid = append(mid, info)
 		} else if common.IsPlainAsset(ticker) { // 只返回白聪
 			if len(info.Assets) == 0 {
-				mid[utxoId] = info
+				mid = append(mid, info)
 			} else {
 				// 如果都是nft，而且是被disable的，也算白聪
 				hasOtherAsset := false
