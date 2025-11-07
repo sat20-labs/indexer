@@ -934,9 +934,12 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			}
 		}
 	case "brc-20":
+		if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
+			return
+		}
 		if brc20.IsCursed(envelope, inscriptionId, block.Height) {
 			common.Log.Infof("%s inscription is cursed", nft.Base.InscriptionId)
-			return 
+			return
 		}
 
 		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)

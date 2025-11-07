@@ -105,3 +105,8 @@ func newTickerInfo(name string) *BRC20TickInfo {
 		MintAdded:      make([]*common.BRC20Mint, 0),
 	}
 }
+
+
+func GetCurseInscriptionKey(inscriptionId string) string {
+	return fmt.Sprintf("%s%s", DB_PREFIX_CURSE_INSCRIPTION_ID, inscriptionId)
+}

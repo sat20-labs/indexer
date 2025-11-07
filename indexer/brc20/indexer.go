@@ -1,6 +1,10 @@
 package brc20
 
 import (
+	"bufio"
+	"embed"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -192,7 +196,11 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 	s.nftIndexer = nftIndexer
 
 	startTime := time.Now()
-	common.Log.Infof("brc20 db version: %s", s.GetDBVersion())
+	version := s.GetDBVersion()
+	if s.nftIndexer.GetBaseIndexer().IsMainnet() && version == "" {
+		s.initCursorInscriptionsDB()
+	}
+	common.Log.Infof("brc20 db version: %s", version)
 	common.Log.Info("InitIndexer ...")
 
 	ticks := s.getTickListFromDB()
@@ -468,4 +476,44 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("BRC20Indexer->CheckSelf took %v.", time.Since(startTime))
 
 	return true
+}
+
+//go:embed brc20_curse.txt
+var brc20Fs embed.FS
+
+func (s *BRC20Indexer) initCursorInscriptionsDB() {
+	// first brc inscriptin_number = 348020, cursor end block height = 837090 / last inescription number = 66799147
+	inputPath := filepath.Join("", "brc20_curse.txt")
+	input, err := brc20Fs.ReadFile(inputPath)
+	if err != nil {
+		common.Log.Panicf("Error reading brc20_curse: %v", err)
+	}
+	reader := strings.NewReader(string(input))
+	regex := regexp.MustCompile(`id:([a-z0-9]+)`)
+	scanner := bufio.NewScanner(reader)
+
+	wb := s.db.NewWriteBatch()
+	defer wb.Close()
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		submatches := regex.FindStringSubmatch(line)
+		if len(submatches) != 2 {
+			common.Log.Panicf("Error parsing brc20_curse: %s", line)
+		}
+		id := submatches[1]
+
+		key := GetCurseInscriptionKey(id)
+		err := wb.Put([]byte(key), nil)
+		if err != nil {
+			common.Log.Panicf("Error setting %s in db %v", key, err)
+		}
+	}
+	wb.Flush()
+}
+
+func (s *BRC20Indexer) IsExistCursorInscriptionInDB(inscriptionId string) bool {
+	key := GetCurseInscriptionKey(inscriptionId)
+	_, err := s.db.Read([]byte(key))
+	return err == nil
 }

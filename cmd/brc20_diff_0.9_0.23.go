@@ -39,9 +39,12 @@ const (
 	url_0_23_0 = "127.0.0.1:81"
 	url_0_9    = "127.0.0.1:80"
 
-	start_inscriptin_number = 29004014 //348020
-	// end_inscriptin_number   = 66796146
-	end_height = 837090
+	// first brc inscriptin_number = 348020, cursor end block height = 837090
+	// 在高度38436851调整了算法，要比对两个服务得到的inscription中的number不一样的inscription并记录，所以后面还要再从348020开始到38436850结束，再跑一次数据来查缺补漏
+	start_inscriptin_number = 66799147 //348020
+	// end_inscriptin_number   = 66799147
+	end_height    = 837090
+	curse_out_dir = "./cmd/brc20_curse.txt"
 )
 
 var (
@@ -121,11 +124,12 @@ func main() {
 }
 
 func CheckInscriptionId() error {
-	file, err := os.OpenFile("file.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	brcDiffCurseFile, err := os.OpenFile((curse_out_dir), os.O_APPEND|os.O_WRONLY|os.O_CREATE /*|os.O_TRUNC*/, 0644)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer brcDiffCurseFile.Close()
+
 	inscriptionNum := start_inscriptin_number
 	for {
 		inscription_0230, err := getInscription(url_0_23_0, strconv.FormatInt(int64(inscriptionNum), 10))
@@ -134,7 +138,7 @@ func CheckInscriptionId() error {
 			return err
 		}
 
-		if inscription_0230.Height == end_height+1 {
+		if inscription_0230.Height == 0 {
 			break
 		}
 
@@ -169,6 +173,8 @@ func CheckInscriptionId() error {
 			fallthrough
 		case "image/avif":
 			fallthrough
+		case "model/gltf+json":
+			fallthrough
 		case "model/gltf-binary":
 			fallthrough
 		case "application/pdf":
@@ -180,7 +186,7 @@ func CheckInscriptionId() error {
 			common.Log.Infof("default skip %s: %s", inscription_0230.ContentType, inscription_0230.ID)
 		}
 
-		content_0230, brc, err := getBrcContent(url_0_23_0, inscription_0230.ID)
+		_, brc, err := getBrcContent(url_0_23_0, inscription_0230.ID)
 		if err == err_parse_brc20 {
 			inscriptionNum++
 			continue
@@ -190,24 +196,25 @@ func CheckInscriptionId() error {
 
 		inscription_09, err := getInscription(url_0_9, inscription_0230.ID)
 		if err != nil {
-			return err
-		}
-		common.Log.Infof("num:%+v, 0230id:%+v，09id:%+v, brc:%+v", inscriptionNum, inscription_0230.ID, inscription_09.InscriptionID, brc.Tick)
-
-		content_09, _, err := getBrcContent(url_0_9, inscription_0230.ID)
-		if err == err_parse_brc20 {
-			_, err = file.Write([]byte(inscription_0230.ID + "\n"))
+			format := "not find in 09, id:%s，num:%d, tick:%s, op:%s"
+			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, brc.Tick, brc.Op)
+			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
 			}
 			inscriptionNum++
+			common.Log.Infof(printStr)
 			continue
-		} else if err != nil {
-			return err
 		}
 
-		if content_0230 != content_09 {
-			_, err = file.Write([]byte(inscription_0230.ID + "\n"))
+		format := "id:%s，num:%d, 09Num:%d, brc:%s"
+		printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_09.Number, brc.Tick)
+		common.Log.Infof(printStr)
+
+		if inscription_09.Number < 0 {
+			format := "curse, id:%s，num:%d, address:%s, 09Num:%d, tick:%s, op:%s"
+			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_0230.Address, inscription_09.Number, brc.Tick, brc.Op)
+			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
 			}
