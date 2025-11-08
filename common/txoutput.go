@@ -265,19 +265,22 @@ func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
 		return nil
 	}
 
-	assetOffsetMap := p.getAssetOffsetMap()
-	assets := make([]*DisplayAsset, 0)
-	for _, asset := range p.Assets {
-		display := DisplayAsset{
-			AssetName: asset.Name,
-			Amount: asset.Amount.String(),
-			Precision: asset.Amount.Precision,
-			BindingSat: int(asset.BindingSat),
-			Offsets: p.Offsets[asset.Name],
-			OffsetToAmts: assetOffsetMap[asset.Name],
-			Invalid: p.Invalids[asset.Name],
+	var assets []*DisplayAsset
+	if len(p.Assets) != 0 {
+		assetOffsetMap := p.getAssetOffsetMap()
+		assets = make([]*DisplayAsset, 0)
+		for _, asset := range p.Assets {
+			display := DisplayAsset{
+				AssetName: asset.Name,
+				Amount: asset.Amount.String(),
+				Precision: asset.Amount.Precision,
+				BindingSat: int(asset.BindingSat),
+				Offsets: p.Offsets[asset.Name],
+				OffsetToAmts: assetOffsetMap[asset.Name],
+				Invalid: p.Invalids[asset.Name],
+			}
+			assets = append(assets, &display)
 		}
-		assets = append(assets, &display)
 	}
 	return &AssetsInUtxo{
 		UtxoId: p.UtxoId,

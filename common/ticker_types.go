@@ -189,27 +189,32 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 	if p == nil {
 		return nil
 	}
-	assets := make(TxAssets, 0, len(p.Assets))
+
 	offsets := make(map[AssetName]AssetOffsets)
 	satBindingMap := make(map[int64]*AssetInfo)
 	invalids := make(map[AssetName]bool)
-	for _, v := range p.Assets {
-		assetInfo := v.ToAssetInfo()
-		assets = append(assets, *assetInfo)
-		if len(v.Offsets) != 0 {
-			offsets[v.AssetName] = v.Offsets
-		}
-		for _, offset := range v.OffsetToAmts {
-			piece := assetInfo.Clone()
-			amt, err := NewDecimalFromString(offset.Amount, assetInfo.Amount.Precision)
-			if err != nil {
-				continue
+
+	var assets TxAssets
+	if len(p.Assets) != 0 {
+		assets = make(TxAssets, 0, len(p.Assets))
+		for _, v := range p.Assets {
+			assetInfo := v.ToAssetInfo()
+			assets = append(assets, *assetInfo)
+			if len(v.Offsets) != 0 {
+				offsets[v.AssetName] = v.Offsets
 			}
-			piece.Amount = *amt
-			satBindingMap[offset.Offset] = piece
-		}
-		if v.Invalid {
-			invalids[v.AssetName] = v.Invalid
+			for _, offset := range v.OffsetToAmts {
+				piece := assetInfo.Clone()
+				amt, err := NewDecimalFromString(offset.Amount, assetInfo.Amount.Precision)
+				if err != nil {
+					continue
+				}
+				piece.Amount = *amt
+				satBindingMap[offset.Offset] = piece
+			}
+			if v.Invalid {
+				invalids[v.AssetName] = v.Invalid
+			}
 		}
 	}
 	return &TxOutput{
