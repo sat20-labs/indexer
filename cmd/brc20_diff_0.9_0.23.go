@@ -196,7 +196,7 @@ func CheckInscriptionId() error {
 
 		inscription_09, err := getInscription(url_0_9, inscription_0230.ID)
 		if err != nil {
-			format := "not find in 09, id:%s，num:%d, tick:%s, op:%s"
+			format := "not find in 09, id: %s, num: %d, tick: %s, op: %s"
 			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, brc.Tick, brc.Op)
 			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
@@ -207,12 +207,12 @@ func CheckInscriptionId() error {
 			continue
 		}
 
-		format := "id:%s，num:%d, 09Num:%d, brc:%s"
+		format := "id: %s, num: %d, 09Num: %d, brc: %s"
 		printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_09.Number, brc.Tick)
 		common.Log.Infof(printStr)
 
 		if inscription_09.Number < 0 {
-			format := "curse, id:%s，num:%d, address:%s, 09Num:%d, tick:%s, op:%s"
+			format := "cursed, id: %s, num: %d, address: %s, 09Num: %d, tick: %s, op: %s"
 			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_0230.Address, inscription_09.Number, brc.Tick, brc.Op)
 			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
