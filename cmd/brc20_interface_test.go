@@ -38,8 +38,6 @@ func InitBrc20Tester() {
 	}
 }
 
-
-
 func printBrc20Ticker(t *testing.T, ticker *common.BRC20Ticker) {
 	format := "print brc20 ticker:\nName: “%s”\n"
 	format += "inscription: %s\nSupply: %s\nMinted: %s\nLimit per mint: %s\nDecimal: %d\nSelf-issuance: %v\nDeploy By: %s\n"
@@ -79,6 +77,7 @@ func TestInterfaceBrc20(t *testing.T) {
 	// for i, v := range tickers {
 	// 	t.Logf("brc20Indexer return brc20Info %d: %+v\n", i, v.Name)
 	// }
+	// brc20Indexer.GetUtxoAssets(0)
 }
 
 type HolderBalance struct {

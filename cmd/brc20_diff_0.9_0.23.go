@@ -24,9 +24,9 @@ type Inscription struct {
 }
 
 type Brc struct {
-	P    string `json:"p"`
-	Op   string `json:"op"`
-	Tick string `json:"tick"`
+	P      string `json:"p"`
+	Op     string `json:"op"`
+	Ticker string `json:"tick"`
 }
 
 type Store struct {
@@ -41,9 +41,9 @@ const (
 
 	// first brc inscriptin_number = 348020, cursor end block height = 837090
 	// 在高度38436851调整了算法，要比对两个服务得到的inscription中的number不一样的inscription并记录，所以后面还要再从348020开始到38436850结束，再跑一次数据来查缺补漏
-	start_inscriptin_number = 66799147 //348020
+	start_inscriptin_number = 348020 //348020
 	// end_inscriptin_number   = 66799147
-	end_height    = 837090
+	// end_height    = 837090
 	curse_out_dir = "./cmd/brc20_curse.txt"
 )
 
@@ -99,11 +99,32 @@ func getBrcContent(url string, inscriptionId string) (ret string, brc *Brc, err 
 		}
 
 		var data Brc
-		err = json.Unmarshal(body, &data)
-		if err != nil {
-			err = err_parse_brc20
+		var deployContent *common.BRC20DeployContent
+		var mintContent *common.BRC20MintContent
+		var transferContent *common.BRC20TransferContent
+		deployContent = common.ParseBrc20DeployContent(string(body))
+		if deployContent != nil {
+			data.P = deployContent.P
+			data.Op = deployContent.Op
+			data.Ticker = deployContent.Ticker
+		} else {
+			mintContent = common.ParseBrc20MintContent(string(body))
+			if mintContent != nil {
+				data.P = mintContent.P
+				data.Op = mintContent.Op
+				data.Ticker = mintContent.Ticker
+			} else {
+				transferContent = common.ParseBrc20TransferContent(string(body))
+				if transferContent != nil {
+					data.P = transferContent.P
+					data.Op = transferContent.Op
+					data.Ticker = transferContent.Ticker
+				}
+			}
 		}
-		if data.P != "brc-20" {
+
+		// err = json.Unmarshal(body, &data)
+		if deployContent == nil && mintContent == nil && transferContent == nil {
 			err = err_parse_brc20
 		}
 		ret = string(body)
@@ -142,6 +163,14 @@ func CheckInscriptionId() error {
 			break
 		}
 
+		_, index, err := common.ParseOrdInscriptionID(inscription_0230.ID)
+		if err != nil {
+			return err
+		}
+		if index != 0 {
+			inscriptionNum++
+			continue
+		}
 		switch inscription_0230.ContentType {
 		case "application/json":
 		case "text/plain":
@@ -197,7 +226,7 @@ func CheckInscriptionId() error {
 		inscription_09, err := getInscription(url_0_9, inscription_0230.ID)
 		if err != nil {
 			format := "not find in 09, id:%s，num:%d, tick:%s, op:%s"
-			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, brc.Tick, brc.Op)
+			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, brc.Ticker, brc.Op)
 			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
@@ -208,12 +237,12 @@ func CheckInscriptionId() error {
 		}
 
 		format := "id:%s，num:%d, 09Num:%d, brc:%s"
-		printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_09.Number, brc.Tick)
+		printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_09.Number, brc.Ticker)
 		common.Log.Infof(printStr)
 
 		if inscription_09.Number < 0 {
 			format := "curse, id:%s，num:%d, address:%s, 09Num:%d, tick:%s, op:%s"
-			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_0230.Address, inscription_09.Number, brc.Tick, brc.Op)
+			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_0230.Address, inscription_09.Number, brc.Ticker, brc.Op)
 			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err

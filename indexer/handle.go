@@ -768,8 +768,8 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 	fields map[int][]byte, nft *common.Nft) {
 
 	content := string(fields[common.FIELD_CONTENT])
-	brc20Content := common.ParseBrc20Content(content)
-	if brc20Content == nil {
+	ordxBaseContent := common.ParseBrc20BaseContent(content)
+	if ordxBaseContent == nil {
 		common.Log.Errorf("invalid content %s", content)
 		return
 	}
@@ -779,15 +779,12 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 		return
 	}
 
-	switch brc20Content.Op {
+	switch strings.ToLower(ordxBaseContent.Op) {
 	case "deploy":
 		deployInfo := common.ParseBrc20DeployContent(content)
 		if deployInfo == nil {
 			return
 		}
-		// if deployInfo.BRC20BaseContent.Ticker != "box1" {
-		// 	return
-		// }
 		if len(deployInfo.Ticker) == 5 {
 			if deployInfo.SelfMint != "true" {
 				common.Log.Errorf("deploy, tick length 5, but not self_mint")

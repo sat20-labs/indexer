@@ -291,7 +291,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		Top10Holders       map[string]map[string]string // address -> ticker -> balance
 	}
 
-	var specialTickers [1]TickerInfo
+	var specialTickers [1]*TickerInfo
 	var checkHeight int
 	if s.nftIndexer.GetBaseIndexer().IsMainnet() {
 		checkHeight = 921406
@@ -333,14 +333,14 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 				},
 			},
 		}
-		specialTickers[0] = tickerInfo1
+		specialTickers[0] = &tickerInfo1
 	} else {
 		checkHeight = 108237
-		tickerInfo1 := TickerInfo{
+		tickerInfo1 := &TickerInfo{
 			Name:               "ordi",
 			InscriptionId:      "3b84bfba456be05287c0888bcbf5df778c8946ff6b057fd0836cc65c12546f12i0",
 			Max:                "2400000000",
-			Minted:             "1211700992", // unisat: 1211670992
+			Minted:             "1211730992", // unisat: 1211670992
 			Limit:              "10000",
 			Decimal:            18,
 			SelfMint:           false,
@@ -349,8 +349,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			CompletedTime:      "",
 			StartInscriptionId: "3b84bfba456be05287c0888bcbf5df778c8946ff6b057fd0836cc65c12546f12i0",
 			EndInscriptionId:   "",
-			HolderCount:        142,    // unisat: 138
-			TransactionCount:   121633, // unisat: 121636
+			HolderCount:        141,    // unisat: 138
+			TransactionCount:   121638, // unisat: 121636
 			Top10Holders: map[string]map[string]string{
 				"tb1p6eahny66039p30ntrp9ke0qpyyffgnkekf69js6d2qcjf8cdmu0shx273f": {
 					"ordi": "230000000",
@@ -401,10 +401,14 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			},
 		}
 		specialTickers[0] = tickerInfo1
+		specialTickers[0] = nil
 	}
 
 	if checkHeight <= height {
 		for _, specialTicker := range specialTickers {
+			if specialTicker == nil {
+				continue
+			}
 			ticker := s.GetTicker(specialTicker.Name)
 			if specialTicker.InscriptionId != ticker.Nft.Base.InscriptionId {
 				return false
@@ -415,7 +419,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			if specialTicker.Max != ticker.Max.String() {
 				return false
 			}
-			if specialTicker.Minted != ticker.Minted.String() {
+			minted := ticker.Minted.String()
+			if specialTicker.Minted != minted {
 				return false
 			}
 			if specialTicker.Limit != ticker.Limit.String() {

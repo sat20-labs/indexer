@@ -59,12 +59,15 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 					}
 					tickerToHolderMap[ticker] = holders
 
-					for _, nft := range tickAbbrInfo.TransferableData {
-						transferNftMap[nft.UtxoId] = &TransferNftInfo{
-							AddressId:   addrId,
-							Ticker:      ticker,
-							TransferNft: nft,
+					for _, transferNft := range tickAbbrInfo.TransferableData {
+						if !transferNft.IsInvalid {
+							transferNftMap[transferNft.UtxoId] = &TransferNftInfo{
+								AddressId:   addrId,
+								Ticker:      ticker,
+								TransferNft: transferNft,
+							}
 						}
+
 					}
 				}
 			} else {

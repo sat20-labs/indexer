@@ -1,5 +1,9 @@
 package common
 
+import (
+	"fmt"
+)
+
 type BRC20Mint struct {
 	Nft  *Nft
 	Id   int64
@@ -37,8 +41,22 @@ type BRC20Ticker struct {
 }
 
 type BRC20BaseContent struct {
-	OrdxBaseContent
+	P      string `json:"p,omitempty"`
+	Op     string `json:"op,omitempty"`
 	Ticker string `json:"tick"`
+}
+
+func (s *BRC20BaseContent) Validate() error {
+	if s.Op != "mint" && s.Op != "transfer" && s.Op != "deploy" {
+		return fmt.Errorf("miss op")
+	}
+	if s.P != "brc-20" {
+		return fmt.Errorf("invalid protocol: %s", s.P)
+	}
+	if len(s.Ticker) != 4 && len(s.Ticker) != 5 {
+		return fmt.Errorf("invalid ticker: %s", s.Ticker)
+	}
+	return nil
 }
 
 // {"p":"brc-20","op":"deploy","tick":"doɡe","lim":"3125000000000","max":"1000000000000000","self_mint":"true"}
@@ -50,16 +68,50 @@ type BRC20DeployContent struct {
 	SelfMint string `json:"self_mint,omitempty"`
 }
 
-// {"p":"brc-20","op":"mint","tick":"wiki","amt":"1000"}
-type BRC20MintContent struct {
+func (s *BRC20DeployContent) Validate() error {
+	err := s.BRC20BaseContent.Validate()
+	if err != nil {
+		return err
+	}
+	if s.Lim == "" {
+		return fmt.Errorf("miss lim")
+	}
+	if s.Max == "" {
+		return fmt.Errorf("miss max")
+	}
+	// if d.Decimal == "" {
+	// 	return fmt.Errorf("miss decimal")
+	// }
+	// if d.SelfMint == "" {
+	// 	return fmt.Errorf("miss self_mint")
+	// }
+	return nil
+}
+
+type BRC20AmtContent struct {
 	BRC20BaseContent
 	Amt string `json:"amt"`
 }
 
+func (s *BRC20AmtContent) Validate() error {
+	err := s.BRC20BaseContent.Validate()
+	if err != nil {
+		return err
+	}
+	if s.Amt == "" {
+		return fmt.Errorf("miss amt")
+	}
+	return nil
+}
+
+// {"p":"brc-20","op":"mint","tick":"wiki","amt":"1000"}
+type BRC20MintContent struct {
+	BRC20AmtContent
+}
+
 // {"p":"brc-20","op":"transfer","tick":"XXOK","amt":"89000000000"}
 type BRC20TransferContent struct {
-	BRC20BaseContent
-	Amt string `json:"amt"`
+	BRC20AmtContent
 }
 
 type BRC20TransferHistory struct {
@@ -149,8 +201,8 @@ func (p *BRC20MintAbbrInfo) ToMintAbbrInfo() *MintAbbrInfo {
 }
 
 type BRC20TransferInfo struct {
-	NftId 		int64    `json:"nftId"`
-	Name        string   `json:"name"`
-	Amt         *Decimal `json:"amt"`
-	Invalid     bool     `json:"invalid"`
+	NftId   int64    `json:"nftId"`
+	Name    string   `json:"name"`
+	Amt     *Decimal `json:"amt"`
+	Invalid bool     `json:"invalid"`
 }

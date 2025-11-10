@@ -299,40 +299,56 @@ func ParseMintContent(content string) *OrdxMintContent {
 	return &ret
 }
 
-func ParseBrc20Content(content string) *BRC20BaseContent {
+func StrictlyUnmarshal(jsonString string, targetStructPtr interface{}) error {
+	decoder := json.NewDecoder(strings.NewReader(jsonString))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(targetStructPtr)
+}
+
+func ParseBrc20BaseContent(content string) *BRC20BaseContent {
 	var ret BRC20BaseContent
 	err := json.Unmarshal([]byte(content), &ret)
 	if err != nil {
 		Log.Warnf("invalid json: %s, %v", content, err)
 		return nil
 	}
-	//ret.Ticker = strings.TrimSpace(ret.Ticker) brc20的ticker支持空格
-	ret.Ticker = strings.ToLower(ret.Ticker)
-	ret.Op = strings.ToLower(ret.Op)
-	ret.P = strings.ToLower(ret.P)
+	if err := ret.Validate(); err != nil {
+		return nil
+	}
 	return &ret
 }
 
 func ParseBrc20DeployContent(content string) *BRC20DeployContent {
 	var ret BRC20DeployContent
-	err := json.Unmarshal([]byte(content), &ret)
+	err := StrictlyUnmarshal(content, &ret)
 	if err != nil {
-		Log.Warnf("invalid json: %s, %v", content, err)
 		return nil
 	}
-	// ret.Ticker = strings.ToLower(ret.Ticker)
-
-	if len(ret.Ticker) != 4 && len(ret.Ticker) != 5 {
+	if err := ret.Validate(); err != nil {
 		return nil
 	}
+	return &ret
+}
 
+func ParseBBRC20AmtContent(content string) *BRC20AmtContent {
+	var ret BRC20AmtContent
+	err := StrictlyUnmarshal(content, &ret)
+	if err != nil {
+		return nil
+	}
+	if err := ret.Validate(); err != nil {
+		return nil
+	}
 	return &ret
 }
 
 func ParseBrc20MintContent(content string) *BRC20MintContent {
 	var ret BRC20MintContent
-	err := json.Unmarshal([]byte(content), &ret)
+	err := StrictlyUnmarshal(content, &ret)
 	if err != nil {
+		return nil
+	}
+	if err := ret.Validate(); err != nil {
 		return nil
 	}
 	return &ret
@@ -340,8 +356,11 @@ func ParseBrc20MintContent(content string) *BRC20MintContent {
 
 func ParseBrc20TransferContent(content string) *BRC20TransferContent {
 	var ret BRC20TransferContent
-	err := json.Unmarshal([]byte(content), &ret)
+	err := StrictlyUnmarshal(content, &ret)
 	if err != nil {
+		return nil
+	}
+	if err := ret.Validate(); err != nil {
 		return nil
 	}
 	return &ret
