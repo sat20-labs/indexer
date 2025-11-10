@@ -516,6 +516,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	return part1, part2, nil
 }
 
+// 根据value或者amt切分
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
