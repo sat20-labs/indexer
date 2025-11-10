@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"strconv"
-	"strings"
 
 	"sync"
 	"time"
@@ -17,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
+	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
@@ -28,9 +27,9 @@ type UserUtxoInMempool struct {
 }
 
 type MiniMemPool struct {
-    txMap    map[string]*wire.MsgTx          // 内存池中所有tx
-    spentUtxoMap  map[string]string          // utxo->address，内存池中所有tx的输入utxo
-    unConfirmedUtxoMap  map[string]string    // utxo->address，内存池中所有tx的输出utxo
+    txMap    map[string]*wire.MsgTx          // 内存池中所有tx， key: TxId
+    spentUtxoMap  map[string]*common.TxOutput          // key: utxo，内存池中所有tx的输入utxo
+    unConfirmedUtxoMap  map[string]*common.TxOutput    // key: utxo，内存池中所有tx的输出utxo
     addrUtxoMap  map[string]*UserUtxoInMempool   // key:address，内存池中所有tx的输入和输出的所属地址
     running  bool
     lastSyncTime int64
@@ -47,8 +46,8 @@ func NewMiniMemPool() *MiniMemPool {
 
 func (p *MiniMemPool) init() {
     p.txMap = make(map[string]*wire.MsgTx)
-    p.spentUtxoMap = make(map[string]string)
-    p.unConfirmedUtxoMap = make(map[string]string)
+    p.spentUtxoMap = make(map[string]*common.TxOutput)
+    p.unConfirmedUtxoMap = make(map[string]*common.TxOutput)
     p.addrUtxoMap = make(map[string]*UserUtxoInMempool)
 }
 
@@ -151,7 +150,8 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
     common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
     common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
 
-    if len(txIds) <= len(add) {
+    if len(txIds) == len(add) {
+        // 全新数据
         p.init()
         for _, txId := range txIds {
             txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
@@ -168,6 +168,7 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
         }
         
     } else {
+        // 部分更新
         for _, txId := range del {
             tx, ok := p.txMap[txId]
             if ok {
@@ -213,41 +214,6 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 	return msgTx, nil
 }
 
-
-func getTxOutFromRawTx(utxo string) (*common.UtxoInfo, error) {
-	parts := strings.Split(utxo, ":")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid utxo %s", utxo)
-	}
-	vout, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return nil, err
-	}
-	txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(parts[0])
-	if err != nil {
-		common.Log.Errorf("GetRawTx %s failed, %v", parts[0], err)
-		return nil, err
-	}
-	tx, err := DecodeMsgTx(txHex)
-	if err != nil {
-		return nil, err
-	}
-	if vout >= len(tx.TxOut) {
-		return nil, fmt.Errorf("invalid index of utxo %s", utxo)
-	}
-	return &common.UtxoInfo{
-		Value: tx.TxOut[vout].Value,
-		PkScript: tx.TxOut[vout].PkScript,
-	}, nil
-}
-
-func (p *MiniMemPool) getUtxoInfo(utxo string) (*common.UtxoInfo, error) {
-    if !p.running {
-        return nil, fmt.Errorf("is closing")
-    }
-    return instance.rpcService.GetUtxoInfo(utxo)
-}
-
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
@@ -258,27 +224,22 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     }
     p.txMap[txId] = tx
     common.Log.Debugf("add tx %s to mempool %d", txId, len(p.txMap))
-    for _, txIn := range tx.TxIn {
-        if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
-            continue // coinbase
-        }
-        spentUtxo := txIn.PreviousOutPoint.String()
-        info, err := p.getUtxoInfo(spentUtxo)
+
+    preFectcher := make(map[string]*common.TxOutput)
+    inputs, outpus, err := p.rebuildTxOutput(tx, preFectcher)
+    if err != nil {
+        common.Log.Errorf("rebuildTxOutput %s failed, %v", txId, err)
+        return 
+    }
+
+    for _, info := range inputs {
+        addr, err := common.PkScriptToAddr(info.OutValue.PkScript, netParam)
         if err != nil {
-            // 可能上个TX也在内存池中
-            info, err = getTxOutFromRawTx(spentUtxo)
-            if err != nil {
-                common.Log.Errorf("GetTxOutFromRawTx %s failed, %v", spentUtxo, err)
-                continue
-            }
-        }
-        addr, err := common.PkScriptToAddr(info.PkScript, netParam)
-        if err != nil {
-            common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(info.PkScript), err)
+            common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(info.OutValue.PkScript), err)
             continue
         }
-        p.spentUtxoMap[spentUtxo] = addr
-        common.Log.Debugf("add utxo %s to spentUtxoMap with %s", spentUtxo, addr)
+        p.spentUtxoMap[info.OutPointStr] = info
+        common.Log.Debugf("add utxo %s to spentUtxoMap with %s", info.OutPointStr, addr)
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
@@ -287,20 +248,20 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
             }
             p.addrUtxoMap[addr] = user
         }
-        user.SpentUtxo[spentUtxo] = true
+        user.SpentUtxo[info.OutPointStr] = true
     }
 
-    for i, txOut := range tx.TxOut {
-        if common.IsOpReturn(txOut.PkScript) {
+    for _, txOut := range outpus {
+        if common.IsOpReturn(txOut.OutValue.PkScript) {
             continue
         }
-        unconfirmedUtxo := fmt.Sprintf("%s:%d", txId, i)
-        addr, err := common.PkScriptToAddr(txOut.PkScript, netParam)
+        addr, err := common.PkScriptToAddr(txOut.OutValue.PkScript, netParam)
         if err != nil {
             //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
             continue
         }
-        p.unConfirmedUtxoMap[unconfirmedUtxo] = addr
+        unconfirmedUtxo := txOut.OutPointStr
+        p.unConfirmedUtxoMap[unconfirmedUtxo] = txOut
         common.Log.Debugf("add utxo %s to unConfirmedUtxoMap with %s", unconfirmedUtxo, addr)
         user, ok := p.addrUtxoMap[addr]
         if !ok {
@@ -318,10 +279,13 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
 func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
     txId := tx.TxID()
     _, ok := p.txMap[txId]
-    if ok {
-        delete(p.txMap, txId)
-        common.Log.Debugf("tx %s removed from mempool %d", txId, len(p.txMap))
+    if !ok {
+        common.Log.Infof("not found tx %s in mempool %d", txId, len(p.txMap))
+        return
     }
+    
+    delete(p.txMap, txId)
+    common.Log.Debugf("tx %s removed from mempool %d", txId, len(p.txMap))
     
     netParam := instance.GetChainParam()
     for _, txIn := range tx.TxIn {
@@ -329,25 +293,19 @@ func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
             continue // coinbase
         }
         spentUtxo := txIn.PreviousOutPoint.String()
-        addr, ok := p.spentUtxoMap[spentUtxo]
+        info, ok := p.spentUtxoMap[spentUtxo]
         if !ok {
-            // 理论上应该能找到，找不到就努力补救
-            info, err := getTxOutFromRawTx(spentUtxo)
-            if err == nil {
-                addr, err = common.PkScriptToAddr(info.PkScript, netParam)
-                if err == nil {
-                    ok = true
-                }
-            }
-        }
-
-        delete(p.spentUtxoMap, spentUtxo)
-        common.Log.Debugf("delete utxo %s from spentUtxoMap", spentUtxo)
-        if !ok {
-            common.Log.Errorf("can't find utxo %s in spentMap", spentUtxo)
+            common.Log.Errorf("can't find utxo %s in spentUtxoMap", spentUtxo)
             continue
         }
+        delete(p.spentUtxoMap, spentUtxo)
+        common.Log.Debugf("delete utxo %s from spentUtxoMap", spentUtxo)
 
+        addr, err := common.PkScriptToAddr(info.OutValue.PkScript, netParam)
+        if err != nil {
+            //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
+            continue
+        }
         user, ok := p.addrUtxoMap[addr]
         if ok {
             common.Log.Debugf("delete utxo %s from address %s SpentUtxo", spentUtxo, addr)
@@ -620,7 +578,7 @@ func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
 }
 
 // 返回内存池中属于该地址的还没确认的utxo
-func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []string {
+func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []*common.TxOutput {
     p.mutex.RLock()
     defer p.mutex.RUnlock()
 
@@ -629,9 +587,12 @@ func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []string {
         return nil
     }
 
-    result := make([]string, 0)
-    for k := range addrUtxo.UnconfirmedUtxoMap {
-        result = append(result, k)
+    result := make([]*common.TxOutput, 0)
+    for utxo := range addrUtxo.UnconfirmedUtxoMap {
+        output, ok := p.unConfirmedUtxoMap[utxo]
+        if ok {
+            result = append(result, output)
+        }
     }
     return result
 }
@@ -728,3 +689,140 @@ func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []string {
 //     p.peer.QueueMessage(getBlocksMsg, nil)
 //     common.Log.Infof("Sent getblocks, locator=%s, stop=%s", getBlocksMsg.BlockLocatorHashes[0].String(), hashStop.String())
 // }
+
+
+// 该Tx还没有广播或者广播了还没有确认，才有可能重建，索引器的限制，utxo被花费后就删除了
+func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*common.TxOutput) (
+	[]*common.TxOutput, []*common.TxOutput, error) {
+	// 尝试为tx的输出分配资产
+	// 按ordx协议的规则
+	// 按runes协议的规则
+	// 增加brc20的规则：在transfer时，可以认为是直接绑定在一个聪上，容纳所有brc20的资产，由indexer.TxOutput执行相关规则
+	var inputs []*common.TxOutput
+	var input *common.TxOutput
+	for _, txIn := range tx.TxIn {
+		if txIn.PreviousOutPoint.Index == wire.MaxPrevOutIndex {
+			continue
+		}
+		utxo := txIn.PreviousOutPoint.String()
+
+		info, ok := preFectcher[utxo]
+		if !ok {
+			info = instance.GetTxOutputWithUtxoV2(utxo, true)
+			if info == nil {
+				// 递归调用
+				preTxId := txIn.PreviousOutPoint.Hash.String()
+				preTx := p.txMap[preTxId]
+				if preTx == nil {
+					common.Log.Infof("rebuildTxOutput GetTx %s failed", preTxId)
+					txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
+					if err != nil {
+						common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
+						return nil, nil, err
+					}
+					preTx, err = DecodeMsgTx(txHex)
+					if err != nil {
+						common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
+						return nil, nil, err
+					}
+				}
+                // TODO 如果是brc20的transfer指令，而且该指令的铸造结果还没确认，这里无法构造出对应的资产数据
+				_, outs, err := p.rebuildTxOutput(preTx, preFectcher)
+				if err != nil {
+					common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
+					return nil, nil, err
+				}
+				for _, out := range outs {
+					preFectcher[out.OutPointStr] = out
+				}
+				info = outs[txIn.PreviousOutPoint.Index]
+			}
+		}
+
+		if input == nil {
+			input = info
+		} else {
+			input.Append(info)
+		}
+		inputs = append(inputs, info.Clone())
+	}
+
+	txId := tx.TxID()
+	outputs := make([]*common.TxOutput, 0)
+	defaultRuneOutput := -1
+	var err error
+	var edicts []runestone.Edict
+	for i, txOut := range tx.TxOut {
+		var curr *common.TxOutput
+		if common.IsOpReturn(txOut.PkScript) {
+			stone := runestone.Runestone{}
+			result, err := stone.DecipherFromPkScript(txOut.PkScript)
+			if err == nil {
+				if result.Runestone != nil {
+					edicts = result.Runestone.Edicts
+				}
+			}
+			if txOut.Value != 0 {
+				curr, input, err = input.Cut(txOut.Value)
+				if err != nil {
+					common.Log.Errorf("rebuildTxOutput Cut failed, %v", err)
+					return nil, nil, err
+				}
+				curr.OutValue.PkScript = txOut.PkScript
+			} else {
+				curr = common.GenerateTxOutput(tx, i)
+			}
+		} else {
+			curr, input, err = input.Cut(txOut.Value)
+			if err != nil {
+				common.Log.Errorf("rebuildTxOutput Cut failed, %v", err)
+				return nil, nil, err
+			}
+			curr.OutValue.PkScript = txOut.PkScript
+			if defaultRuneOutput == -1 {
+				defaultRuneOutput = i
+			}
+		}
+		curr.OutPointStr = fmt.Sprintf("%s:%d", txId, i)
+		outputs = append(outputs, curr)
+	}
+
+	// 执行runes的转移规则
+	for _, edict := range edicts {
+		if int(edict.Output) >= len(tx.TxOut) {
+			return nil, nil, fmt.Errorf("rebuildTxOutput invalid edict %v", edict)
+		}
+
+		tickerInfo := instance.RunesIndexer.GetRuneInfoWithId(edict.ID.String())
+		if tickerInfo == nil {
+			return nil, nil, fmt.Errorf("rebuildTxOutput can't find tick %s", edict.ID.String())
+		}
+		
+		amount := common.NewDecimalFromUint128(edict.Amount, int(tickerInfo.Divisibility))
+
+		asset := common.AssetInfo{
+			Name:       common.AssetName{
+				Protocol: common.PROTOCOL_NAME_RUNES,
+				Type: common.ASSET_TYPE_FT,
+				Ticker: tickerInfo.Name,
+			},
+			Amount:     *amount,
+			BindingSat: 0,
+		}
+
+		output := outputs[edict.Output]
+		if output.Assets != nil {
+			output.Assets.Add(&asset)
+		} else {
+			output.Assets = common.TxAssets{asset}
+		}
+
+		output = outputs[defaultRuneOutput]
+		err := output.Assets.Subtract(&asset)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return inputs, outputs, nil
+}

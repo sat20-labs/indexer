@@ -9,10 +9,47 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
+func (b *IndexerMgr) containAsset(output *common.TxOutput, ticker *common.AssetName) bool {
+	if ticker == nil { // 返回所有
+		return true
+	} else if common.IsPlainAsset(ticker) { // 只返回白聪
+		if len(output.Assets) == 0 {
+			return true
+		} else {
+			// 如果都是nft，而且是被disable的，也算白聪
+			hasOtherAsset := false
+			for _, asset := range output.Assets {
+				if asset.Name.Type != common.ASSET_TYPE_NFT {
+					hasOtherAsset = true
+					break
+				}
+			}
+			if hasOtherAsset {
+				return false
+			}
+			// 只有nft
+			if b.nft.HasNftInUtxo(output.UtxoId) {
+				// 有其他没有被disabled的nft
+				return false
+			}
+			return true
+		}
+	} else {
+		for _, asset := range output.Assets {
+			if asset.Name == *ticker {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// 不包含已经广播但未确认的输出，也不包含已经广播但未确认的输入
+// TODO，需要将已经广播的但未确认的输入加上，才不会导致新的tx无法构造
 // return: utxoId->asset
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) ([]*common.AssetsInUtxo, error) {
 	//t1 := time.Now()
-	utxos, err := b.rpcService.GetUTXOs(address)
+	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {
 		return nil, err
 	}
@@ -26,47 +63,25 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 		if err != nil {
 			continue
 		}
-		// 过滤已经被花费的utxo
-		if b.IsUtxoSpent(utxo) {
-			continue
-		}
 		info := b.GetTxOutputWithUtxoV2(utxo, true)
 		if info == nil {
 			continue
 		}
 
-		if ticker == nil { // 返回所有
+		if b.containAsset(info, ticker) {
 			mid = append(mid, info)
-		} else if common.IsPlainAsset(ticker) { // 只返回白聪
-			if len(info.Assets) == 0 {
-				mid = append(mid, info)
-			} else {
-				// 如果都是nft，而且是被disable的，也算白聪
-				hasOtherAsset := false
-				for _, asset := range info.Assets {
-					if asset.Name.Type != common.ASSET_TYPE_NFT {
-						hasOtherAsset = true
-						break
-					}
-				}
-				if hasOtherAsset {
-					continue
-				}
-				// 只有nft
-				if b.nft.HasNftInUtxo(utxoId) {
-					// 有其他没有被disabled的nft
-					continue
-				}
-				mid = append(mid, info)
-			}
-		} else {
-			for _, asset := range info.Assets {
-				if asset.Name == *ticker {
-					mid = append(mid, info)
-				}
-			}
 		}
 	}
+
+	// TODO 如果是brc20，可能mint/transfer的铸造还没确认，无法构造对应的资产数据，这里会缺少brc20的部分资产数据
+	// 可能会把transfer的铸造结果，当作白聪的utxo，所以暂时关闭代码。考虑提供unconfirmed的接口，由应用自己决定是否使用
+	// unconfirmedUtxos := b.miniMempool.GetUnconfirmedUtxoByAddress(address)
+	// for _, info := range unconfirmedUtxos {
+	// 	if b.containAsset(info, ticker) {
+	// 		mid = append(mid, info)
+	// 	}
+	// }
+
 	//common.Log.Infof("populating takes %v", time.Since(t1))
 	sort.Slice(mid, func(i, j int) bool {
 		if common.IsPlainAsset(ticker) {
@@ -130,7 +145,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			BindingSat: uint32(n),
 		}
 
-		output.Assets = append(output.Assets, asset)
+		output.Assets.Add(&asset)
 		output.Offsets[k] = offsets
 	}
 	//common.Log.Infof("filling assetsInUtxo takes %v", time.Since(t1))
@@ -153,8 +168,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			output.Invalids[k] = v.Invalid
 		}
 
-		output.Assets = append(output.Assets, asset)
-		
+		output.Assets.Add(&asset)
 	}
 
 	return output
@@ -197,8 +211,10 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 	return result
 }
 
+// 不包含未确认的输入，也不包含已经广播的但未确认的输出
+// TODO，需要将已经广播的但未确认的输入加上，才不会导致新的tx无法构造
 func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.TickerName]*common.Decimal {
-	utxos, err := b.GetUTXOsWithAddress(address)
+	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {
 		return nil
 	}
@@ -540,7 +556,7 @@ func (b *IndexerMgr) UnlockOrdinals(utxos []string, pubkey, sig []byte) (map[str
 // 获取哪些因为存在铭文而被锁定的utxo
 func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsInUtxo, error) {
 	//t1 := time.Now()
-	utxos, err := b.rpcService.GetUTXOs(address)
+	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {
 		return nil, err
 	}
@@ -551,9 +567,6 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
 		if err != nil {
-			continue
-		}
-		if b.IsUtxoSpent(utxo) {
 			continue
 		}
 

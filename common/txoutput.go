@@ -265,19 +265,22 @@ func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
 		return nil
 	}
 
-	assetOffsetMap := p.getAssetOffsetMap()
-	assets := make([]*DisplayAsset, 0)
-	for _, asset := range p.Assets {
-		display := DisplayAsset{
-			AssetName: asset.Name,
-			Amount: asset.Amount.String(),
-			Precision: asset.Amount.Precision,
-			BindingSat: int(asset.BindingSat),
-			Offsets: p.Offsets[asset.Name],
-			OffsetToAmts: assetOffsetMap[asset.Name],
-			Invalid: p.Invalids[asset.Name],
+	var assets []*DisplayAsset
+	if len(p.Assets) != 0 {
+		assetOffsetMap := p.getAssetOffsetMap()
+		assets = make([]*DisplayAsset, 0)
+		for _, asset := range p.Assets {
+			display := DisplayAsset{
+				AssetName: asset.Name,
+				Amount: asset.Amount.String(),
+				Precision: asset.Amount.Precision,
+				BindingSat: int(asset.BindingSat),
+				Offsets: p.Offsets[asset.Name],
+				OffsetToAmts: assetOffsetMap[asset.Name],
+				Invalid: p.Invalids[asset.Name],
+			}
+			assets = append(assets, &display)
 		}
-		assets = append(assets, &display)
 	}
 	return &AssetsInUtxo{
 		UtxoId: p.UtxoId,
@@ -513,6 +516,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	return part1, part2, nil
 }
 
+// 根据value或者amt切分
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
 
