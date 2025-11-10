@@ -145,7 +145,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			BindingSat: uint32(n),
 		}
 
-		output.Assets = append(output.Assets, asset)
+		output.Assets.Add(&asset)
 		output.Offsets[k] = offsets
 	}
 	//common.Log.Infof("filling assetsInUtxo takes %v", time.Since(t1))
@@ -168,8 +168,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			output.Invalids[k] = v.Invalid
 		}
 
-		output.Assets = append(output.Assets, asset)
-		
+		output.Assets.Add(&asset)
 	}
 
 	return output
