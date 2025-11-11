@@ -75,7 +75,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 
 	// TODO 如果是brc20，可能mint/transfer的铸造还没确认，无法构造对应的资产数据，这里会缺少brc20的部分资产数据
 	// 可能会把transfer的铸造结果，当作白聪的utxo，所以暂时关闭代码。考虑提供unconfirmed的接口，由应用自己决定是否使用
-	// unconfirmedUtxos := b.miniMempool.GetUnconfirmedUtxoByAddress(address)
+	// unconfirmedUtxos := b.miniMempool.GetUnconfirmedNewUtxoByAddress(address)
 	// for _, info := range unconfirmedUtxos {
 	// 	if b.containAsset(info, ticker) {
 	// 		mid = append(mid, info)
@@ -219,15 +219,18 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		return nil
 	}
 
+	// 过滤已经花费的资产
+	unconfirmedSpents := b.miniMempool.GetUnconfirmedSpentUtxoByAddress(address)
+
 	result := make(map[common.TickerName]*common.Decimal)
-	nsAsset := b.GetSubNameSummaryWithAddress(address) // TODO 已经广播的utxo没有过滤
+	nsAsset := b.getSubNameSummaryWithAddress(address, unconfirmedSpents)
 	for k, v := range nsAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
 	}
 
 	// 合集
-	nftAsset := b.GetNftAmountWithAddress(address) // TODO 已经广播的utxo没有过滤
+	nftAsset := b.getNftAmountWithAddress(address, unconfirmedSpents)
 	for k, v := range nftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
@@ -240,12 +243,25 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	}
 
 	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
+	for _, output := range unconfirmedSpents {
+		if len(output.Assets) == 0 {
+			continue
+		}
+		for k, v := range brc20Asset {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
+			amt := output.GetAsset(&tickName)
+			if amt.Sign() != 0 {
+				d := common.DecimalSub(v, amt)
+				v.Value = d.Value // 不修改指针v
+			}
+		}
+	}
 	for k, v := range brc20Asset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
 	}
 
-	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address), utxos) // TODO 已经广播的utxo没有过滤
+	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address), utxos)
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
 		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))

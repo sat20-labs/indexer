@@ -271,10 +271,17 @@ func (b *IndexerMgr) GetSubNameAmountWithAddress(address, sub string) int {
 }
 
 func (b *IndexerMgr) GetSubNameSummaryWithAddress(address string) map[string]int64 {
+	return b.getSubNameSummaryWithAddress(address, nil)
+}
+
+func (b *IndexerMgr) getSubNameSummaryWithAddress(address string, unconfirmedSpents map[uint64]*common.TxOutput) map[string]int64 {
 	nfts := b.getNamesWithAddressInBuffer(address)
 
 	result := make(map[string]int64)
 	for _, nft := range nfts {
+		if _, ok := unconfirmedSpents[nft.UtxoId]; ok {
+			continue
+		}
 		name := string(nft.Base.UserData)
 		_, subName := getSubName(name)
 		result[subName] += 1

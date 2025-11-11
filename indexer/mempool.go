@@ -22,8 +22,8 @@ import (
 // 一个简化的内存池数据同步线程，启动时先从节点拉取所有mempool数据，然后通过p2p协议实时同步TX
 
 type UserUtxoInMempool struct {
-    SpentUtxo           map[string]bool
-    UnconfirmedUtxoMap  map[string]bool
+    SpentUtxo           map[string]bool  // 被花费的UTXO，作为tx的输入
+    UnconfirmedUtxoMap  map[string]bool  // 新生成的UTXO，作为tx的输出
 }
 
 type MiniMemPool struct {
@@ -577,8 +577,8 @@ func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
     return result
 }
 
-// 返回内存池中属于该地址的还没确认的utxo
-func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []*common.TxOutput {
+// 返回内存池中属于该地址的还没确认的新生成的UTXO
+func (p *MiniMemPool) GetUnconfirmedNewUtxoByAddress(address string) map[uint64]*common.TxOutput {
     p.mutex.RLock()
     defer p.mutex.RUnlock()
 
@@ -587,15 +587,37 @@ func (p *MiniMemPool) GetUnconfirmedUtxoByAddress(address string) []*common.TxOu
         return nil
     }
 
-    result := make([]*common.TxOutput, 0)
+    result := make(map[uint64]*common.TxOutput)
     for utxo := range addrUtxo.UnconfirmedUtxoMap {
         output, ok := p.unConfirmedUtxoMap[utxo]
         if ok {
-            result = append(result, output)
+            result[output.UtxoId] = output
         }
     }
     return result
 }
+
+
+// 返回内存池中属于该地址的还没确认的已经花费的UTXO
+func (p *MiniMemPool) GetUnconfirmedSpentUtxoByAddress(address string) map[uint64]*common.TxOutput {
+    p.mutex.RLock()
+    defer p.mutex.RUnlock()
+
+    addrUtxo, ok := p.addrUtxoMap[address]
+    if !ok {
+        return nil
+    }
+
+    result := make(map[uint64]*common.TxOutput, 0)
+    for utxo := range addrUtxo.UnconfirmedUtxoMap {
+        output, ok := p.unConfirmedUtxoMap[utxo]
+        if ok {
+            result[output.UtxoId] = output
+        }
+    }
+    return result
+}
+
 
 // 直接从p2p协议同步数据，但比较慢
 // syncedBlocks map[chainhash.Hash]int // 已同步区块

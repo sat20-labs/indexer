@@ -100,11 +100,19 @@ func (b *IndexerMgr) GetNftsWithAddress(address string, start, limit int) ([]*co
 }
 
 func (b *IndexerMgr) GetNftAmountWithAddress(address string) map[string]int64 {
+	return b.getNftAmountWithAddress(address, nil)
+}
+
+
+func (b *IndexerMgr) getNftAmountWithAddress(address string, unconfirmedSpents map[uint64]*common.TxOutput) map[string]int64 {
 	nfts := b.getNftWithAddressInBuffer(address)
 
 	result := make(map[string]int64)
 	b.mutex.RLock()
 	for _, nft := range nfts {
+		if _, ok := unconfirmedSpents[nft.UtxoId]; ok {
+			continue
+		}
 		for k, v := range b.clmap {
 			if k.Type == common.ASSET_TYPE_NFT {
 				_, ok := v[nft.Base.InscriptionId]
