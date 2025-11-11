@@ -293,24 +293,11 @@ func (s *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferInfo) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-	common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
-	// transferNft, ok := p.transferNftMap[utxoId]
-	// if !ok {
-	// 	return nil
-	// }
-	// return &common.BRC20TransferInfo{
-	// 	NftId: transferNft.TransferNft.NftId,
-	// 	Name: transferNft.Ticker,
-	// 	Amt: transferNft.TransferNft.Amount.Clone(),
-	// 	Invalid: transferNft.TransferNft.IsInvalid,
-	// }
+	// utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
+	// common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
 
 	nfts := s.nftIndexer.GetNftsWithUtxo(utxoId)
 	for _, nft := range nfts {
-		if nft.Base.Id == 245587 || nft.Base.Id == 245603 {
-			common.Log.Infof("test")
-		}
 		if s.nftIndexer.GetBaseIndexer().IsMainnet() && s.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
 			continue
 		}
