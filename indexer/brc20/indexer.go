@@ -249,8 +249,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("total tickers %d", len(s.tickerMap))
 
 	// 需要高度到达一定高度才需要检查
-	if (s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 828800) ||
-		(!s.nftIndexer.GetBaseIndexer().IsMainnet() && height == 28865) {
+	if (s.nftIndexer.GetBaseIndexer().IsMainnet() && height >= 828800) ||
+		(!s.nftIndexer.GetBaseIndexer().IsMainnet() && height >= 28865) {
 		// 需要区分主网和测试网
 		name := "ordi"
 		ticker := s.GetTicker(name)
@@ -411,35 +411,44 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			}
 			ticker := s.GetTicker(specialTicker.Name)
 			if specialTicker.InscriptionId != ticker.Nft.Base.InscriptionId {
+				common.Log.Errorf("ticker InscriptionId incorrect")
 				return false
 			}
 			if specialTicker.TransactionCount != ticker.TransactionCount {
+				common.Log.Errorf("ticker TransactionCount incorrect")
 				return false
 			}
 			if specialTicker.Max != ticker.Max.String() {
+				common.Log.Errorf("ticker Max incorrect")
 				return false
 			}
 			minted := ticker.Minted.String()
 			if specialTicker.Minted != minted {
+				common.Log.Errorf("ticker Minted incorrect")
 				return false
 			}
 			if specialTicker.Limit != ticker.Limit.String() {
+				common.Log.Errorf("ticker Limit incorrect")
 				return false
 			}
 			if specialTicker.Decimal != ticker.Decimal {
+				common.Log.Errorf("ticker Decimal incorrect")
 				return false
 			}
 			if specialTicker.SelfMint != ticker.SelfMint {
+				common.Log.Errorf("ticker SelfMint incorrect")
 				return false
 			}
 
 			startNftInfo := base_indexer.ShareBaseIndexer.GetNftInfoWithInscriptionId(ticker.StartInscriptionId)
 			deployAddress := base_indexer.ShareBaseIndexer.GetAddressById(startNftInfo.OwnerAddressId)
 			if specialTicker.DeployAddress != deployAddress {
+				common.Log.Errorf("ticker DeployAddress incorrect")
 				return false
 			}
 			deployTime := time.Unix(ticker.DeployTime, 0).Format("2006-01-02 15:04:05")
 			if specialTicker.DeployTime != deployTime {
+				common.Log.Errorf("ticker DeployTime incorrect")
 				return false
 			}
 
@@ -447,20 +456,21 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			if endNftInfo != nil {
 				completedTime := time.Unix(endNftInfo.Base.BlockTime, 0).Format("2006-01-02 15:04:05")
 				if specialTicker.CompletedTime != completedTime {
+					common.Log.Errorf("ticker CompletedTime incorrect")
 					return false
 				}
 			}
 
 			if specialTicker.StartInscriptionId != ticker.StartInscriptionId {
+				common.Log.Errorf("ticker StartInscriptionId incorrect")
 				return false
 			}
 			if specialTicker.EndInscriptionId != ticker.EndInscriptionId {
+				common.Log.Errorf("ticker EndInscriptionId incorrect")
 				return false
 			}
 			if specialTicker.HolderCount != ticker.HolderCount {
-				return false
-			}
-			if specialTicker.TransactionCount != ticker.TransactionCount {
+				common.Log.Errorf("ticker HolderCount incorrect")
 				return false
 			}
 
@@ -469,6 +479,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 				assertSummarys := s.GetAssetSummaryByAddress(addressId)
 				for tickerName, amt := range assertSummarys {
 					if holder[tickerName] != amt.String() {
+						common.Log.Errorf("ticker amt incorrect")
 						return false
 					}
 				}
