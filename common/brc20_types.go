@@ -36,7 +36,7 @@ type BRC20Ticker struct {
 	Minted             Decimal `json:"minted,omitempty"`
 	StartInscriptionId string  `json:"startInscriptionId,omitempty"`
 	EndInscriptionId   string  `json:"endInscriptionId,omitempty"`
-	HolderCount        uint64  `json:"holders,omitempty"`
+	HolderCount        uint64  `json:"holders,omitempty"` // TODO: 要算上处理过的，哪怕最终可用余额是0也要算上
 	TransactionCount   uint64  `json:"transactionCount,omitempty"`
 }
 
