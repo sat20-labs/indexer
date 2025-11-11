@@ -578,7 +578,7 @@ func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
 }
 
 // 返回内存池中属于该地址的还没确认的新生成的UTXO
-func (p *MiniMemPool) GetUnconfirmedNewUtxoByAddress(address string) map[uint64]*common.TxOutput {
+func (p *MiniMemPool) GetUnconfirmedNewUtxoByAddress(address string) map[string]*common.TxOutput {
     p.mutex.RLock()
     defer p.mutex.RUnlock()
 
@@ -587,11 +587,11 @@ func (p *MiniMemPool) GetUnconfirmedNewUtxoByAddress(address string) map[uint64]
         return nil
     }
 
-    result := make(map[uint64]*common.TxOutput)
+    result := make(map[string]*common.TxOutput)
     for utxo := range addrUtxo.UnconfirmedUtxoMap {
         output, ok := p.unConfirmedUtxoMap[utxo]
         if ok {
-            result[output.UtxoId] = output
+            result[utxo] = output
         }
     }
     return result
@@ -608,11 +608,19 @@ func (p *MiniMemPool) GetUnconfirmedSpentUtxoByAddress(address string) map[uint6
         return nil
     }
 
+    // 如果utxoId无效，说明是还未确认的tx的输出，使用一个临时的id，不要跟现有的id冲突
+    invalidId := uint64(common.INVALID_ID)
+
     result := make(map[uint64]*common.TxOutput, 0)
-    for utxo := range addrUtxo.UnconfirmedUtxoMap {
-        output, ok := p.unConfirmedUtxoMap[utxo]
+    for utxo := range addrUtxo.SpentUtxo {
+        output, ok := p.spentUtxoMap[utxo]
         if ok {
-            result[output.UtxoId] = output
+            id := output.UtxoId
+            if id == common.INVALID_ID {
+                id = invalidId
+                invalidId--
+            }
+            result[id] = output
         }
     }
     return result
@@ -713,16 +721,18 @@ func (p *MiniMemPool) GetUnconfirmedSpentUtxoByAddress(address string) map[uint6
 // }
 
 
-// 该Tx还没有广播或者广播了还没有确认，才有可能重建，索引器的限制，utxo被花费后就删除了
+// 该Tx还没有确认，才有可能重建，索引器的限制，utxo被花费后就删除了
+// 对于brc20，资产暂时由output管理，只处理inscribe-transfer，其输出携带对应的资产
 func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*common.TxOutput) (
 	[]*common.TxOutput, []*common.TxOutput, error) {
 	// 尝试为tx的输出分配资产
 	// 按ordx协议的规则
 	// 按runes协议的规则
-	// 增加brc20的规则：在transfer时，可以认为是直接绑定在一个聪上，容纳所有brc20的资产，由indexer.TxOutput执行相关规则
+	// 增加brc20的规则：在transfer时，可以认为是直接绑定在一个聪上，容纳所有brc20的资产，由TxOutput执行相关规则
 	var inputs []*common.TxOutput
 	var input *common.TxOutput
-	for _, txIn := range tx.TxIn {
+    var status int
+	for i, txIn := range tx.TxIn {
 		if txIn.PreviousOutPoint.Index == wire.MaxPrevOutIndex {
 			continue
 		}
@@ -730,35 +740,47 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 
 		info, ok := preFectcher[utxo]
 		if !ok {
-			info = instance.GetTxOutputWithUtxoV2(utxo, true)
-			if info == nil {
-				// 递归调用
-				preTxId := txIn.PreviousOutPoint.Hash.String()
-				preTx := p.txMap[preTxId]
-				if preTx == nil {
-					common.Log.Infof("rebuildTxOutput GetTx %s failed", preTxId)
-					txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
-					if err != nil {
-						common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
-						return nil, nil, err
-					}
-					preTx, err = DecodeMsgTx(txHex)
-					if err != nil {
-						common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
-						return nil, nil, err
-					}
-				}
-                // TODO 如果是brc20的transfer指令，而且该指令的铸造结果还没确认，这里无法构造出对应的资产数据
-				_, outs, err := p.rebuildTxOutput(preTx, preFectcher)
-				if err != nil {
-					common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
-					return nil, nil, err
-				}
-				for _, out := range outs {
-					preFectcher[out.OutPointStr] = out
-				}
-				info = outs[txIn.PreviousOutPoint.Index]
-			}
+            info, ok = p.unConfirmedUtxoMap[utxo]
+            if !ok {
+                info = instance.GetTxOutputWithUtxoV2(utxo, true)
+                if info == nil {
+                    // 递归调用
+                    preTxId := txIn.PreviousOutPoint.Hash.String()
+                    preTx := p.txMap[preTxId]
+                    if preTx == nil {
+                        common.Log.Infof("rebuildTxOutput GetTx %s failed", preTxId)
+                        txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
+                        if err != nil {
+                            common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
+                            return nil, nil, err
+                        }
+                        preTx, err = DecodeMsgTx(txHex)
+                        if err != nil {
+                            common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
+                            return nil, nil, err
+                        }
+                    }
+                    // TODO 如果是brc20的transfer指令，而且该指令的铸造结果还没确认，这里无法构造出对应的资产数据
+                    // 需要由brc20模块，提供接口，检查某个tx是否有mint和transfer的铸造，是否能通过参数检查，然后给出资产数据
+                    _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
+                    if err != nil {
+                        common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
+                        return nil, nil, err
+                    }
+                    for _, out := range outs {
+                        preFectcher[out.OutPointStr] = out
+                    }
+                    info = outs[txIn.PreviousOutPoint.Index]
+                }
+            }
+            preFectcher[utxo] = info
+		}
+
+        s, err := p.processInscription(tx, i, preFectcher)
+		if err == nil {
+			// 处理铸造铸造结果 
+            // 将铸造结果当作input的资产数据，直接添加到info中, 在cut中按照sat的位置分配资产结果
+            status = s
 		}
 
 		if input == nil {
@@ -804,6 +826,44 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 			if defaultRuneOutput == -1 {
 				defaultRuneOutput = i
 			}
+
+            // 检查有效性
+            addr, err := common.PkScriptToAddr(txOut.PkScript, instance.GetChainParam())
+            if err != nil {
+                common.Log.Errorf("rebuildTxOutput PkScriptToAddr failed, %v", err)
+                return nil, nil, err
+            }
+            addrId := instance.GetAddressId(addr) // 有可能是全新的地址
+            
+            deleteAsset := make(map[string]*common.AssetInfo)
+            for _, asset := range curr.Assets {
+                var invalid bool
+                switch asset.Name.Protocol {
+                case common.PROTOCOL_NAME_ORDX:
+                case common.PROTOCOL_NAME_BRC20:
+                    switch status {
+                    case 1: // inscribe-mint
+                    case 2: // inscribe-transfer
+                        holderInfo := instance.brc20Indexer.GetHolderAbbrInfo(addrId, asset.Name.Ticker)
+                        if holderInfo == nil {
+                            // 找不到，那这个transfer就无效
+                            invalid = true
+                        } else {
+                            if asset.Amount.Cmp(holderInfo.AvailableBalance) > 0 {
+                                // 无效
+                                invalid = true
+                            }
+                        }
+                    }
+                }
+                if invalid {
+                    deleteAsset[asset.Name.String()] = &asset
+                }
+            }
+            for _, v := range deleteAsset {
+                // 删除这个资产
+                curr.RemoveAsset(&v.Name)
+            }
 		}
 		curr.OutPointStr = fmt.Sprintf("%s:%d", txId, i)
 		outputs = append(outputs, curr)
@@ -847,4 +907,205 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 	}
 
 	return inputs, outputs, nil
+}
+
+// 只处理transfer，并且没有做数据校验
+func (p *MiniMemPool) processInscription(tx *wire.MsgTx, i int, 
+    preFectcher map[string]*common.TxOutput) (int, error) {
+    
+    txIn := tx.TxIn[i]
+    inscriptions, _, err := common.ParseInscription(txIn.Witness)
+    if err != nil {
+        return 0, err
+    }
+
+    // 需要先确保这里能拿到数据
+    input := preFectcher[txIn.PreviousOutPoint.String()]
+    var status int // 假设一个tx只有一个状态
+    for _, insc := range inscriptions {
+        protocol, content := common.GetProtocol(insc)
+        switch protocol {
+        case "ordx":
+            ordxInfo, bOrdx := common.IsOrdXProtocol(insc)
+            if !bOrdx {
+                continue
+            }
+            ordxType := common.GetBasicContent(ordxInfo)
+            switch ordxType.Op {
+            case "deploy":
+                // deployInfo := common.ParseDeployContent(ordxInfo)
+                // if deployInfo == nil {
+                // 	fmt.Printf("ParseDeployContent failed, %v", err)
+                // 	continue
+                // }
+                // assetName := common.AssetName{
+                //  Protocol: common.PROTOCOL_NAME_ORDX,
+                //  Type:     common.ASSET_TYPE_FT,
+                // 	Ticker:   deployInfo.Ticker,
+                // }
+                
+            case "mint":
+                // mintInfo := common.ParseMintContent(ordxInfo)
+                // if mintInfo == nil {
+                //     fmt.Printf("ParseMintContent failed, %v", err)
+                //     continue
+                // }
+                // assetName := common.AssetName{
+                //     Protocol: common.PROTOCOL_NAME_ORDX,
+                //     Type:     common.ASSET_TYPE_FT,
+                //     Ticker:   mintInfo.Ticker,
+                // }
+                // ticker := instance.GetTickerInfo(&assetName)
+                // if ticker == nil {
+                //     fmt.Printf("ticker %s not exists", mintInfo.Ticker)
+                //     continue
+                // }
+
+                // satpoint := 0
+                // if insc[common.FIELD_POINT] != nil {
+                //     satpoint = common.GetSatpoint(insc[common.FIELD_POINT])
+                //     if int64(satpoint) >= input.Value() {
+                //         satpoint = 0
+                //     }
+                // }
+
+                // amt := ticker.Limit
+                // if mintInfo.Amt != "" {
+                //     amt = mintInfo.Amt
+                // }
+                // dAmt, err := common.NewDecimalFromString(amt, 0)
+                // if err != nil {
+                //     fmt.Printf("NewDecimalFromString %s failed, %v", amt, err)
+                //     continue
+                // }
+
+                // asset := common.AssetInfo{
+                //     Name:       assetName,
+                //     Amount:     *dAmt,
+                //     BindingSat: uint32(ticker.N),
+                // }
+                // input.Assets.Add(&asset)
+                // satsNum := common.GetBindingSatNum(dAmt, uint32(ticker.N))
+                // input.Offsets[assetName] = common.AssetOffsets{&common.OffsetRange{
+                //     Start: int64(satpoint), 
+                //     End: int64(satpoint) + satsNum},
+                // }
+                // status = 1
+                // // 暂时假定有效
+            }
+
+        case "brc-20":
+            brc20Content := common.ParseBrc20BaseContent(string(content))
+            if brc20Content == nil {
+                continue
+            }
+            switch brc20Content.Op {
+            case "deploy":
+                // deployInfo := common.ParseBrc20DeployContent(string(content))
+                // if deployInfo == nil {
+                //     continue
+                // }
+                // if len(deployInfo.Ticker) == 5 {
+                //     if deployInfo.SelfMint != "true" {
+                //         common.Log.Errorf("deploy, tick length 5, but not self_mint")
+                //         continue
+                //     }
+                // }
+                // assetName := common.AssetName{
+                //     Protocol: common.PROTOCOL_NAME_BRC20,
+                //     Type:     common.ASSET_TYPE_FT,
+                //     Ticker:   deployInfo.Ticker,
+                // }
+
+            case "mint":
+                // mintInfo := common.ParseBrc20MintContent(string(content))
+                // if mintInfo == nil {
+                //     continue
+                // }
+
+                // assetName := common.AssetName{
+                //    Protocol: common.PROTOCOL_NAME_BRC20,
+                //     Type:     common.ASSET_TYPE_FT,
+                //     Ticker:   mintInfo.Ticker,
+                // }
+                // ticker := instance.brc20Indexer.GetTicker(mintInfo.Ticker)
+                // if ticker == nil {
+                //     fmt.Printf("ticker %s not exists", mintInfo.Ticker)
+                //     continue
+                // }
+
+                // if ticker.SelfMint {
+                    
+                // }
+                
+                // // 调用 (s *IndexerMgr) handleMintTicker 检查是否是正确的铸造
+
+                // amt := &ticker.Limit
+                // if mintInfo.Amt != "" {
+                //     amt, err = common.NewDecimalFromString(mintInfo.Amt, int(ticker.Decimal))
+                //     if err != nil {
+                //         fmt.Printf("NewDecimalFromString %s failed, %v", amt, err)
+                //         continue
+                //     }
+                // }
+
+                // mintedAmt := ticker.Minted.Add(amt)
+                // if mintedAmt.Cmp(&ticker.Max) > 0 {
+                //     amt = ticker.Max.Sub(&ticker.Minted)
+                // }
+                // if amt.Sign() == 0 {
+                //     continue
+                // }
+
+                // asset := common.AssetInfo{
+                //     Name:       assetName,
+                //     Amount:     *amt,
+                //     BindingSat: 0,
+                // }
+                // // 假装是从这个输入转移到输出
+                // input.Assets.Add(&asset)
+                // input.Offsets[assetName] = common.AssetOffsets{&common.OffsetRange{Start: 0, End: 1}}
+                // input.SatBindingMap[0] = asset.Clone()
+                // status = 1
+
+            case "transfer":
+                transferInfo := common.ParseBrc20TransferContent(string(content))
+                if transferInfo == nil {
+                    continue
+                }
+                
+                assetName := common.AssetName{
+                    Protocol: common.PROTOCOL_NAME_BRC20,
+                    Type:     common.ASSET_TYPE_FT,
+                    Ticker:   transferInfo.Ticker,
+                }
+                ticker := instance.GetTickerInfo(&assetName)
+                if ticker == nil {
+                    fmt.Printf("ticker %s not exists", transferInfo.Ticker)
+                    continue
+                }
+
+                amt := transferInfo.Amt
+                dAmt, err := common.NewDecimalFromString(amt, ticker.Divisibility)
+                if err != nil {
+                    fmt.Printf("NewDecimalFromString %s failed, %v", amt, err)
+                    continue
+                }
+
+                asset := common.AssetInfo{
+                    Name:       assetName,
+                    Amount:     *dAmt.Clone(),
+                    BindingSat: 0,
+                }
+                // 假定有效，在最后再做检查
+                // 假装是从这个输入转移到输出，在输出的地方，检查是否有足够的资产可以转移
+                input.Assets.Add(&asset)
+                input.Offsets[assetName] = common.AssetOffsets{&common.OffsetRange{Start: 0, End: 1}}
+                input.SatBindingMap[0] = asset.Clone()
+                status = 2
+            }
+        }
+    }
+
+    return status, nil
 }

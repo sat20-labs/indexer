@@ -553,8 +553,8 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 	mintedAmt := ticker.Minted.Add(amt)
 	cmpResult := mintedAmt.Cmp(&ticker.Max)
 	if cmpResult > 0 {
-		common.Log.Warnf("mint %s, invalid amount(%s), max(%s)", content.Ticker, content.Amt, ticker.Max.String())
-		return nil
+		amt = ticker.Max.Sub(&ticker.Minted)
+		common.Log.Warnf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
 	}
 	mint.Amt = *amt
 	return mint

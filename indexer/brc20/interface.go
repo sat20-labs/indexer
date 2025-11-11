@@ -294,7 +294,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	testUtxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-	common.Log.Info("GetUtxoAssets", "utxoId", utxoId, "testUtxo", testUtxo)
+	common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", testUtxo)
 	// transferNft, ok := p.transferNftMap[utxoId]
 	// if !ok {
 	// 	return nil
@@ -422,4 +422,22 @@ func (s *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
 		return false
 	}
 	return !ret.Invalid
+}
+
+// transfer
+func (s *BRC20Indexer) GetHolderAbbrInfo(addressId uint64, tickerName string) *common.BRC20TickAbbrInfo {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	holder := s.holderMap[addressId]
+	if holder == nil {
+		return nil
+	}
+
+	tickerName = strings.ToLower(tickerName)
+	tickAbbrInfo := holder.Tickers[tickerName]
+	if tickAbbrInfo == nil {
+		return nil
+	}
+	return tickAbbrInfo
 }

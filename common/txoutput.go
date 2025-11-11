@@ -638,6 +638,34 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 	return part1, part2, nil
 }
 
+
+// 根据value或者amt切分
+// 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
+func (p *TxOutput) RemoveAsset(name *AssetName) {
+	if name == nil || *name == ASSET_PLAIN_SAT {
+		return
+	}
+
+	if len(p.Assets) == 0 {
+		return
+	}
+
+	asset, err := p.Assets.Find(name)
+	if err != nil {
+		return
+	}
+
+	p.Assets.Subtract(asset)
+	delete(p.Invalids, *name)
+	offsets, ok := p.Offsets[*name]
+	if ok {
+		for _, offset := range offsets {
+			delete(p.SatBindingMap, offset.Start)
+		}
+	}
+	delete(p.Offsets, *name)
+}
+
 // 只用于计算ordx资产的偏移，其他资产直接返回0
 func (p *TxOutput) GetAssetOffset(name *AssetName, amt *Decimal) (int64, error) {
 
