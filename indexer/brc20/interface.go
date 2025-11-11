@@ -293,8 +293,8 @@ func (s *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferInfo) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	testUtxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-	common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", testUtxo)
+	utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
+	common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
 	// transferNft, ok := p.transferNftMap[utxoId]
 	// if !ok {
 	// 	return nil
@@ -329,6 +329,21 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 		tickerName := strings.ToLower(content.Ticker)
 		switch content.Op {
 		case "mint":
+			for _, ticker := range s.tickerMap {
+				if strings.ToLower(ticker.Name) == tickerName {
+					for _, v := range ticker.MintAdded {
+						if v.Nft.Base.InscriptionId == nft.Base.InscriptionId {
+							ret = &common.BRC20TransferInfo{
+								NftId:   nft.Base.Id,
+								Name:    content.Ticker,
+								Amt:     v.Amt.Clone(),
+								Invalid: false,
+							}
+							return
+						}
+					}
+				}
+			}
 			mint := s.getMintFromDB(tickerName, nft.Base.InscriptionId)
 			if mint != nil {
 				ret = &common.BRC20TransferInfo{
@@ -364,26 +379,27 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 					NftId:   nft.Base.Id,
 					Name:    content.Ticker,
 					Amt:     transferNft.Amount.Clone(),
-					Invalid: transferNft.IsInvalid,
+					Invalid: false, // transferNft.IsInvalid,
 				}
 				return
 			} else {
 				for _, action := range s.holderActionList {
 					if tickerName == strings.ToLower(action.Ticker) && nft.UtxoId == action.UtxoId {
 						ret = &common.BRC20TransferInfo{
-							NftId: nft.Base.Id,
-							Name:  action.Ticker,
-							Amt:   action.Amount.Clone(),
+							NftId:   nft.Base.Id,
+							Name:    action.Ticker,
+							Amt:     action.Amount.Clone(),
+							Invalid: true,
 						}
-						switch action.Action {
-						case Action_InScribe_Transfer:
-							ret.Invalid = false
-						case Action_Transfer:
-							ret.Invalid = true
-						default:
-							common.Log.Warnf("action is err")
-							continue
-						}
+						// switch action.Action {
+						// case Action_InScribe_Transfer:
+						// 	ret.Invalid = false
+						// case Action_Transfer:
+						// 	ret.Invalid = true
+						// default:
+						// 	common.Log.Warnf("action is err")
+						// 	continue
+						// }
 						return
 					}
 				}

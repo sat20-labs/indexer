@@ -12,6 +12,12 @@ import (
 	"github.com/sat20-labs/indexer/config"
 )
 
+/*
+ord0.9 --rpc-url 127.0.0.1:8332 --data-dir /Users/wenjiechen/ord/0.9 --bitcoin-rpc-user jacky --bitcoin-rpc-pass _RZekaGRgKQJSIOYi6vq0_CkJtjoCootamy81J2cDn0 --first-inscription-height 767430 --height-limit 824545 -e server --http
+ord0.23.3  --bitcoin-rpc-url 127.0.0.1:8332 --data-dir /Users/wenjiechen/ord/0.23.3 --bitcoin-rpc-username jacky --bitcoin-rpc-password _RZekaGRgKQJSIOYi6vq0_CkJtjoCootamy81J2cDn0  server --http --http-port 81
+ord0.14.0 --rpc-url 127.0.0.1:8332 --data-dir /Users/wenjiechen/ord/0.14 --bitcoin-rpc-user jacky --bitcoin-rpc-pass _RZekaGRgKQJSIOYi6vq0_CkJtjoCootamy81J2cDn0 --first-inscription-height 767430 server --http --http-port 82
+*/
+
 type Inscription struct {
 	Address       string `json:"address"`
 	ContentLength int    `json:"content_length"`
@@ -35,20 +41,10 @@ type Store struct {
 	Content       string
 }
 
-const (
-	url_0_23_0 = "127.0.0.1:81"
-	url_0_9    = "127.0.0.1:80"
-
-	// first brc inscriptin_number = 348020, cursor end block height = 837090
-	// 在高度38436851调整了算法，要比对两个服务得到的inscription中的number不一样的inscription并记录，所以后面还要再从348020开始到38436850结束，再跑一次数据来查缺补漏
-	start_inscriptin_number = 348020 //348020
-	// end_inscriptin_number   = 66799147
-	// end_height    = 837090
-	curse_out_dir = "./cmd/brc20_curse.txt"
-)
-
 var (
-	err_parse_brc20 = fmt.Errorf("parse brc20 error")
+	err_parse_brc20       = fmt.Errorf("parse brc20 error")
+	cur_inscriptin_number = 348020 // first brc inscriptin_number is 348020(height 779832), end inscriptin number = 110020899(height 923108)
+	brc20CurseFile        *os.File
 )
 
 func getInscription(url string, id2number string) (ret *Inscription, err error) {
@@ -137,41 +133,64 @@ func getBrcContent(url string, inscriptionId string) (ret string, brc *Brc, err 
 func main() {
 	yamlcfg := config.InitConfig("../testnet.env")
 	config.InitLog(yamlcfg)
-	err := CheckInscriptionId()
+
+	const (
+		url_0_9    = "127.0.0.1:80"
+		url_0_14   = "127.0.0.1:82"
+		url_0_23_0 = "127.0.0.1:81"
+
+		height_limit_1 = 824544
+		height_limit_2 = 923108
+		curse_out_dir  = "./cmd/brc20_curse.txt"
+	)
+
+	var err error
+	brc20CurseFile, err = os.OpenFile((curse_out_dir), os.O_APPEND|os.O_WRONLY|os.O_CREATE /*|os.O_TRUNC*/, 0644)
 	if err != nil {
-		common.Log.Info(err)
+		common.Log.Fatal(err)
+	}
+	defer brc20CurseFile.Close()
+
+	// 760000(767430)-816000，使用ord0.9版本的数据，诅咒铭文无效 (最新版本与ord0.9对比)
+	// 816001-824544，使用ord0.9版本的数据，诅咒铭文无效  (最新版本与ord0.9对比)
+	err = CheckInscriptionId(url_0_23_0, url_0_9, height_limit_1)
+	if err != nil {
+		common.Log.Fatal(err)
 	}
 
+	// 824545-latest，Jubilee 生效，有效铭文定义采用ord0.14版本，理论上，其定义应该和最新版本一致  (最新版本与ord0.14对比)
+	err = CheckInscriptionId(url_0_23_0, url_0_14, height_limit_2)
+	if err != nil {
+		common.Log.Fatal(err)
+	}
 }
 
-func CheckInscriptionId() error {
-	brcDiffCurseFile, err := os.OpenFile((curse_out_dir), os.O_APPEND|os.O_WRONLY|os.O_CREATE /*|os.O_TRUNC*/, 0644)
-	if err != nil {
-		return err
-	}
-	defer brcDiffCurseFile.Close()
-
-	inscriptionNum := start_inscriptin_number
+func CheckInscriptionId(lastOrdUrl, oldOrdUrl string, height_limit int) error {
 	for {
-		inscription_0230, err := getInscription(url_0_23_0, strconv.FormatInt(int64(inscriptionNum), 10))
+		lastOrdVersionServiceInscription, err := getInscription(lastOrdUrl, strconv.FormatInt(int64(cur_inscriptin_number), 10))
 		if err != nil {
 			common.Log.Info(err)
 			return err
 		}
 
-		if inscription_0230.Height == 0 {
+		if lastOrdVersionServiceInscription.Height == 0 {
 			break
 		}
 
-		_, index, err := common.ParseOrdInscriptionID(inscription_0230.ID)
+		if lastOrdVersionServiceInscription.Height == height_limit+1 {
+			cur_inscriptin_number--
+			break
+		}
+
+		_, index, err := common.ParseOrdInscriptionID(lastOrdVersionServiceInscription.ID)
 		if err != nil {
 			return err
 		}
 		if index != 0 {
-			inscriptionNum++
+			cur_inscriptin_number++
 			continue
 		}
-		switch inscription_0230.ContentType {
+		switch lastOrdVersionServiceInscription.ContentType {
 		case "application/json":
 		case "text/plain":
 		case "text/html;charset=utf-8":
@@ -207,50 +226,50 @@ func CheckInscriptionId() error {
 		case "model/gltf-binary":
 			fallthrough
 		case "application/pdf":
-			common.Log.Infof("skip %s: %s", inscription_0230.ContentType, inscription_0230.ID)
-			inscriptionNum++
+			common.Log.Infof("skip %s: %s", lastOrdVersionServiceInscription.ContentType, lastOrdVersionServiceInscription.ID)
+			cur_inscriptin_number++
 			continue
 		case "text/plain;charset=utf-8":
 		default:
-			common.Log.Infof("default skip %s: %s", inscription_0230.ContentType, inscription_0230.ID)
+			common.Log.Infof("default skip %s: %s", lastOrdVersionServiceInscription.ContentType, lastOrdVersionServiceInscription.ID)
 		}
 
-		_, brc, err := getBrcContent(url_0_23_0, inscription_0230.ID)
+		_, brc, err := getBrcContent(lastOrdUrl, lastOrdVersionServiceInscription.ID)
 		if err == err_parse_brc20 {
-			inscriptionNum++
+			cur_inscriptin_number++
 			continue
 		} else if err != nil {
 			return err
 		}
 
-		inscription_09, err := getInscription(url_0_9, inscription_0230.ID)
+		oldVersionOrdServiceInscription, err := getInscription(oldOrdUrl, lastOrdVersionServiceInscription.ID)
 		if err != nil {
 			format := "not find in 09, id:%s，num:%d, tick:%s, op:%s"
-			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, brc.Ticker, brc.Op)
-			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
+			printStr := fmt.Sprintf(format, lastOrdVersionServiceInscription.ID, lastOrdVersionServiceInscription.Number, brc.Ticker, brc.Op)
+			_, err = brc20CurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
 			}
-			inscriptionNum++
+			cur_inscriptin_number++
 			common.Log.Infof(printStr)
 			continue
 		}
 
 		format := "id:%s，num:%d, 09Num:%d, brc:%s"
-		printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_09.Number, brc.Ticker)
+		printStr := fmt.Sprintf(format, lastOrdVersionServiceInscription.ID, lastOrdVersionServiceInscription.Number, oldVersionOrdServiceInscription.Number, brc.Ticker)
 		common.Log.Infof(printStr)
 
-		if inscription_09.Number < 0 {
+		if oldVersionOrdServiceInscription.Number < 0 {
 			format := "curse, id:%s，num:%d, address:%s, 09Num:%d, tick:%s, op:%s"
-			printStr := fmt.Sprintf(format, inscription_0230.ID, inscription_0230.Number, inscription_0230.Address, inscription_09.Number, brc.Ticker, brc.Op)
-			_, err = brcDiffCurseFile.Write([]byte(printStr + "\n"))
+			printStr := fmt.Sprintf(format, lastOrdVersionServiceInscription.ID, lastOrdVersionServiceInscription.Number, lastOrdVersionServiceInscription.Address, oldVersionOrdServiceInscription.Number, brc.Ticker, brc.Op)
+			_, err = brc20CurseFile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
 			}
-			inscriptionNum++
+			cur_inscriptin_number++
 			continue
 		}
-		inscriptionNum++
+		cur_inscriptin_number++
 
 	}
 

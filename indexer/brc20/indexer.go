@@ -404,7 +404,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		specialTickers[0] = nil
 	}
 
-	if checkHeight <= height {
+	if checkHeight == height {
 		for _, specialTicker := range specialTickers {
 			if specialTicker == nil {
 				continue
