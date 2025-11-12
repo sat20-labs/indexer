@@ -296,22 +296,16 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 	transferNft, ok := s.transferNftMap[utxoId]
 	if ok {
 		return &common.BRC20TransferInfo{
-			NftId: transferNft.TransferNft.NftId,
-			Name: transferNft.Ticker,
-			Amt: transferNft.TransferNft.Amount.Clone(),
+			NftId:   transferNft.TransferNft.NftId,
+			Name:    transferNft.Ticker,
+			Amt:     transferNft.TransferNft.Amount.Clone(),
 			Invalid: transferNft.TransferNft.IsInvalid,
 		}
 	}
 
 	// 检查是否可能是mint的结果
-	utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-	// common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
-
 	nfts := s.nftIndexer.GetNftsWithUtxo(utxoId)
 	for _, nft := range nfts {
-		if s.nftIndexer.GetBaseIndexer().IsMainnet() && s.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
-			continue
-		}
 		txid, index, err := common.ParseOrdInscriptionID(nft.Base.InscriptionId)
 		if err != nil {
 			continue
@@ -320,6 +314,18 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 			continue
 		}
 
+		switch string(nft.Base.ContentType) {
+		case "application/json":
+			fallthrough
+		case "text/plain;charset=utf-8":
+			fallthrough
+		case "text/plain":
+		default:
+			continue
+		}
+		if s.nftIndexer.GetBaseIndexer().IsMainnet() && s.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
+			continue
+		}
 		content := common.ParseBBRC20AmtContent(string(nft.Base.Content))
 		if content == nil {
 			continue
@@ -328,6 +334,8 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 		switch content.Op {
 		case "mint":
 			// 对于mint的结果，只有在mint的输出还没有被使用时，才返回资产数据，否则就当作一个完全的白聪
+			utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
+			// common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
 			if !strings.Contains(utxo, txid) {
 				continue
 			}
@@ -355,7 +363,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 				}
 				return
 			}
-		
+
 		}
 	}
 
