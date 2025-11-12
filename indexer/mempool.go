@@ -760,8 +760,6 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
                             return nil, nil, err
                         }
                     }
-                    // TODO 如果是brc20的transfer指令，而且该指令的铸造结果还没确认，这里无法构造出对应的资产数据
-                    // 需要由brc20模块，提供接口，检查某个tx是否有mint和transfer的铸造，是否能通过参数检查，然后给出资产数据
                     _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
                     if err != nil {
                         common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
@@ -1073,6 +1071,13 @@ func (p *MiniMemPool) processInscription(tx *wire.MsgTx, i int,
                 if transferInfo == nil {
                     continue
                 }
+
+                switch string(insc[common.FIELD_CONTENT_TYPE]) {
+                case "application/json", "text/plain", "text/plain;charset=utf-8":
+                    // valid
+                default:
+                    continue
+                }
                 
                 assetName := common.AssetName{
                     Protocol: common.PROTOCOL_NAME_BRC20,
@@ -1094,7 +1099,7 @@ func (p *MiniMemPool) processInscription(tx *wire.MsgTx, i int,
 
                 asset := common.AssetInfo{
                     Name:       assetName,
-                    Amount:     *dAmt.Clone(),
+                    Amount:     *dAmt,
                     BindingSat: 0,
                 }
                 // 假定有效，在最后再做检查

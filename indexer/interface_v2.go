@@ -244,6 +244,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 
 	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
 	for _, output := range unconfirmedSpents {
+		// 去除已经广播的transfer数据
 		if len(output.Assets) == 0 {
 			continue
 		}
