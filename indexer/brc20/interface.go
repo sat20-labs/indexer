@@ -324,7 +324,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 							NftId:   nft.Base.Id,
 							Name:    content.Ticker,
 							Amt:     v.Amt.Clone(),
-							Invalid: false,
+							Invalid: true,
 						}
 						return
 					}
@@ -336,7 +336,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 					NftId:   nft.Base.Id,
 					Name:    content.Ticker,
 					Amt:     mint.Amt.Clone(),
-					Invalid: false,
+					Invalid: true,
 				}
 				return
 			}
@@ -375,7 +375,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 							NftId:   nft.Base.Id,
 							Name:    action.Ticker,
 							Amt:     action.Amount.Clone(),
-							Invalid: true,
+							Invalid: false,
 						}
 						// switch action.Action {
 						// case Action_InScribe_Transfer:
@@ -408,7 +408,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 					NftId:   nft.Base.Id,
 					Name:    result.Ticker,
 					Amt:     amt,
-					Invalid: true,
+					Invalid: false,
 				}
 			}
 			return
