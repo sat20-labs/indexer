@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
@@ -293,7 +292,19 @@ func (s *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferInfo) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	// utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
+
+	transferNft, ok := s.transferNftMap[utxoId]
+	if ok {
+		return &common.BRC20TransferInfo{
+			NftId: transferNft.TransferNft.NftId,
+			Name: transferNft.Ticker,
+			Amt: transferNft.TransferNft.Amount.Clone(),
+			Invalid: transferNft.TransferNft.IsInvalid,
+		}
+	}
+
+	// 检查是否可能是mint的结果
+	utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
 	// common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
 
 	nfts := s.nftIndexer.GetNftsWithUtxo(utxoId)
@@ -316,6 +327,10 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 		tickerName := strings.ToLower(content.Ticker)
 		switch content.Op {
 		case "mint":
+			// 对于mint的结果，只有在mint的输出还没有被使用时，才返回资产数据，否则就当作一个完全的白聪
+			if !strings.Contains(utxo, txid) {
+				continue
+			}
 			ticker := s.tickerMap[tickerName]
 			if ticker != nil {
 				for _, v := range ticker.MintAdded {
@@ -340,78 +355,7 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 				}
 				return
 			}
-		case "transfer":
-			inscription := s.nftIndexer.GetNftWithInscriptionId(nft.Base.InscriptionId)
-			if inscription == nil {
-				common.Log.Warnf("inscription not found: %s", nft.Base.InscriptionId)
-				continue
-			}
-			outputUtxo := base_indexer.ShareBaseIndexer.GetUtxoById(inscription.UtxoId)
-			geniousUtxo := txid + ":0"
-			if geniousUtxo == outputUtxo {
-				holder := s.holderMap[nft.OwnerAddressId]
-				if holder == nil {
-					continue
-				}
-				ticker := holder.Tickers[tickerName]
-				if ticker == nil {
-					continue
-				}
-				transferNft := ticker.TransferableData[nft.UtxoId]
-				if transferNft == nil {
-					continue
-				}
-				ret = &common.BRC20TransferInfo{
-					NftId:   nft.Base.Id,
-					Name:    content.Ticker,
-					Amt:     transferNft.Amount.Clone(),
-					Invalid: false, // transferNft.IsInvalid,
-				}
-				return
-			} else {
-				for _, action := range s.holderActionList {
-					if tickerName == strings.ToLower(action.Ticker) && nft.UtxoId == action.UtxoId {
-						ret = &common.BRC20TransferInfo{
-							NftId:   nft.Base.Id,
-							Name:    action.Ticker,
-							Amt:     action.Amount.Clone(),
-							Invalid: false,
-						}
-						// switch action.Action {
-						// case Action_InScribe_Transfer:
-						// 	ret.Invalid = false
-						// case Action_Transfer:
-						// 	ret.Invalid = true
-						// default:
-						// 	common.Log.Warnf("action is err")
-						// 	continue
-						// }
-						return
-					}
-				}
-
-				key := GetTransferHistoryKey(tickerName, nft.UtxoId)
-				var result common.BRC20TransferHistory
-				err = db.GetValueFromDB([]byte(key), &result, s.db)
-				if err != nil {
-					continue
-				}
-				ticker := s.GetTicker(result.Ticker)
-				if ticker == nil {
-					continue
-				}
-				amt, err := common.NewDecimalFromString(result.Amount, int(ticker.Decimal))
-				if err != nil {
-					continue
-				}
-				ret = &common.BRC20TransferInfo{
-					NftId:   nft.Base.Id,
-					Name:    result.Ticker,
-					Amt:     amt,
-					Invalid: false,
-				}
-			}
-			return
+		
 		}
 	}
 
