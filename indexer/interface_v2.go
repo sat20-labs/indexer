@@ -253,6 +253,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 			amt := output.GetAsset(&tickName)
 			if amt.Sign() != 0 {
 				d := common.DecimalSub(v, amt)
+				if d.Sign() < 0 {
+					d.SetValue(0)
+				}
 				v.Value = d.Value // 不修改指针v
 			}
 		}
