@@ -748,7 +748,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
                     preTxId := txIn.PreviousOutPoint.Hash.String()
                     preTx := p.txMap[preTxId]
                     if preTx == nil {
-                        common.Log.Infof("rebuildTxOutput GetTx %s failed", preTxId)
+                        common.Log.Debugf("rebuildTxOutput GetTx %s failed", preTxId)
                         txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
                         if err != nil {
                             common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)

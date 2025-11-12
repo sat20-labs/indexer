@@ -419,6 +419,10 @@ func (p *TxOutput) Append(another *TxOutput) error {
 // 按照offset将TxOut分割为两个，是Append的反操作
 func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 
+	if p == nil {
+		return nil, nil, fmt.Errorf("TxOutput is nil")
+	}
+
 	if p.Value() < offset {
 		return nil, nil, fmt.Errorf("offset too large")
 	}
