@@ -828,7 +828,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
             // 检查有效性
             addr, err := common.PkScriptToAddr(txOut.PkScript, instance.GetChainParam())
             if err != nil {
-                common.Log.Errorf("rebuildTxOutput PkScriptToAddr failed, %v", err)
+                common.Log.Errorf("rebuildTxOutput PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
                 return nil, nil, err
             }
             addrId := instance.GetAddressId(addr) // 有可能是全新的地址

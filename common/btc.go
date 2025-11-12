@@ -310,9 +310,10 @@ func IsOpReturn(pkScript []byte) bool {
 	if len(pkScript) == 1 {
 		return true
 	}
-	if len(pkScript) > txscript.MaxDataCarrierSize {
-		return false
-	}
+	// 新版本已经放宽
+	// if len(pkScript) > txscript.MaxDataCarrierSize {
+	// 	return false
+	// }
 
 	return true
 }
