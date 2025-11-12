@@ -269,7 +269,14 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 }
 
 func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
-	s.transferNftMap[nft.UtxoId] = nft
+	curr, ok := s.transferNftMap[nft.UtxoId]
+	if ok {
+		// 多个transfer输出到同一个utxo，这个时候只修改amt
+		curr.TransferNft.Amount = *curr.TransferNft.Amount.Add(&nft.TransferNft.Amount)
+	} else {
+		curr = nft
+		s.transferNftMap[nft.UtxoId] = nft
+	}
 
 	holder, ok := s.holderMap[nft.AddressId]
 	if !ok {
@@ -283,14 +290,14 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
 	if ok {
-		tickAbbrInfo.TransferableData[nft.UtxoId] = nft.TransferNft
+		tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
 	}
 }
 
 func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := common.GetUtxoId(output)
-	ids := s.nftIndexer.GetNftsWithUtxo(utxoId)
+	ids := s.nftIndexer.GetNftsWithUtxo(utxoId) // 有可能多个transfer nft，合并输出到一个output中
 	for _, nft := range ids {
 		transferNft, ok := (*inputTransferNfts)[nft.Base.Id]
 		if ok {

@@ -55,7 +55,7 @@ type TransferNftInfo struct {
 	AddressId   uint64 // 当前地址
 	UtxoId      uint64 // 当前utxo
 	Ticker      string
-	TransferNft *common.TransferNFT
+	TransferNft *common.TransferNFT  // 有可能多个transfer nft在转移时，输出到同一个utxo中，这个时候直接修改Amount
 }
 
 type BRC20Indexer struct {
