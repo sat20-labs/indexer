@@ -52,8 +52,8 @@ type HolderInfo struct {
 }
 
 type TransferNftInfo struct {
-	AddressId   uint64
-	Index       int
+	AddressId   uint64 // 当前地址
+	UtxoId      uint64 // 当前utxo
 	Ticker      string
 	TransferNft *common.TransferNFT
 }

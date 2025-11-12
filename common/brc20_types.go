@@ -138,7 +138,7 @@ type BRC20MintAbbrInfo struct {
 
 type TransferNFT struct {
 	NftId     int64
-	UtxoId    uint64
+	UtxoId    uint64 // 铸造时的utxoId
 	Amount    Decimal
 	IsInvalid bool
 }
