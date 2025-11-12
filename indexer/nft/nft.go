@@ -421,14 +421,15 @@ func (p *NftIndexer) getNftInBuffer2(inscriptionId string) *common.Nft {
 	return nil
 }
 
-func (p *NftIndexer) getNftInBuffer4(sat int64) *common.Nft {
+func (p *NftIndexer) getNftInBuffer4(sat int64) []*common.Nft {
+	result := make([]*common.Nft, 0)
 	for _, nft := range p.nftAdded {
 		if nft.Base.Sat == sat {
 			p.refreshNft(nft)
-			return nft
+			result = append(result, nft)
 		}
 	}
-	return nil
+	return result
 }
 
 // sat -> nfts

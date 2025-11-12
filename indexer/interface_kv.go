@@ -68,7 +68,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 			checkedPubKey[pkStr] = true
 		}
 
-		if len(value.Value) > 100*1024 {
+		if len(value.Value) > 200*1024 {
 			return fmt.Errorf("too large data %d", len(value.Value))
 		}
 
