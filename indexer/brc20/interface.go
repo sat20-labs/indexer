@@ -316,18 +316,17 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (ret *common.BRC20TransferIn
 		tickerName := strings.ToLower(content.Ticker)
 		switch content.Op {
 		case "mint":
-			for _, ticker := range s.tickerMap {
-				if strings.ToLower(ticker.Name) == tickerName {
-					for _, v := range ticker.MintAdded {
-						if v.Nft.Base.InscriptionId == nft.Base.InscriptionId {
-							ret = &common.BRC20TransferInfo{
-								NftId:   nft.Base.Id,
-								Name:    content.Ticker,
-								Amt:     v.Amt.Clone(),
-								Invalid: false,
-							}
-							return
+			ticker := s.tickerMap[tickerName]
+			if ticker != nil {
+				for _, v := range ticker.MintAdded {
+					if v.Nft.Base.InscriptionId == nft.Base.InscriptionId {
+						ret = &common.BRC20TransferInfo{
+							NftId:   nft.Base.Id,
+							Name:    content.Ticker,
+							Amt:     v.Amt.Clone(),
+							Invalid: false,
 						}
+						return
 					}
 				}
 			}
