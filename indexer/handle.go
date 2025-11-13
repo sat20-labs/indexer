@@ -446,7 +446,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(rngs []*common.Range, satpoint int,
 	// dec
 	if content.Decimal != "" {
 		dec, err := strconv.ParseUint(content.Decimal, 10, 64)
-		if err != nil || dec > common.MAX_PRECISION {
+		if err != nil || dec > 18 {
 			// dec invalid
 			common.Log.Warnf("deploy, but dec invalid. ticker: %s, dec: %s", content.Ticker, content.Decimal)
 			return nil

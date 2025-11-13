@@ -12,9 +12,7 @@ import (
 	"lukechampine.com/uint128"
 )
 
-const MAX_PRECISION = 18 // brc20
-
-var MAX_PRECISION_STRING = "18"
+const MAX_PRECISION = 64
 
 var precisionFactor [64]*big.Int = [64]*big.Int{
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(0), nil),
