@@ -48,6 +48,9 @@ func (b *IndexerMgr) containAsset(output *common.TxOutput, ticker *common.AssetN
 // TODO，需要将已经广播的但未确认的输入加上，才不会导致新的tx无法构造
 // return: utxoId->asset
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) ([]*common.AssetsInUtxo, error) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+	
 	//t1 := time.Now()
 	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {
@@ -102,6 +105,9 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 
 
 func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *common.TxOutput {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	//t1 := time.Now()
 	info, err := b.rpcService.GetUtxoInfo(utxo)
 	//common.Log.Infof("rpcService.GetUtxoInfo takes %v", time.Since(t1))
@@ -175,6 +181,9 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 }
 
 func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *common.AssetsInUtxo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	output := b.GetTxOutputWithUtxoV2(utxo, excludingInvalid)
 	if output == nil {
 		return nil
@@ -193,6 +202,9 @@ func genBTCTicker() *common.TickerInfo {
 }
 
 func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	var result *common.TickerInfo
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
@@ -214,6 +226,9 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 // 不包含未确认的输入，也不包含已经广播的但未确认的输出
 // TODO，需要将已经广播的但未确认的输入加上，才不会导致新的tx无法构造
 func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.TickerName]*common.Decimal {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {
 		return nil
@@ -303,6 +318,8 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 // return: mint info sorted by inscribed time
 func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 	tick *common.TickerName, start, limit int) ([]*common.MintInfo, int) {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	addressId := b.GetAddressId(address)
 
@@ -331,6 +348,9 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 
 // return: ticker -> asset info (inscriptinId -> asset ranges)
 func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*common.Decimal {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	result := make(map[common.TickerName]*common.Decimal)
 	ftAssets := b.ftIndexer.GetAssetsWithUtxoV2(utxoId)
 	if len(ftAssets) > 0 {
@@ -388,6 +408,9 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 // FT
 // return: ticker's name -> ticker info
 func (b *IndexerMgr) GetTickerMapV2(protocol string) map[string]*common.TickerInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	switch protocol {
 	case common.PROTOCOL_NAME_ORDX:
 		return b.GetOrdxTickerMapV2()
@@ -401,6 +424,9 @@ func (b *IndexerMgr) GetTickerMapV2(protocol string) map[string]*common.TickerIn
 
 // return: addressId -> asset amount
 func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName) map[uint64]*common.Decimal {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	result := make(map[uint64]*common.Decimal)
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
@@ -419,6 +445,9 @@ func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName) map[uin
 
 // return: asset amount, mint times
 func (b *IndexerMgr) GetMintAmountV2(tickerName *common.TickerName) (*common.Decimal, int64) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
 		amt, times := b.ftIndexer.GetMintAmount(tickerName.Ticker)
@@ -434,6 +463,9 @@ func (b *IndexerMgr) GetMintAmountV2(tickerName *common.TickerName) (*common.Dec
 // return:  mint info sorted by inscribed time
 func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 	limit int) []*common.MintInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	result := make([]*common.MintInfo, 0)
 	switch tickerName.Protocol {
 	case common.PROTOCOL_NAME_ORDX:
@@ -491,6 +523,8 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 
 
 func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	if tickerName.Type != common.ASSET_TYPE_FT {
 		return fmt.Errorf("invalid asset type")
@@ -525,6 +559,8 @@ func (b *IndexerMgr) IsUtxoSpent(utxo string) bool {
 
 // 某个用户将某个utxo中的所有铭文都解锁，不再生效，这个操作在该索引器中永久生效，但数据没上链
 func (b *IndexerMgr) UnlockOrdinals(utxos []string, pubkey, sig []byte) (map[string]error, error) {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	jsonBytes, err := json.Marshal(utxos)
 	if err != nil {
@@ -575,6 +611,9 @@ func (b *IndexerMgr) UnlockOrdinals(utxos []string, pubkey, sig []byte) (map[str
 
 // 获取哪些因为存在铭文而被锁定的utxo
 func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsInUtxo, error) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	//t1 := time.Now()
 	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {

@@ -25,6 +25,9 @@ func getRegisterKey(pubkey string) string {
 }
 
 func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	// TODO 以后可以配置增加更多的pubkey，或者注册的地址
 	pkStr := hex.EncodeToString(pubkey)
 	if pkStr == common.GetBootstrapPubKey() && pkStr == common.GetCoreNodePubKey() {
@@ -52,6 +55,8 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 
 // TODO 每个地址限制多少条记录，每条记录限制多大？
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Close()
@@ -107,6 +112,8 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 }
 
 func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Close()
@@ -133,6 +140,8 @@ func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
 }
 
 func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error) {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	pkStr := hex.EncodeToString(pubkey)
 	result := make([]*common.KeyValue, 0)
@@ -163,6 +172,8 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 // 为矿机提供L1索引服务，返回本地公钥，以便矿机生成挖矿地址
 // 默认以引导节点为服务节点，如果不是，需要修改索引器配置
 func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
+	b.rpcEnter()
+	defer b.rpcLeft()
 
 	// TODO
 	// 暂时保留该pubkey，但是如果在一定时间内没有挖矿所得进入该地址，就可能删除

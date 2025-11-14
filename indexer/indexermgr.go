@@ -3,6 +3,7 @@ package indexer
 import (
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -33,6 +34,8 @@ type IndexerMgr struct {
 	// data from market
 	localDB common.KVDB
 	kvDB    common.KVDB
+	reloading bool
+	rpcInProcess int32
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -355,12 +358,33 @@ func (b *IndexerMgr) forceUpdateDB() {
 }
 
 func (b *IndexerMgr) handleReorg(height int) {
+	// 需要等rpc都完成，再重新启动
+	b.reloading = true
+	for atomic.LoadInt32(&b.rpcInProcess) > 0 {
+		time.Sleep(10*time.Millisecond)
+	}
+	defer func() {
+		b.reloading = false
+	}()
+
 	b.miniMempool.Stop()
 	b.closeDB()
 	b.Init() // 数据库重新打开
 	b.miniMempool.ProcessReorg()
 	b.compiling.SetReorgHeight(height)
+
 	common.Log.Infof("IndexerMgr handleReorg completed.")
+}
+
+func (b *IndexerMgr) rpcEnter() {
+	for b.reloading {
+		time.Sleep(10*time.Microsecond)
+	}
+	atomic.AddInt32(&b.rpcInProcess, 1)
+}
+
+func (b *IndexerMgr) rpcLeft() {
+	atomic.AddInt32(&b.rpcInProcess, -1)
 }
 
 // 为了回滚数据，我们采用这样的策略：
