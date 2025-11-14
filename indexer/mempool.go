@@ -832,6 +832,8 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
                 return nil, nil, err
             }
             addrId := instance.GetAddressId(addr) // 有可能是全新的地址
+            // TODO 在rpc模块中暂时生成一个新的地址和id，用于处理mint和transfer结果
+            // 目前我们的使用场景，不会存在mint还没确认，就直接transfer的情况，可以不处理这种情况，地址没有就当作invalid
             
             deleteAsset := make(map[string]*common.AssetInfo)
             for _, asset := range curr.Assets {
@@ -844,7 +846,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
                     case 2: // inscribe-transfer
                         holderInfo := instance.brc20Indexer.GetHolderAbbrInfo(addrId, asset.Name.Ticker)
                         if holderInfo == nil {
-                            // 找不到，那这个transfer就无效
+                            // 找不到，很可能这个transfer无效（只有在前面该地址做了mint，并且该mint还没confirmed，才有可能有效）
                             invalid = true
                         } else {
                             if asset.Amount.Cmp(holderInfo.AvailableBalance) > 0 {
