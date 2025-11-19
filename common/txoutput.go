@@ -643,7 +643,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 }
 
 
-// 根据value或者amt切分
+// 将output中的某一类资产完全清除
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) RemoveAsset(name *AssetName) {
 	if name == nil || *name == ASSET_PLAIN_SAT {
@@ -668,6 +668,57 @@ func (p *TxOutput) RemoveAsset(name *AssetName) {
 		}
 	}
 	delete(p.Offsets, *name)
+}
+
+
+// 将output中的某一类资产减去对应数量，只适合非绑定聪的资产
+func (p *TxOutput) RemoveAssetWithAmt(name *AssetName, amt *Decimal) (*Decimal, error) {
+	if name == nil || *name == ASSET_PLAIN_SAT {
+		return amt, fmt.Errorf("not support")
+	}
+
+	if len(p.Assets) == 0 {
+		return amt, nil
+	}
+
+	asset, err := p.Assets.Find(name)
+	if err != nil {
+		return amt, nil
+	}
+	if asset.BindingSat > 0 {
+		return amt, fmt.Errorf("not support binding sat asset")
+	}
+
+	removedAsset := &AssetInfo{
+		Name: *name,
+		Amount: *amt,
+		BindingSat: asset.BindingSat,
+	}
+	
+	if asset.Amount.Cmp(amt) <= 0 {
+		p.RemoveAsset(name)
+		return amt.Sub(&asset.Amount), nil
+	}
+
+	p.Assets.Subtract(removedAsset)
+	// 仅适用于brc20
+	offsets, ok := p.Offsets[*name]
+	if ok {
+		for i, offset := range offsets {
+			existing, ok := p.SatBindingMap[offset.Start]
+			if ok {
+				if existing.Amount.Cmp(amt) <= 0 {
+					delete(p.SatBindingMap, offset.Start)
+					offsets = RemoveIndex(offsets, i)
+					p.Offsets[*name] = offsets
+				} else {
+					existing.Amount = *existing.Amount.Sub(amt)
+				}
+			}
+		}
+	}
+
+	return nil, nil
 }
 
 // 只用于计算ordx资产的偏移，其他资产直接返回0
