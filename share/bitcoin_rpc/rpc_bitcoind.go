@@ -54,17 +54,22 @@ func (p *BitcoindRPC) TestTx(signedTxs []string) ([]bitcoind.TransactionTestResu
 
 	for i, r := range resp {
 		if !r.Allowed {
+			accept := false
 			if common.IsValidTx(r.RejectReason) {
 				common.Log.Infof("TestMempoolAccept %s has broadcasted. %s", r.TxId, r.RejectReason)
-				tx, err := DecodeMsgTx(signedTxs[i])
-				if err != nil {
-					common.Log.Errorf("DecodeMsgTx failed, %v", err)
-					continue
-				}
 				// 修改结果
-				r.TxId = tx.TxID()
-				r.Allowed = true
-				r.RejectReason = ""
+				accept = true
+			} else {
+				// 看看是否可以获取到该tx
+				_, err := p.GetRawTx(r.TxId)
+				if err == nil {
+					accept = true
+				}
+			}
+			if accept {
+				// 修改结果
+				resp[i].Allowed = true
+				resp[i].RejectReason = ""
 			}
 		}
 	}
@@ -90,13 +95,17 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 func (p *BitcoindRPC) SendTx(signedTxHex string) (string, error) {
 	txId, err := p.bitcoind.SendRawTransaction(signedTxHex, 0)
 	if err != nil {
-		if common.IsValidTx(err.Error()) {
-			tx, err := DecodeMsgTx(signedTxHex)
-			if err != nil {
-				common.Log.Errorf("DecodeMsgTx failed, %v", err)
-				return "", err
+		tx, err2 := DecodeMsgTx(signedTxHex)
+		if err2 == nil {
+			txId = tx.TxID()
+			if common.IsValidTx(err.Error()) {
+				return txId, nil
+			} else {
+				_, err2 := p.GetRawTx(txId)
+				if err2 == nil {
+					return txId, nil
+				}
 			}
-			return tx.TxID(), nil
 		}
 	}
 	return txId, err

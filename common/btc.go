@@ -322,7 +322,10 @@ func IsValidTx(err string) bool {
 	if strings.Contains(err, "transaction already exists in blockchain") ||
 	strings.Contains(err, "database contains entry for spent tx output") ||
 	strings.Contains(err, "already have transaction in mempool") || 
-	strings.Contains(err, "Transaction outputs already in utxo set") {
+	strings.Contains(err, "Transaction outputs already in utxo set") || 
+	strings.Contains(err, "txn-already-known") || 
+	strings.Contains(err, "Transaction already in block chain") ||
+	strings.Contains(err, "already have transaction") {
 		return true
 	}
 	return false
