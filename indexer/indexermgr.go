@@ -13,7 +13,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/ft"
-	"github.com/sat20-labs/indexer/indexer/mpn"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/runes"
@@ -34,8 +33,11 @@ type IndexerMgr struct {
 	// data from market
 	localDB common.KVDB
 	kvDB    common.KVDB
-	reloading bool
-	rpcInProcess int32
+
+	// 保护这两个数据
+	reloading 	 int32
+	rpcProcessing int32
+
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -44,7 +46,7 @@ type IndexerMgr struct {
 	maxIndexHeight  int
 	periodFlushToDB int
 
-	mpn         *mpn.MemPoolNode
+	//mpn         *mpn.MemPoolNode
 	miniMempool *MiniMemPool
 
 	brc20Indexer *brc20.BRC20Indexer
@@ -53,10 +55,9 @@ type IndexerMgr struct {
 	ftIndexer    *ft.FTIndexer
 	ns           *ns.NameService
 	nft          *nft.NftIndexer
-	clmap        map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
-	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
+	
 
-	mutex sync.RWMutex
+	
 	// 跑数据
 	lastCheckHeight int
 	compiling       *base_indexer.BaseIndexer
@@ -69,11 +70,16 @@ type IndexerMgr struct {
 	nsBackupDB        *ns.NameService
 	nftBackupDB       *nft.NftIndexer
 
+	/////////////////////////////////
+	mutex sync.RWMutex // 保护下面的数据
+	clmap        map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
+	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
 	// 本地缓存，在区块更新时清空
 	addressToNftMap  map[string][]*common.Nft
 	addressToNameMap map[string][]*common.Nft
+	/////////////////////////////////
 }
 
 var instance *IndexerMgr
@@ -358,15 +364,17 @@ func (b *IndexerMgr) forceUpdateDB() {
 }
 
 func (b *IndexerMgr) handleReorg(height int) {
+	common.Log.Infof("IndexerMgr handleReorg enter...")
 	// 需要等rpc都完成，再重新启动
-	b.reloading = true
-	for atomic.LoadInt32(&b.rpcInProcess) > 0 {
+	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
 		time.Sleep(10*time.Millisecond)
 	}
+	atomic.AddInt32(&b.reloading, 1)
 	defer func() {
-		b.reloading = false
+		atomic.AddInt32(&b.reloading, -1)
 	}()
 
+	// 要确保下面的调用，没有rpc的调用
 	b.miniMempool.Stop()
 	b.closeDB()
 	b.Init() // 数据库重新打开
@@ -377,14 +385,14 @@ func (b *IndexerMgr) handleReorg(height int) {
 }
 
 func (b *IndexerMgr) rpcEnter() {
-	for b.reloading {
+	for atomic.LoadInt32(&b.reloading) > 0 {
 		time.Sleep(10*time.Microsecond)
 	}
-	atomic.AddInt32(&b.rpcInProcess, 1)
+	atomic.AddInt32(&b.rpcProcessing, 1)
 }
 
 func (b *IndexerMgr) rpcLeft() {
-	atomic.AddInt32(&b.rpcInProcess, -1)
+	atomic.AddInt32(&b.rpcProcessing, -1)
 }
 
 // 为了回滚数据，我们采用这样的策略：

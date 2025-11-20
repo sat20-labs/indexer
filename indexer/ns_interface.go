@@ -12,6 +12,9 @@ func (b *IndexerMgr) GetNSStatus() *common.NameServiceStatus {
 }
 
 func (b *IndexerMgr) getNameInfoWithRegInfo(reg *ns.NameRegister) *common.NameInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	address := b.GetAddressById(reg.Nft.OwnerAddressId)
 	utxo := b.GetUtxoById(reg.Nft.UtxoId)
 	kvs := make(map[string]*common.KeyValueInDB)
@@ -33,6 +36,9 @@ func (b *IndexerMgr) getNameInfoWithRegInfo(reg *ns.NameRegister) *common.NameIn
 }
 
 func (b *IndexerMgr) GetNameInfo(name string) *common.NameInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	reg := b.ns.GetNameRegisterInfo(name)
 	if reg == nil {
 		common.Log.Errorf("GetNameRegisterInfo %s failed", name)
@@ -43,10 +49,16 @@ func (b *IndexerMgr) GetNameInfo(name string) *common.NameInfo {
 }
 
 func (b *IndexerMgr) IsNameExist(name string) bool {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	return b.ns.IsNameExist(name)
 }
 
 func (b *IndexerMgr) GetNameWithInscriptionId(id string) *common.NameInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	reg := b.ns.GetNameRegisterInfoWithInscriptionId(id)
 	if reg == nil {
 		common.Log.Errorf("GetNameWithInscriptionId %s failed", id)
@@ -74,10 +86,16 @@ func (b *IndexerMgr) GetNameWithInscriptionId(id string) *common.NameInfo {
 }
 
 func (b *IndexerMgr) GetNamesWithUtxo(utxoId uint64) []string {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	return b.ns.GetNamesWithUtxo2(utxoId)
 }
 
 func (b *IndexerMgr) GetNames(start, limit int) []string {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	return b.ns.GetNames(start, limit)
 }
 
@@ -117,6 +135,9 @@ func (b *IndexerMgr) initAddressToNameMap(address string) []*common.Nft {
 }
 
 func (b *IndexerMgr) GetNamesWithAddress(address string, start, limit int) ([]*common.NameInfo, int) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	nfts := b.getNamesWithAddressInBuffer(address)
 	total := len(nfts)
 	if start >= total {
@@ -140,6 +161,9 @@ func (b *IndexerMgr) GetNamesWithAddress(address string, start, limit int) ([]*c
 }
 
 func (b *IndexerMgr) GetNameAmountWithAddress(address string) int {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	inscrptions := b.getNamesWithAddressInBuffer(address)
 	return len(inscrptions)
 }
@@ -157,6 +181,9 @@ func getSubName(name string) (string, string) {
 }
 
 func (b *IndexerMgr) GetSubNamesWithAddress(address, sub string, start, limit int) ([]*common.NameInfo, int) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	nfts := b.getNamesWithAddressInBuffer(address)
 
 	subSet := make([]*common.Nft, 0)
@@ -190,6 +217,9 @@ func (b *IndexerMgr) GetSubNamesWithAddress(address, sub string, start, limit in
 }
 
 func (b *IndexerMgr) GetSubNamesWithFilters(address, sub, filters string, start, limit int) ([]*common.NameInfo, int) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	nfts := b.getNamesWithAddressInBuffer(address)
 
 	filterv := strings.Split(filters, "+")
@@ -226,6 +256,9 @@ func (b *IndexerMgr) GetSubNamesWithFilters(address, sub, filters string, start,
 
 
 func (b *IndexerMgr) GetNamesWithKey(address, key string, start, limit int) ([]*common.NameInfo, int) {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	nfts := b.getNamesWithAddressInBuffer(address)
 
 	subSet := make([]*common.NameInfo, 0)
@@ -257,6 +290,9 @@ func (b *IndexerMgr) GetNamesWithKey(address, key string, start, limit int) ([]*
 }
 
 func (b *IndexerMgr) GetSubNameAmountWithAddress(address, sub string) int {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	nfts := b.getNamesWithAddressInBuffer(address)
 
 	subSet := make([]*common.Nft, 0)
@@ -271,6 +307,9 @@ func (b *IndexerMgr) GetSubNameAmountWithAddress(address, sub string) int {
 }
 
 func (b *IndexerMgr) GetSubNameSummaryWithAddress(address string) map[string]int64 {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	return b.getSubNameSummaryWithAddress(address, nil)
 }
 
@@ -290,6 +329,9 @@ func (b *IndexerMgr) getSubNameSummaryWithAddress(address string, unconfirmedSpe
 }
 
 func (b *IndexerMgr) GetNamesWithSat(sat int64) []*common.NameInfo {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	result := make([]*common.NameInfo, 0)
 
 	names := b.ns.GetNameRegisterInfoWithSat(sat)
@@ -304,6 +346,9 @@ func (b *IndexerMgr) GetNamesWithSat(sat int64) []*common.NameInfo {
 }
 
 func (b *IndexerMgr) HasNameInUtxo(utxoId uint64) bool {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
 	return b.ns.HasNamesInUtxo(utxoId)
 }
 
@@ -331,6 +376,9 @@ func (b *IndexerMgr) getNamesWithRanges(ranges []*common.Range) map[string][]*co
 }
 
 func (p *IndexerMgr) GetNameHistory(start int, limit int) []*common.MintAbbrInfo {
+	p.rpcEnter()
+	defer p.rpcLeft()
+
 	result := make([]*common.MintAbbrInfo, 0)
 	names := p.ns.GetNames(start, limit)
 	for _, name := range names {
@@ -344,6 +392,8 @@ func (p *IndexerMgr) GetNameHistory(start int, limit int) []*common.MintAbbrInfo
 }
 
 func (p *IndexerMgr) GetNameHistoryWithAddress(addressId uint64, start int, limit int) ([]*common.MintAbbrInfo, int) {
+	p.rpcEnter()
+	defer p.rpcLeft()
 	result := make([]*common.MintAbbrInfo, 0)
 	nfts, total := p.ns.GetNamesWithInscriptionAddress(addressId, start, limit)
 	for _, nft := range nfts {
