@@ -475,6 +475,9 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 				satmap1 := make(map[int64]*AssetInfo)
 				satmap2 := make(map[int64]*AssetInfo)
 				for k, v := range p.SatBindingMap {
+					if v.Name.String() != asset.Name.String() {
+						continue
+					}
 					if k < offset {
 						satmap1[k] = v.Clone()
 					} else {
@@ -494,7 +497,6 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 					}
 					part1.Assets.Add(&asset)
 					part1.Offsets[asset.Name] = offset1
-					part1.SatBindingMap = satmap1
 				}
 
 				if len(satmap2) > 0 {
@@ -509,13 +511,24 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 					}
 					part2.Assets.Add(&asset)
 					part2.Offsets[asset.Name] = offset2
-					part2.SatBindingMap = satmap2
 				}
 			} else {
 				part1.Assets.Add(&asset) // runes
 			}
 		}
 	}
+
+	satmap1 := make(map[int64]*AssetInfo)
+	satmap2 := make(map[int64]*AssetInfo)
+	for k, v := range p.SatBindingMap {
+		if k < offset {
+			satmap1[k] = v.Clone()
+		} else {
+			satmap2[k-offset] = v.Clone()
+		}
+	}
+	part1.SatBindingMap = satmap1
+	part2.SatBindingMap = satmap2
 
 	return part1, part2, nil
 }
