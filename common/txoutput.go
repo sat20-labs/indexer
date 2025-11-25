@@ -304,7 +304,7 @@ func (p *TxOutput) Value() int64 {
 }
 
 func (p *TxOutput) Zero() bool {
-	return p.OutValue.Value == 0 && len(p.Assets) == 0
+	return p == nil || (p.OutValue.Value == 0 && len(p.Assets) == 0)
 }
 
 func (p *TxOutput) HasPlainSat() bool {
@@ -518,17 +518,19 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 		}
 	}
 
-	satmap1 := make(map[int64]*AssetInfo)
-	satmap2 := make(map[int64]*AssetInfo)
-	for k, v := range p.SatBindingMap {
-		if k < offset {
-			satmap1[k] = v.Clone()
-		} else {
-			satmap2[k-offset] = v.Clone()
+	if len(p.SatBindingMap) > 0 {
+		satmap1 := make(map[int64]*AssetInfo)
+		satmap2 := make(map[int64]*AssetInfo)
+		for k, v := range p.SatBindingMap {
+			if k < offset {
+				satmap1[k] = v.Clone()
+			} else {
+				satmap2[k-offset] = v.Clone()
+			}
 		}
+		part1.SatBindingMap = satmap1
+		part2.SatBindingMap = satmap2
 	}
-	part1.SatBindingMap = satmap1
-	part2.SatBindingMap = satmap2
 
 	return part1, part2, nil
 }
