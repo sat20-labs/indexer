@@ -37,7 +37,7 @@ func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, er
 
 func parseTxVoutScriptAddress(transaction *common.Transaction, voutIndex int, param chaincfg.Params) (address runestone.Address, err error) {
 	output := transaction.Outputs[voutIndex]
-	pkScript := output.Address.PkScript
+	pkScript := output.OutValue.PkScript
 	var addresses []btcutil.Address
 	var scyptClass txscript.ScriptClass
 	scyptClass, addresses, _, err = txscript.ExtractPkScriptAddrs(pkScript, &param)

@@ -154,8 +154,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					id = &edict.ID
 				}
 				balance := unallocated.Get(id)
-				if balance == nil || 
-				balance.Value.IsZero() { // 可能在上一个分配指令中就全部分配出去了 tx = 665f669d03dd4517c8ad2d1aac809a0c3b7878ae7b98bdb4842358fcbfac1849
+				if balance == nil ||
+					balance.Value.IsZero() { // 可能在上一个分配指令中就全部分配出去了 tx = 665f669d03dd4517c8ad2d1aac809a0c3b7878ae7b98bdb4842358fcbfac1849
 					continue
 				}
 
@@ -183,7 +183,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					// find non-OP_RETURN outputs
 					var destinations []uint32
 					for outputIndex, output := range tx.Outputs {
-						if output.Address.PkScript[0] != txscript.OP_RETURN {
+						if output.OutValue.PkScript[0] != txscript.OP_RETURN {
 							destinations = append(destinations, uint32(outputIndex))
 						}
 					}
@@ -257,7 +257,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		if pointer == nil {
 			for index, v := range tx.Outputs {
-				if v.Address.PkScript[0] != txscript.OP_RETURN {
+				if v.OutValue.PkScript[0] != txscript.OP_RETURN {
 					u32Index := uint32(index)
 					outIndex = &u32Index
 					find = true
@@ -273,7 +273,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if find {
 			for id, balance := range unallocated {
 				if balance.Value.Cmp(uint128.Zero) > 0 {
-					allocated[*outIndex].GetOrDefault(&id).AddAssign(balance) // 
+					allocated[*outIndex].GetOrDefault(&id).AddAssign(balance) //
 				}
 			}
 		} else {
@@ -307,7 +307,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			}
 		}
 		// increment burned balances
-		if tx.Outputs[vout].Address.PkScript[0] == txscript.OP_RETURN {
+		if tx.Outputs[vout].OutValue.PkScript[0] == txscript.OP_RETURN {
 			for id, balance := range balances {
 				burned.GetOrDefault(&id).AddAssign(balance)
 			}
@@ -373,7 +373,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		// 	RuneId:    runeBalance.RuneId,
 		// 	Balance:   runeBalance.Balance,
 		// }
-		
+
 		runeIdAddressToCountKey := &table.RuneIdAddressToCount{
 			RuneId:    runeBalance.RuneId,
 			AddressId: runeBalance.AddressId,
@@ -441,7 +441,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				s.runeIdToMintHistoryTbl.Insert(v)
 			}
 		} //else {
-			// burned
+		// burned
 		//}
 	}
 
@@ -564,12 +564,12 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 				key := &table.RuneIdAddressToBalance{RuneId: &val.RuneId, AddressId: oldValue.AddressId}
 				oldruneIdAddressToBalanceValue := s.runeIdAddressToBalanceTbl.Get(key)
 				if oldruneIdAddressToBalanceValue == nil {
-					common.Log.Panicf("address %s has missing rune %s in tx %s", input.Address.Addresses[0], val.RuneId.String(), tx.Txid)
+					common.Log.Panicf("address %s has missing rune %s in tx %s", hex.EncodeToString(input.OutValue.PkScript), val.RuneId.String(), tx.Txid)
 				}
 				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
 				if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
 					//amount = uint128.Zero
-					common.Log.Panicf("address %s has incorrect rune value in tx %s", input.Address.Addresses[0], tx.Txid)
+					common.Log.Panicf("address %s has incorrect rune value in tx %s", hex.EncodeToString(input.OutValue.PkScript), tx.Txid)
 				} else {
 					amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
 				}
@@ -579,7 +579,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 				} else {
 					s.runeIdAddressToBalanceTbl.Remove(oldruneIdAddressToBalanceValue)
 				}
-				
+
 			}
 		}
 
@@ -660,7 +660,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			var err error
 			var resp any
 			for {
-				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.Txid)
+				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.TxId)
 				if err == nil {
 					break
 				} else {

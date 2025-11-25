@@ -114,35 +114,6 @@ func (s *Service) findSatsInAddress(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// 不开放
-func (s *Service) findSat(c *gin.Context) {
-	resp := &wire.SpecificSatResp{
-		BaseResp: wire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	sat, err := strconv.ParseInt(c.Param("sat"), 10, 64)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	result, err := s.model.findSat(sat)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	resp.Data = []*wire.SpecificSat{result}
-	c.JSON(http.StatusOK, resp)
-}
-
 // @Summary Retrieves the supported attributes of a sat
 // @Description Retrieves the supported attributes of a sat
 // @Tags ordx

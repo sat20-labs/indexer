@@ -16,8 +16,8 @@ message InscribeBaseContent {
     bytes content_encoding = 9;
     string parent = 10;
     string delegate = 11;
-    int64 id = 12;
-    uint64 base_point = 13; // utxoId
+    int64 id = 12;          // nftId
+    uint64 base_point = 13; // genesis utxoId
     int64 sat = 14;
     int32 curse_type = 15;
     string typeName = 16;
@@ -29,5 +29,5 @@ message NftsInSat {
     uint64 owner_address_id = 2;
     uint64 utxo_id = 3;
     int64  offset = 4;
-    repeated int64 nfts = 5;
+    repeated int64 nfts = 5; // nftId
 }

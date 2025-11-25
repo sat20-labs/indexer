@@ -36,8 +36,8 @@ type InscribeBaseContent struct {
 	ContentEncoding    []byte `protobuf:"bytes,9,opt,name=content_encoding,json=contentEncoding,proto3" json:"content_encoding,omitempty"`
 	Parent             string `protobuf:"bytes,10,opt,name=parent,proto3" json:"parent,omitempty"`
 	Delegate           string `protobuf:"bytes,11,opt,name=delegate,proto3" json:"delegate,omitempty"`
-	Id                 int64  `protobuf:"varint,12,opt,name=id,proto3" json:"id,omitempty"`
-	BasePoint          uint64 `protobuf:"varint,13,opt,name=base_point,json=basePoint,proto3" json:"base_point,omitempty"` // utxoId
+	Id                 int64  `protobuf:"varint,12,opt,name=id,proto3" json:"id,omitempty"`                                // nftId
+	BasePoint          uint64 `protobuf:"varint,13,opt,name=base_point,json=basePoint,proto3" json:"base_point,omitempty"` // genesis utxoId
 	Sat                int64  `protobuf:"varint,14,opt,name=sat,proto3" json:"sat,omitempty"`
 	CurseType          int32  `protobuf:"varint,15,opt,name=curse_type,json=curseType,proto3" json:"curse_type,omitempty"`
 	TypeName           string `protobuf:"bytes,16,opt,name=typeName,proto3" json:"typeName,omitempty"`
@@ -204,7 +204,7 @@ type NftsInSat struct {
 	OwnerAddressId uint64  `protobuf:"varint,2,opt,name=owner_address_id,json=ownerAddressId,proto3" json:"owner_address_id,omitempty"`
 	UtxoId         uint64  `protobuf:"varint,3,opt,name=utxo_id,json=utxoId,proto3" json:"utxo_id,omitempty"`
 	Offset         int64   `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
-	Nfts           []int64 `protobuf:"varint,5,rep,packed,name=nfts,proto3" json:"nfts,omitempty"`
+	Nfts           []int64 `protobuf:"varint,5,rep,packed,name=nfts,proto3" json:"nfts,omitempty"` // nftId
 }
 
 func (x *NftsInSat) Reset() {

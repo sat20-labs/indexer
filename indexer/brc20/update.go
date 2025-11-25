@@ -304,7 +304,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV
 			// transfer occur
 
 			fromAddressId := transferNft.AddressId
-			toAddressId := s.nftIndexer.GetBaseIndexer().GetAddressId(output.Address.Addresses[0])
+			toAddressId := output.AddressId
 
 			// 在下一次转移时，可以删除，不需要再记录
 			transferNft.AddressId = toAddressId

@@ -33,27 +33,23 @@ type UtxoValue struct {
 }
 
 type AddressValueInDB struct {
-	AddressType uint32
 	AddressId   uint64
 	Op          int                   // -1 deleted; 0 read from db; 1 added
 	Utxos       map[uint64]*UtxoValue // utxoid -> value
 }
 
 type AddressValue struct {
-	AddressType uint32
 	AddressId   uint64
 	Utxos       map[uint64]int64 // utxoid -> value
 }
 
 type AddressValueInDBV2 struct {
-	AddressType uint32
 	AddressId   uint64
 	Utxos       []uint64  // all utxos
 }
 
 func (p *AddressValueInDBV2) ToAddressValueV2() *AddressValueV2{
 	r := &AddressValueV2{
-		AddressType: p.AddressType,
 		AddressId: p.AddressId,
 		Op: 0,
 		Utxos: make(map[uint64]bool),
@@ -65,15 +61,13 @@ func (p *AddressValueInDBV2) ToAddressValueV2() *AddressValueV2{
 }
 
 type AddressValueV2 struct {
-	AddressType uint32
 	AddressId   uint64
-	Op          int                   // -1 deleted; 0 read from db; 1 added/modified
+	Op          int             // -1 deleted; 0 read from db; 1 added/modified
 	Utxos       map[uint64]bool // utxoid，全量数据
 }
 
 func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
 	n := &AddressValueInDBV2 {
-		AddressType: p.AddressType,
 		AddressId: p.AddressId,
 		Utxos: make([]uint64, 0),
 	}
@@ -92,7 +86,6 @@ type BlockValueInDB struct {
 	InputSats  int64
 	OutputSats int64
 	Ordinals   Range
-	LostSats   []*Range // ordinals protocol issue
 }
 
 type BlockInfo struct {

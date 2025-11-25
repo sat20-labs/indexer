@@ -59,17 +59,6 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	common.Log.Infof("processOrdProtocol %d,is done: cost: %v", block.Height, time.Since(measureStartTime))
 }
 
-func findOutputWithSat(tx *common.Transaction, sat int64) *common.TxOutputV2 {
-	for _, out := range tx.Outputs {
-		for _, rng := range out.Ordinals {
-			if sat >= rng.Start && sat < rng.Start+rng.Size {
-				return out
-			}
-		}
-	}
-	return nil
-}
-
 func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64) {
 	var outValue int64
@@ -1083,7 +1072,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 	}
 
 	//addressId1 := s.compiling.GetAddressId(input.Address.Addresses[0])
-	addressId2 := s.compiling.GetAddressId(output.Address.Addresses[0])
+	addressId2 := output.AddressId
 	nft := common.Nft{
 		Base: &common.InscribeBaseContent{
 			InscriptionId:      tx.Txid + "i" + strconv.Itoa(inscriptionId),

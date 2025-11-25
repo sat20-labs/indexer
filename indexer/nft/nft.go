@@ -463,7 +463,7 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 			txOut.Assets = newOut.Assets
 			txOut.Offsets =newOut.Offsets
 
-			addressId := p.baseIndexer.GetAddressId(txOut.Address.Addresses[0])
+			addressId := txOut.AddressId
 			sats := make([]*SatOffset, 0)
 			for _, asset := range newOut.Assets {
 				offsets := newOut.Offsets[asset.Name]
@@ -1001,7 +1001,7 @@ func (b *NftIndexer) printfUtxos(utxos map[uint64]bool, ldb common.KVDB) map[uin
 
 			str, err := db.GetUtxoByDBKey(k)
 			if err == nil {
-				common.Log.Infof("%x %s %d", value.UtxoId, str, common.GetOrdinalsSize(value.Ordinals))
+				common.Log.Infof("%x %s %d", value.UtxoId, str, value.Value)
 				result[value.UtxoId] = str
 			}
 

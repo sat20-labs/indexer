@@ -374,36 +374,3 @@ func (s *Model) findSatsInAddress(req *wire.SpecificSatReq) ([]*wire.SpecificSat
 	return utxoList, nil
 
 }
-
-func (s *Model) findSat(sat int64) (*wire.SpecificSat, error) {
-	address, utxo, err := s.indexer.FindSat(sat)
-	if err != nil {
-		return nil, err
-	}
-
-	_, ranges, err := s.indexer.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
-		common.Log.Errorf("GetOrdinalsForUTXO failed, %s", utxo)
-		return nil, err
-	}
-
-	var result *wire.SpecificSat
-	if common.IsSatInRanges(sat, ranges) {
-		offset := int64(0)
-		sats := make([]wire.SatRange, 0)
-		for _, rng := range ranges {
-			sats = append(sats, wire.SatRange{Start: rng.Start, Size: rng.Size, Offset: offset})
-			offset += rng.Size
-		}
-
-		result = &wire.SpecificSat{
-			Address:     address,
-			Utxo:        utxo,
-			Value:       common.GetOrdinalsSize(ranges),
-			SpecificSat: sat,
-			Sats:        sats,
-		}
-	}
-
-	return result, nil
-}

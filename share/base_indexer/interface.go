@@ -25,8 +25,6 @@ type Indexer interface {
 	GetOrdinalsWithUtxoId(id uint64) (string, []*common.Range, error)
 	// return: utxoId, sat ranges
 	GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, error)
-	// return: address, utxo
-	FindSat(sat int64) (string, string, error)
 	// return: address
 	GetHolderAddress(inscriptionId string) string
 

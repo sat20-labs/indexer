@@ -22,8 +22,6 @@ func (s *Service) InitRouter(r *gin.Engine, basePath string) {
 	r.GET(basePath+"/sat/:sat", s.getSatInfo)
 	// 查找钱包中是否存在某些聪
 	r.POST(basePath+"/sat/FindSatsInAddress", s.findSatsInAddress)
-	// 全局查找，看看聪在哪里，花的时间很长，一个小时左右
-	r.GET(basePath+"/sat/FindSat/:sat", s.findSat)
 	//查询支持的稀有聪类型
 	r.GET(basePath+"/info/satributes", s.getSatributes)
 	//获取地址上大于指定value的utxo;如果value=0,获得所有可用的utxo

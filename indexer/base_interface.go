@@ -6,11 +6,6 @@ import (
 
 ///// rpc interface, run in mul-thread
 
-// address, utxo, message
-func (p *IndexerMgr) FindSat(sat int64) (string, string, error) {
-	return p.rpcService.FindSat(sat)
-}
-
 func (p *IndexerMgr) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, error) {
 	return p.rpcService.GetOrdinalsWithUtxo(utxo)
 }

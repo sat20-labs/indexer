@@ -112,11 +112,8 @@ func GetAddressDBKeyV2(address string) []byte {
 	return []byte(common.DB_KEY_ADDRESSV2 + address)
 }
 
-func GetAddressValueDBKey(addressid uint64, utxoid uint64, typ, i int) []byte {
-	if i == 0 {
-		return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x", addressid, utxoid, typ))
-	}
-	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x-%x", addressid, utxoid, typ, i))
+func GetAddressValueDBKey(addressid uint64, utxoid uint64) []byte {
+	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x", addressid, utxoid))
 }
 
 func GetUtxoIdKey(id uint64) []byte {

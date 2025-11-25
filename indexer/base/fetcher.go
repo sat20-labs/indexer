@@ -4,12 +4,13 @@ import (
 	"encoding/hex"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 )
 
 // 不要panic，可能会影响写数据库
-func (b *BaseIndexer) fetchBlock(height int) *common.Block {
+func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 	hash, err := getBlockHash(uint64(height))
 	if err != nil {
 		common.Log.Errorf("getBlockHash %d failed. %v", height, err)
@@ -48,15 +49,15 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 		for _, txIn := range msgTx.TxIn {
 			input := &common.TxInput{
 				TxOutput: common.TxOutput{
-					UtxoId:      common.INVALID_ID,
-					OutPointStr: txIn.PreviousOutPoint.String(),
-					Offsets:     make(map[common.AssetName]common.AssetOffsets),
+					UtxoId:        common.INVALID_ID,
+					OutPointStr:   txIn.PreviousOutPoint.String(),
+					Offsets:       make(map[common.AssetName]common.AssetOffsets),
 					SatBindingMap: make(map[int64]*common.AssetInfo),
-					Invalids: make(map[common.AssetName]bool),
+					Invalids:      make(map[common.AssetName]bool),
 				},
 				Witness: txIn.Witness,
-				Vout: int(txIn.PreviousOutPoint.Index),
-				Txid: txIn.PreviousOutPoint.Hash.String(),
+				Vout:    int(txIn.PreviousOutPoint.Index),
+				TxId:    txIn.PreviousOutPoint.Hash.String(),
 			}
 			inputs = append(inputs, input)
 		}
@@ -64,52 +65,21 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 		// parse the raw tx values
 		for j, v := range msgTx.TxOut {
 			//Determine the type of the script and extract the address
-			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, b.chaincfgParam)
+			scyptClass, _, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, chaincfgParam)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
 				return nil
 				//common.Log.Panicf("BaseIndexer.fetchBlock-> Failed to extract address: %v", err)
 			}
 
-			addrsString := make([]string, len(addrs))
-			for i, x := range addrs {
-				if scyptClass == txscript.MultiSigTy {
-					addrsString[i] = hex.EncodeToString(x.ScriptAddress()) // pubkey
-				} else {
-					addrsString[i] = x.EncodeAddress()
-				}
-			}
-
-			var receiver common.ScriptPubKey
-
-			if len(addrs) == 0 {
-				address := "UNKNOWN"
-				if scyptClass == txscript.NullDataTy {
-					address = "OP_RETURN"
-				}
-				receiver = common.ScriptPubKey{
-					Addresses: []string{address},
-					Type:      int(scyptClass),
-					PkScript: v.PkScript,
-					ReqSig:   reqSig,
-				}
-			} else {
-				receiver = common.ScriptPubKey{
-					Addresses: addrsString,
-					Type:      int(scyptClass),
-					PkScript: v.PkScript,
-					ReqSig:   reqSig,
-				}
-			}
-
 			output := common.GenerateTxOutput(msgTx, j)
 			output.UtxoId = common.ToUtxoId(height, i, j)
 			outputs = append(outputs, &common.TxOutputV2{
 				TxOutput: *output,
-				Address: &receiver,
-				TxIndex: i,
-				Vout:    j,
-				Height:  height,
+				TxIndex:  i,
+				Vout:     j,
+				Height:   height,
+				AddressType: int(scyptClass),
 			})
 		}
 
@@ -140,7 +110,7 @@ func (b *BaseIndexer) spawnBlockFetcher(startHeigh int, endHeight int, stopChan 
 		case <-stopChan:
 			return
 		default:
-			block := b.fetchBlock(currentHeight)
+			block := FetchBlock(currentHeight, b.chaincfgParam)
 			b.blocksChan <- block
 			currentHeight += 1
 		}

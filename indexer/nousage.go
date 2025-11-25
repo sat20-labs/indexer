@@ -646,14 +646,14 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 				common.Log.Panicf("item.Value error: %v", err)
 			}
 
-			er := p.exotic.GetExoticsWithType(value.Ordinals, exotic.Pizza)
+			er := p.exotic.GetExoticsWithTypeV2(value.UtxoId, exotic.Pizza)
 			if len(er) > 0 {
 				num := int64(0)
 				for _, r := range er {
 					num += r.Range.Size
 				}
 				total += num
-				pizzaAddrMap[(value.AddressIds[0])] += num
+				pizzaAddrMap[(value.AddressId)] += num
 			}
 
 			return nil

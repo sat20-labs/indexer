@@ -8,7 +8,7 @@ import (
 )
 
 const RANGE_IN_GLOBAL = false // true: Range 表示一个satoshi的全局编码，一个 [0, 2099999997690000) 的数字
-						      // false: Range表示特殊聪在当前utxo中的范围。使用false，可以极大降低数据存储需求
+// false: Range表示特殊聪在当前utxo中的范围。使用false，可以极大降低数据存储需求
 
 type Range = pb.MyRange
 
@@ -23,10 +23,10 @@ type Input struct {
 }
 
 type ScriptPubKey struct {
-	Addresses []string             `json:"addresses"`
-	Type     int                   `json:"type"`
-	ReqSig   int                   `json:"reqSig"`
-	PkScript []byte        		   `json:"pkscript"`
+	Addresses []string `json:"addresses"`
+	Type      int      `json:"type"`
+	ReqSig    int      `json:"reqSig"`
+	PkScript  []byte   `json:"pkscript"`
 }
 
 type Output struct {
@@ -41,24 +41,23 @@ type Output struct {
 type TxInput struct {
 	TxOutput
 	Witness  wire.TxWitness
-	Address  *ScriptPubKey
 	Vout     int
-	Txid     string
+	TxId     string
 }
 
 type TxOutputV2 struct {
 	TxOutput
-	Address  *ScriptPubKey
-	Vout     int
-	TxIndex  int
-	Height   int
-	Ordinals []*Range
+	Vout        int
+	TxIndex     int
+	Height      int
+	AddressId   uint64
+	AddressType int
 }
 
 type Transaction struct {
-	Txid    string       `json:"txid"`
-	Inputs  []*TxInput   `json:"inputs"`
-	Outputs []*TxOutputV2  `json:"outputs"`
+	Txid    string        `json:"txid"`
+	Inputs  []*TxInput    `json:"inputs"`
+	Outputs []*TxOutputV2 `json:"outputs"`
 }
 
 type Block struct {

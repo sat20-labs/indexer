@@ -143,44 +143,44 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block) {
 
 func (p *FTIndexer) innerUpdateTransfer(output *common.TxOutputV2) {
 
-	utxo := output.UtxoId
+	// utxo := output.UtxoId
 
-	// 检查是否存在ticker。如果存在，就更新对应的holder数据
-	bUpdated := false
-	tickers := make(map[string]*common.TickAbbrInfo, 0)
+	// // 检查是否存在ticker。如果存在，就更新对应的holder数据
+	// bUpdated := false
+	// tickers := make(map[string]*common.TickAbbrInfo, 0)
 
-	for _, t := range p.tickerMap {
-		mintinfo := make(map[string][]*common.Range, 0)
-		for _, r := range output.Ordinals {
-			// 求相交区间，只记录相交区间
-			interRanges := t.MintInfo.FindIntersections(r)
-			for _, rng := range interRanges {
-				key := rng.Rng
-				value := rng.Value.(*common.RBTreeValue_Mint)
-				for _, mintutxo := range value.InscriptionIds {
-					mintinfo[mintutxo] = append(mintinfo[mintutxo], key)
-				}
-			}
-		}
-		for mintutxo, ranges := range mintinfo {
-			for i, address := range output.Address.Addresses {
-				addressId := p.nftIndexer.GetBaseIndexer().GetAddressId(address)
-				p.addHolder(utxo, t.Name, t.Ticker.N, addressId, i, mintutxo, ranges)
-			}
-			bUpdated = true
-		}
-		if len(mintinfo) > 0 {
-			tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{N: t.Ticker.N, MintInfo: mintinfo}
-		}
-	}
+	// for _, t := range p.tickerMap {
+	// 	mintinfo := make(map[string][]*common.Range, 0)
+	// 	for _, r := range output.Ordinals {
+	// 		// 求相交区间，只记录相交区间
+	// 		interRanges := t.MintInfo.FindIntersections(r)
+	// 		for _, rng := range interRanges {
+	// 			key := rng.Rng
+	// 			value := rng.Value.(*common.RBTreeValue_Mint)
+	// 			for _, mintutxo := range value.InscriptionIds {
+	// 				mintinfo[mintutxo] = append(mintinfo[mintutxo], key)
+	// 			}
+	// 		}
+	// 	}
+	// 	for mintutxo, ranges := range mintinfo {
+	// 		//for i, address := range output.Address.Addresses {
+	// 			addressId := output.AddressId
+	// 			p.addHolder(utxo, t.Name, t.Ticker.N, addressId, 0, mintutxo, ranges)
+	// 		//}
+	// 		bUpdated = true
+	// 	}
+	// 	if len(mintinfo) > 0 {
+	// 		tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{N: t.Ticker.N, MintInfo: mintinfo}
+	// 	}
+	// }
 
-	if bUpdated {
-		for i, address := range output.Address.Addresses {
-			addressId := p.nftIndexer.GetBaseIndexer().GetAddressId(address)
-			action := HolderAction{UtxoId: utxo, AddressId: addressId, Index: i, Tickers: tickers, Action: 1}
-			p.holderActionList = append(p.holderActionList, &action)
-		}
-	}
+	// if bUpdated {
+	// 	//for i, address := range output.Address.Addresses {
+	// 		addressId := output.AddressId
+	// 		action := HolderAction{UtxoId: utxo, AddressId: addressId, Index: 0, Tickers: tickers, Action: 1}
+	// 		p.holderActionList = append(p.holderActionList, &action)
+	// 	//}
+	// }
 }
 
 // 跟basic数据库同步

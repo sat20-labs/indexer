@@ -91,7 +91,7 @@ func TestDecode(t *testing.T) {
 		rngs2 = append(rngs2, Range{Start: i, Size: i})
 	}
 
-	value1 := UtxoValueInDB{UtxoId: 1, AddressIds: []uint64{2}, Ordinals: rngs}
+	value1 := UtxoValueInDB{UtxoId: 1, Value: 1000, AddressId: 0}
 	value2 := UtxoValueInDBv2{UtxoId: 3, AddressId: []uint64{4}, Ordinals: rngs2}
 
 	fmt.Printf("gob...\n")
@@ -197,11 +197,8 @@ func TestDecode2(t *testing.T) {
 	for i := int64(0); i < 10; i++ {
 		rngs = append(rngs, &pb.MyRange{Start: i, Size: i})
 	}
-	value1 := pb.MyUtxoValueInDB{
-		UtxoId:     1,
-		AddressIds: []uint64{2},
-		Ordinals:   rngs,
-	}
+
+	value1 := UtxoValueInDB{UtxoId: 1, Value: 1000, AddressId: 0}
 
 	//fmt.Printf("%v\n", value1)
 	start := time.Now()
