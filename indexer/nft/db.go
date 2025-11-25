@@ -50,6 +50,27 @@ func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	return result
 }
 
+
+func getContentTypesFromDB(db common.KVDB) map[int]string {
+	result := make(map[int]string, 0)
+	err := db.BatchRead([]byte(DB_PREFIX_CT), false, func(k, v []byte) error {
+
+		key := string(k)
+		id, err := ParseContTypeKey(key)
+		if err == nil {
+			result[id] = string(v)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		common.Log.Panicf("getContentTypesFromDB Error: %v", err)
+	}
+
+	return result
+}
+
 func loadNftsInSatFromDB(sat int64, value *common.NftsInSat, ldb common.KVDB) error {
 	key := GetSatKey(sat)
 	// return db.GetValueFromDB([]byte(key), txn, value)
@@ -108,6 +129,10 @@ func GetUtxoKey(UtxoId uint64) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_UTXO, hex.EncodeToString(common.Uint64ToBytes(UtxoId)))
 }
 
+func GetCTKey(id int) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_CT, id)
+}
+
 func GetInscriptionIdKey(id string) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_INSC, id)
 }
@@ -152,6 +177,20 @@ func ParseUtxoKey(input string) (uint64, error) {
 	}
 	utxoId := common.BytesToUint64(bytes)
 	return utxoId, nil
+}
+
+
+func ParseContTypeKey(input string) (int, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_CT) {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	str := strings.TrimPrefix(input, DB_PREFIX_CT)
+	id, err := strconv.Atoi(str)
+	if err != nil {
+		return -1, err
+	}
+	
+	return id, nil
 }
 
 func ParseAddressKey(input string) (uint64, int64, error) {

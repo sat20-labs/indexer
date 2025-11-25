@@ -34,6 +34,9 @@ type NftIndexer struct {
 	// realtime buffer
 	utxoMap          map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
 	satMap           map[int64]*SatInfo // key: sat, 一个写入周期中新增加的铭文的转移结果
+	ctMap            map[int]string
+	ctToIdMap        map[string]int
+	lastCtId         int
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
 	nftAdded  		 []*common.Nft // 保持顺序
@@ -59,6 +62,12 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 	p.baseIndexer = baseIndexer
 	p.status = initStatusFromDB(p.db)
 	p.disabledSats = loadAllDisalbedSatsFromDB(p.db)
+	p.ctMap = getContentTypesFromDB(p.db)
+	p.ctToIdMap = make(map[string]int)
+	for k, v := range p.ctMap {
+		p.ctToIdMap[v] = k
+	}
+	p.lastCtId = p.status.CTCount
 }
 
 func (p *NftIndexer) reset() {
@@ -101,6 +110,13 @@ func (p *NftIndexer) Clone() *NftIndexer {
 			newV.Nfts[nftId] = true
 		}
 		newInst.satMap[k] = newV
+	}
+
+	newInst.ctMap = make(map[int]string)
+	newInst.ctToIdMap = make(map[string]int)
+	for k, v := range p.ctMap {
+		newInst.ctMap[k] = v
+		newInst.ctToIdMap[v] = k
 	}
 
 	newInst.nftAdded = make([]*common.Nft, len(p.nftAdded))
@@ -213,9 +229,15 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if nft.UtxoId == 1016876457263104 || nft.UtxoId == 1022786333310976 || nft.UtxoId == 1022958131478528 {
-			common.Log.Infof("")
-		}
+	ct := string(nft.Base.ContentType)
+	_, ok := p.ctToIdMap[ct]
+	if !ok {
+		ctId := p.status.CTCount
+		p.status.CTCount++
+
+		p.ctMap[ctId] = ct
+		p.ctToIdMap[ct] = ctId
+	}
 
 	nft.Base.Id = int64(p.status.Count)
 	p.status.Count++
@@ -654,6 +676,9 @@ func (p *NftIndexer) UpdateDB() {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
 		}
 
+		ctId := p.ctToIdMap[string(nft.Base.ContentType)]
+		nft.Base.ContentType = []byte(fmt.Sprintf("%d", ctId))
+
 		key = GetNftKey(nft.Base.Id)
 		err = db.SetDBWithProto3([]byte(key), nft.Base, wb)
 		if err != nil {
@@ -703,6 +728,15 @@ func (p *NftIndexer) UpdateDB() {
 		}
 	}
 
+	for ctId := p.lastCtId; ctId < p.status.CTCount; ctId++ {
+		key := GetCTKey(ctId)
+		value := p.ctMap[ctId]
+		err := db.SetDB([]byte(key), value, wb)
+		if err != nil {
+			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
+		}
+	}
+
 	err := db.SetDB([]byte(NFT_STATUS_KEY), p.status, wb)
 	if err != nil {
 		common.Log.Panicf("NftIndexer->UpdateDB Error setting in db %v", err)
@@ -724,6 +758,7 @@ func (p *NftIndexer) UpdateDB() {
 	p.utxoMap = make(map[uint64][]*SatOffset)
 	p.utxoDeled = make([]uint64, 0)
 	p.satMap = make(map[int64]*SatInfo)
+	p.lastCtId = p.status.CTCount
 
 	common.Log.Infof("NftIndexer->UpdateDB takes %v", time.Since(startTime))
 }

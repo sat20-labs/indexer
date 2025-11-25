@@ -1,6 +1,8 @@
 package nft
 
 import (
+	"strconv"
+
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -59,7 +61,7 @@ func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 			for _, nftId := range nfts.Nfts {
 				if nftId == value.Id {
 					var nft common.InscribeBaseContent
-					err := loadNftFromDB(nftId, &nft, p.db)
+					err := p.loadNftFromDB(nftId, &nft)
 					if err != nil {
 						return nil
 					}
@@ -138,7 +140,7 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 		if info != nil {
 			for _, nftId := range info.Nfts {
 				var nft common.InscribeBaseContent
-				err := loadNftFromDB(nftId, &nft, p.db)
+				err := p.loadNftFromDB(nftId, &nft)
 				if err != nil {
 					continue
 				}
@@ -175,7 +177,7 @@ func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 	for _, nftId := range nfts.Nfts {
 		if nftId == id {
 			var nft common.InscribeBaseContent
-			err := loadNftFromDB(nftId, &nft, p.db)
+			err := p.loadNftFromDB(nftId, &nft)
 			if err != nil {
 				return nil
 			}
@@ -313,6 +315,19 @@ func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, proof []byte) error {
 	for _, sat := range sats {
 		p.disabledSats[sat] = true
 		saveDisabledSatToDB(sat, proof, p.db)
+	}
+	return nil
+}
+
+func (p *NftIndexer) loadNftFromDB(nftId int64, value *common.InscribeBaseContent) error {
+	err := loadNftFromDB(nftId, value, p.db)
+	if err != nil {
+		return err
+	}
+
+	id, err := strconv.Atoi(string(value.ContentType))
+	if err == nil {
+		value.ContentType = []byte(p.ctMap[id])
 	}
 	return nil
 }
