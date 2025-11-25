@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type MyRange struct {
+type PbRange struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -29,8 +29,8 @@ type MyRange struct {
 	Size  int64 `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
 }
 
-func (x *MyRange) Reset() {
-	*x = MyRange{}
+func (x *PbRange) Reset() {
+	*x = PbRange{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_pb_ordinals_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -38,13 +38,13 @@ func (x *MyRange) Reset() {
 	}
 }
 
-func (x *MyRange) String() string {
+func (x *PbRange) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MyRange) ProtoMessage() {}
+func (*PbRange) ProtoMessage() {}
 
-func (x *MyRange) ProtoReflect() protoreflect.Message {
+func (x *PbRange) ProtoReflect() protoreflect.Message {
 	mi := &file_common_pb_ordinals_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,26 +56,26 @@ func (x *MyRange) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MyRange.ProtoReflect.Descriptor instead.
-func (*MyRange) Descriptor() ([]byte, []int) {
+// Deprecated: Use PbRange.ProtoReflect.Descriptor instead.
+func (*PbRange) Descriptor() ([]byte, []int) {
 	return file_common_pb_ordinals_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MyRange) GetStart() int64 {
+func (x *PbRange) GetStart() int64 {
 	if x != nil {
 		return x.Start
 	}
 	return 0
 }
 
-func (x *MyRange) GetSize() int64 {
+func (x *PbRange) GetSize() int64 {
 	if x != nil {
 		return x.Size
 	}
 	return 0
 }
 
-type MyUtxoValueInDB struct {
+type PbUtxoValueInDB struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -85,8 +85,8 @@ type MyUtxoValueInDB struct {
 	AddressId uint64 `protobuf:"varint,3,opt,name=addressId,proto3" json:"addressId,omitempty"`
 }
 
-func (x *MyUtxoValueInDB) Reset() {
-	*x = MyUtxoValueInDB{}
+func (x *PbUtxoValueInDB) Reset() {
+	*x = PbUtxoValueInDB{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_common_pb_ordinals_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -94,13 +94,13 @@ func (x *MyUtxoValueInDB) Reset() {
 	}
 }
 
-func (x *MyUtxoValueInDB) String() string {
+func (x *PbUtxoValueInDB) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MyUtxoValueInDB) ProtoMessage() {}
+func (*PbUtxoValueInDB) ProtoMessage() {}
 
-func (x *MyUtxoValueInDB) ProtoReflect() protoreflect.Message {
+func (x *PbUtxoValueInDB) ProtoReflect() protoreflect.Message {
 	mi := &file_common_pb_ordinals_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -112,30 +112,148 @@ func (x *MyUtxoValueInDB) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MyUtxoValueInDB.ProtoReflect.Descriptor instead.
-func (*MyUtxoValueInDB) Descriptor() ([]byte, []int) {
+// Deprecated: Use PbUtxoValueInDB.ProtoReflect.Descriptor instead.
+func (*PbUtxoValueInDB) Descriptor() ([]byte, []int) {
 	return file_common_pb_ordinals_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *MyUtxoValueInDB) GetUtxoId() uint64 {
+func (x *PbUtxoValueInDB) GetUtxoId() uint64 {
 	if x != nil {
 		return x.UtxoId
 	}
 	return 0
 }
 
-func (x *MyUtxoValueInDB) GetValue() int64 {
+func (x *PbUtxoValueInDB) GetValue() int64 {
 	if x != nil {
 		return x.Value
 	}
 	return 0
 }
 
-func (x *MyUtxoValueInDB) GetAddressId() uint64 {
+func (x *PbUtxoValueInDB) GetAddressId() uint64 {
 	if x != nil {
 		return x.AddressId
 	}
 	return 0
+}
+
+type PbUtxoIdInDB struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UtxoId uint64 `protobuf:"varint,1,opt,name=utxo_id,json=utxoId,proto3" json:"utxo_id,omitempty"`
+	Value  int64  `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
+}
+
+func (x *PbUtxoIdInDB) Reset() {
+	*x = PbUtxoIdInDB{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_common_pb_ordinals_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PbUtxoIdInDB) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PbUtxoIdInDB) ProtoMessage() {}
+
+func (x *PbUtxoIdInDB) ProtoReflect() protoreflect.Message {
+	mi := &file_common_pb_ordinals_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PbUtxoIdInDB.ProtoReflect.Descriptor instead.
+func (*PbUtxoIdInDB) Descriptor() ([]byte, []int) {
+	return file_common_pb_ordinals_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PbUtxoIdInDB) GetUtxoId() uint64 {
+	if x != nil {
+		return x.UtxoId
+	}
+	return 0
+}
+
+func (x *PbUtxoIdInDB) GetValue() int64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+type PbAddressValueInDB struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	AddressId   uint64          `protobuf:"varint,1,opt,name=AddressId,proto3" json:"AddressId,omitempty"`
+	AddressType int32           `protobuf:"varint,2,opt,name=AddressType,proto3" json:"AddressType,omitempty"`
+	Utxos       []*PbUtxoIdInDB `protobuf:"bytes,3,rep,name=utxos,proto3" json:"utxos,omitempty"`
+}
+
+func (x *PbAddressValueInDB) Reset() {
+	*x = PbAddressValueInDB{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_common_pb_ordinals_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PbAddressValueInDB) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PbAddressValueInDB) ProtoMessage() {}
+
+func (x *PbAddressValueInDB) ProtoReflect() protoreflect.Message {
+	mi := &file_common_pb_ordinals_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PbAddressValueInDB.ProtoReflect.Descriptor instead.
+func (*PbAddressValueInDB) Descriptor() ([]byte, []int) {
+	return file_common_pb_ordinals_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PbAddressValueInDB) GetAddressId() uint64 {
+	if x != nil {
+		return x.AddressId
+	}
+	return 0
+}
+
+func (x *PbAddressValueInDB) GetAddressType() int32 {
+	if x != nil {
+		return x.AddressType
+	}
+	return 0
+}
+
+func (x *PbAddressValueInDB) GetUtxos() []*PbUtxoIdInDB {
+	if x != nil {
+		return x.Utxos
+	}
+	return nil
 }
 
 var File_common_pb_ordinals_proto protoreflect.FileDescriptor
@@ -143,17 +261,30 @@ var File_common_pb_ordinals_proto protoreflect.FileDescriptor
 var file_common_pb_ordinals_proto_rawDesc = []byte{
 	0x0a, 0x18, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2f, 0x70, 0x62, 0x2f, 0x6f, 0x72, 0x64, 0x69,
 	0x6e, 0x61, 0x6c, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x09, 0x70, 0x62, 0x2e, 0x63,
-	0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x22, 0x33, 0x0a, 0x07, 0x4d, 0x79, 0x52, 0x61, 0x6e, 0x67, 0x65,
+	0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x22, 0x33, 0x0a, 0x07, 0x50, 0x62, 0x52, 0x61, 0x6e, 0x67, 0x65,
 	0x12, 0x14, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x72, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52,
 	0x05, 0x73, 0x74, 0x61, 0x72, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02,
-	0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0x5e, 0x0a, 0x0f, 0x4d, 0x79,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0x5e, 0x0a, 0x0f, 0x50, 0x62,
 	0x55, 0x74, 0x78, 0x6f, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x49, 0x6e, 0x44, 0x42, 0x12, 0x17, 0x0a,
 	0x07, 0x75, 0x74, 0x78, 0x6f, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06,
 	0x75, 0x74, 0x78, 0x6f, 0x49, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18,
 	0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1c, 0x0a, 0x09,
 	0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52,
-	0x09, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x42, 0x0c, 0x5a, 0x0a, 0x2f, 0x63,
-	0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2f, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x09, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x22, 0x3d, 0x0a, 0x0c, 0x50, 0x62,
+	0x55, 0x74, 0x78, 0x6f, 0x49, 0x64, 0x49, 0x6e, 0x44, 0x42, 0x12, 0x17, 0x0a, 0x07, 0x75, 0x74,
+	0x78, 0x6f, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06, 0x75, 0x74, 0x78,
+	0x6f, 0x49, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x03, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x83, 0x01, 0x0a, 0x12, 0x50, 0x62,
+	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x49, 0x6e, 0x44, 0x42,
+	0x12, 0x1c, 0x0a, 0x09, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x04, 0x52, 0x09, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x49, 0x64, 0x12, 0x20,
+	0x0a, 0x0b, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x54, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x05, 0x52, 0x0b, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x54, 0x79, 0x70, 0x65,
+	0x12, 0x2d, 0x0a, 0x05, 0x75, 0x74, 0x78, 0x6f, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32,
+	0x17, 0x2e, 0x70, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2e, 0x50, 0x62, 0x55, 0x74,
+	0x78, 0x6f, 0x49, 0x64, 0x49, 0x6e, 0x44, 0x42, 0x52, 0x05, 0x75, 0x74, 0x78, 0x6f, 0x73, 0x42,
+	0x0c, 0x5a, 0x0a, 0x2f, 0x63, 0x6f, 0x6d, 0x6d, 0x6f, 0x6e, 0x2f, 0x70, 0x62, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -168,17 +299,20 @@ func file_common_pb_ordinals_proto_rawDescGZIP() []byte {
 	return file_common_pb_ordinals_proto_rawDescData
 }
 
-var file_common_pb_ordinals_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_common_pb_ordinals_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_common_pb_ordinals_proto_goTypes = []any{
-	(*MyRange)(nil),         // 0: pb.common.MyRange
-	(*MyUtxoValueInDB)(nil), // 1: pb.common.MyUtxoValueInDB
+	(*PbRange)(nil),            // 0: pb.common.PbRange
+	(*PbUtxoValueInDB)(nil),    // 1: pb.common.PbUtxoValueInDB
+	(*PbUtxoIdInDB)(nil),       // 2: pb.common.PbUtxoIdInDB
+	(*PbAddressValueInDB)(nil), // 3: pb.common.PbAddressValueInDB
 }
 var file_common_pb_ordinals_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: pb.common.PbAddressValueInDB.utxos:type_name -> pb.common.PbUtxoIdInDB
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_common_pb_ordinals_proto_init() }
@@ -188,7 +322,7 @@ func file_common_pb_ordinals_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_common_pb_ordinals_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*MyRange); i {
+			switch v := v.(*PbRange); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -200,7 +334,31 @@ func file_common_pb_ordinals_proto_init() {
 			}
 		}
 		file_common_pb_ordinals_proto_msgTypes[1].Exporter = func(v any, i int) any {
-			switch v := v.(*MyUtxoValueInDB); i {
+			switch v := v.(*PbUtxoValueInDB); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_common_pb_ordinals_proto_msgTypes[2].Exporter = func(v any, i int) any {
+			switch v := v.(*PbUtxoIdInDB); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_common_pb_ordinals_proto_msgTypes[3].Exporter = func(v any, i int) any {
+			switch v := v.(*PbAddressValueInDB); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -218,7 +376,7 @@ func file_common_pb_ordinals_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_common_pb_ordinals_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

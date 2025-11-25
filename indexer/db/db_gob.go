@@ -219,15 +219,11 @@ func GetAddressDataFromDBV2(db common.KVDB, address string) (*common.AddressValu
 
 func GetAddressDataFromDBTxnV2(txn common.ReadBatch, address string) (*common.AddressValueInDBV2, error) {
 	var result common.AddressValueInDBV2
-
-	v, err := txn.Get(GetAddressDBKeyV2(address))
+	err := GetValueFromTxnWithProto3(GetAddressDBKeyV2(address), txn, &result)
 	if err != nil {
-		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
 		return nil, err
 	}
-	
-	err = DecodeBytes(v, &result)
-	return &result, err
+	return &result, nil
 }
 
 func CheckKeyExists(db common.KVDB, key []byte) bool {

@@ -10,7 +10,7 @@ import (
 const RANGE_IN_GLOBAL = false // true: Range 表示一个satoshi的全局编码，一个 [0, 2099999997690000) 的数字
 // false: Range表示特殊聪在当前utxo中的范围。使用false，可以极大降低数据存储需求
 
-type Range = pb.MyRange
+type Range = pb.PbRange
 
 type Input struct {
 	Txid     string         `json:"txid"`

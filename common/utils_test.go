@@ -9,26 +9,25 @@ import (
 
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/sat20-labs/indexer/common/pb"
 	"google.golang.org/protobuf/proto"
 )
 
 func TestBinarySearch(t *testing.T) {
 
 	utxos := make([]*UtxoIdInDB, 0)
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{10, 1})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{20, 2})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{15, 3})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{25, 4})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{5, 5})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{35, 6})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{24, 7})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{26, 8})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:10, Value:1})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:20, Value:2})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:15, Value:3})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:25, Value:4})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:5, Value:5})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:35, Value:6})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:24, Value:7})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:26, Value:8})
 	printUtxos(utxos)
 
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{25, 9})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{5, 11})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{35, 10})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:25, Value:9})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:5, Value:11})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:35, Value:10})
 
 	printUtxos(utxos)
 
@@ -51,10 +50,10 @@ func printUtxos(utxos []*UtxoIdInDB) {
 func TestSliceCopy(t *testing.T) {
 
 	utxos := make([]*UtxoIdInDB, 0)
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{10, 1})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{20, 2})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{15, 3})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{25, 4})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:10, Value:1})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:20, Value:2})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:15, Value:3})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:25, Value:4})
 	destination := make([]*UtxoIdInDB, len(utxos))
 
 	copy(destination, utxos)
@@ -63,7 +62,7 @@ func TestSliceCopy(t *testing.T) {
 	fmt.Printf("%v\n", destination)
 
 	utxos = DeleteUtxo(utxos, 20)
-	destination = InsertUtxo(destination, &UtxoIdInDB{35, 5})
+	destination = InsertUtxo(destination, &UtxoIdInDB{UtxoId:35, Value:5})
 
 	fmt.Printf("%v\n", utxos)
 	fmt.Printf("%v\n", destination)
@@ -193,9 +192,9 @@ func TestDecode(t *testing.T) {
 }
 
 func TestDecode2(t *testing.T) {
-	rngs := make([]*pb.MyRange, 0)
+	rngs := make([]*Range, 0)
 	for i := int64(0); i < 10; i++ {
-		rngs = append(rngs, &pb.MyRange{Start: i, Size: i})
+		rngs = append(rngs, &Range{Start: i, Size: i})
 	}
 
 	value1 := UtxoValueInDB{UtxoId: 1, Value: 1000, AddressId: 0}
@@ -214,7 +213,7 @@ func TestDecode2(t *testing.T) {
 	fmt.Printf("%d\n", len(encodeBytes))                          // 82
 
 	start = time.Now()
-	result1 := &pb.MyUtxoValueInDB{}
+	result1 := &UtxoValueInDB{}
 	for i := 0; i < 1000; i++ {
 		err = proto.Unmarshal(encodeBytes, result1)
 		if err != nil {
@@ -237,7 +236,7 @@ func TestDecode2(t *testing.T) {
 	fmt.Printf("%d\n", len(encodeBytes))                          // 226
 
 	start = time.Now()
-	result2 := &pb.MyUtxoValueInDB{}
+	result2 := &UtxoValueInDB{}
 	for i := 0; i < 1000; i++ {
 		buf := bytes.NewBuffer(encodeBytes)
 		dec := gob.NewDecoder(buf)

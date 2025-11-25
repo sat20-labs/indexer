@@ -22,7 +22,6 @@ type RpcIndexer struct {
 
 	// 接收前端api访问的实例，隔离内存访问
 	mutex              sync.RWMutex
-	addressValueMap    map[string]*common.AddressValueInDB // 缓存中的数据
 	deletedUtxoMap     map[uint64]bool
 	addedUtxoMap       map[uint64]string
 	bSearching         bool
@@ -31,9 +30,8 @@ type RpcIndexer struct {
 
 func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 	indexer := &RpcIndexer{
-		BaseIndexer:        *base.Clone(),
+		BaseIndexer:        *base.Clone(false),
 		bSearching:         false,
-		addressValueMap:    make(map[string]*common.AddressValueInDB),
 		deletedUtxoMap:     make(map[uint64]bool),
 		addedUtxoMap:       make(map[uint64]string),
 		satSearchingStatus: make(map[int64]*SatSearchingStatus),
@@ -44,7 +42,9 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 
 // 仅用于前端RPC数据查询时，更新地址数据
 func (b *RpcIndexer) UpdateServiceInstance() {
-	b.addressValueMap = b.prefechAddressV2()
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	for _, v := range b.delUTXOs {
 		b.deletedUtxoMap[v.UtxoId] = true
 	}
@@ -135,57 +135,20 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 }
 
 // only for api access
-func (b *RpcIndexer) getAddressValue2(address string) *common.AddressValueInDB {
-	result := &common.AddressValueInDB{AddressId: common.INVALID_ID}
-	addressId, err := db.GetAddressIdFromDB(b.db, address)
-	if err == nil {
-		utxos := make(map[uint64]*common.UtxoValue)
-		prefix := []byte(fmt.Sprintf("%s%x-", common.DB_KEY_ADDRESSVALUE, addressId))
-	
-		b.db.BatchRead(prefix, false, func(k, v []byte) error {
-			value := int64(common.BytesToUint64(v))
-			newAddressId, utxoId, err := common.ParseAddressIdKey(string(k))
-			if err != nil {
-				common.Log.Errorf("ParseAddressIdKey %s failed: %v", string(k), err)
-				return nil
-			}
-			if newAddressId != addressId {
-				common.Log.Errorf("ParseAddressIdKey %s get different addressid %d, %d", string(k), newAddressId, addressId)
-				return nil
-			}
-
-			utxos[utxoId] = &common.UtxoValue{Op: 0, Value: value}
-			return nil
-		})
-
-		result.AddressId = addressId
-		result.Op = 0
-		result.Utxos = utxos
-	}
-
-	b.mutex.RLock()
+func (b *RpcIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValueV2 {
+	b.mutex.Lock()
 	value, ok := b.addressValueMap[address]
-	if ok {
-		result.AddressId = value.AddressId
-		if result.Utxos == nil {
-			result.Utxos = make(map[uint64]*common.UtxoValue)
-		}
-		// 过滤已经删除的utxo
-		for k, v := range value.Utxos {
-			if v.Op > 0 {
-				result.Utxos[k] = v
-			} else if v.Op < 0 {
-				delete(result.Utxos, k)
-			}
+	if !ok {
+		data, err := db.GetAddressDataFromDBV2(ldb, address)
+		if err == nil {
+			value = common.ToAddressValueV2(data)
+			b.addressValueMap[address] = value
+			ok = true
 		}
 	}
-	b.mutex.RUnlock()
+	b.mutex.Unlock()
 
-	if result.AddressId == common.INVALID_ID {
-		return nil
-	}
-
-	return result
+	return value
 }
 
 // only for RPC interface
@@ -229,13 +192,16 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 // only for RPC interface
 func (b *RpcIndexer) GetAddressId(address string) uint64 {
 
-	id, err := db.GetAddressIdFromDB(b.db, address)
-	if err != nil {
-		id, _ = b.BaseIndexer.getAddressId(address)
-		if id != common.INVALID_ID {
-			err = nil
-		} else {
-			common.Log.Infof("getAddressId %s failed.", address)
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	id, _ := b.getAddressId(address)
+	if id == common.INVALID_ID {
+		data, err := db.GetAddressDataFromDBV2(b.db, address)
+		if err == nil {
+			value := common.ToAddressValueV2(data)
+			id = value.AddressId
+			b.addressValueMap[address] = value
+			b.idToAddressMap[id] = address
 		}
 	}
 
@@ -282,21 +248,15 @@ func (b *RpcIndexer) GetUTXOs2(address string) []string {
 	return utxos
 }
 
-func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValue, error) {
+func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValueV2, error) {
 	
-	addressValueInDB := b.getAddressValue2(address)
-	value := &common.AddressValue{}
-	value.Utxos = make(map[uint64]int64)
+	addressValueInDB := b.getAddressValue2(address, b.db)
 	if addressValueInDB == nil {
-		//common.Log.Infof("RpcIndexer.getUtxosWithAddress-> No address %s found in db", address)
-		return value, nil
+		//indexer.Log.Infof("RpcIndexer.getUtxosWithAddress-> No address %s found in db", address)
+		return nil, fmt.Errorf("not found")
 	}
 
-	value.AddressId = addressValueInDB.AddressId
-	for utxoid, utxovalue := range addressValueInDB.Utxos {
-		value.Utxos[utxoid] = utxovalue.Value
-	}
-	return value, nil
+	return addressValueInDB, nil
 }
 
 func (b *RpcIndexer) GetBlockInfo(height int) (*common.BlockInfo, error) {

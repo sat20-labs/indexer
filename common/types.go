@@ -20,12 +20,9 @@ const (
 
 // Address Type defined in txscript.ScriptClass
 
-type UtxoValueInDB = pb.MyUtxoValueInDB
+type UtxoValueInDB = pb.PbUtxoValueInDB
 
-type UtxoIdInDB struct {
-	UtxoId uint64
-	Value  int64
-}
+type UtxoIdInDB = pb.PbUtxoIdInDB
 
 type UtxoValue struct {
 	Op    int // -1 deleted; 0 read from db; 1 added
@@ -43,36 +40,39 @@ type AddressValue struct {
 	Utxos       map[uint64]int64 // utxoid -> value
 }
 
-type AddressValueInDBV2 struct {
-	AddressId   uint64
-	Utxos       []uint64  // all utxos
-}
+type AddressValueInDBV2 = pb.PbAddressValueInDB
 
-func (p *AddressValueInDBV2) ToAddressValueV2() *AddressValueV2{
+func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2{
 	r := &AddressValueV2{
 		AddressId: p.AddressId,
+		AddressType: int(p.AddressType),
 		Op: 0,
-		Utxos: make(map[uint64]bool),
+		Utxos: make(map[uint64]int64),
 	}
 	for _, id := range p.Utxos {
-		r.Utxos[id] = true
+		r.Utxos[id.UtxoId] = id.Value
 	}
 	return r
 }
 
 type AddressValueV2 struct {
 	AddressId   uint64
+	AddressType int
 	Op          int             // -1 deleted; 0 read from db; 1 added/modified
-	Utxos       map[uint64]bool // utxoid，全量数据
+	Utxos       map[uint64]int64 // utxoid，全量数据
 }
 
 func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
-	n := &AddressValueInDBV2 {
+	n := &AddressValueInDBV2{
 		AddressId: p.AddressId,
-		Utxos: make([]uint64, 0),
+		AddressType: int32(p.AddressType),
+		Utxos: make([]*UtxoIdInDB, 0),
 	}
-	for id := range p.Utxos {
-		n.Utxos = append(n.Utxos, id)
+	for id, value := range p.Utxos {
+		n.Utxos = append(n.Utxos, &UtxoIdInDB{
+			UtxoId: id,
+			Value: value,
+		})
 	}
 	return n
 }
