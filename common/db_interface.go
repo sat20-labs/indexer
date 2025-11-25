@@ -4,7 +4,7 @@ import "errors"
 
 
 var (
-	ErrKeyNotFound = errors.New("Key not found")
+	ErrKeyNotFound = errors.New("key not found")
 )
 
 type ReadBatch interface {

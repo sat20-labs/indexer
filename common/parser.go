@@ -478,7 +478,7 @@ func ParseInscriptionId(input []byte) string {
 			0 被忽略
 	*/
 
-	if input == nil || len(input) < 32 {
+	if len(input) < 32 {
 		return ""
 	}
 
