@@ -260,9 +260,9 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		}
 
 		holdermap := s.GetHoldersWithTick(name)
-		var holderAmount common.Decimal
+		var holderAmount *common.Decimal
 		for _, amt := range holdermap {
-			holderAmount = *holderAmount.Add(amt)
+			holderAmount = holderAmount.Add(amt)
 		}
 
 		mintAmount, _ := s.GetMintAmount(name)
