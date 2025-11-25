@@ -25,7 +25,7 @@ func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
 	// 过滤disabled的sat
 	disableCount := 0
 	for _, sat := range sats {
-		_, ok := p.disabledSats[sat]
+		_, ok := p.disabledSats[sat.Sat]
 		if ok {
 			disableCount++
 		}
@@ -56,11 +56,17 @@ func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 	} else {
 		nfts := p.getNftsWithSat(value.Sat)
 		if nfts != nil {
-			for _, nft := range nfts.Nfts {
-				if nft.Id == value.Id {
+			for _, nftId := range nfts.Nfts {
+				if nftId == value.Id {
+					var nft common.InscribeBaseContent
+					err := loadNftFromDB(nftId, &nft, p.db)
+					if err != nil {
+						return nil
+					}
+
 					return &common.Nft{
-						Base:           nft,
-						OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId}
+						Base:           &nft,
+						OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId, Offset: nfts.Offset}
 				}
 			}
 		}
@@ -93,19 +99,19 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 
 	satmap := make(map[int64]bool)
 	for _, sat := range value.Sats {
-		if _, ok := p.disabledSats[sat]; ok {
+		if _, ok := p.disabledSats[sat.Sat]; ok {
 			continue
 		}
-		satmap[sat] = true
+		satmap[sat.Sat] = true
 	}
 
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		for _, sat := range sats {
-			if _, ok := p.disabledSats[sat]; ok {
+			if _, ok := p.disabledSats[sat.Sat]; ok {
 				continue
 			}
-			satmap[sat] = true
+			satmap[sat.Sat] = true
 		}
 	}
 
@@ -130,8 +136,13 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 		}
 		info := p.getNftsWithSat(sat)
 		if info != nil {
-			for _, nft := range info.Nfts {
-				result = append(result, &common.Nft{Base: nft,
+			for _, nftId := range info.Nfts {
+				var nft common.InscribeBaseContent
+				err := loadNftFromDB(nftId, &nft, p.db)
+				if err != nil {
+					continue
+				}
+				result = append(result, &common.Nft{Base: &nft,
 					OwnerAddressId: info.OwnerAddressId, UtxoId: utxoId})
 			}
 		}
@@ -156,16 +167,21 @@ func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 	}
 
 	nfts := &common.NftsInSat{}
-	err = loadNftFromDB(bv.Sat, nfts, p.db)
+	err = loadNftsInSatFromDB(bv.Sat, nfts, p.db)
 	if err != nil {
 		return nil
 	}
 
-	for _, nft := range nfts.Nfts {
-		if nft.Id == id {
+	for _, nftId := range nfts.Nfts {
+		if nftId == id {
+			var nft common.InscribeBaseContent
+			err := loadNftFromDB(nftId, &nft, p.db)
+			if err != nil {
+				return nil
+			}
 			return &common.Nft{
-				Base:           nft,
-				OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId}
+				Base:           &nft,
+				OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId, Offset: nfts.Offset}
 		}
 	}
 
@@ -212,16 +228,17 @@ func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 		return nil
 	}
 	nfts := &common.NftsInSat{}
-	err := loadNftFromDB(sat, nfts, p.db)
+	err := loadNftsInSatFromDB(sat, nfts, p.db)
 	addedNfts := p.getNftInBuffer4(sat)
 	if len(addedNfts) != 0 {
 		if err != nil {
 			nfts.OwnerAddressId = addedNfts[0].OwnerAddressId
 			nfts.Sat = addedNfts[0].Base.Sat
 			nfts.UtxoId = addedNfts[0].UtxoId
+			nfts.Offset = addedNfts[0].Offset
 		}
 		for _, nft := range addedNfts {
-			nfts.Nfts = append(nfts.Nfts, nft.Base)
+			nfts.Nfts = append(nfts.Nfts, nft.Base.Id)
 		}
 	}
 

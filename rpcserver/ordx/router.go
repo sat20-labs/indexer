@@ -46,10 +46,6 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.POST(proxy+"/utxos/assets", s.handle.getAssetsWithUtxos_deprecated)
 	r.POST(proxy+"/utxos/exist", s.handle.getExistingUtxos)
 
-	// range
-	// 获取Range上所有的资产信息
-	r.GET(proxy+"/range/:start/:size", s.handle.getAssetDetailInfoWithRange)
-	r.POST(proxy+"/ranges", s.handle.getAssetDetailInfoWithRanges)
 
 	// inscribe
 	// 检查某个ticker是否可以deploy

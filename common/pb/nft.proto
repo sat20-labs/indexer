@@ -17,14 +17,17 @@ message InscribeBaseContent {
     string parent = 10;
     string delegate = 11;
     int64 id = 12;
-    int64 sat = 13;
-    string typeName = 14;
-    bytes user_data = 15;
+    uint64 base_point = 13; // utxoId
+    int64 sat = 14;
+    int32 curse_type = 15;
+    string typeName = 16;
+    bytes user_data = 17;
 }
 
 message NftsInSat {
     int64 sat = 1;
     uint64 owner_address_id = 2;
     uint64 utxo_id = 3;
-    repeated InscribeBaseContent nfts = 4;
+    int64  offset = 4;
+    repeated int64 nfts = 5;
 }

@@ -37,7 +37,7 @@ type Ticker struct {
 	BlockStart int     `json:"blockStart,omitempty"`
 	BlockEnd   int     `json:"blockEnd,omitempty"`
 	Attr       SatAttr `json:"attr,omitempty"`
-	Status     int     `json:"status"`
+	Status     int     `json:"status"` // -1: not ready; 0 minting; 1 finished.
 }
 
 type RBTreeValue_Mint struct {

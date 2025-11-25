@@ -136,6 +136,12 @@ func (p *NameService) UpdateDB() {
 			common.Log.Panicf("NameService->UpdateDB Error setting %s in db %v", key, err)
 		}
 
+		key = GetSatKey(name.Nft.Base.Sat)
+		err = db.SetDB([]byte(key), name.Name, wb)
+		if err != nil {
+			common.Log.Panicf("NameService->UpdateDB Error setting %s in db %v", key, err)
+		}
+
 		buckNames[int(name.Id)] = &BuckValue{Name: name.Name, Sat: name.Nft.Base.Sat}
 	}
 

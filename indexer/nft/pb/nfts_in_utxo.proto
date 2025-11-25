@@ -4,7 +4,12 @@ package pb.indexer.nft;
 
 option go_package = "/indexer/nft/pb";
 
+message SatOffset {
+    int64 sat = 1;
+    int64 offset = 2;
+}
+
 message NftsInUtxo {
-    repeated int64 sats = 1;
+    repeated SatOffset sats = 1;
 }
 

@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	ordx "github.com/sat20-labs/indexer/common"
 	rpcwire "github.com/sat20-labs/indexer/rpcserver/wire"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
@@ -898,100 +897,6 @@ func (s *Handle) getExistingUtxos(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// @Summary Get asset details in a range
-// @Description Get asset details in a range
-// @Tags ordx.range
-// @Produce json
-// @Param start path string true "start"
-// @Param size path string true "size"
-// @Security Bearer
-// @Success 200 {object} rpcwire.AssetsResp_deprecated "Successful response"
-// @Failure 401 "Invalid API Key"
-// @Router /range/{start}/{size} [get]
-func (s *Handle) getAssetDetailInfoWithRange(c *gin.Context) {
-	resp := &rpcwire.AssetsResp_deprecated{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	start, err := strconv.ParseInt(c.Param("start"), 10, 64)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	size, err := strconv.ParseInt(c.Param("size"), 10, 64)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	req := rpcwire.RangesReq{Ranges: []*ordx.Range{{Start: start, Size: size}}}
-	assets, err := s.model.GetDetailAssetWithRanges(&req)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	resp.Data = &rpcwire.AssetsData{
-		ListResp: rpcwire.ListResp{
-			Total: 1,
-			Start: 0,
-		},
-		Detail: assets,
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
-// @Summary Get asset details in a range
-// @Description Get asset details in a range
-// @Tags ordx.range
-// @Produce json
-// @Security Bearer
-// @Success 200 {object} rpcwire.AssetsResp_deprecated "Successful response"
-// @Failure 401 "Invalid API Key"
-// @Router /ranges [post]
-func (s *Handle) getAssetDetailInfoWithRanges(c *gin.Context) {
-	resp := &rpcwire.AssetsResp_deprecated{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	var req rpcwire.RangesReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	assets, err := s.model.GetDetailAssetWithRanges(&req)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	resp.Data = &rpcwire.AssetsData{
-		ListResp: rpcwire.ListResp{
-			Total: 1,
-			Start: 0,
-		},
-		Detail: assets,
-	}
-	c.JSON(http.StatusOK, resp)
-}
 
 // @Summary Get name service status
 // @Description Get name service status

@@ -86,7 +86,7 @@ func parseSatAttrString(s string) (common.SatAttr, error) {
 	return attr, nil
 }
 
-func skipOffsetRange(ord []*common.Range, satpoint int) []*common.Range {
+func skipOffsetRange(ord []*common.Range, satpoint int64) []*common.Range {
 	if satpoint == 0 {
 		return ord
 	}
@@ -96,7 +96,7 @@ func skipOffsetRange(ord []*common.Range, satpoint int) []*common.Range {
 		// skip the offset
 		if satpoint > 0 {
 			if int64(satpoint) >= (rng.Size) {
-				satpoint -= int(rng.Size)
+				satpoint -= (rng.Size)
 			} else {
 				newRange := common.Range{Start: rng.Start + int64(satpoint), Size: rng.Size - int64(satpoint)}
 				result = append(result, &newRange)
@@ -130,7 +130,7 @@ func reSizeRange(ord []*common.Range, amt int64) []*common.Range {
 	return result
 }
 
-func reAlignRange(ord []*common.Range, satpoint int, amt int64) []*common.Range {
+func reAlignRange(ord []*common.Range, satpoint int64, amt int64) []*common.Range {
 	ret := skipOffsetRange(ord, satpoint)
 	return reSizeRange(ret, amt)
 }

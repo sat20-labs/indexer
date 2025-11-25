@@ -314,7 +314,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			continue
 		}
 		// Sort balanceArray by id so tests can assert balanceArray in a fixed order
-		outpoint := &table.OutPoint{UtxoId: common.GetUtxoId(tx.Outputs[vout])}
+		outpoint := &table.OutPoint{UtxoId: tx.Outputs[vout].UtxoId}
 		address, err := parseTxVoutScriptAddress(tx, int(vout), *s.chaincfgParam)
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
@@ -425,7 +425,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if outIndex != nil {
 			// 有效的输出
 			output := tx.Outputs[*outIndex]
-			utxoId := common.GetUtxoId(output)
+			utxoId := output.UtxoId
 			address, err := parseTxVoutScriptAddress(tx, int(*outIndex), *s.chaincfgParam)
 			if err != nil {
 				common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",

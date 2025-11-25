@@ -586,7 +586,9 @@ func CloneBaseContent(base *InscribeBaseContent) *InscribeBaseContent {
 		Parent:             base.Parent,
 		Delegate:           base.Delegate,
 		Id:                 base.Id,
+		BasePoint:          base.BasePoint,
 		Sat:                base.Sat,
+		CurseType:          base.CurseType,
 		TypeName:           base.TypeName,
 		UserData:           base.UserData,
 	}

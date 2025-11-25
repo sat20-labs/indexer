@@ -7,6 +7,9 @@ import (
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
+const RANGE_IN_GLOBAL = false // true: Range 表示一个satoshi的全局编码，一个 [0, 2099999997690000) 的数字
+						      // false: Range表示特殊聪在当前utxo中的范围。使用false，可以极大降低数据存储需求
+
 type Range = pb.MyRange
 
 type Input struct {
@@ -14,6 +17,7 @@ type Input struct {
 	UtxoId   uint64         `json:"utxoid"`
 	Address  *ScriptPubKey  `json:"scriptPubKey"`
 	Vout     int64          `json:"vout"`
+	Value    int64          `json:"value"`
 	Ordinals []*Range       `json:"ordinals"`
 	Witness  wire.TxWitness `json:"witness"`
 }
@@ -34,10 +38,27 @@ type Output struct {
 	Ordinals []*Range      `json:"ordinals"`
 }
 
+type TxInput struct {
+	TxOutput
+	Witness  wire.TxWitness
+	Address  *ScriptPubKey
+	Vout     int
+	Txid     string
+}
+
+type TxOutputV2 struct {
+	TxOutput
+	Address  *ScriptPubKey
+	Vout     int
+	TxIndex  int
+	Height   int
+	Ordinals []*Range
+}
+
 type Transaction struct {
-	Txid    string    `json:"txid"`
-	Inputs  []*Input  `json:"inputs"`
-	Outputs []*Output `json:"outputs"`
+	Txid    string       `json:"txid"`
+	Inputs  []*TxInput   `json:"inputs"`
+	Outputs []*TxOutputV2  `json:"outputs"`
 }
 
 type Block struct {
@@ -49,5 +70,5 @@ type Block struct {
 }
 
 type UTXOIndex struct {
-	Index map[string]*Output
+	Index map[string]*TxOutputV2
 }

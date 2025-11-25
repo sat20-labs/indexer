@@ -72,12 +72,7 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 	return false
 }
 
-func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
-	utxoId, rngs, err := b.rpcService.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
-		return false
-	}
-
+func (b *IndexerMgr) HasAssetInUtxo(utxoId uint64, excludingExotic bool) bool {
 	result := b.nft.HasNftInUtxo(utxoId)
 	if result {
 		return true
@@ -97,7 +92,7 @@ func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
 		return true
 	}
 
-	if !excludingExotic && b.exotic.HasExoticInRanges(rngs) {
+	if !excludingExotic && b.exotic.HasExoticInUtxo(utxoId) {
 		return true
 	}
 
@@ -443,28 +438,6 @@ func (b *IndexerMgr) GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRa
 				}
 			}
 		}
-	}
-
-	return result
-}
-
-// return: ticker -> assets(inscriptionId->Ranges)
-func (b *IndexerMgr) GetAssetsWithRanges(ranges []*common.Range) map[string]map[string][]*common.Range {
-	result := b.ftIndexer.GetAssetsWithRanges(ranges)
-	if result == nil {
-		result = make(map[string]map[string][]*common.Range)
-	}
-	ret := b.getNftsWithRanges(ranges)
-	if len(ret) > 0 {
-		result[common.ASSET_TYPE_NFT] = ret
-	}
-	ret = b.getNamesWithRanges(ranges)
-	if len(ret) > 0 {
-		result[common.ASSET_TYPE_NS] = ret
-	}
-	ret = b.exotic.GetExoticsWithRanges2(ranges)
-	if len(ret) > 0 {
-		result[common.ASSET_TYPE_EXOTIC] = ret
 	}
 
 	return result

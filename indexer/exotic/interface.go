@@ -7,6 +7,15 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
+
+func (p *ExoticIndexer) HasExoticInUtxo(utxoId uint64) bool {
+	return false
+}
+
+func (p *ExoticIndexer) GetExotics(utxoId uint64) []*common.ExoticRange {
+	return nil
+}
+
 func (p *ExoticIndexer) GetExoticsWithRanges(ranges []*common.Range) []*common.ExoticRange {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -64,6 +73,11 @@ func (p *ExoticIndexer) HasExoticInRanges(ranges []*common.Range) bool {
 	}
 
 	return false
+}
+
+
+func (p *ExoticIndexer) GetExoticsWithTypeV2(utxoId uint64, typ string) []*common.ExoticRange {
+	return nil
 }
 
 func (p *ExoticIndexer) GetExoticsWithType(ranges []*common.Range, typ string) []*common.ExoticRange {

@@ -294,9 +294,9 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	}
 }
 
-func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
+func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV2, inputTransferNfts *map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
-	utxoId := common.GetUtxoId(output)
+	utxoId := output.UtxoId
 	ids := s.nftIndexer.GetNftsWithUtxo(utxoId) // 有可能多个transfer nft，合并输出到一个output中
 	for _, nft := range ids {
 		transferNft, ok := (*inputTransferNfts)[nft.Base.Id]

@@ -41,19 +41,29 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 	transactions := block.Transactions()
 	txs := make([]*common.Transaction, len(transactions))
 	for i, tx := range transactions {
-		inputs := []*common.Input{}
-		outputs := []*common.Output{}
+		inputs := []*common.TxInput{}
+		outputs := []*common.TxOutputV2{}
 
-		for _, v := range tx.MsgTx().TxIn {
-			txid := v.PreviousOutPoint.Hash.String()
-			vout := v.PreviousOutPoint.Index
-			input := &common.Input{Txid: txid, Vout: int64(vout), Witness: v.Witness}
+		msgTx := tx.MsgTx()
+		for _, txIn := range msgTx.TxIn {
+			input := &common.TxInput{
+				TxOutput: common.TxOutput{
+					UtxoId:      common.INVALID_ID,
+					OutPointStr: txIn.PreviousOutPoint.String(),
+					Offsets:     make(map[common.AssetName]common.AssetOffsets),
+					SatBindingMap: make(map[int64]*common.AssetInfo),
+					Invalids: make(map[common.AssetName]bool),
+				},
+				Witness: txIn.Witness,
+				Vout: int(txIn.PreviousOutPoint.Index),
+				Txid: txIn.PreviousOutPoint.Hash.String(),
+			}
 			inputs = append(inputs, input)
 		}
 
 		// parse the raw tx values
-		for j, v := range tx.MsgTx().TxOut {
-			// Determine the type of the script and extract the address
+		for j, v := range msgTx.TxOut {
+			//Determine the type of the script and extract the address
 			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, b.chaincfgParam)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
@@ -92,8 +102,15 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 				}
 			}
 
-			output := &common.Output{Height: height, TxId: i, Value: v.Value, Address: &receiver, N: int64(j)}
-			outputs = append(outputs, output)
+			output := common.GenerateTxOutput(msgTx, j)
+			output.UtxoId = common.ToUtxoId(height, i, j)
+			outputs = append(outputs, &common.TxOutputV2{
+				TxOutput: *output,
+				Address: &receiver,
+				TxIndex: i,
+				Vout:    j,
+				Height:  height,
+			})
 		}
 
 		txs[i] = &common.Transaction{

@@ -8,6 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -24,7 +25,7 @@ type AddressStatus struct {
 	Op        int // 0 existed; 1 added
 }
 
-type BlockProcCallback func(*common.Block)
+type BlockProcCallback func(*common.Block, []*common.Range)
 type UpdateDBCallback func()
 
 type BaseIndexer struct {
@@ -235,7 +236,7 @@ func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
 	for _, v := range b.utxoIndex.Index {
 		if v.Address.Type == int(txscript.NullDataTy) {
 			// 只有OP_RETURN 才不记录
-			if v.Value == 0 {
+			if v.OutValue.Value == 0 {
 				continue
 			}
 		}
@@ -291,7 +292,7 @@ func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
 		for _, v := range b.utxoIndex.Index {
 			if v.Address.Type == int(txscript.NullDataTy) {
 				// 只有OP_RETURN 才不记录
-				if v.Value == 0 {
+				if v.OutValue.Value == 0 {
 					continue
 				}
 			}
@@ -418,7 +419,7 @@ func (b *BaseIndexer) UpdateDB() {
 		// 比如：21e48796d17bcab49b1fea7211199c0fa1e296d2ecf4cf2f900cee62153ee331的所有输出 （testnet）
 		if v.Address.Type == int(txscript.NullDataTy) {
 			// 只有OP_RETURN 才不记录
-			if v.Value == 0 {
+			if v.OutValue.Value == 0 {
 				utxoSkipped++
 				continue
 			} else {
@@ -428,14 +429,16 @@ func (b *BaseIndexer) UpdateDB() {
 		}
 		// 9173744691ac25f3cd94f35d4fc0e0a2b9d1ab17b4fe562acc07660552f95518 输出大量0sats的utxo
 		key := db.GetUTXODBKey(k)
-		utxoId := common.GetUtxoId(v)
+		utxoId := v.UtxoId
+
+
 
 		addressIds := make([]uint64, 0)
 		for i, address := range v.Address.Addresses {
 			addrvalue := addressValueMap[address]
 			addressIds = append(addressIds, addrvalue.AddressId)
 			addrkey := db.GetAddressValueDBKey(addrvalue.AddressId, utxoId, int(v.Address.Type), i)
-			err := db.SetRawDB(addrkey, common.Uint64ToBytes(uint64(v.Value)), wb)
+			err := db.SetRawDB(addrkey, common.Uint64ToBytes(uint64(v.OutValue.Value)), wb)
 			if err != nil {
 				common.Log.Panicf("Error setting in db %v", err)
 			}
@@ -449,10 +452,12 @@ func (b *BaseIndexer) UpdateDB() {
 
 		saveUTXO := &common.UtxoValueInDB{
 			UtxoId:      utxoId,
+			Value:       v.OutValue.Value,
 			AddressType: uint32(v.Address.Type),
 			ReqSigs:     uint32(v.Address.ReqSig),
+			PkScript:    v.OutValue.PkScript,
 			AddressIds:  addressIds,
-			Ordinals:    v.Ordinals,
+			Ordinals:    nil,
 		}
 		//err = db.SetDB(key, saveUTXO, wb)
 		err := db.SetDBWithProto3(key, saveUTXO, wb)
@@ -464,7 +469,7 @@ func (b *BaseIndexer) UpdateDB() {
 			common.Log.Panicf("Error setting in db %v", err)
 		}
 		utxoAdded++
-		satsAdded += v.Value
+		satsAdded += v.OutValue.Value
 	}
 	common.Log.Infof("BaseIndexer.updateBasicDB-> add utxos %d (+ %d), cost: %v", utxoAdded, utxoSkipped, time.Since(startTime))
 
@@ -564,9 +569,10 @@ func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, u
 	}
 }
 
-func (b *BaseIndexer) addUtxo(addrmap *map[string]*common.AddressValueInDB, output *common.Output) {
-	utxoId := common.GetUtxoId(output)
-	sats := output.Value
+func (b *BaseIndexer) addUtxo(addrmap *map[string]*common.AddressValueInDB, output *common.TxOutputV2) {
+	utxoId := output.UtxoId
+	sats := output.OutValue.Value
+	
 	for _, address := range output.Address.Addresses {
 		value, ok := (*addrmap)[address]
 		if ok {
@@ -592,6 +598,7 @@ func (b *BaseIndexer) addUtxo(addrmap *map[string]*common.AddressValueInDB, outp
 			(*addrmap)[address] = value
 		}
 	}
+	
 }
 
 func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
@@ -681,7 +688,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			b.prefetchIndexesFromDB(block)
 			common.Log.Infof("BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: %v", time.Since(localStartTime))
 			localStartTime = time.Now()
-			b.assignOrdinals_sat20(block)
+			coinbase := b.assignOrdinals_sat20(block)
 			common.Log.Infof("BaseIndexer.SyncToBlock-> assignOrdinals: cost: %v", time.Since(localStartTime))
 
 			// Update the sync stats
@@ -693,7 +700,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			}
 
 			//localStartTime = time.Now()
-			b.blockprocCB(block)
+			b.blockprocCB(block, coinbase)
 			//common.Log.Infof("BaseIndexer.SyncToBlock-> blockproc: cost: %v", time.Since(localStartTime))
 
 			if (block.Height != 0 && block.Height%b.periodFlushToDB == 0 && height-block.Height > b.keepBlockHistory) ||
@@ -748,7 +755,7 @@ func appendRanges(rngs1, rngs2 []*common.Range) []*common.Range {
 	}
 }
 
-func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
+func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range {
 	first := b.lastSats
 	coinbaseOrdinals := []*common.Range{{Start: first, Size: 0}}
 	blockValue := &common.BlockValueInDB{Height: block.Height,
@@ -763,6 +770,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	satsOutput := int64(0)
 	for _, tx := range block.Transactions[1:] {
 		ranges := make([]*common.Range, 0)
+		var inValue int64
 		for _, input := range tx.Inputs {
 			// the utxo to be spent in the format txid:vout
 			utxoKey := common.GetUtxo(block.Height, input.Txid, int(input.Vout))
@@ -774,64 +782,52 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 			}
 			deledUtxoCount++
 			delete(b.utxoIndex.Index, utxoKey)
-			utxoid := common.GetUtxoId(inputUtxo)
+			utxoid := inputUtxo.UtxoId
 			
 			value := &UtxoValue{Utxo: utxoKey, Address: inputUtxo.Address,
-				UtxoId: utxoid, Value: inputUtxo.Value}
+				UtxoId: utxoid, Value: inputUtxo.OutValue.Value}
 			b.delUTXOs = append(b.delUTXOs, value)
 			
-			satsInput += inputUtxo.Value
+			inValue += inputUtxo.OutValue.Value
 
-			input.Address = inputUtxo.Address
-			input.Ordinals = common.CloneRanges(inputUtxo.Ordinals)
+			input.OutValue = inputUtxo.OutValue
 			input.UtxoId = utxoid
-
-			// add the utxo's ordinals to the list of ordinals to be transferred
-			ranges = appendRanges(ranges, inputUtxo.Ordinals)
+			input.Address = inputUtxo.Address
 		}
+		satsInput += inValue
 
+		var outValue int64
 		for _, output := range tx.Outputs {
-			// transfer the ordinals to the output
-			transferred, remaining := common.TransferRanges(ranges, output.Value)
-			output.Ordinals = common.CloneRanges(transferred)
-			ranges = remaining
 			// add the output to the utxo index
-			u := common.GetUtxo(block.Height, tx.Txid, int(output.N))
+			u := common.GetUtxo(block.Height, tx.Txid, int(output.Vout))
 			b.utxoIndex.Index[u] = output
 			addedUtxoCount++
-			satsOutput += output.Value
+			outValue += output.OutValue.Value
 		}
+		satsOutput += outValue
 
-		// add the remaining ordinals to the coinbase ordinals
-		// those are the ordinals spent on fees
-		coinbaseOrdinals = appendRanges(coinbaseOrdinals, ranges)
+		if common.RANGE_IN_GLOBAL {
+			// add the remaining ordinals to the coinbase ordinals
+			// those are the ordinals spent on fees
+			coinbaseOrdinals = appendRanges(coinbaseOrdinals, ranges)
+		} else {
+			coinbaseOrdinals = append(coinbaseOrdinals, &common.Range{Start: 0, Size: inValue-outValue})
+		}
 	}
 
 	for _, output := range block.Transactions[0].Outputs {
-		u := common.GetUtxo(block.Height, block.Transactions[0].Txid, int(output.N))
+		u := common.GetUtxo(block.Height, block.Transactions[0].Txid, int(output.Vout))
 		b.utxoIndex.Index[u] = output
 		addedUtxoCount++
-		satsOutput += output.Value
+		satsOutput += output.OutValue.Value
 	}
 
+	// sat20 跟ordinals协议唯一不同的地方：实际奖励了多少聪，就编码多少聪在coinbase交易的前面，后面跟着每一笔交易的网络费
 	// adjust the coinbaseOrdinals[0]
 	size := satsOutput - satsInput
 	coinbaseOrdinals[0].Size = size
 	b.lastSats += size
 
-	for _, output := range block.Transactions[0].Outputs {
-		// transfer the coinbase ordinals to the output
-		transferred, remaining := common.TransferRanges(coinbaseOrdinals, output.Value)
-		output.Ordinals = common.CloneRanges(transferred)
-		coinbaseOrdinals = remaining
-	}
-	//common.Log.Infof("b.utxoIndex.Index %d, b.delUTXOs %d, added %d, deled %d",
-	//		len(b.utxoIndex.Index), len(b.delUTXOs), addedUtxoCount, deledUtxoCount)
-
-	// testnet3，height = 33995, 没有领奖励
-	if len(coinbaseOrdinals) != 0 && coinbaseOrdinals[0].Size > 0 {
-		common.Log.Panicf("block %d sats %d-%d wrong", block.Height, first, size)
-	}
 
 	blockValue.Ordinals.Start = first
 	blockValue.Ordinals.Size = satsOutput - satsInput
@@ -841,6 +837,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) {
 	blockValue.OutputSats = satsOutput
 	blockValue.LostSats = nil // sat20, always zero. ordinals, lost sats ranges.
 	b.blockVector = append(b.blockVector, blockValue)
+	return coinbaseOrdinals
 }
 
 func (b *BaseIndexer) getAddressIdFromTxn(address string, bGenerateNew bool, txn common.ReadBatch) (uint64, bool) {
@@ -909,11 +906,22 @@ func (b *BaseIndexer) loadUtxoFromTxn(utxostr string, txn common.ReadBatch) erro
 	addresses.ReqSig = int(utxo.ReqSigs)
 
 	// TODO 对于多签的utxo，目前相当于把这个utxo给第一个地址
-	height, txid, vout := common.FromUtxoId(utxo.UtxoId)
-	b.utxoIndex.Index[utxostr] = &common.Output{Height: height, TxId: txid,
-		Value:   common.GetOrdinalsSize(utxo.Ordinals),
+	// height, txid, vout := common.FromUtxoId(utxo.UtxoId)
+	// b.utxoIndex.Index[utxostr] = &common.TxOutputV2{Height: height, TxId: txid,
+	// 	Value:   common.GetOrdinalsSize(utxo.Ordinals),
+	// 	Address: &addresses,
+	// 	N:       int64(vout), Ordinals: utxo.Ordinals}
+	b.utxoIndex.Index[utxostr] = &common.TxOutputV2{
+		TxOutput: common.TxOutput{
+			UtxoId: utxo.UtxoId,
+			OutPointStr: utxostr,
+			OutValue: wire.TxOut{
+				Value: utxo.Value,
+				PkScript: utxo.PkScript,
+			},
+		},
 		Address: &addresses,
-		N:       int64(vout), Ordinals: utxo.Ordinals}
+	}
 	return nil
 }
 
@@ -1020,11 +1028,22 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			addresses.Type = int(utxoValue.AddressType)
 			addresses.ReqSig = int(utxoValue.ReqSigs)
 
-			height, txid, vout := common.FromUtxoId(utxoValue.UtxoId)
-			b.utxoIndex.Index[utxo.value] = &common.Output{Height: height, TxId: txid,
-				Value:   common.GetOrdinalsSize(utxoValue.Ordinals),
+			// height, txid, vout := common.FromUtxoId(utxoValue.UtxoId)
+			// b.utxoIndex.Index[utxo.value] = &common.Output{Height: height, TxId: txid,
+			// 	Value:   common.GetOrdinalsSize(utxoValue.Ordinals),
+			// 	Address: &addresses,
+			// 	N:       int64(vout), Ordinals: utxoValue.Ordinals}
+			b.utxoIndex.Index[utxo.value] = &common.TxOutputV2{
+				TxOutput: common.TxOutput{
+					UtxoId: utxoValue.UtxoId,
+					OutPointStr: utxo.value,
+					OutValue: wire.TxOut{
+						Value: utxoValue.Value,
+						PkScript: utxoValue.PkScript,
+					},
+				},
 				Address: &addresses,
-				N:       int64(vout), Ordinals: utxoValue.Ordinals}
+			}
 		}
 
 		type addressIdPair struct {
@@ -1202,7 +1221,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 		// 	common.Log.Infof("%x %s", value.UtxoId, str)
 		// }
 
-		sats := (common.GetOrdinalsSize(value.Ordinals))
+		sats := value.Value
 		if sats > 0 {
 			nonZeroUtxo++
 		}

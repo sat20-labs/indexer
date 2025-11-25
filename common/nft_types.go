@@ -9,6 +9,16 @@ type Nft struct {
 	Base           *InscribeBaseContent
 	OwnerAddressId uint64
 	UtxoId         uint64
+	Offset         int64
+}
+
+func (p *Nft) Clone() *Nft {
+	return &Nft{
+		Base: p.Base, // 固定数据
+		OwnerAddressId: p.OwnerAddressId,
+		UtxoId: p.UtxoId,
+		Offset: p.Offset,
+	}
 }
 
 type NftStatus struct {

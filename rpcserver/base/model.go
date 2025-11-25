@@ -21,7 +21,7 @@ func NewModel(i base_indexer.Indexer) *Model {
 }
 
 func (s *Model) GetSatRangeInUtxo(utxo string) (*wire.ExoticSatRangeUtxo, error) {
-	_, utxoRanges, err := s.indexer.GetOrdinalsWithUtxo(utxo)
+	utxoId, utxoRanges, err := s.indexer.GetOrdinalsWithUtxo(utxo)
 	if err != nil {
 		common.Log.Errorf("GetOrdinalsForUTXO failed, %s", utxo)
 		return nil, err
@@ -29,7 +29,7 @@ func (s *Model) GetSatRangeInUtxo(utxo string) (*wire.ExoticSatRangeUtxo, error)
 
 	// Caluclate the offset for each range
 	var satList []wire.SatDetailInfo
-	sr := s.indexer.GetExoticsWithRanges(utxoRanges)
+	sr := s.indexer.GetExotics(utxoId)
 	for _, r := range sr {
 		exoticSat := exotic.Sat(r.Range.Start)
 		sat := wire.SatDetailInfo{
@@ -81,20 +81,20 @@ func (s *Model) GetExoticUtxos(address string) ([]*wire.ExoticSatRangeUtxo, erro
 	}
 	satributeSatList := make([]*wire.ExoticSatRangeUtxo, 0)
 	for utxoId, value := range utxoList {
-		utxo, res, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
+		utxo, _, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
 		if err != nil {
 			common.Log.Errorf("GetOrdinalsWithUtxoId failed, %d", utxoId)
 			return nil, err
 		}
 
-		if s.indexer.HasAssetInUtxo(utxo, true) {
+		if s.indexer.HasAssetInUtxo(utxoId, true) {
 			//common.Log.Infof("HasAssetInUtxo return true %s", utxo)
 			continue
 		}
 
 		// Caluclate the offset for each range
 		var satList []wire.SatDetailInfo
-		sr := s.indexer.GetExoticsWithRanges(res)
+		sr := s.indexer.GetExotics(utxoId)
 		for _, r := range sr {
 			exoticSat := exotic.Sat(r.Range.Start)
 			sat := wire.SatDetailInfo{
@@ -160,7 +160,7 @@ func (s *Model) getPlainUtxos(address string, value int64, start, limit int) ([]
 			continue
 		}
 
-		if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxo, false) {
+		if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxoId.UtxoId, false) {
 			continue
 		}
 
@@ -240,7 +240,7 @@ func (s *Model) getAllUtxos(address string, start, limit int) ([]*wire.PlainUtxo
 
 		height, index, _ := common.FromUtxoId(utxoId.UtxoId)
 		//Find common utxo (that is, utxo with non-ordinal attributes)
-		if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxo, false) {
+		if base_indexer.ShareBaseIndexer.HasAssetInUtxo(utxoId.UtxoId, false) {
 			otherUtxos = append(otherUtxos, &wire.PlainUtxo{
 				Height: height,
 				Index: index,
@@ -277,19 +277,19 @@ func (s *Model) GetExoticUtxosWithType(address string, typ string, amount int64)
 		}
 
 		//Indicates that this utxo has been spent and cannot be used for indexing
-		utxo, ranges, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
+		utxo, _, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
 		if err != nil {
 			common.Log.Errorf("GetOrdinalsForUTXO failed, %d", utxoId)
 			continue
 		}
 
 		// //Find common utxo (that is, utxo with non-ordinal attributes)
-		if s.indexer.HasAssetInUtxo(utxo, true) {
+		if s.indexer.HasAssetInUtxo(utxoId, true) {
 			//common.Log.Infof("HasAssetInUtxo return true %s", utxo)
 			continue
 		}
 
-		exoticRanges := s.indexer.GetExoticsWithType(ranges, typ)
+		exoticRanges := s.indexer.GetExoticsWithType(utxoId, typ)
 
 		total := int64(0)
 		sats := make([]wire.SatRange, 0)

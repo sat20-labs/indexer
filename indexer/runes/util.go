@@ -28,8 +28,7 @@ func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.I
 func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, err error) {
 	var msgTx wire.MsgTx
 	for _, output := range transaction.Outputs {
-		pkScript := output.Address.PkScript
-		msgTx.AddTxOut(wire.NewTxOut(output.Value, pkScript))
+		msgTx.AddTxOut(&output.OutValue)
 	}
 	runestone := &runestone.Runestone{}
 	ret, err = runestone.DecipherFromTx(&msgTx)

@@ -1,13 +1,14 @@
 package nft
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
-	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
@@ -15,9 +16,9 @@ type SatInfo struct {
 	AddressId uint64
 	Index     int
 	UtxoId    uint64
+	Offset    int64
+	Nfts      map[int64]bool // nftId
 }
-
-var _using_sattree = true
 
 // 所有nft的记录
 // 以后ns和ordx模块，数据变大，导致加载、跑数据等太慢，需要按照这个模块的方式来修改优化。
@@ -31,13 +32,13 @@ type NftIndexer struct {
 	mutex       sync.RWMutex
 
 	// realtime buffer
-	satTree *indexer.SatRBTree // key: sat, 用于范围搜索
-	utxoMap map[uint64][]int64 // utxo->sats  确保utxo中包含的所有nft都列在这里
-	satMap  map[int64]*SatInfo // sat->utxo
+	utxoMap          map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
+	satMap           map[int64]*SatInfo // key: sat, 一个写入周期中新增加的铭文的转移结果
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
-	nftAdded  []*common.Nft // 保持顺序
-	utxoDeled []uint64
+	nftAdded  		 []*common.Nft // 保持顺序
+	nftAddedUtxoMap  map[uint64]map[int64]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
+	utxoDeled 		 []uint64
 }
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
@@ -62,10 +63,10 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 
 func (p *NftIndexer) reset() {
 	//p.disabledSats = make(map[int64]bool)
-	p.satTree = indexer.NewSatRBTress()
-	p.utxoMap = make(map[uint64][]int64)
+	p.utxoMap = make(map[uint64][]*SatOffset)
 	p.satMap = make(map[int64]*SatInfo)
 	p.nftAdded = make([]*common.Nft, 0)
+	p.nftAddedUtxoMap = make(map[uint64]map[int64]*common.Nft)
 	p.utxoDeled = make([]uint64, 0)
 }
 
@@ -76,19 +77,36 @@ func (p *NftIndexer) Clone() *NftIndexer {
 	newInst := NewNftIndexer(p.db)
 
 	newInst.disabledSats = p.disabledSats // 仅在rpc中使用
-	newInst.utxoMap = make(map[uint64][]int64)
+	newInst.utxoMap = make(map[uint64][]*SatOffset)
 	for k, v := range p.utxoMap {
-		nv := make([]int64, len(v))
-		copy(nv, v)
+		nv := make([]*SatOffset, len(v))
+		for i, s := range v {
+			nv[i] = &SatOffset{
+				Sat: s.Sat,
+				Offset: s.Offset,
+			}
+		}
 		newInst.utxoMap[k] = nv
 	}
 	newInst.satMap = make(map[int64]*SatInfo)
 	for k, v := range p.satMap {
-		newInst.satMap[k] = v
+		newV := &SatInfo{
+			AddressId: v.AddressId,
+			Index: v.Index,
+			UtxoId: v.UtxoId,
+			Offset: v.Offset,
+			Nfts: make(map[int64]bool),
+		}
+		for nftId := range v.Nfts {
+			newV.Nfts[nftId] = true
+		}
+		newInst.satMap[k] = newV
 	}
 
 	newInst.nftAdded = make([]*common.Nft, len(p.nftAdded))
-	copy(newInst.nftAdded, p.nftAdded)
+	for i, nft := range p.nftAdded {
+		newInst.nftAdded[i] = nft.Clone()
+	}
 
 	newInst.utxoDeled = make([]uint64, len(p.utxoDeled))
 	copy(newInst.utxoDeled, p.utxoDeled)
@@ -136,7 +154,7 @@ func (p *NftIndexer) GetBaseIndexer() *base.BaseIndexer {
 
 func (p *NftIndexer) Repair() {
 
-	fixingUtxoMap := make(map[uint64][]int64)
+	fixingUtxoMap := make(map[uint64][]*SatOffset)
 	p.db.BatchRead([]byte(DB_PREFIX_UTXO), false, func(k, v []byte) error {
 		var value NftsInUtxo
 		err := db.DecodeBytesWithProto3(v, &value)
@@ -150,10 +168,10 @@ func (p *NftIndexer) Repair() {
 		}
 
 		for _, sat := range value.Sats {
-			if sat < 0 {
-				nv := make([]int64, 0)
+			if sat.Sat < 0 {
+				nv := make([]*SatOffset, 0)
 				for _, sat := range value.Sats {
-					if sat >= 0 {
+					if sat.Sat >= 0 {
 						nv = append(nv, sat)
 					}
 				}
@@ -195,10 +213,14 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	if nft.UtxoId == 1016876457263104 || nft.UtxoId == 1022786333310976 || nft.UtxoId == 1022958131478528 {
+			common.Log.Infof("")
+		}
+
 	nft.Base.Id = int64(p.status.Count)
 	p.status.Count++
 	p.nftAdded = append(p.nftAdded, nft)
-
+	
 	if nft.Base.Sat < 0 {
 		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
 		p.status.Unbound++
@@ -206,32 +228,49 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 		return
 	}
 
-	// 确保该nft已经加入utxomap中
-	p.addSatToUtxo(nft.UtxoId, nft.Base.Sat)
-	p.satMap[(nft.Base.Sat)] = &SatInfo{AddressId: nft.OwnerAddressId, Index: 0, UtxoId: nft.UtxoId}
-	p.satTree.Put(nft.Base.Sat, true)
+	nftmap, ok := p.nftAddedUtxoMap[nft.UtxoId]
+	if ok {
+		nftmap[nft.Base.Id] = nft
+	} else {
+		nftmap = make(map[int64]*common.Nft)
+		p.nftAddedUtxoMap[nft.UtxoId] = nftmap
+	}
+	nftmap[nft.Base.Id] = nft
 
-	//action := TransferAction{UtxoId: inputUtxo, Sats: v, Action: -1}
-	//p.transferActionList = append(p.transferActionList, &action)
-
-	//action2 := TransferAction{UtxoId: nft.UtxoId, AddressId: nft.OwnerAddressId, Sats: sats, Action: 1}
-	//p.transferActionList = append(p.transferActionList, &action2)
+	// 这里还没有调用过UpdateTransfer，utxoMap中的数据可能不准确，因为一个区块中，nft可能转移多次，所以这里只记录增量
+	// satOffsetVector := p.getBindingSatsWithUtxo(nft.UtxoId)
+	// if !common.RANGE_IN_GLOBAL {
+	// 	// 同一个sat，使用最早的定义
+	// 	for _, s := range satOffsetVector {
+	// 		if s.Offset == nft.Offset {
+	// 			nft.Base.Sat = s.Sat
+	// 			break
+	// 		}
+	// 	}
+	// }
+	// p.utxoMap[nft.UtxoId] = append(satOffsetVector, &SatOffset{Sat:nft.Base.Sat, Offset: nft.Offset})
+	//p.satMap[(nft.Base.Sat)] = &SatInfo{AddressId: nft.OwnerAddressId, Index: 0, UtxoId: nft.UtxoId, Offset: nft.Offset}
 }
 
 // Mint和Transfer需要仔细协调，确保新增加的nft可以正确被转移
-func (p *NftIndexer) UpdateTransfer(block *common.Block) {
+func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
 	if !p.bEnabled {
 		return
+	}
+
+	if block.Height == 29595 {
+		common.Log.Infof("")
 	}
 
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	// 预加载
 	startTime := time.Now()
 	p.db.View(func(txn common.ReadBatch) error {
 		type pair struct {
 			key   string
-			value uint64
+			value uint64 // utxoId
 		}
 		utxos := make([]*pair, 0)
 		for _, tx := range block.Transactions[1:] {
@@ -250,6 +289,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 		sort.Slice(utxos, func(i, j int) bool {
 			return utxos[i].key < utxos[j].key
 		})
+		sats := make(map[int64]bool)
 		for _, v := range utxos {
 			value := NftsInUtxo{}
 			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &value)
@@ -257,134 +297,218 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 				continue
 			}
 			p.utxoMap[v.value] = value.Sats
+			for _, sat := range value.Sats {
+				sats[sat.Sat] = true
+			}
 		}
+
+		satVector := make([]int64, 0, len(sats))
+		for k := range sats {
+			satVector = append(satVector, k)
+		}
+		sort.Slice(satVector, func(i, j int) bool {
+			return satVector[i] < satVector[j]
+		})
+		for _, v := range satVector {
+			_, ok := p.satMap[v]
+			if ok {
+				continue
+			}
+			value := common.NftsInSat{}
+			err := loadNftsInSatFromTxn(v, &value, txn)
+			if err != nil {
+				continue
+			}
+			
+			info := &SatInfo{
+				AddressId: value.OwnerAddressId,
+				Index: 0,
+				UtxoId: value.UtxoId,
+				Offset: value.Offset,
+				Nfts: make(map[int64]bool),
+			}
+			for _, nftId := range value.Nfts {
+				info.Nfts[nftId] = true
+			}
+			p.satMap[v] = info
+		}
+
 		return nil
 	})
 
-	bindingSatsInCoinbase := make([]int64, 0)
+	// 计算新位置
+	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
-		bindingSats := make([]int64, 0)
-		hasAsset := false
+		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
+			if input.UtxoId == 1016876457263104 || input.UtxoId == 1022786333310976 || input.UtxoId == 1022958131478528 {
+				common.Log.Infof("")
+			}
 			sats := p.utxoMap[input.UtxoId]
-			if _using_sattree {
-				for _, sat := range sats {
-					p.satTree.Put(sat, true)
+			addedNft := p.nftAddedUtxoMap[input.UtxoId]
+			if addedNft != nil {
+				if len(sats) > 0 {
+					// 合并铸造结果
+					appended := make([]*SatOffset, 0)
+					for _, nft := range addedNft {
+						needAppend := true
+						for _, s := range sats {
+							if s.Offset == nft.Offset { // 同一个聪，需要命名一致
+								if s.Sat != nft.Base.Sat {
+									nft.Base.Sat = s.Sat
+								}
+								needAppend = false
+								break
+							}
+						}
+						if needAppend {
+							sats = append(sats, &SatOffset{
+								Sat: nft.Base.Sat,
+								Offset: nft.Offset,
+							})
+						}
+					}
+					sats = append(sats, appended...)
+				} else {
+					for _, nft := range addedNft {
+						sats = append(sats, &SatOffset{
+							Sat: nft.Base.Sat,
+							Offset: nft.Offset,
+						})
+					}
 				}
-			} else {
-				bindingSats = append(bindingSats, sats...)
+
+				// 添加到satMap
+				for _, nft := range addedNft {
+					info, ok := p.satMap[nft.Base.Sat]
+					if ok {
+						info.Nfts[nft.Base.Id] = true
+					} else {
+						info = &SatInfo{
+							AddressId: nft.OwnerAddressId,
+							Index: 0,
+							UtxoId: nft.UtxoId,
+							Offset: nft.Offset,
+							Nfts: make(map[int64]bool),
+						}
+						info.Nfts[nft.Base.Id] = true
+						p.satMap[nft.Base.Sat] = info
+					}
+				}
 			}
 
 			if len(sats) > 0 {
-				hasAsset = true
+				for _, sat := range sats {
+					asset := common.AssetInfo{
+						Name: common.AssetName{
+							Protocol: common.PROTOCOL_NAME_ORD,
+							Type: common.ASSET_TYPE_NFT,
+							Ticker: fmt.Sprintf("%d", sat.Sat), // 绑定了资产的聪
+						},
+						Amount: *common.NewDecimal(1, 0),
+						BindingSat: 1,
+					}
+					input.Assets.Add(&asset)
+					input.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: sat.Offset, End: sat.Offset+1}}
+				}
+
 				delete(p.utxoMap, input.UtxoId)
 				p.utxoDeled = append(p.utxoDeled, input.UtxoId)
 			}
+
+			if allInput == nil {
+				allInput = input.Clone()
+			} else {
+				allInput.Append(&input.TxOutput)
+			}
 		}
 
-		if hasAsset {
-			for _, output := range tx.Outputs {
-				if _using_sattree {
-					p.innerUpdateTransfer2(output)
-				} else {
-					bindingSats = p.innerUpdateTransfer3(output, bindingSats)
-				}
-			}
-			if len(bindingSats) > 0 {
-				bindingSatsInCoinbase = append(bindingSatsInCoinbase, bindingSats...)
-			}
+		change := p.innerUpdateTransfer3(tx, allInput)
+		coinbaseInput.Append(change)
+	}
+
+	if len(coinbaseInput.Assets) != 0 {
+		tx := block.Transactions[0]
+		change := p.innerUpdateTransfer3(tx, coinbaseInput)
+		if !change.Zero() {
+			common.Log.Panicf("UpdateTransfer should consume all input assets")
 		}
 	}
 
-	// 按顺序是最后一块，要放最后，保持顺序很重要
-	tx := block.Transactions[0]
-	for _, output := range tx.Outputs {
-		if _using_sattree {
-			p.innerUpdateTransfer2(output)
-		} else {
-			bindingSatsInCoinbase = p.innerUpdateTransfer3(output, bindingSatsInCoinbase)
-		}
-	}
+	p.nftAddedUtxoMap = make(map[uint64]map[int64]*common.Nft)
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
 
-func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
-	bUpdated := false
-	newUtxo := common.GetUtxoId(output)
 
-	sats := make([]int64, 0)
-	for _, r := range output.Ordinals {
-		values := p.satTree.FindSatValuesWithRange(r)
-		for k := range values {
-			sats = append(sats, k)
-			for i, address := range output.Address.Addresses {
-				newAddress := p.baseIndexer.GetAddressId(address)
-				p.satMap[k] = &SatInfo{AddressId: newAddress, Index: i, UtxoId: newUtxo}
-			}
-
-			bUpdated = true
-		}
-	}
-
-	if bUpdated {
-		// add output utxo
-		p.utxoMap[newUtxo] = sats
-	}
-}
-
-func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int64) []int64 {
+func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction, 
+	input *common.TxOutput) *common.TxOutput {
 	// 只考虑放在第一个地址上 (output的地址处理过，肯定有值)
-	newUtxo := common.GetUtxoId(output)
-	addressId := p.baseIndexer.GetAddressId(output.Address.Addresses[0])
-	satInfo := &SatInfo{AddressId: addressId, Index: 0, UtxoId: newUtxo}
 
-	sats := make([]int64, 0)
-	i := 0
-	for i < len(inputSats) {
-		// 单个遍历，在sat很多，range也很多的时候，性能很低，远远低于 SatRBTree
-		sat := inputSats[i]
-		if common.IsSatInRanges(sat, output.Ordinals) {
-			sats = append(sats, sat)
-			inputSats = common.RemoveIndex(inputSats, i)
-		} else {
-			i++
+	change := input
+	for _, txOut := range tx.Outputs {
+		if txOut.UtxoId == 1016876457263104 || txOut.UtxoId == 1022786333310976 || txOut.UtxoId == 1022958131478528 {
+			common.Log.Infof("")
 		}
-	}
+		if txOut.OutValue.Value == 0 {
+			continue
+		}
+		newOut, newChange, err := change.Cut(txOut.OutValue.Value)
+		if err != nil {
+			common.Log.Panicf("innerUpdateTransfer3 Cut failed, %v", err)
+		}
+		
+		change = newChange
+		if len(newOut.Assets) != 0 {
+			txOut.Assets = newOut.Assets
+			txOut.Offsets =newOut.Offsets
 
-	if len(sats) > 0 {
-		for _, k := range sats {
-			if len(output.Address.Addresses) > 0 {
-				p.satMap[k] = satInfo
+			addressId := p.baseIndexer.GetAddressId(txOut.Address.Addresses[0])
+			sats := make([]*SatOffset, 0)
+			for _, asset := range newOut.Assets {
+				offsets := newOut.Offsets[asset.Name]
+				newValue := &SatInfo{
+					AddressId: addressId, 
+					Index: 0, 
+					UtxoId: txOut.UtxoId, 
+					Offset: offsets[0].Start,
+					Nfts: make(map[int64]bool),
+				}
+				sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
+				if err != nil {
+					common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
+				}
+				
+				oldvalue := p.satMap[sat]
+				newValue.Nfts = oldvalue.Nfts
+				p.satMap[sat] = newValue
+
+				sats = append(sats, &SatOffset{
+					Sat: sat,
+					Offset: newValue.Offset,
+				})
 			}
+
+			
+			p.utxoMap[txOut.UtxoId] = sats
 		}
-
-		// add output utxo
-		p.utxoMap[newUtxo] = sats
 	}
-	return inputSats
+	return change
 }
 
-func (p *NftIndexer) addSatToUtxo(utxoId uint64, sat int64) {
-	p.db.View(func(txn common.ReadBatch) error {
-		p.getBindingSatsWithUtxo(utxoId, txn)
-		return nil
-	})
-	satmap := p.utxoMap[utxoId]
-	p.utxoMap[utxoId] = append(satmap, sat)
-}
 
 // fast
-func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64, txn common.ReadBatch) []int64 {
+func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64) []*SatOffset {
 	sats, ok := p.utxoMap[utxoId]
 	if ok {
 		return sats
 	}
 
 	value := NftsInUtxo{}
-	err := loadUtxoValueFromTxn(utxoId, &value, txn)
+	err := p.db.View(func(txn common.ReadBatch) error {
+		return loadUtxoValueFromTxn(utxoId, &value, txn)
+	})
 	if err != nil {
-		//common.Log.Infof("loadUtxoValueFromDB %d failed. %v", utxoId, err)
 		return nil
 	}
 
@@ -397,6 +521,7 @@ func (p *NftIndexer) refreshNft(nft *common.Nft) {
 	if ok {
 		nft.OwnerAddressId = satinfo.AddressId
 		nft.UtxoId = satinfo.UtxoId
+		nft.Offset = satinfo.Offset
 	}
 }
 
@@ -464,31 +589,30 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 				info := v.value
 				oldvalue.OwnerAddressId = info.AddressId
 				oldvalue.UtxoId = info.UtxoId
+				oldvalue.Offset = info.Offset
 				nftmap[v.sat] = &oldvalue
 			} //else {
 			// 在p.nftAdded中，稍等再加载
 			//}
 		}
 
-		for _, nft := range p.nftAdded {
-			value, ok := nftmap[nft.Base.Sat]
-			base := nft.Base
+		for sat, info := range p.satMap {
+			value, ok := nftmap[sat]
 			if ok {
-				value.Nfts = append(value.Nfts, base)
+				for k := range info.Nfts {
+					value.Nfts = append(value.Nfts, k)
+				}
 			} else {
 				value = &common.NftsInSat{}
-				value.Nfts = []*common.InscribeBaseContent{base}
-				value.Sat = base.Sat
-				satInfo, ok := p.satMap[base.Sat]
-				if ok {
-					// updated
-					value.OwnerAddressId = satInfo.AddressId
-					value.UtxoId = satInfo.UtxoId
-				} else {
-					value.OwnerAddressId = nft.OwnerAddressId
-					value.UtxoId = nft.UtxoId
+				for k := range info.Nfts {
+					value.Nfts = append(value.Nfts, k)
 				}
-				nftmap[base.Sat] = value
+				value.Sat = sat
+				value.OwnerAddressId = info.AddressId
+				value.UtxoId = info.UtxoId
+				value.Offset = info.Offset
+
+				nftmap[sat] = value
 			}
 		}
 
@@ -509,7 +633,7 @@ func (p *NftIndexer) UpdateDB() {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	nftmap := p.prefetchNftsFromDB()
+	//nftmap := p.prefetchNftsFromDB()
 	buckDB := NewBuckStore(p.db)
 	buckNfts := make(map[int64]*BuckValue)
 
@@ -530,13 +654,31 @@ func (p *NftIndexer) UpdateDB() {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
 		}
 
+		key = GetNftKey(nft.Base.Id)
+		err = db.SetDBWithProto3([]byte(key), nft.Base, wb)
+		if err != nil {
+			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
+		}
+
 		buckNfts[nft.Base.Id] = &BuckValue{Sat: nft.Base.Sat}
 	}
 
 	// 处理nft的转移
-	for sat, nft := range nftmap {
+	for sat, nft := range p.satMap {
 		key := GetSatKey(sat)
-		err := db.SetDBWithProto3([]byte(key), nft, wb)
+
+		info := &common.NftsInSat{
+			Sat: sat,
+			OwnerAddressId: nft.AddressId,
+			UtxoId: nft.UtxoId,
+			Offset: nft.Offset,
+			Nfts: make([]int64, 0, len(nft.Nfts)),
+		}
+		for k := range nft.Nfts {
+			info.Nfts = append(info.Nfts, k)
+		}
+
+		err := db.SetDBWithProto3([]byte(key), info, wb)
 		//err := db.SetDB([]byte(key), nft, wb)
 		if err != nil {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
@@ -577,9 +719,9 @@ func (p *NftIndexer) UpdateDB() {
 	}
 
 	// reset memory buffer
-	p.satTree = indexer.NewSatRBTress()
+	//p.satTree = indexer.NewSatRBTress()
 	p.nftAdded = make([]*common.Nft, 0)
-	p.utxoMap = make(map[uint64][]int64)
+	p.utxoMap = make(map[uint64][]*SatOffset)
 	p.utxoDeled = make([]uint64, 0)
 	p.satMap = make(map[int64]*SatInfo)
 
@@ -604,8 +746,8 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	satsInT1 := make(map[uint64]uint64, 0)
 	nftsInT1 := make(map[int64]bool, 0)
 	startTime2 := time.Now()
-	common.Log.Infof("calculating in %s table ...", DB_PREFIX_NFT)
-	p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
+	common.Log.Infof("calculating in %s table ...", DB_PREFIX_SAT)
+	p.db.BatchRead([]byte(DB_PREFIX_SAT), false, func(k, v []byte) error {
 		//defer wg.Done()
 
 		var value common.NftsInSat
@@ -615,8 +757,8 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		}
 		if value.Sat < 0 {
 			// 负数铭文，没有绑定到任何聪的铭文，只统计nft数量
-			for _, nft := range value.Nfts {
-				nftsInT1[nft.Id] = true
+			for _, nftId := range value.Nfts {
+				nftsInT1[nftId] = true
 			}
 			return nil
 		}
@@ -624,13 +766,13 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		addressesInT1[value.OwnerAddressId] = true
 		utxosInT1[value.UtxoId] = true
 		satsInT1[uint64(value.Sat)] = value.UtxoId
-		for _, nft := range value.Nfts {
-			nftsInT1[nft.Id] = true
+		for _, nftId := range value.Nfts {
+			nftsInT1[nftId] = true
 		}
 
 		return nil
 	})
-	common.Log.Infof("%s table takes %v", DB_PREFIX_NFT, time.Since(startTime2))
+	common.Log.Infof("%s table takes %v", DB_PREFIX_SAT, time.Since(startTime2))
 	common.Log.Infof("1: address %d, utxo %d, sats %d, nfts %d", len(addressesInT1), len(utxosInT1), len(satsInT1), len(nftsInT1))
 
 	// utxo的数据涉及到delete操作，但是badger的delete操作有隐藏的bug，需要检查下该utxo是否存在
@@ -654,10 +796,10 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 
 		utxosInT2[utxoId] = true
 		for _, sat := range value.Sats {
-			if sat < 0 { // 不统计负数铭文
+			if sat.Sat < 0 { // 不统计负数铭文
 				continue
 			}
-			satsInT2[uint64(sat)] = utxoId
+			satsInT2[uint64(sat.Sat)] = utxoId
 		}
 		return nil
 	})
@@ -779,7 +921,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		result = false
 	}
 
-	common.Log.Infof("utxos not in table %s", DB_PREFIX_NFT)
+	common.Log.Infof("utxos not in table %s", DB_PREFIX_UTXO)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
 		p.printfUtxos(utxos1, baseDB)
@@ -787,7 +929,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		result = false
 	}
 
-	common.Log.Infof("utxos not in table %s", DB_PREFIX_UTXO)
+	common.Log.Infof("utxos not in table %s", DB_PREFIX_SAT)
 	utxos2 := findDifferentItems(utxosInT2, utxosInT1)
 	if len(utxos2) > 0 {
 		p.printfUtxos(utxos2, baseDB)
@@ -796,14 +938,14 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	}
 
 	// needReCheck := false
-	common.Log.Infof("sats not in table %s", DB_PREFIX_NFT)
+	common.Log.Infof("sats not in table %s", DB_PREFIX_UTXO)
 	sats1 := findDifferentItemsV2(satsInT1, satsInT2)
 	if len(sats1) > 0 {
 		common.Log.Errorf("sat1 wrong %d %v", len(sats1), sats1)
 		result = false
 	}
 
-	common.Log.Infof("sats not in table %s", DB_PREFIX_UTXO)
+	common.Log.Infof("sats not in table %s", DB_PREFIX_SAT)
 	sats2 := findDifferentItemsV2(satsInT2, satsInT1)
 	if len(sats2) > 0 {
 		common.Log.Errorf("sats2 wrong %d", len(sats2))

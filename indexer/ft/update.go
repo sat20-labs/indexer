@@ -141,9 +141,9 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block) {
 	p.CheckSelf(block.Height)
 }
 
-func (p *FTIndexer) innerUpdateTransfer(output *common.Output) {
+func (p *FTIndexer) innerUpdateTransfer(output *common.TxOutputV2) {
 
-	utxo := common.GetUtxoId(output)
+	utxo := output.UtxoId
 
 	// 检查是否存在ticker。如果存在，就更新对应的holder数据
 	bUpdated := false

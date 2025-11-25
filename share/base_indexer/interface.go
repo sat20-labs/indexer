@@ -39,17 +39,15 @@ type Indexer interface {
 	GetAssetUTXOsInAddressWithTick(address string, tickerName *common.TickerName) (map[uint64]int64, error)
 	// return: mint info sorted by inscribed time
 	GetMintHistoryWithAddress(address string, tickerName *common.TickerName, start, limit int) ([]*common.MintAbbrInfo, int)
-	HasAssetInUtxo(utxo string, excludingExotic bool) bool
+	HasAssetInUtxo(utxo uint64, excludingExotic bool) bool
 	// return: ticker -> asset info (inscriptinId -> asset ranges)
 	GetAssetsWithUtxo(utxo uint64) map[common.TickerName]map[string][]*common.Range
 	// return: all asset pieces in the utxo in original sequence, including blank sats
 	GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRange
-	// return: ticker -> asset info (inscriptinId -> asset ranges)
-	GetAssetsWithRanges([]*common.Range) map[string]map[string][]*common.Range
-	// return: exotic range and types
-	GetExoticsWithRanges(ranges []*common.Range) []*common.ExoticRange
-	HasExoticInRanges(ranges []*common.Range) bool
-	GetExoticsWithType(ranges []*common.Range, typ string) []*common.ExoticRange
+	
+
+	GetExotics(utxoId uint64) []*common.ExoticRange
+	GetExoticsWithType(utxoId uint64, typ string) []*common.ExoticRange
 	AddCollection(ntype, ticker string, ids []string) error
 
 	// FT

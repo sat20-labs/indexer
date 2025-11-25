@@ -629,42 +629,6 @@ func (s *Model) GetAssetOffsetWithUtxo(utxo string) ([]*common.AssetOffsetRange,
 	return ret, nil
 }
 
-func (s *Model) GetDetailAssetWithRanges(req *rpcwire.RangesReq) (*rpcwire.AssetDetailInfo, error) {
-
-	var result rpcwire.AssetDetailInfo
-	result.Ranges = req.Ranges
-	result.Utxo = ""
-	result.Value = common.GetOrdinalsSize(req.Ranges)
-
-	assets := s.indexer.GetAssetsWithRanges(req.Ranges)
-	for tickerName, info := range assets {
-		n := s.getBindingSatFromOrdxTicker(common.NewAssetNameFromString(tickerName))
-
-		var tickinfo rpcwire.TickerAsset
-		tickinfo.Ticker = tickerName
-		tickinfo.Utxo = ""
-		tickinfo.Amount = 0
-
-		for mintutxo, mintranges := range info {
-			asset := rpcwire.InscriptionAsset{}
-			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(n)
-			asset.Ranges = mintranges
-			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
-			asset.InscriptionID = mintutxo
-
-			tickinfo.Assets = append(tickinfo.Assets, &asset)
-			tickinfo.AssetAmount += asset.AssetAmount
-		}
-
-		result.Assets = append(result.Assets, &tickinfo)
-	}
-
-	sort.Slice(result.Assets, func(i, j int) bool {
-		return result.Assets[i].AssetAmount > result.Assets[j].AssetAmount
-	})
-
-	return &result, nil
-}
 
 func (s *Model) GetAbbrAssetsWithUtxo(utxo string) ([]*rpcwire.AssetAbbrInfo, error) {
 	result := make([]*rpcwire.AssetAbbrInfo, 0)
@@ -1021,8 +985,9 @@ func (s *Model) GetNftsWithSat(sat int64) (*rpcwire.NftsWithAddressData, error) 
 	address := s.indexer.GetAddressById(nfts.OwnerAddressId)
 	utxo := s.indexer.GetUtxoById(nfts.UtxoId)
 	value := s.getUtxoValue2(utxo)
-	for _, info := range nfts.Nfts {
-		item := s.baseContentToNftItem(info)
+	for _, nftId := range nfts.Nfts {
+		nft := s.indexer.GetNftInfo(nftId)
+		item := s.baseContentToNftItem(nft.Base)
 		item.Address = address
 		item.Utxo = utxo
 		item.Value = value

@@ -6,17 +6,16 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-func (b *IndexerMgr) GetExoticsWithRanges(ranges []*common.Range) []*common.ExoticRange {
-	return b.exotic.GetExoticsWithRanges(ranges)
+
+func (b *IndexerMgr) GetExotics(utxoId uint64) []*common.ExoticRange {
+	return b.exotic.GetExotics(utxoId)
 }
 
-func (b *IndexerMgr) GetExoticsWithType(ranges []*common.Range, typ string) []*common.ExoticRange {
-	return b.exotic.GetExoticsWithType(ranges, typ)
+
+func (b *IndexerMgr) GetExoticsWithType(utxoId uint64, typ string) []*common.ExoticRange {
+	return b.exotic.GetExoticsWithTypeV2(utxoId, typ)
 }
 
-func (b *IndexerMgr) HasExoticInRanges(ranges []*common.Range) bool {
-	return b.exotic.HasExoticInRanges(ranges)
-}
 
 func (b *IndexerMgr) getExoticsWithUtxo(utxoId uint64) map[string]map[string][]*common.Range {
 	_, rngs, err := b.rpcService.GetOrdinalsWithUtxoId(utxoId)

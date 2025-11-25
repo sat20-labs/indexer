@@ -363,18 +363,6 @@ func (b *IndexerMgr) getNamesWithUtxo(utxoId uint64) map[string]map[string][]*co
 	return result
 }
 
-func (b *IndexerMgr) getNamesWithRanges(ranges []*common.Range) map[string][]*common.Range {
-	result := make(map[string][]*common.Range)
-	sats := b.ns.GetNamesWithRanges(ranges)
-	for _, sat := range sats {
-		infos := b.GetNamesWithSat(sat)
-		for _, info := range infos {
-			result[info.Base.InscriptionId] = []*common.Range{{Start: info.Base.Sat, Size: 1}}
-		}
-	}
-	return result
-}
-
 func (p *IndexerMgr) GetNameHistory(start int, limit int) []*common.MintAbbrInfo {
 	p.rpcEnter()
 	defer p.rpcLeft()

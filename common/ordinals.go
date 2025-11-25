@@ -8,7 +8,7 @@ import (
 
 func NewUTXOIndex() *UTXOIndex {
 	return &UTXOIndex{
-		Index: make(map[string]*Output),
+		Index: make(map[string]*TxOutputV2),
 	}
 }
 
@@ -92,6 +92,14 @@ func GetUtxo(height int, tx string, vout int) string {
 		u = fmt.Sprintf("%s:%d", tx, vout)
 	}
 	return u
+}
+
+func GetUtxoV2(height int, utxo string) string {
+	txId, vout, err := ParseUtxo(utxo)
+	if err != nil {
+		Log.Panicf("GetUtxoV2 invalid utxo %s", utxo)
+	}
+	return GetUtxo(height, txId, vout)
 }
 
 func InterRange(r1, r2 *Range) *Range {

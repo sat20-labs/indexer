@@ -115,13 +115,23 @@ func GetBlock(height int, isMainnet bool) (*common.Block, error) {
 	transactions := block.Transactions()
 	txs := make([]*common.Transaction, len(transactions))
 	for i, tx := range transactions {
-		inputs := []*common.Input{}
-		outputs := []*common.Output{}
+		inputs := []*common.TxInput{}
+		outputs := []*common.TxOutputV2{}
 
-		for _, v := range tx.MsgTx().TxIn {
-			txid := v.PreviousOutPoint.Hash.String()
-			vout := v.PreviousOutPoint.Index
-			input := &common.Input{Txid: txid, Vout: int64(vout), Witness: v.Witness}
+		msgTx := tx.MsgTx()
+		for _, txIn := range msgTx.TxIn {
+			input := &common.TxInput{
+				TxOutput: common.TxOutput{
+					UtxoId:      common.INVALID_ID,
+					OutPointStr: txIn.PreviousOutPoint.String(),
+					Offsets:     make(map[common.AssetName]common.AssetOffsets),
+					SatBindingMap: make(map[int64]*common.AssetInfo),
+					Invalids: make(map[common.AssetName]bool),
+				},
+				Witness: txIn.Witness,
+				Vout: int(txIn.PreviousOutPoint.Index),
+				Txid: txIn.PreviousOutPoint.Hash.String(),
+			}
 			inputs = append(inputs, input)
 		}
 
@@ -166,8 +176,14 @@ func GetBlock(height int, isMainnet bool) (*common.Block, error) {
 				}
 			}
 
-			output := &common.Output{Height: height, TxId: i, Value: v.Value, Address: &receiver, N: int64(j)}
-			outputs = append(outputs, output)
+			output := common.GenerateTxOutput(msgTx, j)
+			outputs = append(outputs, &common.TxOutputV2{
+				TxOutput: *output,
+				Address: &receiver,
+				TxIndex: i,
+				Vout:    j,
+				Height:  height,
+			})
 		}
 
 		txs[i] = &common.Transaction{

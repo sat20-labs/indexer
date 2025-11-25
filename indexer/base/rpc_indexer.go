@@ -56,7 +56,7 @@ func (b *RpcIndexer) UpdateServiceInstance() {
 		b.deletedUtxoMap[v.UtxoId] = true
 	}
 	for k, v := range b.utxoIndex.Index {
-		b.addedUtxoMap[common.GetUtxoId(v)] = k
+		b.addedUtxoMap[v.UtxoId] = k
 	}
 }
 
@@ -66,7 +66,7 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	// 有可能还没有写入数据库，所以先读缓存
 	utxoInfo, ok := b.utxoIndex.Index[utxo]
 	if ok {
-		return common.GetUtxoId(utxoInfo), utxoInfo.Ordinals, nil
+		return utxoInfo.UtxoId, nil, nil
 	}
 
 	if err := common.CheckUtxoFormat(utxo); err != nil {
@@ -97,10 +97,10 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 	utxoInfo, ok := b.utxoIndex.Index[utxo]
 	if ok {
 		value := &common.UtxoInfo{
-			UtxoId:   common.GetUtxoId(utxoInfo),
-			Value:    utxoInfo.Value,
+			UtxoId:   utxoInfo.UtxoId,
+			Value:    utxoInfo.OutValue.Value,
 			PkScript: utxoInfo.Address.PkScript,
-			Ordinals: utxoInfo.Ordinals,
+			Ordinals: nil,
 		}
 		return value, nil
 	}
@@ -322,15 +322,15 @@ func (b *RpcIndexer) searhing(sat int64) {
 	bFound := false
 
 	// search in buffer
-	for k, v := range b.utxoIndex.Index {
-		if common.IsSatInRanges(sat, v.Ordinals) {
-			common.Log.Infof("find sat %d in utxo %s in address %s", sat, k, v.Address.Addresses[0])
-			bFound = true
-			address = v.Address.Addresses[0]
-			utxo = k
-			break
-		}
-	}
+	// for k, v := range b.utxoIndex.Index {
+	// 	if common.IsSatInRanges(sat, v.Ordinals) {
+	// 		common.Log.Infof("find sat %d in utxo %s in address %s", sat, k, v.Address.Addresses[0])
+	// 		bFound = true
+	// 		address = v.Address.Addresses[0]
+	// 		utxo = k
+	// 		break
+	// 	}
+	// }
 
 	if !bFound {
 		startTime := time.Now()

@@ -1,6 +1,7 @@
 package nft
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -49,14 +50,27 @@ func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	return result
 }
 
-func loadNftFromDB(sat int64, value *common.NftsInSat, ldb common.KVDB) error {
+func loadNftsInSatFromDB(sat int64, value *common.NftsInSat, ldb common.KVDB) error {
 	key := GetSatKey(sat)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func loadNftFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBatch) error {
+func loadNftsInSatFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBatch) error {
 	key := GetSatKey(sat)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
+}
+
+
+func loadNftFromDB(nftId int64, value *common.InscribeBaseContent, ldb common.KVDB) error {
+	key := GetNftKey(nftId)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
+}
+
+func loadNftFromTxn(nftId int64, value *common.InscribeBaseContent, txn common.ReadBatch) error {
+	key := GetNftKey(nftId)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
 }
@@ -79,14 +93,19 @@ func hasNftInUtxo(utxoId uint64, ldb common.KVDB) bool {
 	return err == nil
 }
 
-// 聪的十进制数字不超过16位，为了排序，这里填足够的0
+// 大端序下，高位字节先比较 → 字节序比较行为与整数比较行为一致。
 func GetSatKey(sat int64) string {
-	return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat)
+	return fmt.Sprintf("%s%s", DB_PREFIX_SAT, hex.EncodeToString(common.Uint64ToBytes(uint64(sat)))) // 1.7.0
+	//return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat) // 1.6.0
 	//return fmt.Sprintf("%s%d", DB_PREFIX_NFT, sat) // 1.5.0
 }
 
+func GetNftKey(nftId int64) string {
+	return fmt.Sprintf("%s%s", DB_PREFIX_NFT, hex.EncodeToString(common.Uint64ToBytes(uint64(nftId))))
+}
+
 func GetUtxoKey(UtxoId uint64) string {
-	return fmt.Sprintf("%s%d", DB_PREFIX_UTXO, UtxoId)
+	return fmt.Sprintf("%s%s", DB_PREFIX_UTXO, hex.EncodeToString(common.Uint64ToBytes(UtxoId)))
 }
 
 func GetInscriptionIdKey(id string) string {
@@ -102,15 +121,21 @@ func GetDisabledSatKey(sat int64) string {
 }
 
 func ParseSatKey(input string) (int64, error) {
-	if !strings.HasPrefix(input, DB_PREFIX_NFT) {
+	if !strings.HasPrefix(input, DB_PREFIX_SAT) {
 		return -1, fmt.Errorf("invalid string format, %s", input)
 	}
-	str := strings.TrimPrefix(input, DB_PREFIX_NFT)
-	sat, err := strconv.ParseInt(str, 10, 64)
+	str := strings.TrimPrefix(input, DB_PREFIX_SAT)
+
+	bytes, err := hex.DecodeString(str)
 	if err != nil {
-		return -1, fmt.Errorf("invalid string format, %s", input)
+		return 0, err
 	}
-	return sat, nil
+	if len(bytes) != 8 {
+		return 0, fmt.Errorf("invalid sat: %s", str)
+	}
+	sat := common.BytesToUint64(bytes)
+
+	return int64(sat), nil
 }
 
 func ParseUtxoKey(input string) (uint64, error) {
@@ -118,7 +143,15 @@ func ParseUtxoKey(input string) (uint64, error) {
 		return common.INVALID_ID, fmt.Errorf("invalid string format, %s", input)
 	}
 	str := strings.TrimPrefix(input, DB_PREFIX_UTXO)
-	return strconv.ParseUint(str, 10, 64)
+	bytes, err := hex.DecodeString(str)
+	if err != nil {
+		return 0, err
+	}
+	if len(bytes) != 8 {
+		return 0, fmt.Errorf("invalid sat: %s", str)
+	}
+	utxoId := common.BytesToUint64(bytes)
+	return utxoId, nil
 }
 
 func ParseAddressKey(input string) (uint64, int64, error) {
