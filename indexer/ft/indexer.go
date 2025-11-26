@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
 )
@@ -14,7 +13,7 @@ import (
 type TickInfo struct {
 	Id             uint64
 	Name           string
-	MintInfo       *indexer.RangeRBTree            // mint history: 用于查找某个SatRange是否存在该ticker， Value是RBTreeValue_Mint
+	MintInfo       map[uint64]common.AssetOffsets
 	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
 	MintAdded      []*common.Mint
 	Ticker         *common.Ticker
@@ -23,15 +22,15 @@ type TickInfo struct {
 type HolderAction struct {
 	UtxoId    uint64
 	AddressId uint64
-	Index     int
-	Tickers   map[string]*common.TickAbbrInfo
+	Tickers   map[string]*common.AssetAbbrInfo
 	Action    int // -1 删除; 1 增加
 }
 
+// asset in utxo
 type HolderInfo struct {
 	AddressId uint64
-	Index     int
-	Tickers   map[string]*common.TickAbbrInfo // key: ticker, 小写
+	IsMinting bool  // 只要该utxo是minting的reveal tx的input
+	Tickers   map[string]*common.AssetAbbrInfo // key: ticker, 小写
 }
 
 type FTIndexer struct {
@@ -41,10 +40,10 @@ type FTIndexer struct {
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
 	// 禁止直接遍历holderInfo和utxoMap，因为数据量太大（ord有亿级数据）
-	mutex      sync.RWMutex                 // 只保护这几个结构
-	tickerMap  map[string]*TickInfo         // ticker -> TickerInfo.  name 小写。 数据由mint数据构造。
-	holderInfo map[uint64]*HolderInfo       // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
-	utxoMap    map[string]*map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
+	mutex      sync.RWMutex                // 只保护这几个结构
+	tickerMap  map[string]*TickInfo        // ticker -> TickerInfo.  name 小写。 数据由mint数据构造。
+	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
+	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
 
 	// 其他辅助信息
 	holderActionList []*HolderAction           // 在同一个block中，状态变迁需要按顺序执行，因为一个utxo会很快被消费掉，变成新的utxo
@@ -99,7 +98,7 @@ func (s *FTIndexer) Clone() *FTIndexer {
 
 	// 保存holderActionList对应的数据
 	newInst.holderInfo = make(map[uint64]*HolderInfo, 0)
-	newInst.utxoMap = make(map[string]*map[uint64]int64, 0)
+	newInst.utxoMap = make(map[string]map[uint64]int64, 0)
 	for _, action := range s.holderActionList {
 		if action.Action > 0 {
 			value, ok := s.holderInfo[action.UtxoId]
@@ -116,15 +115,15 @@ func (s *FTIndexer) Clone() *FTIndexer {
 			if action.Action > 0 {
 				value, ok := s.utxoMap[tickerName]
 				if ok {
-					amount, ok := (*value)[action.UtxoId]
+					amount, ok := value[action.UtxoId]
 					if ok {
 						newmap, ok := newInst.utxoMap[tickerName]
 						if ok {
-							(*newmap)[action.UtxoId] = amount
+							newmap[action.UtxoId] = amount
 						} else {
 							m := make(map[uint64]int64, 0)
 							m[action.UtxoId] = amount
-							newInst.utxoMap[tickerName] = &m
+							newInst.utxoMap[tickerName] = m
 						}
 					} //else {
 					// 已经被删除，不存在了
@@ -223,7 +222,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 			}
 		} else {
 			amontInUtxos := int64(0)
-			for utxo, amoutInUtxo := range *utxos {
+			for utxo, amoutInUtxo := range utxos {
 				amontInUtxos += amoutInUtxo
 
 				holderInfo, ok := s.holderInfo[utxo]
@@ -236,10 +235,8 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 					common.Log.Errorf("ticker %s's utxo %d not in holders", name, utxo)
 					return false
 				}
-				amountInHolder := int64(0)
-				for _, rngs := range tickinfo.MintInfo {
-					amountInHolder += common.GetOrdinalsSize(rngs) * int64(tickinfo.N)
-				}
+
+				amountInHolder := tickinfo.Offsets.Size() * int64(tickinfo.BindingSat)
 				if amountInHolder != amoutInUtxo {
 					common.Log.Errorf("ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
 					return false

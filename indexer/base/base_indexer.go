@@ -408,17 +408,17 @@ func (b *BaseIndexer) UpdateDB() {
 		}
 
 		//for i, address := range value.Address.Addresses {
-			addrvalue, ok := b.addressValueMap[value.PkScript]
-			if ok {
-				addrkey := db.GetAddressValueDBKey(addrvalue.AddressId, value.UtxoId)
-				err := wb.Delete(addrkey)
-				if err != nil {
-					common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
-				}
-			} else {
-				// 不存在
-				//common.Log.Infof("address %s not exists", value.Address)
-			}
+			// addrvalue, ok := b.addressValueMap[value.PkScript]
+			// if ok {
+			// 	addrkey := db.GetAddressValueDBKey(addrvalue.AddressId, value.UtxoId)
+			// 	err := wb.Delete(addrkey)
+			// 	if err != nil {
+			// 		common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			// 	}
+			// } else {
+			// 	// 不存在
+			// 	//common.Log.Infof("address %s not exists", value.Address)
+			// }
 		//}
 
 	}
@@ -428,14 +428,25 @@ func (b *BaseIndexer) UpdateDB() {
 	for k, v := range b.addressValueMap {
 		key := db.GetAddressDBKeyV2(k)
 		value := v.ToAddressValueInDBV2()
-		err := db.SetDBWithProto3(key, value, wb)
-		if err != nil {
-			common.Log.Panicf("Error setting in db %v", err)
-		}
-		if v.Op == 1 {
-			err = db.BindAddressDBKeyToId(k, v.AddressId, wb)
+		if len(value.Utxos) > 0 {
+			err := db.SetDBWithProto3(key, value, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting in db %v", err)
+			}
+			if v.Op == 1 {
+				err = db.BindAddressDBKeyToId(k, v.AddressId, wb)
+				if err != nil {
+					common.Log.Panicf("Error setting in db %v", err)
+				}
+			}
+		} else {
+			err := wb.Delete((key))
+			if err != nil {
+				common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			}
+			err = db.UnBindAddressId(k, value.AddressId, wb)
+			if err != nil {
+				common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
 			}
 		}
 	}

@@ -64,55 +64,6 @@ func (s *Service) getSatInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// @Summary find specific sats in address
-// @Description find specific sats in address
-// @Tags ordx
-// @Produce json
-// @Security Bearer
-// @Param address body string true "address"
-// @Param sats body []number true "sats"
-// @Success 200 {object} wire.SpecificSatResp "Successful response"
-// @Failure 401 "Invalid API Key"
-// @Router /sat/FindSatsInAddress/ [post]
-func (s *Service) findSatsInAddress(c *gin.Context) {
-	resp := &wire.SpecificSatResp{
-		BaseResp: wire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-	var req wire.SpecificSatReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	if req.Address == "" {
-		resp.Code = -1
-		resp.Msg = "invalid address"
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	if len(req.Sats) <= 0 {
-		resp.Code = -1
-		resp.Msg = "invalid sats"
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	result, err := s.model.findSatsInAddress(&req)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	resp.Data = result
-	c.JSON(http.StatusOK, resp)
-}
 
 // @Summary Retrieves the supported attributes of a sat
 // @Description Retrieves the supported attributes of a sat
@@ -130,66 +81,6 @@ func (s *Service) getSatributes(c *gin.Context) {
 		},
 		Data: exotic.SatributeList,
 	}
-	c.JSON(http.StatusOK, resp)
-}
-
-// @Summary Retrieves all sat ranges and attributes in a given utxo
-// @Description Retrieves all sat ranges and attributes in a given utxo
-// @Tags ordx.exotic
-// @Produce json
-// @Param utxo path string true "utxo"
-// @Security Bearer
-// @Success 200 {array} wire.SatRangeResp "Successful response"
-// @Failure 401 "Invalid API Key"
-// @Router /exotic/utxo/{utxo} [get]
-func (s *Service) getExoticWithUtxo(c *gin.Context) {
-	resp := &wire.SatRangeResp{
-		BaseResp: wire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	utxo := c.Param("utxo")
-	satRanges, err := s.model.GetSatRangeInUtxo(utxo)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	resp.Data = satRanges
-	c.JSON(http.StatusOK, resp)
-}
-
-// @Summary Retrieves UTXOs which have exotic sat for a given address
-// @Description Retrieves UTXOs which have exotic sat for a given address
-// @Tags ordx.exotic
-// @Produce json
-// @Param address path string true "Address"
-// @Security Bearer
-// @Success 200 {array} wire.SatRangeUtxoResp "Successful response"
-// @Failure 401 "Invalid API Key"
-// @Router /exotic/address/{address} [get]
-func (s *Service) getExoticUtxos(c *gin.Context) {
-	resp := &wire.SatRangeUtxoResp{
-		BaseResp: wire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	address := c.Param("address")
-	satributeSatList, err := s.model.GetExoticUtxos(address)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	resp.Data = satributeSatList
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -272,38 +163,5 @@ func (s *Service) getAllUtxos(c *gin.Context) {
 	resp.Total = total
 	resp.PlainUtxos = PlainUtxos
 	resp.OtherUtxos = OtherUtxos
-	c.JSON(http.StatusOK, resp)
-}
-
-// @Summary getExoticUtxosWithType
-// @Description Get UTXOs which is the specific exotic type in a address
-// @Tags ordx.exotic
-// @Produce json
-// @Param address path string true "address"
-// @Param type path string true "type"
-// @Security Bearer
-// @Success 200 {array} wire.SpecificExoticUtxo "List of SpecificExoticUtxo"
-// @Failure 401 "Invalid API Key"
-// @Router /exotic/address/{address}/{type} [get]
-func (s *Service) getExoticUtxosWithType(c *gin.Context) {
-	resp := &wire.SpecificExoticUtxoResp{
-		BaseResp: wire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	address := c.Param("address")
-	typ := c.Param("type")
-
-	satritbuteSatList, err := s.model.GetExoticUtxosWithType(address, typ, 1)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	resp.Data = satritbuteSatList
 	c.JSON(http.StatusOK, resp)
 }

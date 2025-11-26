@@ -362,10 +362,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
-		for _, input := range tx.Inputs {
-			if input.UtxoId == 1016876457263104 || input.UtxoId == 1022786333310976 || input.UtxoId == 1022958131478528 {
-				common.Log.Infof("")
-			}
+		for _, in := range tx.Inputs {
+			// if input.UtxoId == 1016876457263104 || input.UtxoId == 1022786333310976 || input.UtxoId == 1022958131478528 {
+			// 	common.Log.Infof("")
+			// }
+			input := in.Clone() // 不要影响原来tx的数据
 			sats := p.utxoMap[input.UtxoId]
 			addedNft := p.nftAddedUtxoMap[input.UtxoId]
 			if addedNft != nil {
@@ -441,7 +442,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			if allInput == nil {
 				allInput = input.Clone()
 			} else {
-				allInput.Append(&input.TxOutput)
+				allInput.Append(input)
 			}
 		}
 
@@ -469,9 +470,9 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 
 	change := input
 	for _, txOut := range tx.Outputs {
-		if txOut.UtxoId == 1016876457263104 || txOut.UtxoId == 1022786333310976 || txOut.UtxoId == 1022958131478528 {
-			common.Log.Infof("")
-		}
+		// if txOut.UtxoId == 1016876457263104 || txOut.UtxoId == 1022786333310976 || txOut.UtxoId == 1022958131478528 {
+		// 	common.Log.Infof("")
+		// }
 		if txOut.OutValue.Value == 0 {
 			continue
 		}
@@ -482,9 +483,6 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 		
 		change = newChange
 		if len(newOut.Assets) != 0 {
-			txOut.Assets = newOut.Assets
-			txOut.Offsets =newOut.Offsets
-
 			addressId := txOut.AddressId
 			sats := make([]*SatOffset, 0)
 			for _, asset := range newOut.Assets {

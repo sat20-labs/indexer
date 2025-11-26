@@ -50,7 +50,7 @@ func (b *IndexerMgr) containAsset(output *common.TxOutput, ticker *common.AssetN
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) ([]*common.AssetsInUtxo, error) {
 	b.rpcEnter()
 	defer b.rpcLeft()
-	
+
 	//t1 := time.Now()
 	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
 	if err != nil {
@@ -59,7 +59,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	// common.Log.Infof("GetUTXOs takes %v", time.Since(t1))
 	// t1 = time.Now()
 
-	
 	mid := make([]*common.TxOutput, 0)
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
@@ -103,7 +102,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	return result, nil
 }
 
-
 func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *common.TxOutput {
 	b.rpcEnter()
 	defer b.rpcLeft()
@@ -126,15 +124,8 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 	//common.Log.Infof("GetAssetsWithUtxo takes %v", time.Since(t1))
 	//t1 = time.Now()
 	for k, v := range assetmap {
-		var offsets common.AssetOffsets
-		value := int64(0)
-		for _, rngs := range v {
-			for _, rng := range rngs {
-				start := common.GetSatOffset(info.Ordinals, rng.Start)
-				offsets.Insert(&common.OffsetRange{Start: start, End: start + rng.Size})
-				value += rng.Size
-			}
-		}
+		offsets := v
+		value := v.Size()
 
 		n := 1
 		if common.IsOrdxFT(&k) {
@@ -162,12 +153,12 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			continue
 		}
 		asset := common.AssetInfo{
-			Name:  k,
+			Name:       k,
 			Amount:     *v.Amt.Clone(),
 			BindingSat: 0,
 		}
 		if k.Protocol == common.PROTOCOL_NAME_BRC20 {
-			output.Offsets[k] = []*common.OffsetRange{{Start:0, End:1}}
+			output.Offsets[k] = []*common.OffsetRange{{Start: 0, End: 1}}
 			output.SatBindingMap[0] = asset.Clone()
 		}
 		if v.Invalid {
@@ -193,12 +184,12 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *
 
 func genBTCTicker() *common.TickerInfo {
 	return &common.TickerInfo{
-			AssetName:    common.ASSET_PLAIN_SAT,
-			DisplayName:  "BTC",
-			MaxSupply:    "21000000000000000", //  sats
-			Divisibility: 0,
-			N:            1,
-		}
+		AssetName:    common.ASSET_PLAIN_SAT,
+		DisplayName:  "BTC",
+		MaxSupply:    "21000000000000000", //  sats
+		Divisibility: 0,
+		N:            1,
+	}
 }
 
 func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.TickerInfo {
@@ -373,31 +364,24 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	}
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
-		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: ""}
-		result[tickName] = common.NewDefaultDecimal(int64(len(nfts)))
+		for k, v := range nfts {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORD, Type: common.ASSET_TYPE_NFT, Ticker: k}
+			result[tickName] = common.NewDefaultDecimal(v.Size())
+		}
 	}
 	names := b.getNamesWithUtxo(utxoId)
 	if len(names) > 0 {
 		for k, v := range names {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
-			amt := int64(0)
-			for _, rngs := range v {
-				amt += common.GetOrdinalsSize(rngs)
-			}
+			amt := v.Size()
 			result[tickName] = common.NewDefaultDecimal(amt)
 		}
 	}
 	exo := b.getExoticsWithUtxo(utxoId)
 	if len(exo) > 0 {
 		for k, v := range exo {
-			if b.HasAssetInUtxoId(utxoId, true) {
-				continue
-			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
-			amt := int64(0)
-			for _, rngs := range v {
-				amt += common.GetOrdinalsSize(rngs)
-			}
+			amt := v.Size()
 			result[tickName] = common.NewDefaultDecimal(amt)
 		}
 	}
@@ -516,11 +500,9 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 	} else if tickerName.Protocol == "" {
 		return 1
 	}
-	
+
 	return 0
 }
-
-
 
 func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 	b.rpcEnter()
@@ -551,7 +533,6 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 	}
 	return err
 }
-
 
 func (b *IndexerMgr) IsUtxoSpent(utxo string) bool {
 	return b.miniMempool.IsSpent(utxo)
@@ -642,11 +623,8 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 		if b.brc20Indexer.IsExistAsset(utxoId) {
 			continue
 		}
-		_, rngs, err := b.GetOrdinalsWithUtxoId(utxoId)
-		if err == nil {
-			if b.exotic.HasExoticInRanges(rngs) {
-				continue
-			}
+		if b.exotic.HasExoticInUtxo(utxoId) {
+			continue
 		}
 		
 		// 只剩下铭文的可能性

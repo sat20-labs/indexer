@@ -18,10 +18,6 @@ func (s *FTIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
 func (s *FTIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 	mintList := s.loadMintDataFromDB(tickinfo.Name)
 	for _, mint := range mintList {
-		for _, rng := range mint.Ordinals {
-			tickinfo.MintInfo.AddMintInfo(rng, mint.Base.InscriptionId)
-		}
-
 		tickinfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
 	}
 }
@@ -62,11 +58,11 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	return result
 }
 
-func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
+func (s *FTIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadUtxoMapFromDB ...")
-	result := make(map[string]*map[uint64]int64, 0)
+	result := make(map[string]map[uint64]int64, 0)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -81,11 +77,11 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
 			if err == nil {
 				oldmap, ok := result[ticker]
 				if ok {
-					(*oldmap)[utxo] = amount
+					oldmap[utxo] = amount
 				} else {
 					utxomap := make(map[uint64]int64, 0)
 					utxomap[utxo] = amount
-					result[ticker] = &utxomap
+					result[ticker] = utxomap
 				}
 			} else {
 				common.Log.Errorln("DecodeBytes " + err.Error())

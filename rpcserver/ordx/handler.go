@@ -737,34 +737,6 @@ func (s *Handle) getAssetDetailInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *Handle) getAssetOffset(c *gin.Context) {
-	resp := &rpcwire.AssetOffsetResp{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-
-	utxo := c.Param("utxo")
-	utxoAssets, err := s.model.GetAssetOffsetWithUtxo(utxo)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	resp.Data = &rpcwire.AssetOffsetData{
-		ListResp: rpcwire.ListResp{
-			Total: uint64(len(utxoAssets)),
-			Start: 0,
-		},
-		AssetOffset: utxoAssets,
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
 // @Summary Get assets with abbreviated info in the UTXO
 // @Description Get assets with abbreviated info in the UTXO
 // @Tags ordx.utxo
@@ -820,53 +792,6 @@ func (s *Handle) getSeedWithUtxo(c *gin.Context) {
 		return
 	}
 	resp.Data = seeds
-	c.JSON(http.StatusOK, resp)
-}
-
-func (s *Handle) getSatRangeWithUtxo(c *gin.Context) {
-	resp := &rpcwire.UtxoInfoResp{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-		Data: nil,
-	}
-	utxo := c.Param("utxo")
-	ret, err := s.model.GetSatRangeWithUtxo(utxo)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-	resp.Data = ret
-	c.JSON(http.StatusOK, resp)
-}
-
-func (s *Handle) getAssetsWithUtxos_deprecated(c *gin.Context) {
-	resp := &rpcwire.AbbrAssetsWithUtxosResp{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-	}
-
-	var req rpcwire.UtxosReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	result, err := s.model.GetAssetsWithUtxos_deprecated(&req)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-	} else {
-		resp.Data = result
-	}
-
 	c.JSON(http.StatusOK, resp)
 }
 

@@ -151,7 +151,7 @@ func (s *Model) GetUtxoInfoListV3(req *rpcwire.UtxosReq) ([]*common.AssetsInUtxo
 	return result, nil
 }
 
-func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) (map[string]error, error)  {
+func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) (map[string]error, error) {
 	pubkey, err := hex.DecodeString(req.PubKey)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,6 @@ func (s *Model) UnlockOrdinals(req *rpcwire.UnlockOrdinalsReq) (map[string]error
 func (s *Model) GetLockedUtxoInAddress(address string) ([]*common.AssetsInUtxo, error) {
 	return s.indexer.GetLockedUTXOsInAddress(address)
 }
-
 
 func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
 	result := make([]*common.AssetsInUtxo, 0)
@@ -191,7 +190,7 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*rpcwire.HolderV3, uint64, error) {
 	result := make([]*rpcwire.HolderV3, 0)
-	
+
 	assetName := common.NewAssetNameFromString(tickName)
 	holders := s.indexer.GetHoldersWithTickV2(assetName)
 
@@ -210,7 +209,7 @@ func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*rpcwir
 	})
 
 	total := uint64(len(result))
-	
+
 	end := total
 	if start >= end {
 		return nil, 0, nil

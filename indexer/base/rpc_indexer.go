@@ -84,6 +84,14 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	return output.UtxoId, nil, nil
 }
 
+func (b *RpcIndexer) GetUtxoValue(utxo string) (int64) {
+	info, err := b.GetUtxoInfo(utxo)
+	if err != nil {
+		return 0
+	}
+	return info.Value
+}
+
 func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 
 	// 有可能还没有写入数据库，所以先读缓存

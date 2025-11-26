@@ -32,6 +32,17 @@ func (p *OffsetRange) Clone() *OffsetRange {
 	return &n
 }
 
+func (p *OffsetRange) ToRange() *Range {
+	if p == nil {
+		return nil
+	}
+	return &Range{
+		Start: p.Start,
+		Size: p.End-p.Start,
+	}
+}
+
+// 有序的数组，
 type AssetOffsets []*OffsetRange
 
 func (p *AssetOffsets) Clone() AssetOffsets {
@@ -42,6 +53,17 @@ func (p *AssetOffsets) Clone() AssetOffsets {
 	result := make([]*OffsetRange, len(*p))
 	for i, u := range *p {
 		result[i] = &OffsetRange{Start: u.Start, End: u.End}
+	}
+	return result
+}
+
+func (p AssetOffsets) ToRanges() []*Range {
+	if len(p) == 0 {
+		return nil
+	}
+	result := make([]*Range, len(p))
+	for i, offset := range p {
+		result[i] = offset.ToRange()
 	}
 	return result
 }
@@ -191,6 +213,76 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 		*p = append(*p, another...)
 	}
 }
+
+// 求包含关系
+func AssetOffsetsContains(container, target AssetOffsets) bool {
+    i, j := 0, 0
+
+    for j < len(target) {
+        if i >= len(container) {
+            return false
+        }
+
+        c := container[i]
+        t := target[j]
+
+        // 如果 container 当前区间完全在 target 之前，跳过它
+        if c.End <= t.Start {
+            i++
+            continue
+        }
+
+        // 如果 container 当前区间完全在 target 后面，则不可能覆盖
+        if c.Start > t.Start {
+            return false
+        }
+
+        // 现在 c.Start <= t.Start < c.End
+
+        if c.End >= t.End {
+            // container[i] 完全覆盖 target[j]，继续下一个 target
+            j++
+        } else {
+            // container[i] 只覆盖了 target[j] 的前半段
+            // target[j] 剩余部分必须继续用下一个 container 区间覆盖
+            t.Start = c.End
+            i++
+        }
+    }
+
+    return true
+}
+
+
+// 求两个数组的交集
+func IntersectAssetOffsets(a, b AssetOffsets) AssetOffsets {
+    i, j := 0, 0
+    var res AssetOffsets
+
+    for i < len(a) && j < len(b) {
+        r1 := a[i]
+        r2 := b[j]
+
+        // 计算交集区间
+        start := max(r1.Start, r2.Start)
+        end := min(r1.End,  r2.End)
+
+        // 如果有交集
+        if start < end {
+            res = append(res, &OffsetRange{Start: start, End: end})
+        }
+
+        // 谁先结束就移动谁
+        if r1.End < r2.End {
+            i++
+        } else {
+            j++
+        }
+    }
+
+    return res
+}
+
 
 type TxOutput struct {
 	UtxoId      uint64

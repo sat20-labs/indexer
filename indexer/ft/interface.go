@@ -14,7 +14,7 @@ func (p *FTIndexer) TickExisted(ticker string) bool {
 	return p.tickerMap[strings.ToLower(ticker)] != nil
 }
 
-func (p *FTIndexer) GetAllTickers() ([]string) {
+func (p *FTIndexer) GetAllTickers() []string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	ret := make([]string, 0)
@@ -61,15 +61,14 @@ func (p *FTIndexer) GetTicker(tickerName string) *common.Ticker {
 }
 
 func (p *FTIndexer) GetMint(inscriptionId string) *common.Mint {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-	tickerName, err := p.GetTickerWithInscriptionId(inscriptionId)
+	tickerName, err := p.getTickerWithInscriptionId(inscriptionId)
 	if err != nil {
 		common.Log.Errorf(err.Error())
 		return nil
 	}
-
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
 
 	ticker := p.tickerMap[strings.ToLower(tickerName)]
 	if ticker == nil {
@@ -98,7 +97,7 @@ func (p *FTIndexer) GetHoldersWithTick(tickerName string) map[uint64][]uint64 {
 		return nil
 	}
 
-	for utxo := range *utxos {
+	for utxo := range utxos {
 		info, ok := p.holderInfo[utxo]
 		if !ok {
 			common.Log.Errorf("can't find holder with utxo %d", utxo)
@@ -123,7 +122,7 @@ func (p *FTIndexer) GetHolderAndAmountWithTick(tickerName string) map[uint64]int
 		return nil
 	}
 
-	for utxo, amount := range *utxos {
+	for utxo, amount := range utxos {
 		info, ok := p.holderInfo[utxo]
 		if !ok {
 			common.Log.Errorf("can't find holder with utxo %d", utxo)
@@ -147,7 +146,7 @@ func (p *FTIndexer) GetAssetUtxosWithTicker(address uint64, ticker string) map[u
 		return nil
 	}
 
-	for utxo, amout := range *utxos {
+	for utxo, amout := range utxos {
 		info, ok := p.holderInfo[utxo]
 		if !ok {
 			common.Log.Errorf("can't find holder with utxo %d", utxo)
@@ -176,11 +175,7 @@ func (p *FTIndexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]
 		}
 
 		for k, v := range info.Tickers {
-			amount := int64(0)
-			for _, rng := range v.MintInfo {
-				amount += common.GetOrdinalsSize(rng) * int64(v.N)
-			}
-			result[k] += amount
+			result[k] += v.Offsets.Size() * int64(v.BindingSat)
 		}
 	}
 
@@ -225,31 +220,22 @@ func (p *FTIndexer) GetTickersWithUtxo(utxo uint64) []string {
 
 // 获取utxo的资产详细信息
 // return: ticker -> assets(inscriptionId->Ranges)
-func (p *FTIndexer) GetAssetsWithUtxo(utxo uint64) map[string]map[string][]*common.Range {
+func (p *FTIndexer) GetAssetsWithUtxo(utxo uint64) map[string]common.AssetOffsets {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	result := make(map[string]map[string][]*common.Range, 0)
+	result := make(map[string]common.AssetOffsets, 0)
 
 	holders := p.holderInfo[utxo]
 	if holders != nil {
 		for ticker, info := range holders.Tickers {
 			// deep copy
-			mintInfo := make(map[string][]*common.Range, 0)
-			for mintUtxo, mintRngs := range info.MintInfo {
-				rngs := make([]*common.Range, 0)
-				for _, rng := range mintRngs {
-					rngs = append(rngs, &common.Range{Start: rng.Start, Size: rng.Size})
-				}
-				mintInfo[mintUtxo] = rngs
-			}
-			result[ticker] = mintInfo
+			result[ticker] = info.Offsets.Clone()
 		}
 		return result
 	}
 
 	return nil
 }
-
 
 // 获取utxo的资产详细信息
 // return: ticker -> assets(inscriptionId->Ranges)
@@ -262,42 +248,12 @@ func (p *FTIndexer) GetAssetsWithUtxoV2(utxo uint64) map[string]int64 {
 	if holders != nil {
 		for ticker, info := range holders.Tickers {
 			// deep copy
-			value := int64(0)
-			for _, mintRngs := range info.MintInfo {
-				value += common.GetOrdinalsSize(mintRngs) * int64(info.N)	
-			}
-			result[ticker] = value
+			result[ticker] = info.Offsets.Size() * int64(info.BindingSat)
 		}
 		return result
 	}
 
 	return nil
-}
-
-// return: ticker -> assets(inscriptionId->Ranges)
-func (p *FTIndexer) GetAssetsWithRanges(rngs []*common.Range) map[string]map[string][]*common.Range {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	result := make(map[string]map[string][]*common.Range)
-	for tickerName, v := range p.tickerMap {
-		for _, rng := range rngs {
-			intersections := v.MintInfo.FindIntersections(rng)
-			for _, it := range intersections {
-				mintinfo := it.Value.(*common.RBTreeValue_Mint)
-				tickinfo, ok := result[tickerName]
-				if ok {
-					tickinfo[mintinfo.InscriptionIds[0]] = append(tickinfo[mintinfo.InscriptionIds[0]], it.Rng)
-				} else {
-					tickinfo = make(map[string][]*common.Range)
-					tickinfo[mintinfo.InscriptionIds[0]] = []*common.Range{it.Rng}
-					result[tickerName] = tickinfo
-				}
-			}
-		}
-	}
-
-	return result
 }
 
 // 检查utxo是否有资产
@@ -313,35 +269,8 @@ func (p *FTIndexer) HasAssetInUtxo(utxo uint64) bool {
 	return len(holder.Tickers) > 0
 }
 
-// 获取该utxo中哪些range有指定的tick资产
-// return: inscriptionId -> assets range
-func (p *FTIndexer) GetAssetRangesWithUtxo(utxo uint64, tickerName string) map[string][]*common.Range {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	tickerName = strings.ToLower(tickerName)
-
-	holder := p.holderInfo[utxo]
-	if holder == nil {
-		return nil
-	}
-
-	tickinfo := holder.Tickers[tickerName]
-	if tickinfo == nil {
-		return nil
-	}
-
-	result := make(map[string][]*common.Range, 0)
-	for id, ranges := range tickinfo.MintInfo {
-		result[id] = ranges
-	}
-
-	return result
-}
-
-
-// 获取该utxo中哪些range有指定的tick资产
-// return: inscriptionId -> assets range
+// 获取该utxo中有指定的tick资产的数量
+// return: inscriptionId -> assets amount
 func (p *FTIndexer) GetAssetsWithUtxoV3(utxo uint64, tickerName string) int64 {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -358,32 +287,11 @@ func (p *FTIndexer) GetAssetsWithUtxoV3(utxo uint64, tickerName string) int64 {
 		return 0
 	}
 
-	result := int64(0)
-	for _, ranges := range tickinfo.MintInfo {
-		result += common.GetOrdinalsSize(ranges) * int64(tickinfo.N)
-	}
-
-	return result
-}
-
-// 检查该Range是否有ticker存在
-func (p *FTIndexer) CheckTickersWithSatRange(ticker string, rng *common.Range) bool {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	tickinfo := p.tickerMap[strings.ToLower(ticker)]
-	if tickinfo == nil {
-		return false
-	}
-
-	value := tickinfo.MintInfo.FindIntersections(rng)
-	return len(value) > 0
+	return tickinfo.AssetAmt()
 }
 
 // return: mint的ticker名字
-func (p *FTIndexer) GetTickerWithInscriptionId(inscriptionId string) (string, error) {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
+func (p *FTIndexer) getTickerWithInscriptionId(inscriptionId string) (string, error) {
 
 	for _, tickinfo := range p.tickerMap {
 		for k := range tickinfo.InscriptionMap {
@@ -459,7 +367,6 @@ func (p *FTIndexer) GetMintHistoryWithAddress(addressId uint64, tick string, sta
 	return result[start:end], total
 }
 
-
 // return: 按铸造时间排序的铸造历史
 func (p *FTIndexer) GetMintHistoryWithAddressV2(addressId uint64, tick string, start, limit int) ([]*common.MintInfo, int) {
 	p.mutex.RLock()
@@ -493,9 +400,8 @@ func (p *FTIndexer) GetMintHistoryWithAddressV2(addressId uint64, tick string, s
 	return result[start:end], total
 }
 
-
 // return: mint的总量
-func (p *FTIndexer) GetMintAmountWithAddressId(addressId uint64, tick string) (int64) {
+func (p *FTIndexer) GetMintAmountWithAddressId(addressId uint64, tick string) int64 {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -533,58 +439,59 @@ func (p *FTIndexer) GetMintAmount(tick string) (int64, int64) {
 }
 
 func (p *FTIndexer) GetSplittedInscriptionsWithTick(tickerName string) []string {
-	tickerName = strings.ToLower(tickerName)
+	return nil
+	// tickerName = strings.ToLower(tickerName)
 
-	mintMap := p.getMintListFromDB(tickerName)
-	result := make([]string, 0)
+	// mintMap := p.getMintListFromDB(tickerName)
+	// result := make([]string, 0)
 
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
+	// p.mutex.RLock()
+	// defer p.mutex.RUnlock()
 
-	inscMap := make(map[string]string, 0)
+	// inscMap := make(map[string]string, 0)
 
-	utxos, ok := p.utxoMap[tickerName]
-	if !ok {
-		return nil
-	}
+	// utxos, ok := p.utxoMap[tickerName]
+	// if !ok {
+	// 	return nil
+	// }
 
-	for utxo := range *utxos {
-		holder, ok := p.holderInfo[utxo]
-		if !ok {
-			common.Log.Errorf("can't find holder with utxo %d", utxo)
-			continue
-		}
+	// for utxo := range utxos {
+	// 	holder, ok := p.holderInfo[utxo]
+	// 	if !ok {
+	// 		common.Log.Errorf("can't find holder with utxo %d", utxo)
+	// 		continue
+	// 	}
 
-		for name, tickinfo := range holder.Tickers {
-			if strings.EqualFold(name, tickerName) {
-				for mintutxo, newRngs := range tickinfo.MintInfo {
-					mintinfo := mintMap[mintutxo]
-					oldRngs := mintinfo.Ordinals
+	// 	for name, tickinfo := range holder.Tickers {
+	// 		if strings.EqualFold(name, tickerName) {
+	// 			for mintutxo, newRngs := range tickinfo.Offsets {
+	// 				mintinfo := mintMap[mintutxo]
+	// 				oldRngs := mintinfo.Offsets
 
-					if len(oldRngs) != len(newRngs) {
-						inscMap[mintutxo] = mintinfo.Base.InscriptionId
-						//break 不能跳出，有更多的在后面
-					} else {
-						// newRng的顺序可能是错乱的
-						if !common.RangesContained(oldRngs, newRngs) ||
-							!common.RangesContained(newRngs, oldRngs) {
-							inscMap[mintutxo] = mintinfo.Base.InscriptionId
-							//break
-						}
-					}
-				}
-			}
-		}
-	}
+	// 				if len(oldRngs) != len(newRngs) {
+	// 					inscMap[mintutxo] = mintinfo.Base.InscriptionId
+	// 					//break 不能跳出，有更多的在后面
+	// 				} else {
+	// 					// newRng的顺序可能是错乱的
+	// 					if !common.RangesContained(oldRngs, newRngs) ||
+	// 						!common.RangesContained(newRngs, oldRngs) {
+	// 						inscMap[mintutxo] = mintinfo.Base.InscriptionId
+	// 						//break
+	// 					}
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 
-	for _, id := range inscMap {
-		common.Log.Warnf("Splited inscription ID %s", id)
-		result = append(result, id)
-	}
+	// for _, id := range inscMap {
+	// 	common.Log.Warnf("Splited inscription ID %s", id)
+	// 	result = append(result, id)
+	// }
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i] < result[j]
-	})
+	// sort.Slice(result, func(i, j int) bool {
+	// 	return result[i] < result[j]
+	// })
 
-	return result
+	// return result
 }

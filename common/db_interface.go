@@ -37,6 +37,6 @@ type KVDB interface {
 	BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error
 	BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error  // 只用于非客户端模式下
 
-	// 多次读
+	// 随机读
 	View(func(ReadBatch) error) error
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
-	indexer "github.com/sat20-labs/indexer/indexer/common"
 )
 
 func parseTickListKey(input string) (string, error) {
@@ -62,7 +61,7 @@ func parseTickUtxoKey(input string) (string, uint64, error) {
 func newTickerInfo(name string) *TickInfo {
 	return &TickInfo{
 		Name:           name,
-		MintInfo:       indexer.NewRBTress(),
+		MintInfo:       make(map[uint64]common.AssetOffsets),
 		InscriptionMap: make(map[string]*common.MintAbbrInfo, 0),
 		MintAdded:      make([]*common.Mint, 0),
 	}

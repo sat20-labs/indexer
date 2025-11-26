@@ -3,10 +3,10 @@ package common
 import "github.com/btcsuite/btcd/wire"
 
 const (
-	TICKER_STATUS_INVALID 	int = -1
-	TICKER_STATUS_INIT 		int = 0
-	TICKER_STATUS_NOT_START int = 1
-	TICKER_STATUS_MINTING 	int = 2
+	TICKER_STATUS_INVALID        int = -1
+	TICKER_STATUS_INIT           int = 0
+	TICKER_STATUS_NOT_START      int = 1
+	TICKER_STATUS_MINTING        int = 2
 	TICKER_STATUS_MINT_COMPLETED int = 3
 )
 
@@ -14,30 +14,32 @@ const TickerSeparatedFromName = true
 
 // amt / n == sizeof(ordinals)
 type Mint struct {
-	Base     *InscribeBaseContent
-	Id       int64
-	Name     string  
-	Amt int64 `json:"amt"`
+	Base *InscribeBaseContent
+	Id   int64
+	Name string
+	Amt  int64 `json:"amt"`
 
-	Ordinals []*Range `json:"ordinals"`
-	Desc     string   `json:"desc,omitempty"`
+	UtxoId  uint64
+	Offsets AssetOffsets `json:"offsets"`
+	Desc    string       `json:"desc,omitempty"`
 }
 
 type Ticker struct {
-	Base     *InscribeBaseContent
-	Id       int64
-	Name     string  
-	Desc     string   `json:"desc,omitempty"`
+	Base *InscribeBaseContent
+	Id   int64
+	Name string
+	Desc string `json:"desc,omitempty"`
 
-	Type       string  `json:"type,omitempty"` // 默认是FT，留待以后扩展
-	Limit      int64   `json:"limit,omitempty"`
-	N          int     `json:"n,omitempty"`
-	SelfMint   int     `json:"selfmint,omitempty"` // 0-100
-	Max        int64   `json:"max,omitempty"`
-	BlockStart int     `json:"blockStart,omitempty"`
-	BlockEnd   int     `json:"blockEnd,omitempty"`
-	Attr       SatAttr `json:"attr,omitempty"`
-	Status     int     `json:"status"` // -1: not ready; 0 minting; 1 finished.
+	Type        string  `json:"type,omitempty"` // 默认是FT，留待以后扩展
+	Limit       int64   `json:"limit,omitempty"`
+	N           int     `json:"n,omitempty"`        // bindingSat
+	SelfMint    int     `json:"selfmint,omitempty"` // 0-100
+	Max         int64   `json:"max,omitempty"`
+	BlockStart  int     `json:"blockStart,omitempty"`
+	BlockEnd    int     `json:"blockEnd,omitempty"`
+	Attr        SatAttr `json:"attr,omitempty"`
+	TotalMinted int64   `json:"totalMinted,omitempty"`
+	Status      int     `json:"status"` // -1: not ready; 0 minting; 1 finished.
 }
 
 type RBTreeValue_Mint struct {
@@ -46,26 +48,31 @@ type RBTreeValue_Mint struct {
 
 // 仅用于TickInfo内部
 type MintAbbrInfo struct {
-	Id            int64
-	Address       uint64
-	Amount        *Decimal
-	Ordinals      []*Range
-	InscriptionId string
+	Id             int64
+	Address        uint64
+	Amount         *Decimal
+	Offsets        AssetOffsets
+	InscriptionId  string
 	InscriptionNum int64
-	Height        int
+	Height         int
 }
 
-// key: mint时的inscriptionId。 value: 某个资产对应的ranges
-type TickAbbrInfo struct {
-	N int
-	MintInfo map[string][]*Range
+// 某个utxo中的某种资产数据
+type AssetAbbrInfo struct {
+	IsMinting  bool // 还在铸造中，不确定是否有效
+	BindingSat int
+	Offsets    AssetOffsets
+}
+
+func (p *AssetAbbrInfo) AssetAmt() int64 {
+	return p.Offsets.Size() * int64(p.BindingSat)
 }
 
 func NewMintAbbrInfo(mint *Mint) *MintAbbrInfo {
 	info := NewMintAbbrInfo2(mint.Base)
 	info.Id = mint.Id
 	info.Amount = NewDefaultDecimal(mint.Amt)
-	info.Ordinals = mint.Ordinals
+	info.Offsets = mint.Offsets
 	return info
 }
 
@@ -73,31 +80,31 @@ func (p *MintAbbrInfo) ToMintInfo() *MintInfo {
 	return &MintInfo{
 		Id: p.Id,
 		//Address: p.Address,
-		Amount: p.Amount.String(),
-		Ordinals: p.Ordinals,
-		Height: p.Height,
-		InscriptionId: p.InscriptionId,
+		Amount:         p.Amount.String(),
+		Offsets:        p.Offsets,
+		Height:         p.Height,
+		InscriptionId:  p.InscriptionId,
 		InscriptionNum: p.InscriptionNum,
 	}
 }
 
 func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 	return &MintAbbrInfo{
-		Address: base.InscriptionAddress,
-		Amount: NewDefaultDecimal(1), 
-		InscriptionId: base.InscriptionId, 
+		Address:        base.InscriptionAddress,
+		Amount:         NewDefaultDecimal(1),
+		InscriptionId:  base.InscriptionId,
 		InscriptionNum: base.Id,
-		Height: int(base.BlockHeight)}
+		Height:         int(base.BlockHeight)}
 }
 
 ///////////////////////////////////////////////////
 // 用于展示统一的数据信息
 
 type TickerInfo struct {
-	AssetName        `json:"name"`
+	AssetName       `json:"name"`
 	DisplayName     string `json:"displayname"`
-	Id 				int64  `json:"id"`
-	Divisibility 	int	   `json:"divisibility,omitempty"`
+	Id              int64  `json:"id"`
+	Divisibility    int    `json:"divisibility,omitempty"`
 	StartBlock      int    `json:"startBlock,omitempty"`
 	EndBlock        int    `json:"endBlock,omitempty"`
 	SelfMint        int    `json:"selfmint,omitempty"`
@@ -122,38 +129,38 @@ type TickerInfo struct {
 }
 
 type MintInfo struct {
-	Id             int64  `json:"id"`  // ticker内的铸造序号，非全局
-	Address        string `json:"mintaddress"`
-	Amount         string `json:"amount"`
-	Ordinals       []*Range `json:"ordinals,omitempty"`
-	Height         int    `json:"height"`
-	InscriptionId  string `json:"inscriptionId,omitempty"`  // 铭文id，或者符文的铸造输出utxo
-	InscriptionNum int64  `json:"inscriptionNumber,omitempty"`
+	Id             int64        `json:"id"` // ticker内的铸造序号，非全局
+	Address        string       `json:"mintaddress"`
+	Amount         string       `json:"amount"`
+	Offsets        AssetOffsets `json:"offsets,omitempty"`
+	Height         int          `json:"height"`
+	InscriptionId  string       `json:"inscriptionId,omitempty"` // 铭文id，或者符文的铸造输出utxo
+	InscriptionNum int64        `json:"inscriptionNumber,omitempty"`
 }
 
 type MintHistory struct {
-	AssetName        `json:"Name"`
-	Total    int           `json:"Total,omitempty"`
-	Start    int           `json:"Start,omitempty"`
-	Limit    int           `json:"Limit,omitempty"`
-	Items    []*MintInfo   `json:"Items,omitempty"`
+	AssetName `json:"Name"`
+	Total     int         `json:"Total,omitempty"`
+	Start     int         `json:"Start,omitempty"`
+	Limit     int         `json:"Limit,omitempty"`
+	Items     []*MintInfo `json:"Items,omitempty"`
 }
 
 type OffsetToAmount struct {
-	Offset int64	`json:"Offset"`
-	Amount string 	`json:"Amount"`
+	Offset int64  `json:"Offset"`
+	Amount string `json:"Amount"`
 }
 
 type DisplayAsset struct {
-	AssetName             `json:"Name"`
-	Amount  string        `json:"Amount"`
-	Precision int         `json:"Precision"`
-	BindingSat int        `json:"BindingSat"`
+	AssetName  `json:"Name"`
+	Amount     string `json:"Amount"`
+	Precision  int    `json:"Precision"`
+	BindingSat int    `json:"BindingSat"`
 
 	// 以下仅用在主网上，聪网不涉及
-	Offsets []*OffsetRange `json:"Offsets,omitempty"`
+	Offsets      []*OffsetRange    `json:"Offsets,omitempty"`
 	OffsetToAmts []*OffsetToAmount `json:"OffsetToAmts,omitempty"` // brc20 transfer nft, offset->decimal
-	Invalid     bool      `json:"invalid,omitempty"` // 表示该Utxo的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后
+	Invalid      bool              `json:"invalid,omitempty"`      // 表示该Utxo的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后
 }
 
 func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
@@ -163,18 +170,18 @@ func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
 		return nil
 	}
 	return &AssetInfo{
-		Name: p.AssetName,
-		Amount: *amount,
+		Name:       p.AssetName,
+		Amount:     *amount,
 		BindingSat: uint32(p.BindingSat),
 	}
 }
 
 type AssetsInUtxo struct {
-	UtxoId      uint64          `json:"UtxoId"`
-	OutPoint    string     		`json:"Outpoint"` // tx:vout
-	Value       int64      		`json:"Value"`
-	PkScript    []byte      	`json:"PkScript"`
-	Assets  	[]*DisplayAsset `json:"Assets"`
+	UtxoId   uint64          `json:"UtxoId"`
+	OutPoint string          `json:"Outpoint"` // tx:vout
+	Value    int64           `json:"Value"`
+	PkScript []byte          `json:"PkScript"`
+	Assets   []*DisplayAsset `json:"Assets"`
 }
 
 func (p *AssetsInUtxo) ToTxAssets() TxAssets {
@@ -218,15 +225,15 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 		}
 	}
 	return &TxOutput{
-		UtxoId: p.UtxoId,
+		UtxoId:      p.UtxoId,
 		OutPointStr: p.OutPoint,
 		OutValue: wire.TxOut{
-			Value: p.Value,
+			Value:    p.Value,
 			PkScript: p.PkScript,
 		},
-		Assets: assets,
-		Offsets: offsets,
+		Assets:        assets,
+		Offsets:       offsets,
 		SatBindingMap: satBindingMap,
-		Invalids: invalids,
+		Invalids:      invalids,
 	}
 }

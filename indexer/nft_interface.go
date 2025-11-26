@@ -128,17 +128,21 @@ func (b *IndexerMgr) getNftAmountWithAddress(address string, unconfirmedSpents m
 	return result
 }
 
-func (b *IndexerMgr) getNftsWithUtxo(utxoId uint64) map[string][]*common.Range {
-	result := make(map[string][]*common.Range)
+func (b *IndexerMgr) getNftsWithUtxo(utxoId uint64) map[string]common.AssetOffsets {
+	result := make(map[string]common.AssetOffsets)
 	sats := b.nft.GetBoundSatsWithUtxo(utxoId)
 	for _, sat := range sats {
 		nfts := b.nft.GetNftsWithSat(sat)
 		if nfts != nil {
-			rngs := make([]*common.Range, 0)
-			for _, nftId := range nfts.Nfts {
-				rngs = append(rngs, &common.Range{Start: nftId, Size: 1})
+			offsets := common.AssetOffsets{
+				{
+					Start: nfts.Offset,
+					End: nfts.Offset+1,
+				},
 			}
-			result[fmt.Sprintf("%d", sat)] = rngs
+			for _, nftId := range nfts.Nfts {
+				result[fmt.Sprintf("%d", nftId)] = offsets
+			}
 		}
 	}
 	return result

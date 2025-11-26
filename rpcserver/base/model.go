@@ -20,112 +20,6 @@ func NewModel(i base_indexer.Indexer) *Model {
 	}
 }
 
-func (s *Model) GetSatRangeInUtxo(utxo string) (*wire.ExoticSatRangeUtxo, error) {
-	utxoId, utxoRanges, err := s.indexer.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
-		common.Log.Errorf("GetOrdinalsForUTXO failed, %s", utxo)
-		return nil, err
-	}
-
-	// Caluclate the offset for each range
-	var satList []wire.SatDetailInfo
-	sr := s.indexer.GetExotics(utxoId)
-	for _, r := range sr {
-		exoticSat := exotic.Sat(r.Range.Start)
-		sat := wire.SatDetailInfo{
-			SatributeRange: wire.SatributeRange{
-				SatRange: wire.SatRange{
-					Start:  r.Range.Start,
-					Size:   r.Range.Size,
-					Offset: r.Offset,
-				},
-				Satributes: r.Satributes,
-			},
-			Block: int(exoticSat.Height()),
-			// Time:  0, //暂时不显示，需要获取Block的时间。
-		}
-		satList = append(satList, sat)
-	}
-
-	offset := int64(0)
-	for _, r := range utxoRanges {
-		exoticSat := exotic.Sat(r.Start)
-		sat := wire.SatDetailInfo{
-			SatributeRange: wire.SatributeRange{
-				SatRange: wire.SatRange{
-					Start:  r.Start,
-					Size:   r.Size,
-					Offset: offset,
-				},
-				Satributes: nil,
-			},
-			Block: int(exoticSat.Height()),
-			// Time:  0, //暂时不显示，需要获取Block的时间。
-		}
-		offset += r.Size
-		satList = append(satList, sat)
-	}
-
-	return &wire.ExoticSatRangeUtxo{
-		Utxo:  utxo,
-		Value: common.GetOrdinalsSize(utxoRanges),
-		Sats:  satList,
-	}, nil
-}
-
-func (s *Model) GetExoticUtxos(address string) ([]*wire.ExoticSatRangeUtxo, error) {
-	utxoList, err := s.indexer.GetUTXOsWithAddress(address)
-	if err != nil {
-		common.Log.Errorf("GetUTXOs failed. %s", err)
-		return nil, err
-	}
-	satributeSatList := make([]*wire.ExoticSatRangeUtxo, 0)
-	for utxoId, value := range utxoList {
-		utxo, _, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
-		if err != nil {
-			common.Log.Errorf("GetOrdinalsWithUtxoId failed, %d", utxoId)
-			return nil, err
-		}
-
-		if s.indexer.HasAssetInUtxo(utxoId, true) {
-			//common.Log.Infof("HasAssetInUtxo return true %s", utxo)
-			continue
-		}
-
-		// Caluclate the offset for each range
-		var satList []wire.SatDetailInfo
-		sr := s.indexer.GetExotics(utxoId)
-		for _, r := range sr {
-			exoticSat := exotic.Sat(r.Range.Start)
-			sat := wire.SatDetailInfo{
-				SatributeRange: wire.SatributeRange{
-					SatRange: wire.SatRange{
-						Start:  r.Range.Start,
-						Size:   r.Range.Size,
-						Offset: r.Offset,
-					},
-					Satributes: r.Satributes,
-				},
-				Block: int(exoticSat.Height()),
-				// Time:  0, //暂时不显示，需要获取Block的时间。
-			}
-			satList = append(satList, sat)
-		}
-
-		satributeSatList = append(satributeSatList, &wire.ExoticSatRangeUtxo{
-			Utxo:  utxo,
-			Value: value,
-			Sats:  satList,
-		})
-
-	}
-
-	sort.Slice(satributeSatList, func(i, j int) bool {
-		return satributeSatList[i].Value > satributeSatList[j].Value
-	})
-
-	return satributeSatList, nil
-}
 
 func (s *Model) getPlainUtxos(address string, value int64, start, limit int) ([]*wire.PlainUtxo, int, error) {
 	utxomap, err := s.indexer.GetUTXOsWithAddress(address)
@@ -155,8 +49,8 @@ func (s *Model) getPlainUtxos(address string, value int64, start, limit int) ([]
 
 	for _, utxoId := range utxos {
 		//Indicates that this utxo has been spent and cannot be used for indexing
-		utxo, _, err := s.indexer.GetOrdinalsWithUtxoId(utxoId.UtxoId)
-		if err != nil {
+		utxo := s.indexer.GetUtxoById(utxoId.UtxoId)
+		if utxo == "" {
 			continue
 		}
 
@@ -224,8 +118,8 @@ func (s *Model) getAllUtxos(address string, start, limit int) ([]*wire.PlainUtxo
 
 	for _, utxoId := range utxos {
 		//Indicates that this utxo has been spent and cannot be used for indexing
-		utxo, _, err := s.indexer.GetOrdinalsWithUtxoId(utxoId.UtxoId)
-		if err != nil {
+		utxo := s.indexer.GetUtxoById(utxoId.UtxoId)
+		if utxo == "" {
 			continue
 		}
 
@@ -263,65 +157,6 @@ func (s *Model) getAllUtxos(address string, start, limit int) ([]*wire.PlainUtxo
 	return plainUtxos, otherUtxos, totalRecords, nil
 }
 
-func (s *Model) GetExoticUtxosWithType(address string, typ string, amount int64) ([]*wire.SpecificExoticUtxo, error) {
-	utxos, err := s.indexer.GetUTXOsWithAddress(address)
-	if err != nil {
-		return nil, err
-	}
-	utxoList := make([]*wire.SpecificExoticUtxo, 0)
-
-	for utxoId, value := range utxos {
-
-		if value < amount {
-			continue
-		}
-
-		//Indicates that this utxo has been spent and cannot be used for indexing
-		utxo, _, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
-		if err != nil {
-			common.Log.Errorf("GetOrdinalsForUTXO failed, %d", utxoId)
-			continue
-		}
-
-		// //Find common utxo (that is, utxo with non-ordinal attributes)
-		if s.indexer.HasAssetInUtxo(utxoId, true) {
-			//common.Log.Infof("HasAssetInUtxo return true %s", utxo)
-			continue
-		}
-
-		exoticRanges := s.indexer.GetExoticsWithType(utxoId, typ)
-
-		total := int64(0)
-		sats := make([]wire.SatRange, 0)
-		for _, rng := range exoticRanges {
-			total += rng.Range.Size
-			sats = append(sats, wire.SatRange{Start: rng.Range.Start, Size: rng.Range.Size, Offset: rng.Offset})
-		}
-
-		if total < amount {
-			continue
-		}
-
-		if utils.IsUtxoSpent(utxo) {
-			common.Log.Infof("IsUtxoSpent return true %s", utxo)
-			continue
-		}
-
-		utxoList = append(utxoList, &wire.SpecificExoticUtxo{
-			Utxo:   utxo,
-			Value:  value,
-			Type:   typ,
-			Amount: total,
-			Sats:   sats,
-		})
-	}
-
-	sort.Slice(utxoList, func(i, j int) bool {
-		return utxoList[i].Amount > utxoList[j].Amount
-	})
-
-	return utxoList, nil
-}
 
 func (s *Model) GetSatInfo(sat int64) *wire.SatInfo {
 	sm := exotic.Sat(sat)
@@ -334,43 +169,4 @@ func (s *Model) GetSatInfo(sat int64) *wire.SatInfo {
 		Period:     int64(sm.Period()),
 		Satributes: sm.Satributes(),
 	}
-}
-
-func (s *Model) findSatsInAddress(req *wire.SpecificSatReq) ([]*wire.SpecificSat, error) {
-
-	utxos, err := s.indexer.GetUTXOsWithAddress(req.Address)
-	if err != nil {
-		return nil, err
-	}
-	utxoList := make([]*wire.SpecificSat, 0)
-
-	for utxoId, value := range utxos {
-		utxo, ranges, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
-		if err != nil {
-			common.Log.Errorf("GetOrdinalsForUTXO failed, %d", utxoId)
-			continue
-		}
-
-		for _, sat := range req.Sats {
-			if common.IsSatInRanges(sat, ranges) {
-				offset := int64(0)
-				sats := make([]wire.SatRange, 0)
-				for _, rng := range ranges {
-					sats = append(sats, wire.SatRange{Start: rng.Start, Size: rng.Size, Offset: offset})
-					offset += rng.Size
-				}
-
-				utxoList = append(utxoList, &wire.SpecificSat{
-					Address:     req.Address,
-					Utxo:        utxo,
-					Value:       value,
-					SpecificSat: sat,
-					Sats:        sats,
-				})
-			}
-		}
-	}
-
-	return utxoList, nil
-
 }

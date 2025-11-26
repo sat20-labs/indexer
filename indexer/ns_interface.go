@@ -352,13 +352,17 @@ func (b *IndexerMgr) HasNameInUtxo(utxoId uint64) bool {
 	return b.ns.HasNamesInUtxo(utxoId)
 }
 
-func (b *IndexerMgr) getNamesWithUtxo(utxoId uint64) map[string]map[string][]*common.Range {
-	result := make(map[string]map[string][]*common.Range)
+func (b *IndexerMgr) getNamesWithUtxo(utxoId uint64) map[string]common.AssetOffsets {
+	result := make(map[string]common.AssetOffsets)
 	names := b.ns.GetNamesWithUtxo(utxoId)
 	for _, name := range names {
-		mintInfo := make(map[string][]*common.Range)
-		mintInfo[name.Nft.Base.InscriptionId] = []*common.Range{{Start: name.Nft.Base.Sat, Size: 1}}
-		result[name.Name] = mintInfo
+		offsets := common.AssetOffsets{
+			{
+				Start: name.Nft.Offset,
+				End: name.Nft.Offset+1,
+			},
+		}
+		result[name.Name] = offsets
 	}
 	return result
 }

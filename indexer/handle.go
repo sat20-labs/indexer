@@ -44,10 +44,10 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
 
 	//time2 := time.Now()
-	//s.exotic.UpdateTransfer(block)
+	s.exotic.UpdateTransfer(block)
 	s.nft.UpdateTransfer(block, coinbase)
 	s.ns.UpdateTransfer(block)
-	// s.ftIndexer.UpdateTransfer(block)
+	s.ftIndexer.UpdateTransfer(block, coinbase)
 	s.brc20Indexer.UpdateTransfer(block)
 	s.RunesIndexer.UpdateTransfer(block)
 
@@ -63,7 +63,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64) {
 	var outValue int64
 	for _, txOut := range tx.Outputs {
-		if outValue + txOut.OutValue.Value >= int64(satpoint) {
+		if outValue+txOut.OutValue.Value >= int64(satpoint) {
 			return txOut, int64(satpoint) - outValue
 		}
 		outValue += txOut.OutValue.Value
@@ -73,14 +73,14 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 
 	var baseOffset int64
 	for i := 0; i <= index; i++ { // 0 是奖励聪
-		baseOffset += coinbase[i].Size 
+		baseOffset += coinbase[i].Size
 	}
 	baseOffset += posInFee
-	
+
 	coinbaseTx := block.Transactions[0]
 	outValue = 0
 	for _, txOut := range coinbaseTx.Outputs {
-		if outValue + txOut.OutValue.Value >= baseOffset {
+		if outValue+txOut.OutValue.Value >= baseOffset {
 			return txOut, baseOffset - outValue
 		}
 		outValue += txOut.OutValue.Value
@@ -90,7 +90,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	return nil, 0
 }
 
-func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int64, out *common.Output,
+func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
 	content *common.OrdxDeployContent, nft *common.Nft) *common.Ticker {
 	height := nft.Base.BlockHeight
 	// 去掉这个限制
@@ -107,7 +107,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int64, ou
 		}
 
 		// 目前只允许持有足够的pearl的用户可以部署lpt
-		if !s.isEligibleUser(out.Address.Addresses[0], content.Des) {
+		if !s.isEligibleUser(out.OutValue.PkScript, content.Des) {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, not eligible user",
 				nft.Base.InscriptionId, content.Ticker)
 			return nil
@@ -279,28 +279,13 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int64, ou
 		}
 	}
 
-	if common.RANGE_IN_GLOBAL {
-		newRngs := reAlignRange(rngs, satpoint, 1)
-		if len(newRngs) == 0 {
-			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, satpoint %d ",
-				nft.Base.InscriptionId, content.Ticker, satpoint)
-			return nil
-		}
-
-		// 确保newRngs都在output中
-		if !common.RangesContained(out.Ordinals, newRngs) {
-			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, ranges not in output",
-				nft.Base.InscriptionId, content.Ticker)
-			return nil
-		}
-	} else {
-		// 确保输出在output中
-		if out.Value < satpoint {
-			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, ranges not in output",
-				nft.Base.InscriptionId, content.Ticker)
-			return nil
-		}
+	// 确保输出在output中
+	if out.OutValue.Value < satpoint {
+		common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, ranges not in output",
+			nft.Base.InscriptionId, content.Ticker)
+		return nil
 	}
+	
 
 	nft.Base.UserData = []byte(content.Ticker)
 	ticker := &common.Ticker{
@@ -332,7 +317,7 @@ func (s *IndexerMgr) handleDeployTicker(rngs []*common.Range, satpoint int64, ou
 	return ticker
 }
 
-func (s *IndexerMgr) handleMintTicker(rngs []*common.Range, satpoint int64, out *common.Output,
+func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
 	content *common.OrdxMintContent, nft *common.Nft) *common.Mint {
 	inscriptionId := nft.Base.InscriptionId
 	height := nft.Base.BlockHeight
@@ -381,7 +366,7 @@ func (s *IndexerMgr) handleMintTicker(rngs []*common.Range, satpoint int64, out 
 			return nil
 		}
 	}
-	addressId := s.compiling.GetAddressId(out.Address.Addresses[0])
+	addressId := out.AddressId
 	permitAmt := s.getMintAmount(deployTicker.Name, addressId)
 	if amt > permitAmt {
 		common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, invalid amt: %s",
@@ -389,73 +374,44 @@ func (s *IndexerMgr) handleMintTicker(rngs []*common.Range, satpoint int64, out 
 		return nil
 	}
 
-	var newRngs []*common.Range
 	satsNum := int64(amt) / int64(deployTicker.N)
-	var sat int64 = nft.Base.Sat
-	if common.RANGE_IN_GLOBAL {
-		if indexer.IsRaritySatRequired(&deployTicker.Attr) {
-			// check trz=N
-			if deployTicker.Attr.TrailingZero > 0 {
-				if satsNum != 1 || !indexer.EndsWithNZeroes(deployTicker.Attr.TrailingZero, nft.Base.Sat) {
-					common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, invalid sat: %d, trailingZero: %d",
-						inscriptionId, content.Ticker, nft.Base.Sat, deployTicker.Attr.TrailingZero)
-					return nil
-				}
-			}
-
-			newRngs = skipOffsetRange(rngs, satpoint)
-			// check rarity
-			if deployTicker.Attr.Rarity != "" {
-				exoticranges := s.exotic.GetExoticsWithType(newRngs, deployTicker.Attr.Rarity)
-				size := int64(0)
-				newRngs2 := make([]*common.Range, 0)
-				for _, exrng := range exoticranges {
-					size += exrng.Range.Size
-					newRngs2 = append(newRngs2, exrng.Range)
-
-				}
-				if size < (satsNum) {
-					common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, invalid sat: %d, size %d, rarity: %s",
-						inscriptionId, content.Ticker, sat, size, deployTicker.Attr.Rarity)
-					return nil
-				}
-				newRngs = newRngs2
-			}
-			newRngs = reSizeRange(newRngs, satsNum)
-		} else {
-			newRngs = reAlignRange(rngs, satpoint, satsNum)
-		}
-	} else {
-		newRngs = []*common.Range{
-			{
-				Start: satpoint,
-				Size: satsNum,
-			},
-		}
-		if indexer.IsRaritySatRequired(&deployTicker.Attr) {
-			// check rarity
-			if deployTicker.Attr.Rarity != "" {
-				exoticranges := s.exotic.GetExoticsWithType(newRngs, deployTicker.Attr.Rarity)
-				size := int64(0)
-				newRngs2 := make([]*common.Range, 0)
-				for _, exrng := range exoticranges {
-					size += exrng.Range.Size
-					newRngs2 = append(newRngs2, exrng.Range)
-
-				}
-				if size < (satsNum) {
-					common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, invalid sat: %d, size %d, rarity: %s",
-						inscriptionId, content.Ticker, sat, size, deployTicker.Attr.Rarity)
-					return nil
-				}
-				newRngs = newRngs2
-			}
-		} 
+	newRngs := common.AssetOffsets{
+		{
+			Start: satpoint,
+			End:  satpoint + satsNum,
+		},
 	}
+	// local range 模式下，在这里无法得知聪的属性，需要推迟判断
+	//var sat int64 = nft.Base.Sat
+	// if indexer.IsRaritySatRequired(&deployTicker.Attr) {
+	// 	// check rarity
+	// 	if deployTicker.Attr.Rarity != "" {
+	// 		exoticranges := s.exotic.GetExoticsWithType(nft.UtxoId, newRngs, deployTicker.Attr.Rarity)
+	// 		size := int64(0)
+	// 		newRngs2 := make([]*common.Range, 0)
+	// 		for _, exrng := range exoticranges {
+	// 			size += exrng.Range.Size
+	// 			newRngs2 = append(newRngs2, exrng.Range)
 
-	if len(newRngs) == 0 || common.GetOrdinalsSize(newRngs) != satsNum {
+	// 		}
+	// 		if size < (satsNum) {
+	// 			common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, invalid sat: %d, size %d, rarity: %s",
+	// 				inscriptionId, content.Ticker, sat, size, deployTicker.Attr.Rarity)
+	// 			return nil
+	// 		}
+	// 		newRngs = newRngs2
+	// 	}
+	// }
+	// // 禁止在同一个聪上做同样名字的资产的铸造
+	// if s.hasSameTickerInRange(content.Ticker, newRngs) {
+	// 	common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, ranges has same ticker",
+	// 		inscriptionId, content.Ticker)
+	// 	return nil
+	// }
+
+	if len(newRngs) == 0 || newRngs.Size() != satsNum {
 		common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, amt(%d), no enough sats %d",
-			inscriptionId, content.Ticker, satsNum, common.GetOrdinalsSize(newRngs))
+			inscriptionId, content.Ticker, satsNum, newRngs.Size())
 		return nil
 	}
 
@@ -467,20 +423,14 @@ func (s *IndexerMgr) handleMintTicker(rngs []*common.Range, satpoint int64, out 
 	// 	return nil
 	// }
 
-	// 禁止在同一个聪上做同样名字的铸造
-	if s.hasSameTickerInRange(content.Ticker, newRngs) {
-		common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, ranges has same ticker",
-			inscriptionId, content.Ticker)
-		return nil
-	}
-
 	nft.Base.TypeName = common.ASSET_TYPE_FT
 	mint := &common.Mint{
-		Base:     common.CloneBaseContent(nft.Base),
-		Name:     content.Ticker,
-		Ordinals: newRngs,
-		Amt:      int64(amt),
-		Desc:     content.Des,
+		Base:    common.CloneBaseContent(nft.Base),
+		Name:    content.Ticker,
+		UtxoId:  nft.UtxoId,
+		Offsets: newRngs,
+		Amt:     int64(amt),
+		Desc:    content.Des,
 	}
 
 	return mint
@@ -776,7 +726,7 @@ func (s *IndexerMgr) handleNameRouting(content *common.OrdxUpdateContentV2, nft 
 	s.ns.NameUpdate(update)
 }
 
-func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint int64, out *common.Output,
+func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
 	fields map[int][]byte, nft *common.Nft) {
 	ordxInfo, bOrdx := common.IsOrdXProtocol(fields)
 	if !bOrdx {
@@ -797,7 +747,7 @@ func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint
 			return
 		}
 
-		ticker := s.handleDeployTicker(input, satpoint, out, deployInfo, nft)
+		ticker := s.handleDeployTicker(satpoint, in, out, deployInfo, nft)
 		if ticker == nil {
 			return
 		}
@@ -816,12 +766,12 @@ func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint
 			return
 		}
 
-		mint := s.handleMintTicker(input, satpoint, out, mintInfo, nft)
+		mint := s.handleMintTicker(satpoint, in, out, mintInfo, nft)
 		if mint == nil {
 			return
 		}
 
-		s.ftIndexer.UpdateMint(inUtxoId, mint)
+		s.ftIndexer.UpdateMint(out, mint)
 
 	default:
 		//common.Log.Warnf("handleOrdX unknown ordx type: %s, content: %s, txid: %s", ordxType, content, tx.Txid)
@@ -915,7 +865,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 }
 
 func (s *IndexerMgr) handleOrd(input *common.TxInput,
-	fields map[int][]byte, inscriptionId int, envelope []byte, curseType int, tx *common.Transaction, 
+	fields map[int][]byte, inscriptionId int, envelope []byte, curseType int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range, index int) {
 
 	satpoint := int64(0)
@@ -932,7 +882,6 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	if output == nil {
 		output = tx.Outputs[0]
 	}
-	
 
 	// 1. 先保存nft数据
 	nft := s.handleNft(input, output, satpoint, curseType, fields, inscriptionId, tx, block)
@@ -944,7 +893,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	protocol, content := common.GetProtocol(fields)
 	switch protocol {
 	case "ordx":
-		//s.handleOrdX(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		s.handleOrdX(satpoint, input, output, fields, nft)
 	case "sns":
 		domain := common.ParseDomainContent(string(fields[common.FIELD_CONTENT]))
 		if domain == nil {
@@ -1113,21 +1062,21 @@ func getSatInRange(common []*common.Range, satpoint int64) int64 {
 	return -1
 }
 
-func (s *IndexerMgr) hasSameTickerInRange(ticker string, rngs []*common.Range) bool {
-	for _, rng := range rngs {
-		if s.ftIndexer.CheckTickersWithSatRange(ticker, rng) {
-			return true
-		}
-	}
-	return false
-}
+// func (s *IndexerMgr) hasSameTickerInRange(ticker string, rngs []*common.Range) bool {
+// 	for _, rng := range rngs {
+// 		if s.ftIndexer.CheckTickersWithSatRange(ticker, rng) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 func (s *IndexerMgr) getMintAmountByAddressId(ticker string, address uint64) int64 {
 	return s.ftIndexer.GetMintAmountWithAddressId(address, ticker)
 }
 
 // 有资格的地址：跟引导节点建立了通道，而且该通道持有足够的资产
-func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
+func (s *IndexerMgr) isEligibleUser(pkScript []byte, pubkey string) bool {
 	assetName := common.NewAssetNameFromString(common.CORENODE_STAKING_ASSET_NAME)
 	amt := common.CORENODE_STAKING_ASSET_AMOUNT
 	if !s.IsMainnet() {
@@ -1138,6 +1087,12 @@ func (s *IndexerMgr) isEligibleUser(address, pubkey string) bool {
 	pubkeyBytes, err := hex.DecodeString(pubkey)
 	if err != nil {
 		common.Log.Errorf("DecodeString %s failed", pubkey)
+		return false
+	}
+
+	address, err := common.GetBTCAddressFromPkScript(pkScript, s.chaincfgParam)
+	if err != nil {
+		common.Log.Errorf("GetBTCAddressFromPkScript %v failed, %v", pkScript, err)
 		return false
 	}
 

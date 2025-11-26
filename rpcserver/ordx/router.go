@@ -42,8 +42,6 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	//获取utxo上的资产类型和对应的seed，seed由聪的属性（资产类型，数量，序号）决定
 	r.GET(proxy+"/utxo/seed/:utxo", s.handle.getSeedWithUtxo)
 	// for test
-	r.GET(proxy+"/utxo/range/:utxo", s.handle.getSatRangeWithUtxo)
-	r.POST(proxy+"/utxos/assets", s.handle.getAssetsWithUtxos_deprecated)
 	r.POST(proxy+"/utxos/exist", s.handle.getExistingUtxos)
 
 

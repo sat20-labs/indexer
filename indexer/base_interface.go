@@ -76,3 +76,7 @@ func (p *IndexerMgr) GetUtxoId(utxo string) uint64 {
 	id, _, _ := p.rpcService.GetOrdinalsWithUtxo(utxo)
 	return id
 }
+
+func (p *IndexerMgr) GetUtxoValue(utxo string) int64 {
+	return p.rpcService.GetUtxoValue(utxo)
+}
