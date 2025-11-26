@@ -26,7 +26,7 @@ func (p *ExoticIndexer) GetTicker(tickerName string) *common.Ticker {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	ret := p.exoticTickerMap[strings.ToLower(tickerName)]
+	ret := p.tickerMap[strings.ToLower(tickerName)]
 	if ret == nil {
 		return nil
 	}

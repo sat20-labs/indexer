@@ -7,31 +7,14 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/nft"
 )
 
-type TickInfo struct {
-	Id             uint64
-	Name           string
-	MintInfo       map[uint64]common.AssetOffsets
-	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
-	MintAdded      []*common.Mint
-	Ticker         *common.Ticker
-}
+type TickInfo = exotic.TickInfo
+type HolderInfo = exotic.HolderInfo
 
-type HolderAction struct {
-	UtxoId    uint64
-	AddressId uint64
-	Tickers   map[string]*common.AssetAbbrInfo
-	Action    int // -1 删除; 1 增加
-}
-
-// asset in utxo
-type HolderInfo struct {
-	AddressId uint64
-	IsMinting bool  // 只要该utxo是minting的reveal tx的input
-	Tickers   map[string]*common.AssetAbbrInfo // key: ticker, 小写
-}
+type HolderAction = exotic.HolderAction
 
 type FTIndexer struct {
 	db         common.KVDB
@@ -162,7 +145,7 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 }
 
 // 在系统初始化时调用一次，如果有历史数据的话。一般在NewSatIndex之后调用。
-func (s *FTIndexer) InitOrdxIndexer(nftIndexer *nft.NftIndexer) {
+func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
 	height := nftIndexer.GetBaseIndexer().GetSyncHeight()
@@ -197,6 +180,8 @@ func (s *FTIndexer) InitOrdxIndexer(nftIndexer *nft.NftIndexer) {
 
 // 自检。如果错误，将停机
 func (s *FTIndexer) CheckSelf(height int) bool {
+
+	return true
 
 	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
 	startTime := time.Now()

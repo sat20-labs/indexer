@@ -14,6 +14,7 @@ const MAX_SUBSIDY_HEIGHT = 6929999 // subsidy = 0 when exceeds this height
 
 var PizzaRanges = ReadRangesFromOrdResponse(PIZZA_RANGES)
 var NakamotoBlocks = []int{9, 286, 688, 877, 1760, 2459, 2485, 3479, 5326, 9443, 9925, 10645, 14450, 15625, 15817, 19093, 23014, 28593, 29097}
+// f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16:0
 var FirstTransactionRanges = []*common.Range{
 	{
 		Start: 45000000000,
@@ -67,10 +68,10 @@ func (s Sat) EpochPosition() int64 {
 }
 
 func (s Sat) Height() int64 {
-	v, ok := getExoticIndexer().firstSatInBlock.FindFirstSmaller(int64(s))
-	if ok {
-		return int64(v.(int))
-	}
+	// v, ok := getExoticIndexer().firstSatInBlock.FindFirstSmaller(int64(s))
+	// if ok {
+	// 	return int64(v.(int))
+	// }
 	// r := int64(s.Epoch()) * HalvingInterval
 	// sub := s.Epoch().GetSubsidy()
 	// p := s.EpochPosition() / sub
@@ -79,10 +80,11 @@ func (s Sat) Height() int64 {
 }
 
 func (s Sat) IsFirstSatInBlock() bool {
-	v := getExoticIndexer().firstSatInBlock.FindNode(int64(s))
-	return v != nil
+	// v := getExoticIndexer().firstSatInBlock.FindNode(int64(s))
+	// return v != nil
 	// sub := s.Epoch().GetSubsidy()
 	// return int64(s)%sub == 0
+	return false
 }
 
 func (s Sat) GetRodarmorRarity() string {

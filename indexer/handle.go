@@ -44,12 +44,14 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
 
 	//time2 := time.Now()
-	s.exotic.UpdateTransfer(block)
 	s.nft.UpdateTransfer(block, coinbase)
 	s.ns.UpdateTransfer(block)
-	s.ftIndexer.UpdateTransfer(block, coinbase)
 	s.brc20Indexer.UpdateTransfer(block)
 	s.RunesIndexer.UpdateTransfer(block)
+
+	//s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产
+	//s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
+	
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 

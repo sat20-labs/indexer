@@ -806,6 +806,7 @@ func (b *BaseIndexer) outputUtxo(output *common.TxOutputV2) {
 	if !ok {
 		common.Log.Panicf("%s should be loaded before", address)
 	}
+	output.AddressId = addrValue.AddressId
 	if addrValue.AddressType == int(txscript.NullDataTy) && output.OutValue.Value == 0 {
 		// 跟 utxo的记录保持一致，丢弃value == 0 的opreturn
 		return
@@ -880,7 +881,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		utxo string
 	}
 	inputs := make([]*pair, 0)
-	addressMap := make(map[string]uint64)
+	addressMap := make(map[string]bool)
 	for _, tx := range block.Transactions {
 		for _, input := range tx.Inputs {
 			if input.Vout >= 0xffffffff {
@@ -898,17 +899,19 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 
 		for _, output := range tx.Outputs {
 			address := base64.StdEncoding.EncodeToString(output.OutValue.PkScript)
-			_, ok := b.addressValueMap[address]
-			if !ok {
-				addressMap[address] = common.INVALID_ID
-
-				scyptClass, _, _, err := txscript.ExtractPkScriptAddrs(output.OutValue.PkScript, b.chaincfgParam)
-				if err != nil {
-					common.Log.Panicf("ExtractPkScriptAddrs %s failed. %v", output.OutPointStr, err)
+			s, ok := b.addressValueMap[address]
+			if ok {
+				if s.AddressId != common.INVALID_ID {
+					output.AddressId = s.AddressId
+				} else {
+					addressMap[address] = true
 				}
+			} else {
+				addressMap[address] = true
+
 				b.addressValueMap[address] = &common.AddressValueV2{
 					AddressId:   common.INVALID_ID,
-					AddressType: int(scyptClass),
+					AddressType: output.AddressType,
 				}
 			}
 		}
@@ -970,7 +973,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				common.Log.Panicf("failed to get value of address: %s, %v", v.key, err)
 			}
 			address := strings.TrimPrefix(string(value), common.DB_KEY_ADDRESS)
-			addressMap[address] = v.value
+			addressMap[address] = true
 			b.idToAddressMap[v.value] = address
 		}
 		addresses := make([]string, len(addressMap))
@@ -1025,6 +1028,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				common.Log.Panicf("DecodeString %s, %v", address, err)
 			}
 			output.OutValue.PkScript = pkScript
+			output.AddressId = addrId
 		}
 
 		common.Log.Infof("BaseIndexer.prefetchIndexesFromDB-> prefetched %d in %v", len(addressIdMap), time.Since(startTime))

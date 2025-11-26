@@ -35,9 +35,8 @@ type IndexerMgr struct {
 	kvDB    common.KVDB
 
 	// 保护这两个数据
-	reloading 	 int32
+	reloading     int32
 	rpcProcessing int32
-
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -55,9 +54,7 @@ type IndexerMgr struct {
 	ftIndexer    *ft.FTIndexer
 	ns           *ns.NameService
 	nft          *nft.NftIndexer
-	
 
-	
 	// 跑数据
 	lastCheckHeight int
 	compiling       *base_indexer.BaseIndexer
@@ -71,8 +68,8 @@ type IndexerMgr struct {
 	nftBackupDB       *nft.NftIndexer
 
 	/////////////////////////////////
-	mutex sync.RWMutex // 保护下面的数据
-	clmap        map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
+	mutex sync.RWMutex                           // 保护下面的数据
+	clmap map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
 	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
@@ -164,12 +161,12 @@ func (b *IndexerMgr) Init() {
 		exotic.SatributeList = append(exotic.SatributeList, exotic.Customized)
 	}
 
-	b.exotic = exotic.NewExoticIndexer(b.compiling)
-	b.exotic.Init()
+	b.exotic = exotic.NewExoticIndexer(b.ftDB)
+	b.exotic.Init(b.compiling)
 	b.nft = nft.NewNftIndexer(b.nftDB)
 	b.nft.Init(b.compiling)
 	b.ftIndexer = ft.NewOrdxIndexer(b.ftDB)
-	b.ftIndexer.InitOrdxIndexer(b.nft)
+	b.ftIndexer.Init(b.nft)
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
@@ -221,51 +218,51 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		if !isRunning {
 			isRunning = true
 			go func() {
-					ret := b.compiling.SyncToChainTip(stopIndexerChan)
-					if ret == 0 {
+				ret := b.compiling.SyncToChainTip(stopIndexerChan)
+				if ret == 0 {
 					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
-							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
-							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
-							b.compiling.SetUpdateDBCallback(nil)
-							b.updateDB()
-							if b.maxIndexHeight <= 0 {
+						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
+						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
+						b.compiling.SetUpdateDBCallback(nil)
+						b.updateDB()
+						if b.maxIndexHeight <= 0 {
 							b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
-							}
 						}
+					}
 
-						if b.maxIndexHeight > 0 {
-							if b.maxIndexHeight <= b.compiling.GetHeight() {
-								b.checkSelf()
-								common.Log.Infof("reach expected height, set exit flag")
-								bWantExit = true
-							}
-						}
-
-						b.dbgc()
-						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
-						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
-						// 	period := 1000
-						// 	if b.compiling.GetSyncHeight()%period == 0 {
-						// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
-						// 		b.checkSelf()
-						// 	}
-						// }
-						if b.dbStatistic() {
-							bWantExit = true
-						}
-
-					} else if ret > 0 {
-						// handle reorg
-						b.handleReorg(ret)
-						b.compiling.SyncToChainTip(stopIndexerChan)
-					} else {
-						if ret == -1 {
-							common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+					if b.maxIndexHeight > 0 {
+						if b.maxIndexHeight <= b.compiling.GetHeight() {
+							b.checkSelf()
+							common.Log.Infof("reach expected height, set exit flag")
 							bWantExit = true
 						}
 					}
 
-					isRunning = false
+					b.dbgc()
+					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
+					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
+					// 	period := 1000
+					// 	if b.compiling.GetSyncHeight()%period == 0 {
+					// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
+					// 		b.checkSelf()
+					// 	}
+					// }
+					if b.dbStatistic() {
+						bWantExit = true
+					}
+
+				} else if ret > 0 {
+					// handle reorg
+					b.handleReorg(ret)
+					b.compiling.SyncToChainTip(stopIndexerChan)
+				} else {
+					if ret == -1 {
+						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+						bWantExit = true
+					}
+				}
+
+				isRunning = false
 			}()
 		}
 	}
@@ -367,7 +364,7 @@ func (b *IndexerMgr) handleReorg(height int) {
 	common.Log.Infof("IndexerMgr handleReorg enter...")
 	// 需要等rpc都完成，再重新启动
 	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
-		time.Sleep(10*time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	atomic.AddInt32(&b.reloading, 1)
 	defer func() {
@@ -386,7 +383,7 @@ func (b *IndexerMgr) handleReorg(height int) {
 
 func (b *IndexerMgr) rpcEnter() {
 	for atomic.LoadInt32(&b.reloading) > 0 {
-		time.Sleep(10*time.Microsecond)
+		time.Sleep(10 * time.Microsecond)
 	}
 	atomic.AddInt32(&b.rpcProcessing, 1)
 }

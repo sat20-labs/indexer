@@ -3,6 +3,7 @@ package exotic
 const PIZZA_HEIGHT = 57043
 const PIZZA_TX = "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d"
 const PIZZA_UTXO = "a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d:0"
+const PIZZA_VALUE int64 = 10000*100000000 
 
 // 在第一个发生少申领奖励的区块124724前，序号不会有问题，可以沿用
 const PIZZA_RANGES = `
