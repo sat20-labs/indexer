@@ -789,10 +789,10 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 func (b *BaseIndexer) inputUtxo(input *common.TxOutput) {
 	utxoId := input.UtxoId
 	address := base64.StdEncoding.EncodeToString(input.OutValue.PkScript)
-	utxomap, ok := b.addressValueMap[address]
+	addrValue, ok := b.addressValueMap[address]
 	if ok {
-		utxomap.Op = 1
-		delete(utxomap.Utxos, utxoId)
+		addrValue.Op = 1
+		delete(addrValue.Utxos, utxoId)
 	} else {
 		common.Log.Panicf("%s should be loaded before", address)
 	}
@@ -881,7 +881,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		utxo string
 	}
 	inputs := make([]*pair, 0)
-	addressMap := make(map[string]bool)
+	addressMap := make(map[string]uint64)
 	for _, tx := range block.Transactions {
 		for _, input := range tx.Inputs {
 			if input.Vout >= 0xffffffff {
@@ -904,11 +904,10 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				if s.AddressId != common.INVALID_ID {
 					output.AddressId = s.AddressId
 				} else {
-					addressMap[address] = true
+					addressMap[address] = common.INVALID_ID
 				}
 			} else {
-				addressMap[address] = true
-
+				addressMap[address] = common.INVALID_ID
 				b.addressValueMap[address] = &common.AddressValueV2{
 					AddressId:   common.INVALID_ID,
 					AddressType: output.AddressType,
@@ -973,12 +972,20 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				common.Log.Panicf("failed to get value of address: %s, %v", v.key, err)
 			}
 			address := strings.TrimPrefix(string(value), common.DB_KEY_ADDRESS)
-			addressMap[address] = true
+
+			addressMap[address] = v.value
 			b.idToAddressMap[v.value] = address
+			s, ok := b.addressValueMap[address]
+			if ok {
+				s.AddressId = v.value
+			}
 		}
 		addresses := make([]string, len(addressMap))
 		i = 0
-		for k := range addressMap {
+		for k, v := range addressMap {
+			if v != common.INVALID_ID {
+				continue
+			}
 			addresses[i] = k
 			i++
 		}
