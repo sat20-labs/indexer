@@ -7,6 +7,157 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+
+func init() {
+	blocks := make(map[int]bool)
+	for i := 0; i < 1000; i++ {
+		blocks[i] = true
+	}
+	defaultAssetInBlockSubSidy[Vintage] = blocks
+
+	blocks2 := make(map[int]bool)
+	for _, block := range NakamotoBlocks {
+		blocks2[block] = true
+	}
+	defaultAssetInBlockSubSidy[Nakamoto] = blocks2
+}
+
+
+// 所有事先定义的稀有聪
+// utxo->ticker->offset
+var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets {
+	
+	
+	PIZZA_UTXO: {
+		Pizza: common.AssetOffsets{
+			{
+				Start: 0,
+				End: PIZZA_VALUE,
+			},
+		},
+	},
+
+
+	"0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9:0": {
+		Block9: common.AssetOffsets{
+			{
+				Start: 0,
+				End: 50*100000000,
+			},
+		},
+	},
+
+	"7ea1d2304f1f95fae773ed8ef67b51cfd5ab33ea8b6ab0a932ee3e248b7ba74c:0": {
+		Block78: common.AssetOffsets{
+			{
+				Start: 0,
+				End: 50*100000000,
+			},
+		},
+	},
+
+	"f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16:0": {
+		FirstTransaction: common.AssetOffsets{
+			{
+				Start: 0,
+				End: 10*100000000,
+			},
+		},
+	},
+}
+
+var defaultAssetInBlockSubSidy = map[string]map[int]bool {}
+
+func generateRarityAssetWithTx(output *common.TxOutput) {
+	assetMap, ok := defaultAssetInUtxo[output.OutPointStr]
+	if ok {
+		for name, offsets := range assetMap {
+			asset := common.AssetInfo{
+				Name: common.AssetName{ 
+					Protocol: common.PROTOCOL_NAME_ORD,
+					Type: common.ASSET_TYPE_EXOTIC,
+					Ticker: name,
+				},
+				Amount: *common.NewDecimal(1, 0),
+				BindingSat: 1,
+			}
+			output.Assets.Add(&asset)
+			output.Offsets[asset.Name] = offsets.Clone()
+		}
+	}
+}
+
+func generateRarityAssetWithBlock(height int, coinbaseInput *common.TxOutput) {
+
+	for name, blocks := range defaultAssetInBlockSubSidy {
+		_, ok := blocks[height]
+		if ok {
+			asset := common.AssetInfo{
+				Name: common.AssetName{ 
+					Protocol: common.PROTOCOL_NAME_ORD,
+					Type: common.ASSET_TYPE_EXOTIC,
+					Ticker: name,
+				},
+				Amount: *common.NewDecimal(1, 0),
+				BindingSat: 1,
+			}
+			offset := common.OffsetRange{
+				Start: 0,
+				End: coinbaseInput.OutValue.Value-1,
+			}
+			coinbaseInput.Assets.Add(&asset)
+			coinbaseInput.Offsets[asset.Name] = common.AssetOffsets{&offset}
+		}
+	}
+
+	generateRodarmorRarityAssetInBlock(height, coinbaseInput)
+}
+
+func  generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput)  {
+	
+	asset := common.AssetInfo{
+		Name: common.AssetName{ 
+			Protocol: common.PROTOCOL_NAME_ORD,
+			Type: common.ASSET_TYPE_EXOTIC,
+			Ticker: "",
+		},
+		Amount: *common.NewDecimal(1, 0),
+		BindingSat: 1,
+	}
+	offset0 := common.OffsetRange{
+		Start: 0,
+		End: 1,
+	}
+
+	var name string
+	if height == 0 {
+		name = Mythic
+	} else if height%CycleInterval == 0 {
+		name = Legendary
+	} else if height%HalvingInterval == 0 {
+		name = Epic
+	} else if height%DificultyAdjustmentInterval == 0 {
+		name = Rare
+	} else {
+		name = Uncommon
+	}
+	asset.Name.Ticker = name
+	coinbaseInput.Assets.Add(&asset)
+	coinbaseInput.Offsets[asset.Name] = common.AssetOffsets{&offset0}
+
+	if name == Uncommon {
+		asset.Name.Ticker = Black
+		coinbaseInput.Assets.Add(&asset)
+
+		offset1 := common.OffsetRange{
+			Start: coinbaseInput.OutValue.Value-1,
+			End: coinbaseInput.OutValue.Value,
+		}
+		coinbaseInput.Offsets[asset.Name] = common.AssetOffsets{&offset1}
+	}
+}
+
+
 func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {
 	return p.baseIndexer.GetBlockInBuffer(height)
 }
@@ -259,49 +410,6 @@ func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn common
 	return ranges
 }
 
-// 所有事先定义的稀有聪
-// ticker->utxo->offset
-func (p *ExoticIndexer) getDefaultExoticTickerMap() map[string]map[string]common.AssetOffsets {
-	result := make(map[string]map[string]common.AssetOffsets)
-	
-
-	
-	result[Pizza] = map[string]common.AssetOffsets{
-		PIZZA_UTXO: common.AssetOffsets{
-			{
-				Start: 0,
-				End: PIZZA_VALUE,
-			},
-		},
-	}
-
-	result[Block9] = map[string]common.AssetOffsets{
-		"0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9:0": common.AssetOffsets{
-			{
-				Start: 0,
-				End: 50*100000000,
-			},
-		},
-	}
-
-	result[Block78] = map[string]common.AssetOffsets{
-		"7ea1d2304f1f95fae773ed8ef67b51cfd5ab33ea8b6ab0a932ee3e248b7ba74c:0": common.AssetOffsets{
-			{
-				Start: 0,
-				End: 50*100000000,
-			},
-		},
-	}
-
-	result[FirstTransaction] = map[string]common.AssetOffsets{
-		"f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16:0": common.AssetOffsets{
-			{
-				Start: 0,
-				End: 10*100000000,
-			},
-		},
-	}
-
 
 		// validBlock := make([]int, 0)
 		// for h := range NakamotoBlocks {
@@ -328,6 +436,3 @@ func (p *ExoticIndexer) getDefaultExoticTickerMap() map[string]map[string]common
 		// }
 		// return nil
 
-
-	return result
-}

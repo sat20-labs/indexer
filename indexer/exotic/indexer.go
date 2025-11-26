@@ -215,8 +215,8 @@ func (p *ExoticIndexer) getExoticDefaultTicker(name string) *common.Ticker {
 	return ticker
 }
 
-func (p *ExoticIndexer) generateAssetWithBlock(block *common.Block, coinbase []*common.Range) {
-
+func (p *ExoticIndexer) generateAssetWithBlock(block *common.Block, coinbase *common.TxOutput) {
+	generateRarityAssetWithBlock(block.Height, coinbase)
 }
 
 func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
@@ -226,9 +226,9 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 	// 生成所有当前区块的稀有聪
 	startTime := time.Now()
 
-	p.generateAssetWithBlock(block, coinbase)
-
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	p.generateAssetWithBlock(block, coinbaseInput)
+
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
@@ -349,72 +349,10 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 			action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
 			p.holderActionList = append(p.holderActionList, &action)
 		}
+
+		generateRarityAssetWithTx(&txOut.TxOutput)
 	}
 	return change
-}
-
-func (p *ExoticIndexer) getMoreExoticRangesToHeight(startHeight, endHeight int) map[string][]*common.Range {
-	if p.baseIndexer.GetHeight() < 0 {
-		return nil
-	}
-
-	var result map[string][]*common.Range
-	p.db.View(func(txn common.ReadBatch) error {
-		result = p.getMoreRodarmorRarityRangesToHeight(startHeight, endHeight, txn)
-		// TODO
-		//result[Alpha] = p.GetRangesForAlpha(startHeight, endHeight)
-		//result[Omega] = p.GetRangesForOmega(startHeight, endHeight)
-		if endHeight >= 9 {
-			result[Block9] = p.getRangeForBlock(9, txn)
-		}
-		if endHeight >= 78 {
-			result[Block78] = p.getRangeForBlock(78, txn)
-		}
-		validBlock := make([]int, 0)
-		for h := range NakamotoBlocks {
-			if h <= endHeight {
-				validBlock = append(validBlock, h)
-			}
-		}
-		result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
-
-		result[FirstTransaction] = FirstTransactionRanges
-		if endHeight >= 1000 {
-			result[Vintage] = p.getRangeToBlock(1000, txn)
-		}
-		return nil
-	})
-
-	return result
-}
-
-func initEpochSat(ldb common.KVDB, height int) {
-
-	ldb.View(func(txn common.ReadBatch) error {
-		currentEpoch := height / HalvingInterval
-		underpays := int64(0)
-
-		for epoch := (height / HalvingInterval); epoch > 0; epoch-- {
-
-			value := &common.BlockValueInDB{}
-			key := db.GetBlockDBKey(210000 * epoch)
-			err := db.GetValueFromTxn(key, value, txn)
-			if err != nil {
-				common.Log.Panicf("GetValueFromDB %s failed. %v", key, err)
-			}
-
-			if epoch == currentEpoch {
-				underpays = int64(Epoch(int64(epoch)).GetStartingSat()) - value.Ordinals.Start
-			}
-			SetEpochStartingSat(int64(epoch), value.Ordinals.Start)
-		}
-
-		for epoch := currentEpoch + 1; epoch < MAX_EPOCH; epoch++ {
-			SetEpochStartingSat(int64(epoch), int64(Epoch(int64(epoch)).GetStartingSat())-underpays)
-		}
-		return nil
-	})
-
 }
 
 // 跟base数据库同步
