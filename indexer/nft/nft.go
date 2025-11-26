@@ -251,9 +251,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	}
 
 	nftmap, ok := p.nftAddedUtxoMap[nft.UtxoId]
-	if ok {
-		nftmap[nft.Base.Id] = nft
-	} else {
+	if !ok {
 		nftmap = make(map[int64]*common.Nft)
 		p.nftAddedUtxoMap[nft.UtxoId] = nftmap
 	}
