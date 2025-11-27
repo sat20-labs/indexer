@@ -152,11 +152,11 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 					hasTransfer = true
 					nft.TransferNft.IsInvalid = true // 仅设置标志位
 				} //else {
-				 // 已经转移过的transfer铭文，不需要再处理，直接删除就行
+				 	// 已经转移过的transfer铭文，不需要再处理，直接删除就行
 				//}
-				s.removeTransferNft(nft) // 从当前地址中删除数据
+					s.removeTransferNft(nft) // 从当前地址中删除数据
+				}
 			}
-		}
 
 		if hasTransfer {
 			for _, output := range tx.Outputs {
@@ -264,7 +264,8 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 			common.Log.Panic("can't find ticker info")
 		}
 	} else {
-		common.Log.Panic("can't find ticker info")
+		// 已经转移过的transfer nft不一定能找到
+		// common.Log.Panic("can't find ticker info")
 	}
 }
 
