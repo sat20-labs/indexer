@@ -48,15 +48,17 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 		msgTx := tx.MsgTx()
 		for _, txIn := range msgTx.TxIn {
 			input := &common.TxInput{
-				TxOutput: common.TxOutput{
-					UtxoId:        common.INVALID_ID,
-					OutPointStr:   txIn.PreviousOutPoint.String(),
-					Offsets:       make(map[common.AssetName]common.AssetOffsets),
-					SatBindingMap: make(map[int64]*common.AssetInfo),
-					Invalids:      make(map[common.AssetName]bool),
+				TxOutputV2: common.TxOutputV2{
+					TxOutput: common.TxOutput{
+						UtxoId:        common.INVALID_ID,
+						OutPointStr:   txIn.PreviousOutPoint.String(),
+						Offsets:       make(map[common.AssetName]common.AssetOffsets),
+						SatBindingMap: make(map[int64]*common.AssetInfo),
+						Invalids:      make(map[common.AssetName]bool),
+					},
+					Vout:    int(txIn.PreviousOutPoint.Index),
 				},
 				Witness: txIn.Witness,
-				Vout:    int(txIn.PreviousOutPoint.Index),
 				TxId:    txIn.PreviousOutPoint.Hash.String(),
 			}
 			inputs = append(inputs, input)

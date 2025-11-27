@@ -1,8 +1,10 @@
 package common
 
 import (
+	"encoding/base64"
 	"time"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common/pb"
 )
@@ -39,9 +41,8 @@ type Output struct {
 }
 
 type TxInput struct {
-	TxOutput
+	TxOutputV2
 	Witness  wire.TxWitness
-	Vout     int
 	TxId     string
 }
 
@@ -52,6 +53,16 @@ type TxOutputV2 struct {
 	Height      int
 	AddressId   uint64
 	AddressType int
+}
+
+func (p *TxOutputV2) GetAddress() string {
+	switch txscript.ScriptClass (p.AddressType) {
+	case txscript.NullDataTy:
+		return "OP_RETURN"
+	case txscript.NonStandardTy:
+		return "UNKNOWN"
+	}
+	return base64.StdEncoding.EncodeToString(p.OutValue.PkScript)
 }
 
 type Transaction struct {
