@@ -144,7 +144,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 			if ok {
 				if !nft.TransferNft.IsInvalid {
 					inputTransferNfts[nft.TransferNft.NftId] = nft
-					
+
 					ticker := s.tickerMap[nft.Ticker]
 					ticker.Ticker.TransactionCount++
 					s.tickerUpdated[nft.Ticker] = ticker.Ticker
@@ -152,7 +152,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 					hasTransfer = true
 					nft.TransferNft.IsInvalid = true // 仅设置标志位
 				} //else {
-				 // 已经转移过的transfer铭文，不需要再处理，直接删除就行
+				// 已经转移过的transfer铭文，不需要再处理，直接删除就行
 				//}
 				s.removeTransferNft(nft) // 从当前地址中删除数据
 			}
@@ -160,7 +160,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 		if hasTransfer {
 			for _, output := range tx.Outputs {
-				s.innerUpdateTransfer(tx.Txid, output, &inputTransferNfts)
+				s.innerUpdateTransfer(tx.TxId, output, &inputTransferNfts)
 			}
 		}
 	}
@@ -287,7 +287,7 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 		holder.Tickers[nft.Ticker] = common.NewBRC20TickAbbrInfo(nil, nil)
 		s.holderMap[nft.AddressId] = holder
 	}
-	
+
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
 	if ok {
 		tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
@@ -323,7 +323,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV
 			}
 			// p.addHolderBalance(transferNft.Ticker, fromAddrId,
 			// 	transferNft.TransferNft.Amount)
-			
+
 			s.addHolderBalance(transferNft.Ticker, toAddressId,
 				transferNft.TransferNft.Amount)
 

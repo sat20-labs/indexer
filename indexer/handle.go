@@ -22,9 +22,9 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	measureStartTime := time.Now()
 	//common.Log.Info("processOrdProtocol ...")
 	count := 0
-	for _, tx := range block.Transactions {
+	for i, tx := range block.Transactions {
 		id := 0
-		for i, input := range tx.Inputs {
+		for _, input := range tx.Inputs {
 
 			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
 			if err != nil {
@@ -38,7 +38,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 			}
 		}
 		if id > 0 {
-			detectOrdMap[tx.Txid] = id
+			detectOrdMap[tx.TxId] = id
 		}
 	}
 	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
@@ -51,7 +51,6 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 
 	//s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产
 	//s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
-	
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 
@@ -62,11 +61,11 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 }
 
 func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
-	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64) {
+	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2) {
 	var outValue int64
 	for _, txOut := range tx.Outputs {
 		if outValue+txOut.OutValue.Value >= int64(satpoint) {
-			return txOut, int64(satpoint) - outValue
+			return txOut
 		}
 		outValue += txOut.OutValue.Value
 	}
@@ -74,7 +73,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	// 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
 
 	var baseOffset int64
-	for i := 0; i <= index; i++ { // 0 是奖励聪
+	for i := 0; i < index; i++ { // 0 是奖励聪
 		baseOffset += coinbase[i].Size
 	}
 	baseOffset += posInFee
@@ -83,13 +82,13 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	outValue = 0
 	for _, txOut := range coinbaseTx.Outputs {
 		if outValue+txOut.OutValue.Value >= baseOffset {
-			return txOut, baseOffset - outValue
+			return txOut
 		}
 		outValue += txOut.OutValue.Value
 	}
 
 	// 没有绑定聪的铭文
-	return nil, 0
+	return nil
 }
 
 func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
@@ -287,7 +286,6 @@ func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out 
 			nft.Base.InscriptionId, content.Ticker)
 		return nil
 	}
-	
 
 	nft.Base.UserData = []byte(content.Ticker)
 	ticker := &common.Ticker{
@@ -380,7 +378,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	newRngs := common.AssetOffsets{
 		{
 			Start: satpoint,
-			End:  satpoint + satsNum,
+			End:   satpoint + satsNum,
 		},
 	}
 	// local range 模式下，在这里无法得知聪的属性，需要推迟判断
@@ -879,8 +877,10 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	}
 
 	var output *common.TxOutputV2
-	// 根据偏移找到对应的输出
-	output, satpoint = findOutputWithSatPoint(block, coinbase, index, tx, satpoint)
+	// 根据偏移找到对应的输出 注意这里跟ordinals协议的细微区别：ordinals协议是根据输出确定satpoint的位置，
+	// 而我们认为是在输入确定satpoint的位置，只要satpoint不超过输入的value，就是有效的satpoint
+	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 最后一个satpoint指向了给矿工的手续费
+	output = findOutputWithSatPoint(block, coinbase, index, tx, satpoint)
 	if output == nil {
 		output = tx.Outputs[0]
 	}
@@ -1026,7 +1026,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 	addressId2 := output.AddressId
 	nft := common.Nft{
 		Base: &common.InscribeBaseContent{
-			InscriptionId:      tx.Txid + "i" + strconv.Itoa(inscriptionId),
+			InscriptionId:      tx.TxId + "i" + strconv.Itoa(inscriptionId),
 			InscriptionAddress: addressId2, // TODO 这个地址不是铭刻者，模型的问题，比较难改，直接使用输出地址
 			BlockHeight:        int32(block.Height),
 			BlockTime:          block.Timestamp.Unix(),

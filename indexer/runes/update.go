@@ -68,7 +68,7 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		isParseOk, _ := s.index_runes(uint32(txIndex), transaction)
 		if isParseOk {
 			common.Log.Tracef("RuneIndexer.UpdateTransfer-> height:%d, txIndex:%d, txid:%s",
-				block.Height, txIndex, transaction.Txid)
+				block.Height, txIndex, transaction.TxId)
 		}
 	}
 	sinceTime := time.Since(startTime)
@@ -86,10 +86,10 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	artifact, err = parseArtifact(tx)
 	if err != nil {
 		if err != runestone.ErrNoOpReturn {
-			common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.Txid, err.Error())
+			common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.TxId, err.Error())
 		}
 	} else {
-		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
+		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.TxId, tx_index, artifact)
 	}
 	// if artifact != nil && artifact.Runestone != nil && artifact.Runestone.Edicts != nil {
 	// 	common.Log.Infof("%v", artifact.Runestone.Etching)
@@ -318,7 +318,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		address, err := parseTxVoutScriptAddress(tx, int(vout), *s.chaincfgParam)
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
-				tx.Txid, vout, s.chaincfgParam.Net, err)
+				tx.TxId, vout, s.chaincfgParam.Net, err)
 		}
 		addressId := s.BaseIndexer.GetAddressId(string(address))
 		outpointToBalancesValue := &table.OutpointToBalancesValue{
@@ -429,7 +429,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			address, err := parseTxVoutScriptAddress(tx, int(*outIndex), *s.chaincfgParam)
 			if err != nil {
 				common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
-					tx.Txid, outIndex, s.chaincfgParam.Net, err)
+					tx.TxId, outIndex, s.chaincfgParam.Net, err)
 			} else {
 				addressId := s.BaseIndexer.GetAddressId(string(address))
 				v := &table.RuneIdToMintHistory{
@@ -465,7 +465,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 			RuneId:       *id,
 			Burned:       uint128.Uint128{},
 			Divisibility: 0,
-			Etching:      tx.Txid,
+			Etching:      tx.TxId,
 			Parent:       nil,
 			Terms:        nil,
 			Mints:        uint128.Uint128{},
@@ -480,7 +480,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 		entry = &runestone.RuneEntry{
 			RuneId:     *id,
 			Burned:     uint128.Uint128{},
-			Etching:    tx.Txid,
+			Etching:    tx.TxId,
 			Parent:     parent,
 			Terms:      artifact.Runestone.Etching.Terms,
 			Mints:      uint128.Uint128{},
@@ -520,7 +520,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 		if oldValue != nil {
 			for _, val := range oldValue.RuneIdLots {
 				if val.Lot.Value.IsZero() {
-					common.Log.Panicf("unallocated input rune is zero. tx %s", tx.Txid)
+					common.Log.Panicf("unallocated input rune is zero. tx %s", tx.TxId)
 				}
 				if ret1[val.RuneId] == nil {
 					ret1[val.RuneId] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
@@ -564,12 +564,12 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 				key := &table.RuneIdAddressToBalance{RuneId: &val.RuneId, AddressId: oldValue.AddressId}
 				oldruneIdAddressToBalanceValue := s.runeIdAddressToBalanceTbl.Get(key)
 				if oldruneIdAddressToBalanceValue == nil {
-					common.Log.Panicf("address %s has missing rune %s in tx %s", hex.EncodeToString(input.OutValue.PkScript), val.RuneId.String(), tx.Txid)
+					common.Log.Panicf("address %s has missing rune %s in tx %s", hex.EncodeToString(input.OutValue.PkScript), val.RuneId.String(), tx.TxId)
 				}
 				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
 				if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
 					//amount = uint128.Zero
-					common.Log.Panicf("address %s has incorrect rune value in tx %s", hex.EncodeToString(input.OutValue.PkScript), tx.Txid)
+					common.Log.Panicf("address %s has incorrect rune value in tx %s", hex.EncodeToString(input.OutValue.PkScript), tx.TxId)
 				} else {
 					amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
 				}

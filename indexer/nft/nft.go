@@ -14,7 +14,6 @@ import (
 
 type SatInfo struct {
 	AddressId uint64
-	Index     int
 	UtxoId    uint64
 	Offset    int64
 	Nfts      map[int64]bool // nftId
@@ -23,25 +22,25 @@ type SatInfo struct {
 // 所有nft的记录
 // 以后ns和ordx模块，数据变大，导致加载、跑数据等太慢，需要按照这个模块的方式来修改优化。
 type NftIndexer struct {
-	db       common.KVDB
-	status   *common.NftStatus
-	bEnabled bool
+	db           common.KVDB
+	status       *common.NftStatus
+	bEnabled     bool
 	disabledSats map[int64]bool // 所有disabled的satoshi
 
 	baseIndexer *base.BaseIndexer
 	mutex       sync.RWMutex
 
 	// realtime buffer
-	utxoMap          map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
-	satMap           map[int64]*SatInfo // key: sat, 一个写入周期中新增加的铭文的转移结果
-	ctMap            map[int]string
-	ctToIdMap        map[string]int
-	lastCtId         int
+	utxoMap   map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
+	satMap    map[int64]*SatInfo      // key: sat, 一个写入周期中新增加的铭文的转移结果
+	ctMap     map[int]string
+	ctToIdMap map[string]int
+	lastCtId  int
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
-	nftAdded  		 []*common.Nft // 保持顺序
-	nftAddedUtxoMap  map[uint64]map[int64]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
-	utxoDeled 		 []uint64
+	nftAdded        []*common.Nft                    // 保持顺序
+	nftAddedUtxoMap map[uint64]map[int64]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
+	utxoDeled       []uint64
 }
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
@@ -91,7 +90,7 @@ func (p *NftIndexer) Clone() *NftIndexer {
 		nv := make([]*SatOffset, len(v))
 		for i, s := range v {
 			nv[i] = &SatOffset{
-				Sat: s.Sat,
+				Sat:    s.Sat,
 				Offset: s.Offset,
 			}
 		}
@@ -101,10 +100,9 @@ func (p *NftIndexer) Clone() *NftIndexer {
 	for k, v := range p.satMap {
 		newV := &SatInfo{
 			AddressId: v.AddressId,
-			Index: v.Index,
-			UtxoId: v.UtxoId,
-			Offset: v.Offset,
-			Nfts: make(map[int64]bool),
+			UtxoId:    v.UtxoId,
+			Offset:    v.Offset,
+			Nfts:      make(map[int64]bool),
 		}
 		for nftId := range v.Nfts {
 			newV.Nfts[nftId] = true
@@ -199,7 +197,7 @@ func (p *NftIndexer) Repair() {
 	})
 
 	common.Log.Infof("detect %d utxo has unbound sats", len(fixingUtxoMap))
-	
+
 	wb := p.db.NewWriteBatch()
 	defer wb.Close()
 
@@ -212,7 +210,7 @@ func (p *NftIndexer) Repair() {
 			utxoValue := NftsInUtxo{Sats: sats}
 			err = db.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
 		}
-		
+
 		if err != nil {
 			common.Log.Panicf("NftIndexer->Repair Error setting %s in db %v", utxokey, err)
 		}
@@ -242,7 +240,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	nft.Base.Id = int64(p.status.Count)
 	p.status.Count++
 	p.nftAdded = append(p.nftAdded, nft)
-	
+
 	if nft.Base.Sat < 0 {
 		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
 		p.status.Unbound++
@@ -278,9 +276,9 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		return
 	}
 
-	if block.Height == 29595 {
-		common.Log.Infof("")
-	}
+	// if block.Height == 29595 {
+	// 	common.Log.Infof("")
+	// }
 
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -289,47 +287,47 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	startTime := time.Now()
 	p.db.View(func(txn common.ReadBatch) error {
 		type pair struct {
-			key   string
-			value uint64 // utxoId
+			key    string
+			utxoId uint64 // utxoId
 		}
-		utxos := make([]*pair, 0)
+		inputsToLoad := make([]*pair, 0)
 		for _, tx := range block.Transactions[1:] {
 			for _, input := range tx.Inputs {
 				_, ok := p.utxoMap[input.UtxoId]
 				if ok {
 					continue
 				}
-				utxos = append(utxos, &pair{
-					key:   GetUtxoKey(input.UtxoId),
-					value: input.UtxoId,
+				inputsToLoad = append(inputsToLoad, &pair{
+					key:    GetUtxoKey(input.UtxoId),
+					utxoId: input.UtxoId,
 				})
 			}
 		}
 		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
-		sort.Slice(utxos, func(i, j int) bool {
-			return utxos[i].key < utxos[j].key
+		sort.Slice(inputsToLoad, func(i, j int) bool {
+			return inputsToLoad[i].key < inputsToLoad[j].key
 		})
-		sats := make(map[int64]bool)
-		for _, v := range utxos {
+		satsToLoad := make(map[int64]bool)
+		for _, v := range inputsToLoad {
 			value := NftsInUtxo{}
 			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &value)
 			if err != nil {
 				continue
 			}
-			p.utxoMap[v.value] = value.Sats
+			p.utxoMap[v.utxoId] = value.Sats
 			for _, sat := range value.Sats {
-				sats[sat.Sat] = true
+				satsToLoad[sat.Sat] = true
 			}
 		}
 
-		satVector := make([]int64, 0, len(sats))
-		for k := range sats {
-			satVector = append(satVector, k)
+		satLoadingVector := make([]int64, 0, len(satsToLoad))
+		for k := range satsToLoad {
+			satLoadingVector = append(satLoadingVector, k)
 		}
-		sort.Slice(satVector, func(i, j int) bool {
-			return satVector[i] < satVector[j]
+		sort.Slice(satLoadingVector, func(i, j int) bool {
+			return satLoadingVector[i] < satLoadingVector[j]
 		})
-		for _, v := range satVector {
+		for _, v := range satLoadingVector {
 			_, ok := p.satMap[v]
 			if ok {
 				continue
@@ -339,13 +337,12 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			if err != nil {
 				continue
 			}
-			
+
 			info := &SatInfo{
 				AddressId: value.OwnerAddressId,
-				Index: 0,
-				UtxoId: value.UtxoId,
-				Offset: value.Offset,
-				Nfts: make(map[int64]bool),
+				UtxoId:    value.UtxoId,
+				Offset:    value.Offset,
+				Nfts:      make(map[int64]bool),
 			}
 			for _, nftId := range value.Nfts {
 				info.Nfts[nftId] = true
@@ -368,32 +365,23 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			sats := p.utxoMap[input.UtxoId]
 			addedNft := p.nftAddedUtxoMap[input.UtxoId]
 			if addedNft != nil {
-				if len(sats) > 0 {
-					// 合并铸造结果
-					appended := make([]*SatOffset, 0)
-					for _, nft := range addedNft {
-						needAppend := true
-						for _, s := range sats {
-							if s.Offset == nft.Offset { // 同一个聪，需要命名一致
-								if s.Sat != nft.Base.Sat {
-									nft.Base.Sat = s.Sat
-								}
-								needAppend = false
-								break
+				
+				// 合并铸造结果
+				for _, nft := range addedNft {
+					newSat := true
+					for _, s := range sats {
+						if s.Offset == nft.Offset {
+							if s.Sat != nft.Base.Sat {
+								nft.Base.Sat = s.Sat // 同一个聪，需要命名一致
+								fmt.Printf("%s\n", tx.TxId)
 							}
-						}
-						if needAppend {
-							sats = append(sats, &SatOffset{
-								Sat: nft.Base.Sat,
-								Offset: nft.Offset,
-							})
+							newSat = false
+							break
 						}
 					}
-					sats = append(sats, appended...)
-				} else {
-					for _, nft := range addedNft {
+					if newSat {
 						sats = append(sats, &SatOffset{
-							Sat: nft.Base.Sat,
+							Sat:    nft.Base.Sat,
 							Offset: nft.Offset,
 						})
 					}
@@ -402,35 +390,33 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				// 添加到satMap
 				for _, nft := range addedNft {
 					info, ok := p.satMap[nft.Base.Sat]
-					if ok {
-						info.Nfts[nft.Base.Id] = true
-					} else {
+					if !ok {
 						info = &SatInfo{
 							AddressId: nft.OwnerAddressId,
-							Index: 0,
-							UtxoId: nft.UtxoId,
-							Offset: nft.Offset,
-							Nfts: make(map[int64]bool),
+							UtxoId:    nft.UtxoId,
+							Offset:    nft.Offset,
+							Nfts:      make(map[int64]bool),
 						}
-						info.Nfts[nft.Base.Id] = true
 						p.satMap[nft.Base.Sat] = info
 					}
+					info.Nfts[nft.Base.Id] = true
 				}
 			}
 
 			if len(sats) > 0 {
 				for _, sat := range sats {
+					info := p.satMap[sat.Sat]
 					asset := common.AssetInfo{
 						Name: common.AssetName{
 							Protocol: common.PROTOCOL_NAME_ORD,
-							Type: common.ASSET_TYPE_NFT,
-							Ticker: fmt.Sprintf("%d", sat.Sat), // 绑定了资产的聪
+							Type:     common.ASSET_TYPE_NFT,
+							Ticker:   fmt.Sprintf("%d", sat.Sat), // 绑定了资产的聪
 						},
-						Amount: *common.NewDecimal(1, 0),
-						BindingSat: 1,
+						Amount:     *common.NewDecimal(1, 0),
+						BindingSat: uint32(len(info.Nfts)),
 					}
 					input.Assets.Add(&asset)
-					input.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: sat.Offset, End: sat.Offset+1}}
+					input.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: sat.Offset, End: sat.Offset + 1}}
 				}
 
 				delete(p.utxoMap, input.UtxoId)
@@ -461,8 +447,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
 
-
-func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction, 
+func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 	input *common.TxOutput) *common.TxOutput {
 	// 只考虑放在第一个地址上 (output的地址处理过，肯定有值)
 
@@ -478,42 +463,32 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 		if err != nil {
 			common.Log.Panicf("innerUpdateTransfer3 Cut failed, %v", err)
 		}
-		
+
 		change = newChange
 		if len(newOut.Assets) != 0 {
-			addressId := txOut.AddressId
 			sats := make([]*SatOffset, 0)
 			for _, asset := range newOut.Assets {
-				offsets := newOut.Offsets[asset.Name]
-				newValue := &SatInfo{
-					AddressId: addressId, 
-					Index: 0, 
-					UtxoId: txOut.UtxoId, 
-					Offset: offsets[0].Start,
-					Nfts: make(map[int64]bool),
-				}
 				sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
 				if err != nil {
 					common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
 				}
-				
-				oldvalue := p.satMap[sat]
-				newValue.Nfts = oldvalue.Nfts
-				p.satMap[sat] = newValue
+				offsets := newOut.Offsets[asset.Name]
+				value := p.satMap[sat]
+				value.AddressId = txOut.AddressId
+				value.UtxoId = txOut.UtxoId
+				value.Offset = offsets[0].Start
 
 				sats = append(sats, &SatOffset{
-					Sat: sat,
-					Offset: newValue.Offset,
+					Sat:    sat,
+					Offset: value.Offset,
 				})
 			}
 
-			
 			p.utxoMap[txOut.UtxoId] = sats
 		}
 	}
 	return change
 }
-
 
 // fast
 func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64) []*SatOffset {
@@ -689,11 +664,11 @@ func (p *NftIndexer) UpdateDB() {
 		key := GetSatKey(sat)
 
 		info := &common.NftsInSat{
-			Sat: sat,
+			Sat:            sat,
 			OwnerAddressId: nft.AddressId,
-			UtxoId: nft.UtxoId,
-			Offset: nft.Offset,
-			Nfts: make([]int64, 0, len(nft.Nfts)),
+			UtxoId:         nft.UtxoId,
+			Offset:         nft.Offset,
+			Nfts:           make([]int64, 0, len(nft.Nfts)),
 		}
 		for k := range nft.Nfts {
 			info.Nfts = append(info.Nfts, k)

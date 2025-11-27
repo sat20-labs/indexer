@@ -42,8 +42,8 @@ type Output struct {
 
 type TxInput struct {
 	TxOutputV2
-	Witness  wire.TxWitness
-	TxId     string
+	Witness wire.TxWitness
+	TxId    string
 }
 
 type TxOutputV2 struct {
@@ -56,17 +56,27 @@ type TxOutputV2 struct {
 }
 
 func (p *TxOutputV2) GetAddress() string {
-	switch txscript.ScriptClass (p.AddressType) {
-	case txscript.NullDataTy:
-		return "OP_RETURN"
-	case txscript.NonStandardTy:
-		return "UNKNOWN"
+	if IsMainnet() {
+		switch txscript.ScriptClass(p.AddressType) {
+		case txscript.NullDataTy:
+			return "OP_RETURN"
+		case txscript.NonStandardTy:
+			return "UNKNOWN"
+		}
+	} else {
+		switch txscript.ScriptClass(p.AddressType) {
+		case txscript.NullDataTy:
+			return "OP_RETURN"
+			// case txscript.NonStandardTy: 测试网允许生成和花费这些地址
+			// 	return "UNKNOWN"
+		}
 	}
+
 	return base64.StdEncoding.EncodeToString(p.OutValue.PkScript)
 }
 
 type Transaction struct {
-	Txid    string        `json:"txid"`
+	TxId    string        `json:"txid"`
 	Inputs  []*TxInput    `json:"inputs"`
 	Outputs []*TxOutputV2 `json:"outputs"`
 }
