@@ -482,7 +482,9 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 				}
 			}
 
-			p.utxoMap[txOut.UtxoId] = sats
+			if len(sats) > 0 {
+				p.utxoMap[txOut.UtxoId] = sats
+			}
 		}
 	}
 	return change
