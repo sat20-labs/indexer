@@ -264,7 +264,8 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 			common.Log.Panic("can't find ticker info")
 		}
 	} else {
-		common.Log.Panic("can't find ticker info")
+		// 已经转移过的transfer nft不一定能找到
+		// common.Log.Panic("can't find ticker info")
 	}
 }
 

@@ -276,10 +276,6 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		return
 	}
 
-	// if block.Height == 29595 {
-	// 	common.Log.Infof("")
-	// }
-
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -468,20 +464,22 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 		if len(newOut.Assets) != 0 {
 			sats := make([]*SatOffset, 0)
 			for _, asset := range newOut.Assets {
-				sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
-				if err != nil {
-					common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
-				}
-				offsets := newOut.Offsets[asset.Name]
-				value := p.satMap[sat]
-				value.AddressId = txOut.AddressId
-				value.UtxoId = txOut.UtxoId
-				value.Offset = offsets[0].Start
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD && asset.Name.Type == common.ASSET_TYPE_NFT {
+					sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
+					if err != nil {
+						common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
+					}
+					offsets := newOut.Offsets[asset.Name]
+					value := p.satMap[sat]
+					value.AddressId = txOut.AddressId
+					value.UtxoId = txOut.UtxoId
+					value.Offset = offsets[0].Start
 
-				sats = append(sats, &SatOffset{
-					Sat:    sat,
-					Offset: value.Offset,
-				})
+					sats = append(sats, &SatOffset{
+						Sat:    sat,
+						Offset: value.Offset,
+					})
+				}
 			}
 
 			p.utxoMap[txOut.UtxoId] = sats

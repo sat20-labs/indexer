@@ -2,14 +2,12 @@ package base
 
 import (
 	"bytes"
-	"encoding/base64"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
@@ -709,6 +707,11 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 	satsInput := int64(0)
 	satsOutput := int64(0)
 	for _, tx := range block.Transactions[1:] {
+
+		// if tx.TxId == "475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756" {
+		// 	common.Log.Infof("")
+		// }
+
 		ranges := make([]*common.Range, 0)
 		var inValue int64
 		for _, input := range tx.Inputs {
@@ -720,6 +723,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 			if !ok {
 				common.Log.Panicf("%s does not exist in the utxo index", utxo)
 			}
+			inputUtxo.OutPointStr = utxo
 			input.TxOutputV2 = *inputUtxo
 			b.inputUtxo(input)
 
@@ -925,21 +929,16 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			utxoToAddressIdMap[utxo.utxo] = utxoValue.AddressId
 			idToAddressMap[utxoValue.AddressId] = ""
 			h, i, j := common.FromUtxoId(utxoValue.UtxoId)
-			b.utxoIndex.Index[utxo.utxo] = &common.TxOutputV2{
-				TxOutput: common.TxOutput{
-					UtxoId:      utxoValue.UtxoId,
-					OutPointStr: utxo.utxo,
-					OutValue: wire.TxOut{
-						Value:    utxoValue.Value,
-						PkScript: nil, // 最后填
-					},
-				},
+			output := &common.TxOutputV2{
+				TxOutput:    *common.NewTxOutput(utxoValue.Value),
 				Height:      h,
 				TxIndex:     i,
 				Vout:        j,
 				AddressId:   utxoValue.AddressId,
 				AddressType: 0, // 最后填
 			}
+			output.UtxoId = utxoValue.UtxoId
+			b.utxoIndex.Index[utxo.utxo] = output
 		}
 
 		type addressIdPair struct {
@@ -1019,7 +1018,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			}
 			addrId := utxoToAddressIdMap[utxo.utxo]
 			address := b.idToAddressMap[addrId]
-			pkScript, err := base64.StdEncoding.DecodeString(address)
+			pkScript, err := common.GetPkScriptFromAddress(address)
 			if err != nil {
 				common.Log.Panicf("DecodeString %s failed, utxo %s, err %v", address, utxo.utxo, err)
 			}

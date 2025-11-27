@@ -50,7 +50,7 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 			input := &common.TxInput{
 				TxOutputV2: common.TxOutputV2{
 					TxOutput: common.TxOutput{
-						UtxoId:        common.INVALID_ID,
+						UtxoId:        0,
 						OutPointStr:   txIn.PreviousOutPoint.String(),
 						Offsets:       make(map[common.AssetName]common.AssetOffsets),
 						SatBindingMap: make(map[int64]*common.AssetInfo),
@@ -67,11 +67,22 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 		// parse the raw tx values
 		for j, v := range msgTx.TxOut {
 			//Determine the type of the script and extract the address
-			scyptClass, _, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, chaincfgParam)
+			scyptClass, addresses, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, chaincfgParam)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
 				return nil
 				//common.Log.Panicf("BaseIndexer.fetchBlock-> Failed to extract address: %v", err)
+			}
+			if len(addresses) > 1 {
+				common.Log.Infof("tx: %s has multi addresses %v", msgTx.TxID(), addresses)
+			}
+			if scyptClass == txscript.NonStandardTy {
+				// 很多opreturn被识别为NonStandarTy
+				if common.IsOpReturn(v.PkScript) {
+					scyptClass = txscript.NullDataTy
+				} else {
+					//common.Log.Infof("tx: %s has not std address, pkscript %s", msgTx.TxID(), hex.EncodeToString(v.PkScript))
+				}
 			}
 
 			output := common.GenerateTxOutput(msgTx, j)

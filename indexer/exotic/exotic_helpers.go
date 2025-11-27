@@ -20,6 +20,35 @@ func init() {
 		blocks2[block] = true
 	}
 	defaultAssetInBlockSubSidy[Nakamoto] = blocks2
+
+	defaultAssetInBlockSubSidy[Block9] = map[int]bool{9:true}
+	defaultAssetInBlockSubSidy[Block78] = map[int]bool{78:true}
+
+	if !common.IsMainnet() {
+		defaultAssetInUtxo = make(map[string]map[string]common.AssetOffsets)
+		defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:0"] = map[string]common.AssetOffsets{
+			FirstTransaction: {
+				{
+					Start: 0,
+					End: 100*100000000,
+				},
+			},
+		}
+		defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:1"] = map[string]common.AssetOffsets{
+			FirstTransaction: {
+				{
+					Start: 0,
+					End: 2804999961782,
+				},
+			},
+		}
+
+		blocks3 := make(map[int]bool)
+		for _, block := range PIZZA_ORG_BLOCK {
+			blocks3[block] = true
+		}
+		defaultAssetInBlockSubSidy[Pizza] = blocks3
+	}
 }
 
 
@@ -27,31 +56,11 @@ func init() {
 // utxo->ticker->offset
 var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets {
 	
-	
 	PIZZA_UTXO: {
 		Pizza: common.AssetOffsets{
 			{
 				Start: 0,
 				End: PIZZA_VALUE,
-			},
-		},
-	},
-
-
-	"0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9:0": {
-		Block9: common.AssetOffsets{
-			{
-				Start: 0,
-				End: 50*100000000,
-			},
-		},
-	},
-
-	"7ea1d2304f1f95fae773ed8ef67b51cfd5ab33ea8b6ab0a932ee3e248b7ba74c:0": {
-		Block78: common.AssetOffsets{
-			{
-				Start: 0,
-				End: 50*100000000,
 			},
 		},
 	},
@@ -68,52 +77,54 @@ var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets {
 
 var defaultAssetInBlockSubSidy = map[string]map[int]bool {}
 
-func generateRarityAssetWithTx(output *common.TxOutput) {
-	assetMap, ok := defaultAssetInUtxo[output.OutPointStr]
-	if ok {
-		for name, offsets := range assetMap {
-			asset := common.AssetInfo{
-				Name: common.AssetName{ 
-					Protocol: common.PROTOCOL_NAME_ORD,
-					Type: common.ASSET_TYPE_EXOTIC,
-					Ticker: name,
-				},
-				Amount: *common.NewDecimal(1, 0),
-				BindingSat: 1,
-			}
-			output.Assets.Add(&asset)
-			output.Offsets[asset.Name] = offsets.Clone()
-		}
-	}
-}
-
-func generateRarityAssetWithBlock(height int, coinbaseInput *common.TxOutput) {
+func (p *ExoticIndexer) generateRarityAssetWithBlock(height int, coinbaseInput *common.TxOutput) {
 
 	for name, blocks := range defaultAssetInBlockSubSidy {
 		_, ok := blocks[height]
 		if ok {
+			
+	
 			asset := common.AssetInfo{
 				Name: common.AssetName{ 
 					Protocol: common.PROTOCOL_NAME_ORD,
 					Type: common.ASSET_TYPE_EXOTIC,
 					Ticker: name,
 				},
-				Amount: *common.NewDecimal(1, 0),
+				Amount: *common.NewDecimal(coinbaseInput.OutValue.Value, 0),
 				BindingSat: 1,
 			}
-			offset := common.OffsetRange{
-				Start: 0,
-				End: coinbaseInput.OutValue.Value-1,
+			offset := common.AssetOffsets{&common.OffsetRange{
+					Start: 0,
+					End: coinbaseInput.OutValue.Value,
+				},
 			}
 			coinbaseInput.Assets.Add(&asset)
-			coinbaseInput.Offsets[asset.Name] = common.AssetOffsets{&offset}
+			coinbaseInput.Offsets[asset.Name] = offset
+
+			p.addTickerAsset(name, coinbaseInput.UtxoId, offset)
 		}
 	}
 
-	generateRodarmorRarityAssetInBlock(height, coinbaseInput)
+	p.generateRodarmorRarityAssetInBlock(height, coinbaseInput)
 }
 
-func  generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput)  {
+func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets common.AssetOffsets) {
+	tickInfo, ok := p.tickerMap[name]
+	if !ok {
+		tickInfo = newExoticTickerInfo(name)
+		tickInfo.Id = uint64(len(p.tickerMap))
+	
+		tickInfo.Ticker = newExoticDefaultTicker(name)
+		p.tickerMap[name] = tickInfo
+		p.tickerAdded[name] = tickInfo.Ticker
+	}
+	tickInfo.MintInfo[utxoId] = offsets.Clone()
+	tickInfo.Ticker.TotalMinted += offsets.Size()
+	// tickInfo.MintAdded = append(ticker.MintAdded, mint)
+	// tickInfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
+}
+
+func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput)  {
 	
 	asset := common.AssetInfo{
 		Name: common.AssetName{ 
@@ -124,9 +135,11 @@ func  generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOut
 		Amount: *common.NewDecimal(1, 0),
 		BindingSat: 1,
 	}
-	offset0 := common.OffsetRange{
-		Start: 0,
-		End: 1,
+	offset0 := common.AssetOffsets{
+		{
+			Start: 0,
+			End: 1,
+		},
 	}
 
 	var name string
@@ -143,17 +156,23 @@ func  generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOut
 	}
 	asset.Name.Ticker = name
 	coinbaseInput.Assets.Add(&asset)
-	coinbaseInput.Offsets[asset.Name] = common.AssetOffsets{&offset0}
+	coinbaseInput.Offsets[asset.Name] = offset0
+
+	p.addTickerAsset(name, coinbaseInput.UtxoId, offset0)
 
 	if name == Uncommon {
 		asset.Name.Ticker = Black
 		coinbaseInput.Assets.Add(&asset)
 
-		offset1 := common.OffsetRange{
-			Start: coinbaseInput.OutValue.Value-1,
-			End: coinbaseInput.OutValue.Value,
+		offset1 := common.AssetOffsets{
+			{
+				Start: coinbaseInput.OutValue.Value-1,
+				End: coinbaseInput.OutValue.Value,
+			},
 		}
-		coinbaseInput.Offsets[asset.Name] = common.AssetOffsets{&offset1}
+		coinbaseInput.Offsets[asset.Name] = offset1
+
+		p.addTickerAsset(name, coinbaseInput.UtxoId, offset1)
 	}
 }
 

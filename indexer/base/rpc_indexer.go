@@ -1,7 +1,6 @@
 package base
 
 import (
-	"encoding/base64"
 	"fmt"
 	"sync"
 
@@ -129,7 +128,7 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 		return nil, err
 	}
 	
-	pkScript, err := base64.StdEncoding.DecodeString(address)
+	pkScript, err := common.GetPkScriptFromAddress(address)
 	if err != nil {
 		return nil, err
 	}

@@ -35,6 +35,14 @@ func PkScriptToAddr(pkScript []byte, chainParams *chaincfg.Params) (string, erro
 	return addrs[0].EncodeAddress(), nil
 }
 
+func AddrToPkScript(addr string, chainParams *chaincfg.Params) ([]byte, error) {
+	address, err := btcutil.DecodeAddress(addr, chainParams)
+	if err != nil {
+		return nil, err
+	}
+	return txscript.PayToAddrScript(address)
+}
+
 func IsValidAddr(addr string, chain string) (bool, error) {
 	chainParams := &chaincfg.TestNet4Params
 	switch chain {
@@ -54,7 +62,7 @@ func IsValidAddr(addr string, chain string) (bool, error) {
 	return true, nil
 }
 
-func AddrToPkScript(addr string, chain string) ([]byte, error) {
+func AddrToPkScriptV2(addr string, chain string) ([]byte, error) {
 	chainParams := &chaincfg.TestNet4Params
 	switch chain {
 	case ChainTestnet:

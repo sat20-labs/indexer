@@ -185,7 +185,7 @@ func (s *ExoticIndexer) Subtract(another *ExoticIndexer) {
 	// 不需要更新 holderInfo 和 utxoMap
 }
 
-func (p *ExoticIndexer) getExoticDefaultTicker(name string) *common.Ticker {
+func newExoticDefaultTicker(name string) *common.Ticker {
 	ticker := &common.Ticker{
 		Base: &common.InscribeBaseContent{
 			Id:       0,
@@ -202,7 +202,7 @@ func (p *ExoticIndexer) getExoticDefaultTicker(name string) *common.Ticker {
 		Id:         -1,
 		Name:       name,
 		Type:       common.ASSET_TYPE_EXOTIC,
-		Limit:      100000000,
+		Limit:      1,
 		N:          1,
 		SelfMint:   0,
 		Max:        0,
@@ -216,7 +216,7 @@ func (p *ExoticIndexer) getExoticDefaultTicker(name string) *common.Ticker {
 }
 
 func (p *ExoticIndexer) generateAssetWithBlock(block *common.Block, coinbase *common.TxOutput) {
-	generateRarityAssetWithBlock(block.Height, coinbase)
+	p.generateRarityAssetWithBlock(block.Height, coinbase)
 }
 
 func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
@@ -227,9 +227,16 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 	startTime := time.Now()
 
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	coinbaseInput.UtxoId = block.Transactions[0].Inputs[0].UtxoId
 	p.generateAssetWithBlock(block, coinbaseInput)
 
+	// 执行转移
 	for _, tx := range block.Transactions[1:] {
+
+		// if tx.TxId == "475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756" {
+		// 	common.Log.Infof("")
+		// }
+
 		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
 			utxo := input.UtxoId
@@ -301,11 +308,6 @@ func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetI
 		tickers[ticker] = assetInfo
 		info = &HolderInfo{AddressId: utxo.AddressId, IsMinting: assetInfo.IsMinting, Tickers: tickers}
 		p.holderInfo[utxo.UtxoId] = info
-	}
-
-	_, ok = info.Tickers[ticker]
-	if ok {
-		common.Log.Panicf("ExoticIndexer.addHolder utxo %s already has asset %s", utxo.OutPointStr, ticker)
 	} else {
 		info.Tickers[ticker] = assetInfo
 	}
@@ -349,8 +351,6 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 			action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
 			p.holderActionList = append(p.holderActionList, &action)
 		}
-
-		generateRarityAssetWithTx(&txOut.TxOutput)
 	}
 	return change
 }
