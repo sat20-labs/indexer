@@ -10,7 +10,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-
 type TickInfo struct {
 	Id             uint64
 	Name           string
@@ -30,10 +29,9 @@ type HolderAction struct {
 // asset in utxo
 type HolderInfo struct {
 	AddressId uint64
-	IsMinting bool  // 只要该utxo是minting的reveal tx的input
+	IsMinting bool                             // 只要该utxo是minting的reveal tx的input
 	Tickers   map[string]*common.AssetAbbrInfo // key: ticker, 小写
 }
-
 
 type ExoticIndexer struct {
 	db          common.KVDB
@@ -42,12 +40,12 @@ type ExoticIndexer struct {
 	mutex sync.RWMutex // 只保护这几个结构
 
 	// exotic sat range
-	tickerMap  map[string]*TickInfo // 用于检索稀有聪. key 稀有聪种类
+	tickerMap  map[string]*TickInfo        // 用于检索稀有聪. key 稀有聪种类
 	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
 	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
 
 	exoticSyncHeight int
-	holderActionList []*HolderAction     
+	holderActionList []*HolderAction
 	tickerAdded      map[string]*common.Ticker // key: ticker
 }
 
@@ -68,7 +66,7 @@ func newExoticTickerInfo(name string) *TickInfo {
 
 func NewExoticIndexer(db common.KVDB) *ExoticIndexer {
 	_instance = &ExoticIndexer{
-		db:              db,
+		db: db,
 	}
 	return _instance
 }
@@ -100,19 +98,19 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 }
 
 // 只保存UpdateDB需要用的数据
-func (s *ExoticIndexer) Clone() *ExoticIndexer {
-	newInst := NewExoticIndexer(s.db)
-	
-	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
-	copy(newInst.holderActionList, s.holderActionList)
+func (p *ExoticIndexer) Clone() *ExoticIndexer {
+	newInst := NewExoticIndexer(p.db)
+
+	newInst.holderActionList = make([]*HolderAction, len(p.holderActionList))
+	copy(newInst.holderActionList, p.holderActionList)
 
 	newInst.tickerAdded = make(map[string]*common.Ticker, 0)
-	for key, value := range s.tickerAdded {
+	for key, value := range p.tickerAdded {
 		newInst.tickerAdded[key] = value
 	}
 
 	newInst.tickerMap = make(map[string]*TickInfo, 0)
-	for key, value := range s.tickerMap {
+	for key, value := range p.tickerMap {
 		if len(value.MintAdded) > 0 {
 			tick := TickInfo{}
 			tick.Name = value.Name
@@ -125,9 +123,9 @@ func (s *ExoticIndexer) Clone() *ExoticIndexer {
 	// 保存holderActionList对应的数据
 	newInst.holderInfo = make(map[uint64]*HolderInfo, 0)
 	newInst.utxoMap = make(map[string]map[uint64]int64, 0)
-	for _, action := range s.holderActionList {
+	for _, action := range p.holderActionList {
 		if action.Action > 0 {
-			value, ok := s.holderInfo[action.UtxoId]
+			value, ok := p.holderInfo[action.UtxoId]
 			if ok {
 				info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
 				newInst.holderInfo[action.UtxoId] = &info
@@ -139,7 +137,7 @@ func (s *ExoticIndexer) Clone() *ExoticIndexer {
 
 		for tickerName := range action.Tickers {
 			if action.Action > 0 {
-				value, ok := s.utxoMap[tickerName]
+				value, ok := p.utxoMap[tickerName]
 				if ok {
 					amount, ok := value[action.UtxoId]
 					if ok {
@@ -167,16 +165,16 @@ func (s *ExoticIndexer) Clone() *ExoticIndexer {
 }
 
 // update之后，删除原来instance中的数据
-func (s *ExoticIndexer) Subtract(another *ExoticIndexer) {
+func (p *ExoticIndexer) Subtract(another *ExoticIndexer) {
 
-	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)
+	p.holderActionList = append([]*HolderAction(nil), p.holderActionList[len(another.holderActionList):]...)
 
 	for key := range another.tickerAdded {
-		delete(s.tickerAdded, key)
+		delete(p.tickerAdded, key)
 	}
 
 	for key, value := range another.tickerMap {
-		ticker, ok := s.tickerMap[key]
+		ticker, ok := p.tickerMap[key]
 		if ok {
 			ticker.MintAdded = append([]*common.Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
 		}
@@ -246,10 +244,10 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 					asset := common.AssetInfo{
 						Name: common.AssetName{
 							Protocol: common.PROTOCOL_NAME_ORD,
-							Type: common.ASSET_TYPE_EXOTIC,
-							Ticker: ticker,
+							Type:     common.ASSET_TYPE_EXOTIC,
+							Ticker:   ticker,
 						},
-						Amount: *common.NewDecimal(info.AssetAmt(), 0),
+						Amount:     *common.NewDecimal(info.AssetAmt(), 0),
 						BindingSat: 1,
 					}
 					input.Assets.Add(&asset)
@@ -266,7 +264,6 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 			}
 
 			// 当前区块生成的各种稀有聪资产
-
 
 			if allInput == nil {
 				allInput = input.Clone()
@@ -286,11 +283,9 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 			common.Log.Panicf("ExoticIndexer.UpdateTransfer should consume all input assets")
 		}
 	}
-	
 
 	common.Log.Infof("ExoticIndexer.UpdateTransfer in %v", time.Since(startTime))
 }
-
 
 func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxo uint64) {
 	utxos, ok := p.utxoMap[ticker]
@@ -298,7 +293,6 @@ func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxo uint64) {
 		delete(utxos, utxo)
 	}
 }
-
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
 func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
@@ -311,7 +305,7 @@ func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetI
 	} else {
 		info.Tickers[ticker] = assetInfo
 	}
-	
+
 	utxovalue, ok := p.utxoMap[ticker]
 	if !ok {
 		utxovalue = make(map[uint64]int64, 0)
@@ -320,8 +314,7 @@ func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetI
 	utxovalue[utxo.UtxoId] = assetInfo.AssetAmt()
 }
 
-
-func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction, 
+func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 	input *common.TxOutput) *common.TxOutput {
 
 	change := input
@@ -334,22 +327,27 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 			common.Log.Panicf("innerUpdateTransfer Cut failed, %v", err)
 		}
 		change = newChange
-		
-		tickers := make(map[string]*common.AssetAbbrInfo)
+
 		if len(newOut.Assets) != 0 {
 			txOut.Assets = newOut.Assets
 			txOut.Offsets = newOut.Offsets
-			
+
+			tickers := make(map[string]*common.AssetAbbrInfo)
 			for _, asset := range newOut.Assets {
-				offsets := newOut.Offsets[asset.Name]
-				assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
-				tickers[asset.Name.Ticker] = assetInfo
-				p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD &&
+					asset.Name.Type == common.ASSET_TYPE_EXOTIC {
+					offsets := newOut.Offsets[asset.Name]
+					assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
+					tickers[asset.Name.Ticker] = assetInfo
+					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+				}
 			}
 
-			addressId := txOut.AddressId
-			action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
-			p.holderActionList = append(p.holderActionList, &action)
+			if len(tickers) > 0 {
+				addressId := txOut.AddressId
+				action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
+				p.holderActionList = append(p.holderActionList, &action)
+			}
 		}
 	}
 	return change
@@ -450,6 +448,119 @@ func (p *ExoticIndexer) UpdateDB() {
 	common.Log.Infof("ExoticIndexer->UpdateDB takes %v", time.Since(startTime))
 }
 
+
+func (s *ExoticIndexer) setDBVersion() {
+	err := db.SetRawValueToDB([]byte(ORDX_DB_VER_KEY), []byte(ORDX_DB_VERSION), s.db)
+	if err != nil {
+		common.Log.Panicf("SetRawValueToDB failed %v", err)
+	}
+}
+
+func (s *ExoticIndexer) GetDBVersion() string {
+	value, err := db.GetRawValueFromDB([]byte(ORDX_DB_VER_KEY), s.db)
+	if err != nil {
+		common.Log.Errorf("GetRawValueFromDB failed %v", err)
+		return ""
+	}
+
+	return string(value)
+}
+
 func (p *ExoticIndexer) CheckSelf() bool {
+	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
+	startTime := time.Now()
+	for name := range p.tickerMap {
+		//common.Log.Infof("checking ticker %s", name)
+		holdermap := p.GetHolderAndAmountWithTick(name)
+		holderAmount := int64(0)
+		for _, amt := range holdermap {
+			holderAmount += amt
+		}
+		
+		ticker := p.GetTicker(name)
+		mintAmount := ticker.TotalMinted
+		if holderAmount != mintAmount {
+			common.Log.Errorf("ExoticIndexer ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			return false
+		}
+
+		common.Log.Infof("ExoticIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
+
+		utxos, ok := p.utxoMap[name]
+		if !ok {
+			if holderAmount != 0 {
+				common.Log.Errorf("ExoticIndexer ticker %s has no asset utxos", name)
+				return false
+			}
+		} else {
+			amontInUtxos := int64(0)
+			for utxo, amoutInUtxo := range utxos {
+				amontInUtxos += amoutInUtxo
+
+				holderInfo, ok := p.holderInfo[utxo]
+				if !ok {
+					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d not in holdermap", name, utxo)
+					return false
+				}
+				tickinfo, ok := holderInfo.Tickers[name]
+				if !ok {
+					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d not in holders", name, utxo)
+					return false
+				}
+
+				amountInHolder := tickinfo.Offsets.Size() * int64(tickinfo.BindingSat)
+				if amountInHolder != amoutInUtxo {
+					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
+					return false
+				}
+			}
+		}
+	}
+
+	// // 需要高度到达一定高度才需要检查
+	// if p.baseIndexer.IsMainnet() && p.exoticSyncHeight == 920000 {
+	// 	// 需要区分主网和测试网
+	// 	name := "pearl"
+	// 	ticker := p.GetTicker(name)
+	// 	if ticker == nil {
+	// 		common.Log.Errorf("ExoticIndexer can't find %s in db", name)
+	// 		return false
+	// 	}
+
+	// 	holdermap := p.GetHolderAndAmountWithTick(name)
+	// 	holderAmount := int64(0)
+	// 	for _, amt := range holdermap {
+	// 		holderAmount += amt
+	// 	}
+
+	// 	mintAmount, _ := p.GetMintAmount(name)
+	// 	if holderAmount != mintAmount {
+	// 		common.Log.Errorf("ExoticIndexer ticker amount incorrect. %d %d", mintAmount, holderAmount)
+	// 		return false
+	// 	}
+
+	// 	// 1.2.0 版本升级后，pearl的数量增加了105张。原因是之前铸造时，部分输出少于amt的铸造，被错误的识别为无效的铸造。
+	// 	// 但实际上，这些铸造是有效的，铸造时已经提供了大于10000的聪，只是大部分铸造出来的pearl，都给了矿工，只有546或者330留在铸造者手里
+	// 	// 比如： 5647d570edcbe45d4953915f7b9063e9b39b83432ae2ae13fdbd5283abb83367i0 等
+	// 	if ticker.BlockStart == 828200 {
+	// 		if holderAmount != 156271012 {
+	// 			common.Log.Errorf("ExoticIndexer %s amount incorrect. %d", name, holderAmount)
+	// 			return false
+	// 		}
+	// 	} else {
+	// 		common.Log.Errorf("ExoticIndexer Incorrect %s", name)
+	// 		return false
+	// 	}
+	// }
+
+	// 检查holderinfo？
+	// for utxo, holderInfo := range s.holderInfo {
+
+	// }
+
+	// 最后才设置dbver
+	p.setDBVersion()
+	common.Log.Infof("ExoticIndexer CheckSelf took %v.", time.Since(startTime))
+
 	return true
 }

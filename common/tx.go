@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/base64"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -56,28 +57,21 @@ type TxOutputV2 struct {
 }
 
 func (p *TxOutputV2) GetAddress() string {
-	var chainParams *chaincfg.Params
-	if IsMainnet() {
-		switch txscript.ScriptClass(p.AddressType) {
-		case txscript.NullDataTy:
-			return "OP_RETURN"
-		case txscript.NonStandardTy:
-			return "UNKNOWN"
-		}
-		chainParams = &chaincfg.MainNetParams
-	} else {
-		switch txscript.ScriptClass(p.AddressType) {
-		case txscript.NullDataTy:
-			return "OP_RETURN"
-			// case txscript.NonStandardTy: 测试网允许生成和花费这些地址
-			// 	return "UNKNOWN"
-		}
-		chainParams = &chaincfg.TestNet4Params
+	switch txscript.ScriptClass(p.AddressType) {
+	case txscript.NullDataTy:
+		return "OP_RETURN"
 	}
 
+	var chainParams *chaincfg.Params
+	if IsMainnet() {
+		chainParams = &chaincfg.MainNetParams
+	} else {
+		chainParams = &chaincfg.TestNet4Params
+	}
 	_, addresses, _, _ := txscript.ExtractPkScriptAddrs(p.OutValue.PkScript, chainParams)
 	if len(addresses) == 0 {
-		return "UNKNOWN"
+		// txscript.MultiSigTy, NonStandardTy
+		return base64.StdEncoding.EncodeToString(p.OutValue.PkScript)
 	}
 
 	return addresses[0].EncodeAddress()
@@ -87,16 +81,45 @@ func GetPkScriptFromAddress(address string) ([]byte, error) {
 	if address == "OP_RETURN" {
 		return []byte{0x6a}, nil
 	}
-	if address == "UNKNOWN" {
-		return []byte{0x51}, nil
-	}
+	// if address == "UNKNOWN" {
+	// 	return []byte{0x51}, nil
+	// }
 	var chainParams *chaincfg.Params
 	if IsMainnet() {
 		chainParams = &chaincfg.MainNetParams
 	} else {
 		chainParams = &chaincfg.TestNet4Params
 	}
-	return AddrToPkScript(address, chainParams)
+
+	pkScript, err := AddrToPkScript(address, chainParams)
+	if err != nil {
+		// base64
+		pkScript, err = base64.StdEncoding.DecodeString(address)
+	}
+	return pkScript, err
+}
+
+
+func GetAddressTypeFromAddress(address string) int {
+	pkScript, err := GetPkScriptFromAddress(address)
+	if err != nil {
+		return int(txscript.NonStandardTy)
+	}
+	return GetAddressTypeFromPkScript(pkScript)
+}
+
+func GetAddressTypeFromPkScript(pkScript []byte) int {
+	var chainParams *chaincfg.Params
+	if IsMainnet() {
+		chainParams = &chaincfg.MainNetParams
+	} else {
+		chainParams = &chaincfg.TestNet4Params
+	}
+	scriptClass, _, _, err := txscript.ExtractPkScriptAddrs(pkScript, chainParams)
+	if err != nil {
+		return int(txscript.NonStandardTy)
+	}
+	return int(scriptClass)
 }
 
 type Transaction struct {

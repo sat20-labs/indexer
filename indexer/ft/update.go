@@ -212,7 +212,7 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 	common.Log.Infof("OrdxIndexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 
 	p.mutex.Unlock()
-	p.CheckSelf(block.Height)
+	//p.CheckSelf(block.Height)
 }
 
 func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction, 
@@ -229,18 +229,24 @@ func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction,
 		}
 		change = newChange
 		
-		tickers := make(map[string]*common.AssetAbbrInfo)
 		if len(newOut.Assets) != 0 {
+			tickers := make(map[string]*common.AssetAbbrInfo)
+			// 只处理ordx资产
 			for _, asset := range newOut.Assets {
-				offsets := newOut.Offsets[asset.Name]
-				assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
-				tickers[asset.Name.Ticker] = assetInfo
-				p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORDX && 
+				asset.Name.Type == common.ASSET_TYPE_FT {
+					offsets := newOut.Offsets[asset.Name]
+					assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
+					tickers[asset.Name.Ticker] = assetInfo
+					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+				}
 			}
 
-			addressId := txOut.AddressId
-			action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
-			p.holderActionList = append(p.holderActionList, &action)
+			if len(tickers) > 0 {
+				addressId := txOut.AddressId
+				action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
+				p.holderActionList = append(p.holderActionList, &action)
+			}
 		}
 	}
 	return change

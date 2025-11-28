@@ -221,7 +221,13 @@ func GetAddressDataFromDBTxnV2(txn common.ReadBatch, address string) (*common.Ad
 	var result common.AddressValueInDBV2
 	err := GetValueFromTxnWithProto3(GetAddressDBKeyV2(address), txn, &result)
 	if err != nil {
-		return nil, err
+		// 即使没有数据，也可以尝试读取已经保存的id
+		addrId, err := GetAddressIdFromTxn(txn, address)
+		if err != nil {
+			return nil, err
+		}
+		result.AddressId = addrId
+		result.AddressType = int32(common.GetAddressTypeFromAddress(address))
 	}
 	return &result, nil
 }

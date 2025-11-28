@@ -50,7 +50,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	s.RunesIndexer.UpdateTransfer(block)
 
 	s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产
-	//s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
+	s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 

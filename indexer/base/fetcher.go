@@ -67,17 +67,19 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 		// parse the raw tx values
 		for j, v := range msgTx.TxOut {
 			//Determine the type of the script and extract the address
-			scyptClass, addresses, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, chaincfgParam)
+			scyptClass, _, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, chaincfgParam)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
 				return nil
 				//common.Log.Panicf("BaseIndexer.fetchBlock-> Failed to extract address: %v", err)
 			}
-			if len(addresses) > 1 {
-				common.Log.Infof("tx: %s has multi addresses %v", msgTx.TxID(), addresses)
-			}
+			// MultiSigTy, 例如testnet4: 21f4713326dbe56bdd553613fdf6f112086425f55c83fd54e8a2f36045e1d965 2/3签名
+			// if len(addresses) > 1 {
+			// 	common.Log.Infof("tx: %s has multi addresses %v", msgTx.TxID(), addresses)
+			// }
 			if scyptClass == txscript.NonStandardTy {
-				// 很多opreturn被识别为NonStandarTy
+				// 很多opreturn被识别为NonStandarTy，比如testnet4 2826ead858ddb5b58d331849481189bd7b705ab0582a1d39b3b1c0bd42c864f9
+				//common.Log.Infof("tx: %s has nonStandard address %v", msgTx.TxID(), addresses)
 				if common.IsOpReturn(v.PkScript) {
 					scyptClass = txscript.NullDataTy
 				} else {

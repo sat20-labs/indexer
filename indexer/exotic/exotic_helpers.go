@@ -172,7 +172,7 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 		}
 		coinbaseInput.Offsets[asset.Name] = offset1
 
-		p.addTickerAsset(name, coinbaseInput.UtxoId, offset1)
+		p.addTickerAsset(asset.Name.Ticker, coinbaseInput.UtxoId, offset1)
 	}
 }
 

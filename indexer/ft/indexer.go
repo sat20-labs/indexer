@@ -181,8 +181,6 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 // 自检。如果错误，将停机
 func (s *FTIndexer) CheckSelf(height int) bool {
 
-	return true
-
 	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
 	startTime := time.Now()
 	for name := range s.tickerMap {
@@ -195,14 +193,14 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 		mintAmount, _ := s.GetMintAmount(name)
 		if holderAmount != mintAmount {
-			common.Log.Errorf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			common.Log.Errorf("FTIndexer ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
 			return false
 		}
 
 		utxos, ok := s.utxoMap[name]
 		if !ok {
 			if holderAmount != 0 {
-				common.Log.Errorf("ticker %s has no asset utxos", name)
+				common.Log.Errorf("FTIndexer ticker %s has no asset utxos", name)
 				return false
 			}
 		} else {
@@ -212,18 +210,18 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 				holderInfo, ok := s.holderInfo[utxo]
 				if !ok {
-					common.Log.Errorf("ticker %s's utxo %d not in holdermap", name, utxo)
+					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holdermap", name, utxo)
 					return false
 				}
 				tickinfo, ok := holderInfo.Tickers[name]
 				if !ok {
-					common.Log.Errorf("ticker %s's utxo %d not in holders", name, utxo)
+					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holders", name, utxo)
 					return false
 				}
 
 				amountInHolder := tickinfo.Offsets.Size() * int64(tickinfo.BindingSat)
 				if amountInHolder != amoutInUtxo {
-					common.Log.Errorf("ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
+					common.Log.Errorf("FTIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
 					return false
 				}
 			}
@@ -236,7 +234,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 		name := "pearl"
 		ticker := s.GetTicker(name)
 		if ticker == nil {
-			common.Log.Errorf("can't find %s in db", name)
+			common.Log.Errorf("FTIndexer can't find %s in db", name)
 			return false
 		}
 
@@ -248,7 +246,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 		mintAmount, _ := s.GetMintAmount(name)
 		if holderAmount != mintAmount {
-			common.Log.Errorf("ticker amount incorrect. %d %d", mintAmount, holderAmount)
+			common.Log.Errorf("FTIndexer ticker amount incorrect. %d %d", mintAmount, holderAmount)
 			return false
 		}
 
@@ -257,11 +255,11 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 		// 比如： 5647d570edcbe45d4953915f7b9063e9b39b83432ae2ae13fdbd5283abb83367i0 等
 		if ticker.BlockStart == 828200 {
 			if holderAmount != 156271012 {
-				common.Log.Errorf("%s amount incorrect. %d", name, holderAmount)
+				common.Log.Errorf("FTIndexer %s amount incorrect. %d", name, holderAmount)
 				return false
 			}
 		} else {
-			common.Log.Errorf("Incorrect %s", name)
+			common.Log.Errorf("FTIndexer Incorrect %s", name)
 			return false
 		}
 	}
@@ -273,7 +271,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 	// 最后才设置dbver
 	s.setDBVersion()
-	common.Log.Infof("OrdxIndexer->CheckSelf took %v.", time.Since(startTime))
+	common.Log.Infof("FTIndexer CheckSelf took %v.", time.Since(startTime))
 
 	return true
 }

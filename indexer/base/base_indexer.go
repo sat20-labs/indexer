@@ -436,10 +436,11 @@ func (b *BaseIndexer) UpdateDB() {
 			if err != nil {
 				common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
 			}
-			err = db.UnBindAddressId(k, value.AddressId, wb)
-			if err != nil {
-				common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
-			}
+			// brc20 依赖一个不变的id
+			//err = db.UnBindAddressId(k, value.AddressId, wb)
+			//if err != nil {
+			//	common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			//}
 		}
 	}
 
@@ -935,7 +936,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				TxIndex:     i,
 				Vout:        j,
 				AddressId:   utxoValue.AddressId,
-				AddressType: 0, // 最后填
+				AddressType: -1, // 最后填
 			}
 			output.UtxoId = utxoValue.UtxoId
 			b.utxoIndex.Index[utxo.utxo] = output
