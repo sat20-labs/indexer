@@ -69,26 +69,28 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 		}
 		outValue += txOut.OutValue.Value
 	}
-	posInFee := int64(satpoint) - outValue
-	// 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
+	return nil // 遵循ordinals协议的规则
 
-	var baseOffset int64
-	for i := 0; i < index; i++ { // 0 是奖励聪
-		baseOffset += coinbase[i].Size
-	}
-	baseOffset += posInFee
+	// 另外一种规则
+	// posInFee := int64(satpoint) - outValue
+	// // 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
 
-	coinbaseTx := block.Transactions[0]
-	outValue = 0
-	for _, txOut := range coinbaseTx.Outputs {
-		if outValue+txOut.OutValue.Value >= baseOffset {
-			return txOut
-		}
-		outValue += txOut.OutValue.Value
-	}
+	// var baseOffset int64
+	// for i := 0; i < index; i++ { // 0 是奖励聪
+	// 	baseOffset += coinbase[i].Size
+	// }
+	// baseOffset += posInFee
 
-	// 没有绑定聪的铭文
-	return nil
+	// coinbaseTx := block.Transactions[0]
+	// outValue = 0
+	// for _, txOut := range coinbaseTx.Outputs {
+	// 	if outValue+txOut.OutValue.Value >= baseOffset {
+	// 		return txOut
+	// 	}
+	// 	outValue += txOut.OutValue.Value
+	// }
+	// // 没有绑定聪的铭文
+	// return nil
 }
 
 func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
@@ -880,9 +882,12 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	// 根据偏移找到对应的输出 注意这里跟ordinals协议的细微区别：ordinals协议是根据输出确定satpoint的位置，
 	// 而我们认为是在输入确定satpoint的位置，只要satpoint不超过输入的value，就是有效的satpoint
 	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 最后一个satpoint指向了给矿工的手续费
+	
+	// 最终，我们决定尽可能遵循ordinals的规则
 	output = findOutputWithSatPoint(block, coinbase, index, tx, satpoint)
 	if output == nil {
 		output = tx.Outputs[0]
+		satpoint = 0
 	}
 
 	// 1. 先保存nft数据

@@ -355,7 +355,7 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 
 // 跟base数据库同步
 func (p *ExoticIndexer) UpdateDB() {
-	//common.Log.Infof("NftIndexer->UpdateDB start...")
+	//common.Log.Infof("ExoticIndexer->UpdateDB start...")
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
@@ -368,7 +368,7 @@ func (p *ExoticIndexer) UpdateDB() {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}
 	}
-	// common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(tickerAdded:%d), cost: %.6fs", len(tickerAdded), time.Since(startTime).Seconds())
+	// common.Log.Infof("ExoticIndexer->UpdateDB->SetDB(tickerAdded:%d), cost: %.6fs", len(tickerAdded), time.Since(startTime).Seconds())
 
 	//startTime = time.Now()
 	for _, ticker := range p.tickerMap {
@@ -380,7 +380,7 @@ func (p *ExoticIndexer) UpdateDB() {
 			}
 		}
 	}
-	//common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(ticker.MintAdded(), cost: %v", time.Since(startTime))
+	//common.Log.Infof("ExoticIndexer->UpdateDB->SetDB(ticker.MintAdded(), cost: %v", time.Since(startTime))
 	//startTime = time.Now()
 
 	for _, action := range p.holderActionList {
@@ -431,7 +431,7 @@ func (p *ExoticIndexer) UpdateDB() {
 			}
 		}
 	}
-	//common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(ticker.HolderActionList(%d), cost: %v",len(p.holderActionList), time.Since(startTime))
+	//common.Log.Infof("ExoticIndexer->UpdateDB->SetDB(ticker.HolderActionList(%d), cost: %v",len(p.holderActionList), time.Since(startTime))
 
 	err := wb.Flush()
 	if err != nil {
@@ -467,7 +467,7 @@ func (s *ExoticIndexer) GetDBVersion() string {
 }
 
 func (p *ExoticIndexer) CheckSelf() bool {
-	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
+	//common.Log.Infof("ExoticIndexer->CheckSelf ...")
 	startTime := time.Now()
 	for name := range p.tickerMap {
 		//common.Log.Infof("checking ticker %s", name)

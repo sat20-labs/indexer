@@ -25,6 +25,7 @@ type IndexerMgr struct {
 	dbDir string
 	// data from blockchain
 	baseDB  common.KVDB
+	exoticDB common.KVDB
 	ftDB    common.KVDB
 	nsDB    common.KVDB
 	nftDB   common.KVDB
@@ -161,7 +162,7 @@ func (b *IndexerMgr) Init() {
 		exotic.SatributeList = append(exotic.SatributeList, exotic.Customized)
 	}
 
-	b.exotic = exotic.NewExoticIndexer(b.ftDB)
+	b.exotic = exotic.NewExoticIndexer(b.exoticDB)
 	b.exotic.Init(b.compiling)
 	b.nft = nft.NewNftIndexer(b.nftDB)
 	b.nft.Init(b.compiling)
@@ -312,6 +313,7 @@ func (b *IndexerMgr) dbgc() {
 	db.RunDBGC(b.baseDB)
 	db.RunDBGC(b.nftDB)
 	db.RunDBGC(b.nsDB)
+	db.RunDBGC(b.exoticDB)
 	db.RunDBGC(b.ftDB)
 	db.RunDBGC(b.brc20DB)
 	db.RunDBGC(b.runesDB)
@@ -325,6 +327,7 @@ func (b *IndexerMgr) closeDB() {
 	b.runesDB.Close()
 	b.brc20DB.Close()
 	b.ftDB.Close()
+	b.exoticDB.Close()
 	b.nsDB.Close()
 	b.nftDB.Close()
 	b.baseDB.Close()

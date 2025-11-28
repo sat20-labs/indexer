@@ -122,6 +122,8 @@ func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets commo
 	tickInfo.Ticker.TotalMinted += offsets.Size()
 	// tickInfo.MintAdded = append(ticker.MintAdded, mint)
 	// tickInfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
+
+	p.tickerAdded[name] = tickInfo.Ticker // 更新
 }
 
 func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput)  {
@@ -155,23 +157,21 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 		name = Uncommon
 	}
 	asset.Name.Ticker = name
-	coinbaseInput.Assets.Add(&asset)
+	coinbaseInput.Assets.Add(asset.Clone())
 	coinbaseInput.Offsets[asset.Name] = offset0
-
 	p.addTickerAsset(name, coinbaseInput.UtxoId, offset0)
 
 	if name == Uncommon {
 		asset.Name.Ticker = Black
-		coinbaseInput.Assets.Add(&asset)
-
 		offset1 := common.AssetOffsets{
 			{
 				Start: coinbaseInput.OutValue.Value-1,
 				End: coinbaseInput.OutValue.Value,
 			},
 		}
-		coinbaseInput.Offsets[asset.Name] = offset1
 
+		coinbaseInput.Assets.Add(asset.Clone())
+		coinbaseInput.Offsets[asset.Name] = offset1
 		p.addTickerAsset(asset.Name.Ticker, coinbaseInput.UtxoId, offset1)
 	}
 }
