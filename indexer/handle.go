@@ -773,7 +773,7 @@ func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.
 			return
 		}
 
-		s.ftIndexer.UpdateMint(out, mint)
+		s.ftIndexer.UpdateMint(in, mint)
 
 	default:
 		//common.Log.Warnf("handleOrdX unknown ordx type: %s, content: %s, txid: %s", ordxType, content, tx.Txid)

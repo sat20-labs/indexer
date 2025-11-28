@@ -72,7 +72,7 @@ func NewMintAbbrInfo(mint *Mint) *MintAbbrInfo {
 	info := NewMintAbbrInfo2(mint.Base)
 	info.Id = mint.Id
 	info.Amount = NewDefaultDecimal(mint.Amt)
-	info.Offsets = mint.Offsets
+	info.Offsets = mint.Offsets.Clone()
 	return info
 }
 
