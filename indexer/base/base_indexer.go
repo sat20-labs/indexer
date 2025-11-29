@@ -1473,7 +1473,7 @@ func (b *BaseIndexer) GetAddressIdFromDB(address string) uint64 {
 func (p *BaseIndexer) getAddressId(address string) (uint64, int) {
 	value, ok := p.addressValueMap[address]
 	if !ok {
-		common.Log.Errorf("can't find addressId %s", address)
+		//common.Log.Errorf("can't find addressId %s", address)
 		return common.INVALID_ID, -1
 	}
 	return value.AddressId, value.Op
