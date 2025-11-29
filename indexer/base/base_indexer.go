@@ -1451,6 +1451,25 @@ func (p *BaseIndexer) GetBlockInBuffer(height int) *common.BlockValueInDB {
 	return nil
 }
 
+
+// only for RPC interface
+func (b *BaseIndexer) GetAddressIdFromDB(address string) uint64 {
+
+	id, _ := b.getAddressId(address)
+	if id == common.INVALID_ID {
+		data, err := db.GetAddressDataFromDBV2(b.db, address)
+		//id, err := db.GetAddressIdFromDB(b.db, address)
+		if err == nil {
+			value := common.ToAddressValueV2(data)
+			id = value.AddressId
+			b.addressValueMap[address] = value
+			b.idToAddressMap[id] = address
+		}
+	}
+
+	return id
+}
+
 func (p *BaseIndexer) getAddressId(address string) (uint64, int) {
 	value, ok := p.addressValueMap[address]
 	if !ok {

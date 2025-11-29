@@ -203,35 +203,6 @@ func GetAddressIdFromTxn(db common.ReadBatch, address string) (uint64, error) {
 	return common.BytesToUint64(key), nil
 }
 
-
-func GetAddressDataFromDBV2(db common.KVDB, address string) (*common.AddressValueInDBV2, error) {
-	var result common.AddressValueInDBV2
-
-	v, err := db.Read(GetAddressDBKeyV2(address))
-	if err != nil {
-		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
-		return nil, err
-	}
-	
-	err = DecodeBytes(v, &result)
-	return &result, err
-}
-
-func GetAddressDataFromDBTxnV2(txn common.ReadBatch, address string) (*common.AddressValueInDBV2, error) {
-	var result common.AddressValueInDBV2
-	err := GetValueFromTxnWithProto3(GetAddressDBKeyV2(address), txn, &result)
-	if err != nil {
-		// 即使没有数据，也可以尝试读取已经保存的id
-		addrId, err := GetAddressIdFromTxn(txn, address)
-		if err != nil {
-			return nil, err
-		}
-		result.AddressId = addrId
-		result.AddressType = int32(common.GetAddressTypeFromAddress(address))
-	}
-	return &result, nil
-}
-
 func CheckKeyExists(db common.KVDB, key []byte) bool {
 	_, err := db.Read(key)
 	return err == nil

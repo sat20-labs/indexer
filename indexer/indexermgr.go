@@ -366,12 +366,13 @@ func (b *IndexerMgr) forceUpdateDB() {
 func (b *IndexerMgr) handleReorg(height int) {
 	common.Log.Infof("IndexerMgr handleReorg enter...")
 	// 需要等rpc都完成，再重新启动
+	atomic.AddInt32(&b.reloading, 1)
 	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(10*time.Millisecond)
 	}
 	atomic.AddInt32(&b.reloading, 1)
 	defer func() {
-		atomic.AddInt32(&b.reloading, -1)
+		atomic.AddInt32(&b.reloading, -2)
 	}()
 
 	// 要确保下面的调用，没有rpc的调用
@@ -389,6 +390,13 @@ func (b *IndexerMgr) rpcEnter() {
 		time.Sleep(10 * time.Microsecond)
 	}
 	atomic.AddInt32(&b.rpcProcessing, 1)
+	if atomic.LoadInt32(&b.reloading) > 0 {
+		atomic.AddInt32(&b.rpcProcessing, -1)
+		for atomic.LoadInt32(&b.reloading) > 0 {
+			time.Sleep(10*time.Microsecond)
+		}
+		atomic.AddInt32(&b.rpcProcessing, 1)
+	}
 }
 
 func (b *IndexerMgr) rpcLeft() {
