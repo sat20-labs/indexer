@@ -15,8 +15,10 @@ const (
 	DB_PREFIX_BUCK     = "bk-" // buck ->
 	DB_PREFIX_INSC     = "i-"  // inscriptionId -> sat
 	DB_PREFIX_INSCADDR = "a-"  // addressId -> sat
-	DB_PREFIX_CT       = "ct-"  // ct number -> content type
-	DB_PREFIX_CF       = "cf-"
+	DB_PREFIX_IT       = "it-" // content type id -> content type
+
+	DB_PREFIX_IC = "ic-" // contentId -> content
+	DB_PREFIX_CI = "ci-" // content -> id
 
 	DB_PREFIX_DISABLED_SAT = "ds-" // disabled sat
 )

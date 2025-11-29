@@ -36,10 +36,14 @@ func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
 	return disableCount != len(sats)
 }
 
+
 func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+	return p.getNftWithInscriptionId(inscriptionId)
+}
 
+func (p *NftIndexer) getNftWithInscriptionId(inscriptionId string) *common.Nft {
 	if inscriptionId == "" {
 		return nil
 	}
@@ -153,10 +157,15 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 	return result
 }
 
+
 func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+	return p.getNftWithId(id)
+}
 
+func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
+	
 	nft := p.getNftInBuffer(id)
 	if nft != nil {
 		return nft
@@ -325,9 +334,35 @@ func (p *NftIndexer) loadNftFromDB(nftId int64, value *common.InscribeBaseConten
 		return err
 	}
 
+	// 恢复相关数据
 	id, err := strconv.Atoi(string(value.ContentType))
 	if err == nil {
-		value.ContentType = []byte(p.ctMap[id])
+		value.ContentType = []byte(p.contentTypeMap[id])
 	}
+	if value.ContentId != 0 {
+		content, err := p.getContentById(value.ContentId)
+		if err == nil {
+			value.Content = []byte(content)
+		}
+	}
+	if len(value.Delegate) != 0 && len(value.Delegate) < 16 {
+		nftId, err := strconv.ParseInt(value.Delegate, 16, 64)
+		if err == nil {
+			inscriptionId, err := p.getInscriptionIdByNftId(nftId)
+			if err == nil {
+				value.Delegate = inscriptionId
+			}
+		}
+	}
+	if len(value.Parent) != 0 && len(value.Parent) < 16 {
+		nftId, err := strconv.ParseInt(value.Parent, 16, 64)
+		if err == nil {
+			inscriptionId, err := p.getInscriptionIdByNftId(nftId)
+			if err == nil {
+				value.Parent = inscriptionId
+			}
+		}
+	}
+
 	return nil
 }

@@ -1,6 +1,8 @@
 package runes
 
 import (
+	"time"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -138,7 +140,61 @@ func (s *Indexer) Subtract(backupIndexer *Indexer) {
 }
 
 func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
-	common.Log.Infof("total runes: %d", len(s.GetAllRuneIds()))
+
+	allRunes := s.GetAllRuneInfos()
+	common.Log.Infof("total runes: %d", len(allRunes))
+	
+	startTime := time.Now()
+	for _, rune := range allRunes {
+		//common.Log.Infof("checking ticker %s", name)
+		holdermap := s.GetHoldersWithTick(rune.Id)
+		var holderAmount *common.Decimal
+		for _, amt := range holdermap {
+			holderAmount = holderAmount.Add(amt)
+
+			// address, err := rpc.GetAddressByID(addressId)
+			// if err != nil {
+			// 	common.Log.Errorf("rune indexer GetAddressByID %d failed, %v", addressId, err)
+			// 	return false
+			// }
+			// utxos, err := rpc.GetUTXOs(address)
+			// if err != nil {
+			// 	common.Log.Errorf("GetUTXOs failed, %v", err)
+			// 	return false
+			// }
+			
+		}
+		if rune.HolderCount != uint64(len(holdermap)) {
+			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, len(holdermap))
+			return false
+		}
+
+		if rune.Number < 10 {
+			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
+		}
+ 
+		_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
+		if total == 0 {
+			if holderAmount.Sign() != 0 {
+				common.Log.Errorf("rune ticker %s GetAllUtxoBalances failed", rune.Name)
+				return false
+			}
+		} else {
+			utxos, _ := s.GetAllUtxoBalances(rune.Id, 0, total)
+			var amontInUtxos uint128.Uint128
+			for _, balance := range utxos.Balances {
+				amontInUtxos = amontInUtxos.Add(balance.Balance)
+			}
+			amt := common.NewDecimalFromUint128(amontInUtxos, int(rune.Divisibility))
+
+			if amt.Cmp(holderAmount) != 0 {
+				common.Log.Errorf("rune ticker %s amount in utoxs incorrect. %s %s", rune.Name, holderAmount.String(), amt.String())
+				return false
+			}
+
+		}
+	}
+	common.Log.Infof("rune check amount took %v.", time.Since(startTime))
 
 	var firstRuneName = ""
 	switch s.chaincfgParam.Net {
@@ -175,7 +231,7 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 		return false
 	}
 
-	_, total = s.GetAllUtxoBalances(runeId.String(), 0, 1)
+	_, total = s.GetAllUtxoBalances(runeId.String(), 0, 0)
 	utxoBalances, _ := s.GetAllUtxoBalances(runeId.String(), 0, total)
 	totalUtxoBalance := utxoBalances.Total.Add(runeInfo.Burned)
 	if utxoBalances.Total.Add(runeInfo.Burned).Cmp(totalUtxoBalance) != 0 {

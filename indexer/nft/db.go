@@ -50,10 +50,9 @@ func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	return result
 }
 
-
 func getContentTypesFromDB(db common.KVDB) map[int]string {
 	result := make(map[int]string, 0)
-	err := db.BatchRead([]byte(DB_PREFIX_CT), false, func(k, v []byte) error {
+	err := db.BatchRead([]byte(DB_PREFIX_IT), false, func(k, v []byte) error {
 
 		key := string(k)
 		id, err := ParseContTypeKey(key)
@@ -83,11 +82,10 @@ func loadNftsInSatFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBat
 	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
 }
 
-
 func loadNftFromDB(nftId int64, value *common.InscribeBaseContent, ldb common.KVDB) error {
-	key := GetNftKey(nftId)
-	// return db.GetValueFromDB([]byte(key), txn, value)
-	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
+	return ldb.View(func(rb common.ReadBatch) error {
+		return loadNftFromTxn(nftId, value, rb)
+	})
 }
 
 func loadNftFromTxn(nftId int64, value *common.InscribeBaseContent, txn common.ReadBatch) error {
@@ -130,7 +128,7 @@ func GetUtxoKey(UtxoId uint64) string {
 }
 
 func GetCTKey(id int) string {
-	return fmt.Sprintf("%s%d", DB_PREFIX_CT, id)
+	return fmt.Sprintf("%s%d", DB_PREFIX_IT, id)
 }
 
 func GetInscriptionIdKey(id string) string {
@@ -179,17 +177,16 @@ func ParseUtxoKey(input string) (uint64, error) {
 	return utxoId, nil
 }
 
-
 func ParseContTypeKey(input string) (int, error) {
-	if !strings.HasPrefix(input, DB_PREFIX_CT) {
+	if !strings.HasPrefix(input, DB_PREFIX_IT) {
 		return -1, fmt.Errorf("invalid string format, %s", input)
 	}
-	str := strings.TrimPrefix(input, DB_PREFIX_CT)
+	str := strings.TrimPrefix(input, DB_PREFIX_IT)
 	id, err := strconv.Atoi(str)
 	if err != nil {
 		return -1, err
 	}
-	
+
 	return id, nil
 }
 
@@ -250,4 +247,57 @@ func loadAllDisalbedSatsFromDB(ldb common.KVDB) map[int64]bool {
 func saveDisabledSatToDB(sat int64, value []byte, ldb common.KVDB) error {
 	key := GetDisabledSatKey(sat)
 	return db.GobSetDB([]byte(key), value, ldb)
+}
+
+func GetContentIdKey(id uint64) []byte {
+	return []byte(fmt.Sprintf(DB_PREFIX_IC+"%x", id))
+}
+
+func GetContentDBKey(content string) []byte {
+	return []byte(DB_PREFIX_CI + content)
+}
+
+func BindContentDBKeyToId(content string, id uint64, wb common.WriteBatch) error {
+	if err := wb.Put(GetContentIdKey(id), []byte(content)); err != nil {
+		return err
+	}
+	return wb.Put(GetContentDBKey(content), common.Uint64ToBytes(id))
+}
+
+func UnBindContentId(content string, id uint64, wb common.WriteBatch) error {
+	wb.Delete(GetContentIdKey(id))
+	wb.Delete(GetContentDBKey(content))
+	return nil
+}
+
+func GetContentByIdFromDB(ldb common.KVDB, id uint64) (string, error) {
+	key, err := ldb.Read(GetContentIdKey(id))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(key), DB_PREFIX_CI), nil
+}
+
+func GetContentByIdFromTxn(txn common.ReadBatch, id uint64) (string, error) {
+	key, err := txn.Get(GetContentIdKey(id))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(key), DB_PREFIX_CI), nil
+}
+
+func GetContentIdFromDB(db common.KVDB, content string) (uint64, error) {
+	key, err := db.Read(GetContentDBKey(content))
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	return common.BytesToUint64(key), nil
+}
+
+func GetContentIdFromTxn(db common.ReadBatch, content string) (uint64, error) {
+	key, err := db.Get(GetContentDBKey(content))
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	return common.BytesToUint64(key), nil
 }

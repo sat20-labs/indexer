@@ -178,6 +178,9 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	if len(balances) == 0 {
 		return nil, 0
 	}
+	if limit == 0 {
+		return nil, uint64(len(balances))
+	}
 
 	sort.Slice(balances, func(i, j int) bool {
 		return balances[i].OutPoint.UtxoId < balances[j].OutPoint.UtxoId
