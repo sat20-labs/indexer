@@ -62,6 +62,33 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 	p.addHolder(&in.TxOutputV2, name, assetInfo)
 }
 
+// 将某次无效铸造的结果清除，一般都是在区块处理前先加入，该区块处理过程中发现铸造无效，就清除
+func (p *FTIndexer) removeMint(utxoId uint64, tickerName string, mintingAsset *common.AssetAbbrInfo) {
+	for i, action := range p.holderActionList {
+		if action.UtxoId == utxoId {
+			p.holderActionList = common.RemoveIndex(p.holderActionList, i)
+			break
+		}
+	}
+	tickers, ok := p.holderInfo[utxoId]
+	if ok {
+		tickers.RemoveTickerAsset(tickerName, mintingAsset)
+	}
+
+	ticker := p.tickerMap[tickerName]
+	delete(ticker.MintInfo, utxoId)
+	p.deleteUtxoMap(tickerName, utxoId)
+
+	ticker.Ticker.TotalMinted -= mintingAsset.AssetAmt()
+	for i, minted := range ticker.MintAdded {
+		if minted.UtxoId == utxoId {
+			ticker.MintAdded = common.RemoveIndex(ticker.MintAdded, i)
+			delete(ticker.InscriptionMap, minted.Base.InscriptionId)
+		}
+	}
+}
+
+
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
 func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
 	info, ok := p.holderInfo[utxo.UtxoId]
@@ -76,7 +103,7 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 	// minting的数据，在区块处理前，提前就加入了holderInfo中
 	if assetInfo.IsMinting {
 		// 铸造中的资产，直接加进来，因为这个时候的utxo中还没有加载资产数据
-		info.Tickers[ticker] = assetInfo
+		info.AddTickerAsset(ticker, assetInfo)
 		utxovalue, ok := p.utxoMap[ticker]
 		if !ok {
 			utxovalue = make(map[uint64]int64, 0)
@@ -101,7 +128,7 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 			inter := common.IntersectAssetOffsets(mintingAssetOffsets, assetInfo.Offsets)
 			if len(inter) != 0 {
 				common.Log.Infof("utxo %s mint asset %s on some satoshi with the same asset", utxo.OutPointStr, ticker)
-				p.clearOneMint(utxo.UtxoId, ticker, mintingAsset)
+				p.removeMint(utxo.UtxoId, ticker, mintingAsset)
 			}
 		
 		
@@ -118,45 +145,19 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 					exoticranges := utxo.Offsets[exoticName]
 					if !common.AssetOffsetsContains(exoticranges, mintingAssetOffsets) {
 						common.Log.Infof("utxo %s mint asset %s, but no enough exotic satoshi", utxo.OutPointStr, ticker)
-						p.clearOneMint(utxo.UtxoId, ticker, mintingAsset)
+						p.removeMint(utxo.UtxoId, ticker, mintingAsset)
 					}
 				}
 			}
 		}
 	}
-	info.Tickers[ticker] = assetInfo
+	info.AddTickerAsset(ticker, assetInfo)
 	utxovalue, ok := p.utxoMap[ticker]
 	if !ok {
 		utxovalue = make(map[uint64]int64, 0)
 		p.utxoMap[ticker] = utxovalue
 	}
 	utxovalue[utxo.UtxoId] = assetInfo.AssetAmt()
-}
-
-// 将某次无效铸造的结果清除，一般都是在区块处理前先加入，该区块处理过程中发现铸造无效，就清除
-func (p *FTIndexer) clearOneMint(utxoId uint64, tickerName string, mintingAsset *common.AssetAbbrInfo) {
-	for i, action := range p.holderActionList {
-		if action.UtxoId == utxoId {
-			p.holderActionList = common.RemoveIndex(p.holderActionList, i)
-			break
-		}
-	}
-	tickers, ok := p.holderInfo[utxoId]
-	if ok {
-		delete(tickers.Tickers, tickerName)
-	}
-
-	ticker := p.tickerMap[tickerName]
-	delete(ticker.MintInfo, utxoId)
-	p.deleteUtxoMap(tickerName, utxoId)
-
-	ticker.Ticker.TotalMinted -= mintingAsset.AssetAmt()
-	for i, minted := range ticker.MintAdded {
-		if minted.UtxoId == utxoId {
-			ticker.MintAdded = common.RemoveIndex(ticker.MintAdded, i)
-			delete(ticker.InscriptionMap, minted.Base.InscriptionId)
-		}
-	}
 }
 
 func (p *FTIndexer) deleteUtxoMap(ticker string, utxo uint64) {

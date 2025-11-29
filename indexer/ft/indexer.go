@@ -86,7 +86,16 @@ func (s *FTIndexer) Clone() *FTIndexer {
 		if action.Action > 0 {
 			value, ok := s.holderInfo[action.UtxoId]
 			if ok {
-				info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
+				for k, v := range value.Tickers {
+					newAssetInfo := &common.AssetAbbrInfo{
+						IsMinting: v.IsMinting,
+						BindingSat: v.BindingSat,
+						Offsets: v.Offsets.Clone(),
+					}
+					newTickerInfo[k] = newAssetInfo
+				}
+				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
 				newInst.holderInfo[action.UtxoId] = &info
 			} //else {
 			// 已经被删除，不存在了
@@ -196,6 +205,9 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 			common.Log.Errorf("FTIndexer ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
 			return false
 		}
+
+		common.Log.Infof("FTIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
+
 
 		utxos, ok := s.utxoMap[name]
 		if !ok {

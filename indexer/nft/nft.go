@@ -33,7 +33,7 @@ type NftIndexer struct {
 	// realtime buffer
 	utxoMap   map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
 	satMap    map[int64]*SatInfo      // key: sat, 一个写入周期中新增加的铭文的转移结果
-	ctMap     map[int]string
+	ctMap     map[int]string          // 所有content
 	ctToIdMap map[string]int
 	lastCtId  int
 

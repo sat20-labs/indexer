@@ -33,6 +33,31 @@ type HolderInfo struct {
 	Tickers   map[string]*common.AssetAbbrInfo // key: ticker, 小写
 }
 
+func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) {
+	tickerAsset, ok := p.Tickers[name]
+	if !ok {
+		p.Tickers[name] = assetInfo
+		return
+	}
+
+	// 合并
+	if assetInfo.IsMinting {
+		tickerAsset.IsMinting = true
+	}
+	tickerAsset.Offsets.Append(assetInfo.Offsets)
+}
+
+func (p *HolderInfo) RemoveTickerAsset(name string, assetInfo *common.AssetAbbrInfo) {
+	tickerAsset, ok := p.Tickers[name]
+	if !ok {
+		return
+	}
+	tickerAsset.Offsets.Remove(assetInfo.Offsets)
+	if len(tickerAsset.Offsets) == 0 {
+		delete(p.Tickers, name)
+	}
+}
+
 type ExoticIndexer struct {
 	db          common.KVDB
 	baseIndexer *base.BaseIndexer
@@ -127,7 +152,16 @@ func (p *ExoticIndexer) Clone() *ExoticIndexer {
 		if action.Action > 0 {
 			value, ok := p.holderInfo[action.UtxoId]
 			if ok {
-				info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
+				for k, v := range value.Tickers {
+					newAssetInfo := &common.AssetAbbrInfo{
+						IsMinting: v.IsMinting,
+						BindingSat: v.BindingSat,
+						Offsets: v.Offsets.Clone(),
+					}
+					newTickerInfo[k] = newAssetInfo
+				}
+				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
 				newInst.holderInfo[action.UtxoId] = &info
 			} //else {
 			// 已经被删除，不存在了
@@ -303,7 +337,7 @@ func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetI
 		info = &HolderInfo{AddressId: utxo.AddressId, IsMinting: assetInfo.IsMinting, Tickers: tickers}
 		p.holderInfo[utxo.UtxoId] = info
 	} else {
-		info.Tickers[ticker] = assetInfo
+		info.AddTickerAsset(ticker, assetInfo)
 	}
 
 	utxovalue, ok := p.utxoMap[ticker]

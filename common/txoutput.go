@@ -214,6 +214,66 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 	}
 }
 
+// Remove 从 p 中移除 another 描述的区间集合（假定 p 与 another 都是按升序、区间不重叠的列表，且 another 已经是相对于 p 的全局坐标）。
+// 该操作相当于用 p - another，结果仍保持有序且不重叠。
+func (p *AssetOffsets) Remove(another AssetOffsets) {
+    if p == nil || len(*p) == 0 || len(another) == 0 {
+        return
+    }
+
+    var res AssetOffsets
+    i, j := 0, 0
+
+    for i < len(*p) && j < len(another) {
+        cur := (*p)[i]
+        rem := another[j]
+
+        // another 在 cur 之前（不可能发生重叠）
+        if rem.End <= cur.Start {
+            j++
+            continue
+        }
+
+        // another 在 cur 之后（cur 完全保留）
+        if rem.Start >= cur.End {
+            res = append(res, cur.Clone())
+            i++
+            continue
+        }
+
+        // 有重叠
+        // 保留 cur 被覆盖前的左边部分（如果有）
+        if rem.Start > cur.Start {
+            res = append(res, &OffsetRange{Start: cur.Start, End: rem.Start})
+        }
+
+        // 根据 rem.End 与 cur.End 的关系决定如何推进指针
+        if rem.End >= cur.End {
+            // rem 覆盖 cur 的右端或完全覆盖 cur
+            if rem.End == cur.End {
+                // 两者在边界对齐，cur 和 rem 同时结束，推进两者
+                i++
+                j++
+            } else {
+                // rem 延伸到 cur 之后，cur 被完全消耗，推进 cur，保持 rem 以继续覆盖后续 cur
+                i++
+            }
+        } else {
+            // rem 在 cur 里面结束（rem.End < cur.End），保留右边剩余部分并推进 rem
+            (*p)[i] = &OffsetRange{Start: rem.End, End: cur.End}
+            j++
+        }
+    }
+
+    // 将剩余未处理的 cur 直接添加
+    for i < len(*p) {
+        res = append(res, (*p)[i].Clone())
+        i++
+    }
+
+    *p = res
+}
+
 // 求包含关系
 func AssetOffsetsContains(container, target AssetOffsets) bool {
     i, j := 0, 0
