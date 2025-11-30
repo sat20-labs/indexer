@@ -69,28 +69,29 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 		}
 		outValue += txOut.OutValue.Value
 	}
-	return nil // 遵循ordinals协议的规则
+	// TODO 正式版本直接返回，遵循ordinals协议的规则。
+	//return nil // 遵循ordinals协议的规则
 
 	// 另外一种规则
-	// posInFee := int64(satpoint) - outValue
-	// // 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
+	posInFee := int64(satpoint) - outValue
+	// 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
 
-	// var baseOffset int64
-	// for i := 0; i < index; i++ { // 0 是奖励聪
-	// 	baseOffset += coinbase[i].Size
-	// }
-	// baseOffset += posInFee
+	var baseOffset int64
+	for i := 0; i < index; i++ { // 0 是奖励聪
+		baseOffset += coinbase[i].Size
+	}
+	baseOffset += posInFee
 
-	// coinbaseTx := block.Transactions[0]
-	// outValue = 0
-	// for _, txOut := range coinbaseTx.Outputs {
-	// 	if outValue+txOut.OutValue.Value >= baseOffset {
-	// 		return txOut
-	// 	}
-	// 	outValue += txOut.OutValue.Value
-	// }
-	// // 没有绑定聪的铭文
-	// return nil
+	coinbaseTx := block.Transactions[0]
+	outValue = 0
+	for _, txOut := range coinbaseTx.Outputs {
+		if outValue+txOut.OutValue.Value >= baseOffset {
+			return txOut
+		}
+		outValue += txOut.OutValue.Value
+	}
+	// 没有绑定聪的铭文
+	return nil
 }
 
 func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
@@ -274,11 +275,13 @@ func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out 
 			return nil
 		}
 
-		// 先不要支持这个属性
 		if indexer.IsRaritySatRequired(&attr) {
-			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid attr: %s",
-				nft.Base.InscriptionId, content.Ticker, content.Attr)
-			return nil
+			// 目前只支持稀有聪铸造
+			if attr.RegularExp != "" || attr.Template != "" || attr.TrailingZero != 0 {
+				common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, invalid attr: %s",
+					nft.Base.InscriptionId, content.Ticker, content.Attr)
+				return nil
+			}
 		}
 	}
 

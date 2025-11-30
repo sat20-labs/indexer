@@ -8,7 +8,7 @@ import (
 )
 
 
-func init() {
+func initDefaultExoticAsset() {
 	blocks := make(map[int]bool)
 	for i := 0; i < 1000; i++ {
 		blocks[i] = true
@@ -86,7 +86,7 @@ func (p *ExoticIndexer) generateRarityAssetWithBlock(height int, coinbaseInput *
 	
 			asset := common.AssetInfo{
 				Name: common.AssetName{ 
-					Protocol: common.PROTOCOL_NAME_ORD,
+					Protocol: common.PROTOCOL_NAME_ORDX,
 					Type: common.ASSET_TYPE_EXOTIC,
 					Ticker: name,
 				},
@@ -130,7 +130,7 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 	
 	asset := common.AssetInfo{
 		Name: common.AssetName{ 
-			Protocol: common.PROTOCOL_NAME_ORD,
+			Protocol: common.PROTOCOL_NAME_ORDX,
 			Type: common.ASSET_TYPE_EXOTIC,
 			Ticker: "",
 		},
@@ -259,7 +259,7 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 func AddAsset(output *common.TxOutput, name string, offset int64, amt int64) {
 	asset := common.AssetInfo{
 		Name: common.AssetName{
-			Protocol: common.PROTOCOL_NAME_ORD,
+			Protocol: common.PROTOCOL_NAME_ORDX,
 			Type: common.ASSET_TYPE_EXOTIC,
 			Ticker: name,
 		},

@@ -89,7 +89,7 @@ func (s *FTIndexer) Clone() *FTIndexer {
 				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
 				for k, v := range value.Tickers {
 					newAssetInfo := &common.AssetAbbrInfo{
-						IsMinting: v.IsMinting,
+						MintingNftId: v.MintingNftId,
 						BindingSat: v.BindingSat,
 						Offsets: v.Offsets.Clone(),
 					}

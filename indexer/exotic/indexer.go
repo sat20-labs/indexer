@@ -33,18 +33,19 @@ type HolderInfo struct {
 	Tickers   map[string]*common.AssetAbbrInfo // key: ticker, 小写
 }
 
-func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) {
+func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) *common.AssetAbbrInfo {
 	tickerAsset, ok := p.Tickers[name]
 	if !ok {
 		p.Tickers[name] = assetInfo
-		return
+		return assetInfo
 	}
 
 	// 合并
-	if assetInfo.IsMinting {
-		tickerAsset.IsMinting = true
+	if assetInfo.MintingNftId != 0 {
+		tickerAsset.MintingNftId = assetInfo.MintingNftId
 	}
 	tickerAsset.Offsets.Append(assetInfo.Offsets)
+	return tickerAsset
 }
 
 func (p *HolderInfo) RemoveTickerAsset(name string, assetInfo *common.AssetAbbrInfo) {
@@ -90,6 +91,8 @@ func newExoticTickerInfo(name string) *TickInfo {
 }
 
 func NewExoticIndexer(db common.KVDB) *ExoticIndexer {
+	initDefaultExoticAsset()
+
 	_instance = &ExoticIndexer{
 		db: db,
 	}
@@ -155,7 +158,7 @@ func (p *ExoticIndexer) Clone() *ExoticIndexer {
 				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
 				for k, v := range value.Tickers {
 					newAssetInfo := &common.AssetAbbrInfo{
-						IsMinting: v.IsMinting,
+						MintingNftId: v.MintingNftId,
 						BindingSat: v.BindingSat,
 						Offsets: v.Offsets.Clone(),
 					}
@@ -277,7 +280,7 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 				for ticker, info := range holder.Tickers {
 					asset := common.AssetInfo{
 						Name: common.AssetName{
-							Protocol: common.PROTOCOL_NAME_ORD,
+							Protocol: common.PROTOCOL_NAME_ORDX,
 							Type:     common.ASSET_TYPE_EXOTIC,
 							Ticker:   ticker,
 						},
@@ -334,10 +337,10 @@ func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetI
 	if !ok {
 		tickers := make(map[string]*common.AssetAbbrInfo, 0)
 		tickers[ticker] = assetInfo
-		info = &HolderInfo{AddressId: utxo.AddressId, IsMinting: assetInfo.IsMinting, Tickers: tickers}
+		info = &HolderInfo{AddressId: utxo.AddressId, IsMinting: assetInfo.MintingNftId != 0, Tickers: tickers}
 		p.holderInfo[utxo.UtxoId] = info
 	} else {
-		info.AddTickerAsset(ticker, assetInfo)
+		assetInfo = info.AddTickerAsset(ticker, assetInfo)
 	}
 
 	utxovalue, ok := p.utxoMap[ticker]
@@ -368,7 +371,7 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 
 			tickers := make(map[string]*common.AssetAbbrInfo)
 			for _, asset := range newOut.Assets {
-				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD &&
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORDX &&
 					asset.Name.Type == common.ASSET_TYPE_EXOTIC {
 					offsets := newOut.Offsets[asset.Name]
 					assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
