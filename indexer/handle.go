@@ -14,6 +14,8 @@ import (
 )
 
 func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.Range) {
+	s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产
+
 	if block.Height < s.ordFirstHeight {
 		return
 	}
@@ -49,7 +51,6 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	s.brc20Indexer.UpdateTransfer(block)
 	s.RunesIndexer.UpdateTransfer(block)
 
-	s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产
 	s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
@@ -383,31 +384,32 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	newRngs := common.AssetOffsets{
 		{
 			Start: satpoint,
-			End:   satpoint + satsNum,
+			End:   satpoint + satsNum, // TODO 如果是稀有聪铸造，这里的范围可能就不对，稀有聪中间可能有白聪存在
 		},
 	}
-	// local range 模式下，在这里无法得知聪的属性，需要推迟判断
-	//var sat int64 = nft.Base.Sat
-	// if indexer.IsRaritySatRequired(&deployTicker.Attr) {
-	// 	// check rarity
-	// 	if deployTicker.Attr.Rarity != "" {
-	// 		exoticranges := s.exotic.GetExoticsWithType(nft.UtxoId, newRngs, deployTicker.Attr.Rarity)
-	// 		size := int64(0)
-	// 		newRngs2 := make([]*common.Range, 0)
-	// 		for _, exrng := range exoticranges {
-	// 			size += exrng.Range.Size
-	// 			newRngs2 = append(newRngs2, exrng.Range)
 
-	// 		}
-	// 		if size < (satsNum) {
-	// 			common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, invalid sat: %d, size %d, rarity: %s",
-	// 				inscriptionId, content.Ticker, sat, size, deployTicker.Attr.Rarity)
-	// 			return nil
-	// 		}
-	// 		newRngs = newRngs2
-	// 	}
-	// }
-	// // 禁止在同一个聪上做同样名字的资产的铸造
+								
+	if indexer.IsRaritySatRequired(&deployTicker.Attr) {
+		// 如果是稀有聪铸造，需要调整稀有聪范围
+		// 因为中间可能存在白聪：383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143ci4
+		if deployTicker.Attr.Rarity != "" {
+			exoticName := common.AssetName{
+				Protocol: common.PROTOCOL_NAME_ORDX,
+				Type:     common.ASSET_TYPE_EXOTIC,
+				Ticker:   deployTicker.Attr.Rarity,
+			}
+			// 如果是稀有聪铸造，其mint数据中的offset可能不够，
+			// 因为中间可能存在白聪：383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143ci4
+			
+			exoticranges := in.Offsets[exoticName]
+			newRngs = exoticranges.Pickup(satpoint, satsNum)
+			if len(newRngs) == 0 {
+				common.Log.Infof("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, but no enough exotic satoshi", inscriptionId, content.Ticker)
+				return nil
+			}
+		}
+	}
+	// 禁止在同一个聪上做同样名字的资产的铸造
 	// if s.hasSameTickerInRange(content.Ticker, newRngs) {
 	// 	common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, ranges has same ticker",
 	// 		inscriptionId, content.Ticker)

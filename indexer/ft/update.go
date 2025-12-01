@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
@@ -45,8 +44,22 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 		return
 	}
 	mint.Id = int64(len(ticker.InscriptionMap))
+
+	assetInfo := &common.AssetAbbrInfo{
+		MintingNftId: mint.Base.Id, 
+		BindingSat: ticker.Ticker.N, 
+		Offsets: mint.Offsets.Clone(),
+	}
+	if !p.addHolder(&in.TxOutputV2, name, assetInfo) {
+		// 同一个聪上重复铸造导致的失败
+		common.Log.Warnf("FTIndexer UpdateMint %s invalid mint %s", name, in.TxId)
+		return
+	}
+
 	old, ok := ticker.UtxoMap[mint.UtxoId]
 	if ok {
+		// 批量铸造。如果是稀有聪，其offset需要调整
+		// 最合理方案是根据聪的属性调整，但这里还不知道聪的属性
 		old.Merge(mint.Offsets)
 	} else {
 		ticker.UtxoMap[mint.UtxoId] = mint.Offsets
@@ -57,18 +70,6 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 	ticker.MintAdded = append(ticker.MintAdded, mint)
 	ticker.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
 
-	//tickers := make(map[string]*common.AssetAbbrInfo, 0)
-	assetInfo := &common.AssetAbbrInfo{
-		MintingNftId: mint.Base.Id, 
-		BindingSat: ticker.Ticker.N, 
-		Offsets: mint.Offsets.Clone(),
-	}
-	//tickers[name] = assetInfo
-	//action := HolderAction{UtxoId: mint.UtxoId, AddressId: mint.Base.InscriptionAddress, Tickers: tickers, Action: 1}
-	//p.holderActionList = append(p.holderActionList, &action)
-
-	// mint 将资产添加到input的资产中
-	p.addHolder(&in.TxOutputV2, name, assetInfo)
 }
 
 // 将某次无效铸造的结果清除，一般都是在区块处理前先加入，该区块处理过程中发现铸造无效，就清除
@@ -79,9 +80,9 @@ func (p *FTIndexer) removeMint(holder *HolderInfo, ticker *TickInfo, utxoId uint
 	// 		break
 	// 	}
 	// }
-	if utxoId == 1022786333310976 {
-		common.Log.Info("")
-	}
+	// if utxoId == 1022786333310976 {
+	// 	common.Log.Info("")
+	// }
 
 	mintingAsset = mintingAsset.Clone()
 	tickerName := ticker.Name
@@ -113,27 +114,15 @@ func (p *FTIndexer) removeMint(holder *HolderInfo, ticker *TickInfo, utxoId uint
 }
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
-func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
+func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) bool {
 	info, ok := p.holderInfo[utxo.UtxoId]
 	if !ok {
 		info = &HolderInfo{
 			AddressId: utxo.AddressId,
 			IsMinting: assetInfo.MintingNftId != 0,
-			Tickers:   make(map[string]map[int64]*common.AssetAbbrInfo, 0)}
-		p.holderInfo[utxo.UtxoId] = info
-	}
-
-	// minting的数据，在区块处理前，提前就加入了holderInfo中
-	if assetInfo.MintingNftId != 0 {
-		// 铸造中的资产，直接加进来，因为这个时候的utxo中还没有加载资产数据
-		amt := info.AddTickerAsset(ticker, assetInfo)
-		utxovalue, ok := p.utxoMap[ticker]
-		if !ok {
-			utxovalue = make(map[uint64]int64, 0)
-			p.utxoMap[ticker] = utxovalue
+			Tickers:   make(map[string]map[int64]*common.AssetAbbrInfo, 0),
 		}
-		utxovalue[utxo.UtxoId] = amt
-		return
+		p.holderInfo[utxo.UtxoId] = info
 	}
 
 	// 执行transfer的过程中，utxo中已经加载了稀有聪资产数据 （让exotic的结果直接放在tx的输出中）
@@ -154,7 +143,16 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 					if len(inter) != 0 {
 						common.Log.Infof("utxo %s mint asset %s on some satoshi with the same asset", utxo.OutPointStr, ticker)
 						tickerInfo := p.tickerMap[ticker]
-						p.removeMint(info, tickerInfo, utxo.UtxoId, mintingAsset)
+						if assetInfo.MintingNftId != 0 {
+							// 两个铸造资产冲突，后面的无效
+							//p.removeMint(info, tickerInfo, utxo.UtxoId, assetInfo)
+							if len(info.Tickers) == 0 {
+								delete(p.holderInfo, utxo.UtxoId)
+							}
+							return false
+						} else {
+							p.removeMint(info, tickerInfo, utxo.UtxoId, mintingAsset)
+						}
 						// info 可能被删除，需要重新加进来
 						info, ok = p.holderInfo[utxo.UtxoId]
 						if !ok {
@@ -176,6 +174,8 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 		p.utxoMap[ticker] = utxovalue
 	}
 	utxovalue[utxo.UtxoId] = amt
+
+	return true
 }
 
 func (p *FTIndexer) deleteUtxoMap(ticker string, utxo uint64) {
@@ -202,7 +202,7 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 			input := in.Clone()
 
 			utxo := input.UtxoId
-		loopback:
+		//loopback:
 			holder, ok := p.holderInfo[utxo]
 			if ok {
 				// 如果是批量铸造，需要能区分各个铸造
@@ -214,25 +214,28 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 					var amt int64
 					var offsets common.AssetOffsets
 					for _, info := range assetVector {
-						if info.MintingNftId != 0 {
-							// 检查是否满足要求的属性
-							if indexer.IsRaritySatRequired(&tickerInfo.Ticker.Attr) {
-								// 如果是稀有聪铸造，需要有对应的资产
-								if tickerInfo.Ticker.Attr.Rarity != "" {
-									exoticName := common.AssetName{
-										Protocol: common.PROTOCOL_NAME_ORDX,
-										Type:     common.ASSET_TYPE_EXOTIC,
-										Ticker:   tickerInfo.Ticker.Attr.Rarity,
-									}
-									exoticranges := input.Offsets[exoticName]
-									if !common.AssetOffsetsContains(exoticranges, info.Offsets) {
-										common.Log.Infof("utxo %s mint asset %s, but no enough exotic satoshi", input.OutPointStr, ticker)
-										p.removeMint(holder, tickerInfo, input.UtxoId, info) // 修改了 p.holderInfo 需要从头开始
-										goto loopback
-									}
-								}
-							}
-						}
+						// if info.MintingNftId != 0 {
+						// 	// 检查是否满足要求的属性
+						// 	if indexer.IsRaritySatRequired(&tickerInfo.Ticker.Attr) {
+						// 		// 如果是稀有聪铸造，需要有对应的资产
+						// 		if tickerInfo.Ticker.Attr.Rarity != "" {
+						// 			exoticName := common.AssetName{
+						// 				Protocol: common.PROTOCOL_NAME_ORDX,
+						// 				Type:     common.ASSET_TYPE_EXOTIC,
+						// 				Ticker:   tickerInfo.Ticker.Attr.Rarity,
+						// 			}
+						// 			// 如果是稀有聪铸造，其mint数据中的offset可能不够，
+						// 			// 因为中间可能存在白聪：383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143ci4
+									
+						// 			exoticranges := input.Offsets[exoticName]
+						// 			if !common.AssetOffsetsContains(exoticranges, info.Offsets) {
+						// 				common.Log.Infof("utxo %s mint asset %s, but no enough exotic satoshi", input.OutPointStr, ticker)
+						// 				p.removeMint(holder, tickerInfo, input.UtxoId, info) // 修改了 p.holderInfo 需要从头开始
+						// 				goto loopback
+						// 			}
+						// 		}
+						// 	}
+						// }
 						amt += info.AssetAmt()
 						offsets.Merge(info.Offsets)
 					}

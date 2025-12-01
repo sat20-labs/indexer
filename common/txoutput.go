@@ -42,6 +42,16 @@ func (p *OffsetRange) ToRange() *Range {
 	}
 }
 
+
+func (p *OffsetRange) Size() int64 {
+	if p == nil {
+		return 0
+	}
+	
+	return p.End-p.Start
+}
+
+
 // 有序的数组，
 type AssetOffsets []*OffsetRange
 
@@ -115,6 +125,7 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 
 	return left, right
 }
+
 
 // 按聪数量分割, Append 的逆操作
 func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
@@ -213,6 +224,54 @@ func (p *AssetOffsets) Merge(another AssetOffsets) {
 	}
 }
 
+// merge的反操作
+// 从某个位置开始，取出一定数量的资产，偏移值不调整
+func (p *AssetOffsets) Pickup(offset int64, value int64) AssetOffsets {
+	var right AssetOffsets
+
+	if p == nil {
+		return nil
+	}
+	if value == 0 {
+		return nil
+	}
+
+	var total int64
+	for _, r := range *p {
+		if r.End > offset {
+			left := value - total
+			if r.Start >= offset {
+				if r.Size() <= left {
+					n := r.Clone()
+					total += n.Size()
+					right = append(right, n)
+				} else {
+					right = append(right, &OffsetRange{Start: r.Start, End: r.Start + left})
+					total += left
+				}
+			} else {
+				n := r.Clone()
+				n.Start = offset
+				if n.Size() <= left {
+					total += n.Size()
+					right = append(right, n)
+				} else {
+					right = append(right, &OffsetRange{Start: n.Start, End: n.Start + left})
+					total += left
+				}
+			}
+		}
+		if total == value {
+			break
+		}
+	}
+
+	if right.Size() != value {
+		return nil
+	}
+
+	return right
+}
 
 // another 已经调整过偏移值，并且偏移值都大于p
 func (p *AssetOffsets) Append(another AssetOffsets) {

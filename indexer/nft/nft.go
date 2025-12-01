@@ -554,7 +554,8 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 		if len(newOut.Assets) != 0 {
 			sats := make([]*SatOffset, 0)
 			for _, asset := range newOut.Assets {
-				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD && asset.Name.Type == common.ASSET_TYPE_NFT {
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD && 
+				asset.Name.Type == common.ASSET_TYPE_NFT {
 					sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
 					if err != nil {
 						common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
