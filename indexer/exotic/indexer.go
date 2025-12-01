@@ -13,7 +13,7 @@ import (
 type TickInfo struct {
 	Id             uint64
 	Name           string
-	MintInfo       map[uint64]common.AssetOffsets
+	UtxoMap        map[uint64]common.AssetOffsets  // utxoId, 动态的utxo数据
 	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
 	MintAdded      []*common.Mint
 	Ticker         *common.Ticker
@@ -22,40 +22,66 @@ type TickInfo struct {
 type HolderAction struct {
 	UtxoId    uint64
 	AddressId uint64
-	Tickers   map[string]*common.AssetAbbrInfo
+	Tickers   map[string]bool
 	Action    int // -1 删除; 1 增加
 }
 
 // asset in utxo
 type HolderInfo struct {
 	AddressId uint64
-	IsMinting bool                             // 只要该utxo是minting的reveal tx的input
-	Tickers   map[string]*common.AssetAbbrInfo // key: ticker, 小写
+	IsMinting bool                               // 只要该utxo是minting的reveal tx的input
+	Tickers   map[string]map[int64]*common.AssetAbbrInfo // key: ticker->nftId(or 0)。 如果是铸造，每个nftId对应一个AssetAbbrInfo，铸造资产从铸造的reveal输入转移到输出时，就全部合并到nftId=0的项中；否则数组中最多一个元素。
 }
 
-func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) *common.AssetAbbrInfo {
-	tickerAsset, ok := p.Tickers[name]
+func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) int64 {
+	tickerAssetVector, ok := p.Tickers[name]
 	if !ok {
-		p.Tickers[name] = assetInfo
-		return assetInfo
+		tickerAssetVector = make(map[int64]*common.AssetAbbrInfo)
+		tickerAssetVector[assetInfo.MintingNftId] = assetInfo.Clone()
+		p.Tickers[name] = tickerAssetVector
+		return assetInfo.AssetAmt()
 	}
 
-	// 合并
-	if assetInfo.MintingNftId != 0 {
-		tickerAsset.MintingNftId = assetInfo.MintingNftId
+	asset, ok := tickerAssetVector[assetInfo.MintingNftId]
+	if !ok {
+		tickerAssetVector[assetInfo.MintingNftId] = assetInfo.Clone()
+	} else {
+		asset.Offsets.Merge(assetInfo.Offsets)
 	}
-	tickerAsset.Offsets.Append(assetInfo.Offsets)
-	return tickerAsset
+
+	var amt int64
+	for _, asset := range tickerAssetVector {
+		amt += asset.AssetAmt()
+	}
+
+	return amt
 }
 
 func (p *HolderInfo) RemoveTickerAsset(name string, assetInfo *common.AssetAbbrInfo) {
-	tickerAsset, ok := p.Tickers[name]
+	tickerAssetVector, ok := p.Tickers[name]
 	if !ok {
 		return
 	}
-	tickerAsset.Offsets.Remove(assetInfo.Offsets)
-	if len(tickerAsset.Offsets) == 0 {
-		delete(p.Tickers, name)
+
+	if assetInfo.MintingNftId != 0 {
+		delete(tickerAssetVector, assetInfo.MintingNftId)
+		if len(tickerAssetVector) == 0 {
+			delete(p.Tickers, name)
+		}
+		return
+	}
+	
+	asset, ok := tickerAssetVector[assetInfo.MintingNftId]
+	if !ok {
+		return
+	}
+	
+	asset.Offsets.Remove(assetInfo.Offsets)
+	if len(asset.Offsets) == 0 {
+		delete(tickerAssetVector, assetInfo.MintingNftId)
+		if len(tickerAssetVector) == 0 {
+			delete(p.Tickers, name)
+		}
 	}
 }
 
@@ -84,7 +110,7 @@ func getExoticIndexer() *ExoticIndexer {
 func newExoticTickerInfo(name string) *TickInfo {
 	return &TickInfo{
 		Name:           name,
-		MintInfo:       make(map[uint64]common.AssetOffsets),
+		UtxoMap:        make(map[uint64]common.AssetOffsets),
 		InscriptionMap: make(map[string]*common.MintAbbrInfo, 0),
 		MintAdded:      make([]*common.Mint, 0),
 	}
@@ -115,6 +141,17 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 		}
 
 		p.holderInfo = p.loadHolderInfoFromDB()
+		// 更新ticker数据的utxo数据
+		for utxoId, holder := range p.holderInfo {
+			for name, assetInfoMap := range holder.Tickers {
+				ticker := p.tickerMap[name]
+				var offsets common.AssetOffsets
+				for _, asset := range assetInfoMap {
+					offsets.Merge(asset.Offsets)
+				}
+				ticker.UtxoMap[utxoId] = offsets
+			}
+		}
 		p.utxoMap = p.loadUtxoMapFromDB()
 
 		p.holderActionList = make([]*HolderAction, 0)
@@ -155,14 +192,18 @@ func (p *ExoticIndexer) Clone() *ExoticIndexer {
 		if action.Action > 0 {
 			value, ok := p.holderInfo[action.UtxoId]
 			if ok {
-				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
-				for k, v := range value.Tickers {
-					newAssetInfo := &common.AssetAbbrInfo{
-						MintingNftId: v.MintingNftId,
-						BindingSat: v.BindingSat,
-						Offsets: v.Offsets.Clone(),
+				newTickerInfo := make(map[string]map[int64]*common.AssetAbbrInfo)
+				for k, assets := range value.Tickers {
+					assetVector := make(map[int64]*common.AssetAbbrInfo)
+					for i, v := range assets {
+						newAssetInfo := &common.AssetAbbrInfo{
+							MintingNftId: v.MintingNftId,
+							BindingSat:   v.BindingSat,
+							Offsets:      v.Offsets.Clone(),
+						}
+						assetVector[i] = newAssetInfo
 					}
-					newTickerInfo[k] = newAssetInfo
+					newTickerInfo[k] = assetVector
 				}
 				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
 				newInst.holderInfo[action.UtxoId] = &info
@@ -277,21 +318,30 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 			utxo := input.UtxoId
 			holder, ok := p.holderInfo[utxo]
 			if ok {
-				for ticker, info := range holder.Tickers {
-					asset := common.AssetInfo{
-						Name: common.AssetName{
-							Protocol: common.PROTOCOL_NAME_ORDX,
-							Type:     common.ASSET_TYPE_EXOTIC,
-							Ticker:   ticker,
-						},
-						Amount:     *common.NewDecimal(info.AssetAmt(), 0),
-						BindingSat: 1,
+				tickers := make(map[string]bool)
+				for ticker, assetVector := range holder.Tickers {
+					for _, info := range assetVector {
+						asset := common.AssetInfo{
+							Name: common.AssetName{
+								Protocol: common.PROTOCOL_NAME_ORDX,
+								Type:     common.ASSET_TYPE_EXOTIC,
+								Ticker:   ticker,
+							},
+							Amount:     *common.NewDecimal(info.AssetAmt(), 0),
+							BindingSat: 1,
+						}
+						input.Assets.Add(&asset)
+						old, ok := input.Offsets[asset.Name]
+						if ok {
+							old.Merge(info.Offsets)
+						} else {
+							input.Offsets[asset.Name] = info.Offsets.Clone()
+						}
 					}
-					input.Assets.Add(&asset)
-					input.Offsets[asset.Name] = info.Offsets
+					tickers[ticker] = true
 				}
 
-				action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: holder.Tickers, Action: -1}
+				action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: tickers, Action: -1}
 				p.holderActionList = append(p.holderActionList, &action)
 
 				delete(p.holderInfo, utxo)
@@ -333,14 +383,21 @@ func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxo uint64) {
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
 func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
+	var amt int64
 	info, ok := p.holderInfo[utxo.UtxoId]
 	if !ok {
-		tickers := make(map[string]*common.AssetAbbrInfo, 0)
-		tickers[ticker] = assetInfo
-		info = &HolderInfo{AddressId: utxo.AddressId, IsMinting: assetInfo.MintingNftId != 0, Tickers: tickers}
+		tickers := make(map[string]map[int64]*common.AssetAbbrInfo, 0)
+		assets := make(map[int64]*common.AssetAbbrInfo)
+		assets[assetInfo.MintingNftId] = assetInfo.Clone()
+		tickers[ticker] = assets
+		info = &HolderInfo{
+			AddressId: utxo.AddressId, 
+			IsMinting: assetInfo.MintingNftId != 0, 
+			Tickers: tickers}
 		p.holderInfo[utxo.UtxoId] = info
+		amt = assetInfo.AssetAmt()
 	} else {
-		assetInfo = info.AddTickerAsset(ticker, assetInfo)
+		amt = info.AddTickerAsset(ticker, assetInfo)
 	}
 
 	utxovalue, ok := p.utxoMap[ticker]
@@ -348,7 +405,7 @@ func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetI
 		utxovalue = make(map[uint64]int64, 0)
 		p.utxoMap[ticker] = utxovalue
 	}
-	utxovalue[utxo.UtxoId] = assetInfo.AssetAmt()
+	utxovalue[utxo.UtxoId] = amt
 }
 
 func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
@@ -369,14 +426,15 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 			txOut.Assets = newOut.Assets
 			txOut.Offsets = newOut.Offsets
 
-			tickers := make(map[string]*common.AssetAbbrInfo)
+			tickers := make(map[string]bool)
 			for _, asset := range newOut.Assets {
 				if asset.Name.Protocol == common.PROTOCOL_NAME_ORDX &&
 					asset.Name.Type == common.ASSET_TYPE_EXOTIC {
 					offsets := newOut.Offsets[asset.Name]
 					assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
-					tickers[asset.Name.Ticker] = assetInfo
 					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+
+					tickers[asset.Name.Ticker] = true
 				}
 			}
 
@@ -485,7 +543,6 @@ func (p *ExoticIndexer) UpdateDB() {
 	common.Log.Infof("ExoticIndexer->UpdateDB takes %v", time.Since(startTime))
 }
 
-
 func (s *ExoticIndexer) setDBVersion() {
 	err := db.SetRawValueToDB([]byte(ORDX_DB_VER_KEY), []byte(ORDX_DB_VERSION), s.db)
 	if err != nil {
@@ -513,7 +570,7 @@ func (p *ExoticIndexer) CheckSelf() bool {
 		for _, amt := range holdermap {
 			holderAmount += amt
 		}
-		
+
 		ticker := p.GetTicker(name)
 		mintAmount := ticker.TotalMinted
 		if holderAmount != mintAmount {
@@ -539,13 +596,17 @@ func (p *ExoticIndexer) CheckSelf() bool {
 					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d not in holdermap", name, utxo)
 					return false
 				}
-				tickinfo, ok := holderInfo.Tickers[name]
+				tickInfoVector, ok := holderInfo.Tickers[name]
 				if !ok {
 					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d not in holders", name, utxo)
 					return false
 				}
 
-				amountInHolder := tickinfo.Offsets.Size() * int64(tickinfo.BindingSat)
+				var amountInHolder int64
+				for _, info := range tickInfoVector {
+					amountInHolder += info.AssetAmt()
+				}
+
 				if amountInHolder != amoutInUtxo {
 					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
 					return false

@@ -7,7 +7,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-
 func initDefaultExoticAsset() {
 	blocks := make(map[int]bool)
 	for i := 0; i < 1000; i++ {
@@ -21,8 +20,8 @@ func initDefaultExoticAsset() {
 	}
 	defaultAssetInBlockSubSidy[Nakamoto] = blocks2
 
-	defaultAssetInBlockSubSidy[Block9] = map[int]bool{9:true}
-	defaultAssetInBlockSubSidy[Block78] = map[int]bool{78:true}
+	defaultAssetInBlockSubSidy[Block9] = map[int]bool{9: true}
+	defaultAssetInBlockSubSidy[Block78] = map[int]bool{78: true}
 
 	if !common.IsMainnet() {
 		defaultAssetInUtxo = make(map[string]map[string]common.AssetOffsets)
@@ -30,7 +29,7 @@ func initDefaultExoticAsset() {
 			FirstTransaction: {
 				{
 					Start: 0,
-					End: 100*100000000,
+					End:   100 * 100000000,
 				},
 			},
 		}
@@ -38,7 +37,7 @@ func initDefaultExoticAsset() {
 			FirstTransaction: {
 				{
 					Start: 0,
-					End: 2804999961782,
+					End:   2804999961782,
 				},
 			},
 		}
@@ -51,16 +50,15 @@ func initDefaultExoticAsset() {
 	}
 }
 
-
 // 所有事先定义的稀有聪
 // utxo->ticker->offset
-var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets {
-	
+var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
+
 	PIZZA_UTXO: {
 		Pizza: common.AssetOffsets{
 			{
 				Start: 0,
-				End: PIZZA_VALUE,
+				End:   PIZZA_VALUE,
 			},
 		},
 	},
@@ -69,34 +67,34 @@ var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets {
 		FirstTransaction: common.AssetOffsets{
 			{
 				Start: 0,
-				End: 10*100000000,
+				End:   10 * 100000000,
 			},
 		},
 	},
 }
 
-var defaultAssetInBlockSubSidy = map[string]map[int]bool {}
+var defaultAssetInBlockSubSidy = map[string]map[int]bool{}
 
+// 在区块的coinbase输入中生成稀有聪资产
 func (p *ExoticIndexer) generateRarityAssetWithBlock(height int, coinbaseInput *common.TxOutput) {
 
 	for name, blocks := range defaultAssetInBlockSubSidy {
 		_, ok := blocks[height]
 		if ok {
-			
-	
+
 			asset := common.AssetInfo{
-				Name: common.AssetName{ 
+				Name: common.AssetName{
 					Protocol: common.PROTOCOL_NAME_ORDX,
-					Type: common.ASSET_TYPE_EXOTIC,
-					Ticker: name,
+					Type:     common.ASSET_TYPE_EXOTIC,
+					Ticker:   name,
 				},
-				Amount: *common.NewDecimal(coinbaseInput.OutValue.Value, 0),
+				Amount:     *common.NewDecimal(coinbaseInput.OutValue.Value, 0),
 				BindingSat: 1,
 			}
 			offset := common.AssetOffsets{&common.OffsetRange{
-					Start: 0,
-					End: coinbaseInput.OutValue.Value,
-				},
+				Start: 0,
+				End:   coinbaseInput.OutValue.Value,
+			},
 			}
 			coinbaseInput.Assets.Add(&asset)
 			coinbaseInput.Offsets[asset.Name] = offset
@@ -113,12 +111,12 @@ func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets commo
 	if !ok {
 		tickInfo = newExoticTickerInfo(name)
 		tickInfo.Id = uint64(len(p.tickerMap))
-	
+
 		tickInfo.Ticker = newExoticDefaultTicker(name)
 		p.tickerMap[name] = tickInfo
 		p.tickerAdded[name] = tickInfo.Ticker
 	}
-	tickInfo.MintInfo[utxoId] = offsets.Clone()
+	tickInfo.UtxoMap[utxoId] = offsets.Clone()
 	tickInfo.Ticker.TotalMinted += offsets.Size()
 	// tickInfo.MintAdded = append(ticker.MintAdded, mint)
 	// tickInfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
@@ -126,21 +124,21 @@ func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets commo
 	p.tickerAdded[name] = tickInfo.Ticker // 更新
 }
 
-func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput)  {
-	
+func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput) {
+
 	asset := common.AssetInfo{
-		Name: common.AssetName{ 
+		Name: common.AssetName{
 			Protocol: common.PROTOCOL_NAME_ORDX,
-			Type: common.ASSET_TYPE_EXOTIC,
-			Ticker: "",
+			Type:     common.ASSET_TYPE_EXOTIC,
+			Ticker:   "",
 		},
-		Amount: *common.NewDecimal(1, 0),
+		Amount:     *common.NewDecimal(1, 0),
 		BindingSat: 1,
 	}
 	offset0 := common.AssetOffsets{
 		{
 			Start: 0,
-			End: 1,
+			End:   1,
 		},
 	}
 
@@ -165,8 +163,8 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 		asset.Name.Ticker = Black
 		offset1 := common.AssetOffsets{
 			{
-				Start: coinbaseInput.OutValue.Value-1,
-				End: coinbaseInput.OutValue.Value,
+				Start: coinbaseInput.OutValue.Value - 1,
+				End:   coinbaseInput.OutValue.Value,
 			},
 		}
 
@@ -175,7 +173,6 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 		p.addTickerAsset(asset.Name.Ticker, coinbaseInput.UtxoId, offset1)
 	}
 }
-
 
 func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {
 	return p.baseIndexer.GetBlockInBuffer(height)
@@ -260,28 +257,27 @@ func AddAsset(output *common.TxOutput, name string, offset int64, amt int64) {
 	asset := common.AssetInfo{
 		Name: common.AssetName{
 			Protocol: common.PROTOCOL_NAME_ORDX,
-			Type: common.ASSET_TYPE_EXOTIC,
-			Ticker: name,
+			Type:     common.ASSET_TYPE_EXOTIC,
+			Ticker:   name,
 		},
-		Amount: *common.NewDecimal(amt, 0),
+		Amount:     *common.NewDecimal(amt, 0),
 		BindingSat: 1,
 	}
 	output.Assets.Add(&asset)
 	output.Offsets[asset.Name] = common.AssetOffsets{
 		{
 			Start: offset,
-			End: offset+amt,
+			End:   offset + amt,
 		},
 	}
 }
 
-func (p *ExoticIndexer) GenerateRodarmorRarityAssets(block *common.Block, 
-	coinbase []*common.Range)  {
+func (p *ExoticIndexer) GenerateRodarmorRarityAssets(block *common.Block,
+	coinbase []*common.Range) {
 
 	// // uncommon
 	// tx := block.Transactions[0]
-	
-	
+
 	// for height, rng := range rngsInBlock {
 	// 	firstSatInBlock = append(firstSatInBlock, rng)
 	// 	p.firstSatInBlock.Put(rng.Start, height)
@@ -429,29 +425,27 @@ func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn common
 	return ranges
 }
 
+// validBlock := make([]int, 0)
+// for h := range NakamotoBlocks {
+// 	if h <= height {
+// 		validBlock = append(validBlock, h)
+// 	}
+// }
+// result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
 
-		// validBlock := make([]int, 0)
-		// for h := range NakamotoBlocks {
-		// 	if h <= height {
-		// 		validBlock = append(validBlock, h)
-		// 	}
-		// }
-		// result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
+// if height >= 1000 {
+// 	result[Vintage] = p.getRangeToBlock(1000, txn)
+// }
 
-		// if height >= 1000 {
-		// 	result[Vintage] = p.getRangeToBlock(1000, txn)
-		// }
+// // TODO
+// //result[Alpha] = GetRangesForAlpha(0, height)
+// //result[Omega] = GetRangesForOmega(0, height)
 
-		// // TODO
-		// //result[Alpha] = GetRangesForAlpha(0, height)
-		// //result[Omega] = GetRangesForOmega(0, height)
+// //result[Hitman] = HitmanRanges
+// //result[Jpeg] = JpegRanges
+// //result[Fibonacci] =
 
-		// //result[Hitman] = HitmanRanges
-		// //result[Jpeg] = JpegRanges
-		// //result[Fibonacci] =
-
-		// if IsTestNet {
-		// 	result[Customized] = CustomizedRange
-		// }
-		// return nil
-
+// if IsTestNet {
+// 	result[Customized] = CustomizedRange
+// }
+// return nil

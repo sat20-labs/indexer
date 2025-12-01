@@ -174,8 +174,10 @@ func (p *FTIndexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]
 			continue
 		}
 
-		for k, v := range info.Tickers {
-			result[k] += v.Offsets.Size() * int64(v.BindingSat)
+		for k, assetVector := range info.Tickers {
+			for _, v := range assetVector {
+				result[k] += v.AssetAmt()
+			}
 		}
 	}
 
@@ -227,9 +229,13 @@ func (p *FTIndexer) GetAssetsWithUtxo(utxo uint64) map[string]common.AssetOffset
 
 	holders := p.holderInfo[utxo]
 	if holders != nil {
-		for ticker, info := range holders.Tickers {
+		for ticker, assetVector := range holders.Tickers {
 			// deep copy
-			result[ticker] = info.Offsets.Clone()
+			var offsets common.AssetOffsets
+			for _, info := range assetVector {
+				offsets.Merge(info.Offsets)
+			}
+			result[ticker] = offsets
 		}
 		return result
 	}
@@ -246,9 +252,13 @@ func (p *FTIndexer) GetAssetsWithUtxoV2(utxo uint64) map[string]int64 {
 
 	holders := p.holderInfo[utxo]
 	if holders != nil {
-		for ticker, info := range holders.Tickers {
+		for ticker, assetVector := range holders.Tickers {
 			// deep copy
-			result[ticker] = info.Offsets.Size() * int64(info.BindingSat)
+			var amt int64
+			for _, info := range assetVector {
+				amt += info.AssetAmt()
+			}
+			result[ticker] = amt
 		}
 		return result
 	}
@@ -282,12 +292,17 @@ func (p *FTIndexer) GetAssetsWithUtxoV3(utxo uint64, tickerName string) int64 {
 		return 0
 	}
 
-	tickinfo := holder.Tickers[tickerName]
-	if tickinfo == nil {
+	tickInfoVector := holder.Tickers[tickerName]
+	if tickInfoVector == nil {
 		return 0
 	}
 
-	return tickinfo.AssetAmt()
+	var amt int64
+	for _, info := range tickInfoVector {
+		amt += info.AssetAmt()
+	}
+
+	return amt
 }
 
 // return: mint的ticker名字

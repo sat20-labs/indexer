@@ -72,7 +72,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	// TODO 正式版本直接返回，遵循ordinals协议的规则。
 	//return nil // 遵循ordinals协议的规则
 
-	// 另外一种规则
+	// 另外一种规则: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f
 	posInFee := int64(satpoint) - outValue
 	// 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
 

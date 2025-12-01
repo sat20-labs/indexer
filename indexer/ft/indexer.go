@@ -24,7 +24,7 @@ type FTIndexer struct {
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
 	// 禁止直接遍历holderInfo和utxoMap，因为数据量太大（ord有亿级数据）
 	mutex      sync.RWMutex                // 只保护这几个结构
-	tickerMap  map[string]*TickInfo        // ticker -> TickerInfo.  name 小写。 数据由mint数据构造。
+	tickerMap  map[string]*TickInfo        // ticker -> TickerInfo.  name 小写。
 	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
 	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
 
@@ -86,14 +86,18 @@ func (s *FTIndexer) Clone() *FTIndexer {
 		if action.Action > 0 {
 			value, ok := s.holderInfo[action.UtxoId]
 			if ok {
-				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
-				for k, v := range value.Tickers {
-					newAssetInfo := &common.AssetAbbrInfo{
-						MintingNftId: v.MintingNftId,
-						BindingSat: v.BindingSat,
-						Offsets: v.Offsets.Clone(),
+				newTickerInfo := make(map[string]map[int64]*common.AssetAbbrInfo)
+				for k, assets := range value.Tickers {
+					assetVector := make(map[int64]*common.AssetAbbrInfo, len(assets))
+					for i, v := range assets {
+						newAssetInfo := &common.AssetAbbrInfo{
+							MintingNftId: v.MintingNftId,
+							BindingSat: v.BindingSat,
+							Offsets: v.Offsets.Clone(),
+						}
+						assetVector[i] = newAssetInfo
 					}
-					newTickerInfo[k] = newAssetInfo
+					newTickerInfo[k] = assetVector
 				}
 				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
 				newInst.holderInfo[action.UtxoId] = &info
@@ -173,6 +177,17 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 		}
 
 		s.holderInfo = s.loadHolderInfoFromDB()
+		// 更新ticker数据的utxo数据
+		for utxoId, holder := range s.holderInfo {
+			for name, assetInfoMap := range holder.Tickers {
+				ticker := s.tickerMap[name]
+				var offsets common.AssetOffsets
+				for _, asset := range assetInfoMap {
+					offsets.Merge(asset.Offsets)
+				}
+				ticker.UtxoMap[utxoId] = offsets
+			}
+		}
 		s.utxoMap = s.loadUtxoMapFromDB()
 
 		s.holderActionList = make([]*HolderAction, 0)
@@ -225,13 +240,16 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holdermap", name, utxo)
 					return false
 				}
-				tickinfo, ok := holderInfo.Tickers[name]
+				tickInfoVector, ok := holderInfo.Tickers[name]
 				if !ok {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holders", name, utxo)
 					return false
 				}
 
-				amountInHolder := tickinfo.Offsets.Size() * int64(tickinfo.BindingSat)
+				var amountInHolder int64
+				for _, info := range tickInfoVector {
+					amountInHolder += info.AssetAmt()
+				}
 				if amountInHolder != amoutInUtxo {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
 					return false

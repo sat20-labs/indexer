@@ -193,6 +193,28 @@ func (p *AssetOffsets) Insert(r2 *OffsetRange) {
 }
 
 // another 已经调整过偏移值
+func (p *AssetOffsets) Merge(another AssetOffsets) {
+	len1 := len(*p)
+	len2 := len(another)
+	if len2 == 0 {
+		return
+	}
+	if len1 == 0 {
+		*p = another.Clone()
+		return
+	}
+	if (*p)[len1-1].End <= another[len2-1].Start {
+		p.Append(another)
+		return
+	}
+
+	for _, r := range another {
+		p.Insert(r)
+	}
+}
+
+
+// another 已经调整过偏移值，并且偏移值都大于p
 func (p *AssetOffsets) Append(another AssetOffsets) {
 	var r1, r2 *OffsetRange
 	len1 := len(*p)
@@ -303,10 +325,8 @@ func AssetOffsetsContains(container, target AssetOffsets) bool {
             // container[i] 完全覆盖 target[j]，继续下一个 target
             j++
         } else {
-            // container[i] 只覆盖了 target[j] 的前半段
-            // target[j] 剩余部分必须继续用下一个 container 区间覆盖
-            t.Start = c.End
-            i++
+            // container[i] 只覆盖了 target[j] 的前半段，target必然有部分没有覆盖到
+			return false
         }
     }
 

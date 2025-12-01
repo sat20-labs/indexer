@@ -309,6 +309,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 		return
 	}
 
+	// 批量铸造时，nft不一样，但是utxoId一致
 	nftmap, ok := p.nftAddedUtxoMap[nft.UtxoId]
 	if !ok {
 		nftmap = make(map[int64]*common.Nft)
