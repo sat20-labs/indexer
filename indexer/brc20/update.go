@@ -151,12 +151,12 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 					hasTransfer = true
 					nft.TransferNft.IsInvalid = true // 仅设置标志位
-				} //else {
+				} else {
 				 	// 已经转移过的transfer铭文，不需要再处理，直接删除就行
-				//}
 					s.removeTransferNft(nft) // 从当前地址中删除数据
 				}
 			}
+		}
 
 		if hasTransfer {
 			for _, output := range tx.Outputs {
