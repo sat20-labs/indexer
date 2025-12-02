@@ -194,7 +194,7 @@ const (
 	curse_out_dir       = "./cmd/curse.txt"
 )
 
-func main() {
+func main3() {
 	yamlcfg := config.InitConfig("../testnet.env")
 	config.InitLog(yamlcfg)
 
