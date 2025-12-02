@@ -8,11 +8,12 @@ import (
 )
 
 func initDefaultExoticAsset() {
-	blocks := make(map[int]bool)
-	for i := 0; i < 1000; i++ {
-		blocks[i] = true
-	}
-	defaultAssetInBlockSubSidy[Vintage] = blocks
+	// 没啥用
+	// blocks := make(map[int]bool)
+	// for i := 0; i < 1000; i++ {
+	// 	blocks[i] = true
+	// }
+	// defaultAssetInBlockSubSidy[Vintage] = blocks
 
 	blocks2 := make(map[int]bool)
 	for _, block := range NakamotoBlocks {
@@ -75,8 +76,45 @@ var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
 
 var defaultAssetInBlockSubSidy = map[string]map[int]bool{}
 
+
 // 在区块的coinbase输入中生成稀有聪资产
-func (p *ExoticIndexer) generateRarityAssetWithBlock(height int, coinbaseInput *common.TxOutput) {
+func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinbaseInput *common.TxOutput) {
+
+	// 根据交易本身生成的稀有聪
+	for _, tx := range block.Transactions {
+		for _, txOut := range tx.Outputs {
+			utxo := txOut.OutPointStr
+			assetmap, ok := defaultAssetInUtxo[utxo]
+			if ok {
+				for name, offsets := range assetmap {
+					asset := common.AssetInfo{
+						Name: common.AssetName{
+							Protocol: common.PROTOCOL_NAME_ORDX,
+							Type:     common.ASSET_TYPE_EXOTIC,
+							Ticker:   name,
+						},
+						Amount:     *common.NewDecimal(txOut.OutValue.Value, 0),
+						BindingSat: 1,
+					}
+					
+					txOut.Assets.Add(&asset)
+					txOut.Offsets[asset.Name] = offsets.Clone()
+
+					p.addTickerAsset(name, txOut.UtxoId, offsets)
+					assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
+					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+				}
+			}
+		}
+	}
+
+	// 根据区块奖励聪生成的稀有聪
+	height := block.Height
+	if coinbaseInput.OutValue.Value == 0 {
+		// empty block
+		common.Log.Infof("empty block %d, not need to generate rarity asset", height)
+		return
+	}
 
 	for name, blocks := range defaultAssetInBlockSubSidy {
 		_, ok := blocks[height]
@@ -159,7 +197,7 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 	coinbaseInput.Offsets[asset.Name] = offset0
 	p.addTickerAsset(name, coinbaseInput.UtxoId, offset0)
 
-	if name == Uncommon {
+	//if name == Uncommon {
 		asset.Name.Ticker = Black
 		offset1 := common.AssetOffsets{
 			{
@@ -171,7 +209,7 @@ func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseI
 		coinbaseInput.Assets.Add(asset.Clone())
 		coinbaseInput.Offsets[asset.Name] = offset1
 		p.addTickerAsset(asset.Name.Ticker, coinbaseInput.UtxoId, offset1)
-	}
+	//}
 }
 
 func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {

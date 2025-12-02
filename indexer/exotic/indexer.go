@@ -291,10 +291,6 @@ func newExoticDefaultTicker(name string) *common.Ticker {
 	return ticker
 }
 
-func (p *ExoticIndexer) generateAssetWithBlock(block *common.Block, coinbase *common.TxOutput) {
-	p.generateRarityAssetWithBlock(block.Height, coinbase)
-}
-
 func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -304,7 +300,7 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	coinbaseInput.UtxoId = block.Transactions[0].Inputs[0].UtxoId
-	p.generateAssetWithBlock(block, coinbaseInput)
+	p.generateRarityAssetWithBlock(block, coinbaseInput)
 
 	// 执行转移
 	for _, tx := range block.Transactions[1:] {
@@ -361,6 +357,10 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 
 		change := p.innerUpdateTransfer(tx, allInput)
 		coinbaseInput.Append(change)
+	}
+
+	if block.Height == 501726 {
+		common.Log.Infof("")
 	}
 
 	if len(coinbaseInput.Assets) != 0 {
