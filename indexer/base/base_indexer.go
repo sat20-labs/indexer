@@ -18,7 +18,7 @@ type AddressStatus struct {
 }
 
 type BlockProcCallback func(*common.Block, []*common.Range)
-type UpdateDBCallback func()
+type UpdateDBCallback func(wantToDelete map[string]uint64)
 
 type BaseIndexer struct {
 	db    common.KVDB
@@ -224,12 +224,14 @@ func (b *BaseIndexer) forceUpdateDB() {
 	*/
 	if b.updateDBCB != nil {
 		startTime := time.Now()
-		b.UpdateDB()
+		wantToDelete := b.UpdateDB()
 		common.Log.Infof("BaseIndexer.updateBasicDB: cost: %v", time.Since(startTime))
 
 		// startTime = time.Now()
-		b.updateDBCB()
+		b.updateDBCB(wantToDelete)
 		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
+
+		b.CleanEmptyAddress(wantToDelete)
 
 		common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
 	} //else {
@@ -290,7 +292,7 @@ func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
 	return addressValueMap
 }
 
-func (b *BaseIndexer) UpdateDB() {
+func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	common.Log.Infof("BaseIndexer->updateBasicDB %d start...", b.lastHeight)
 
 	// 拿到所有的addressId
@@ -417,6 +419,7 @@ func (b *BaseIndexer) UpdateDB() {
 	common.Log.Infof("BaseIndexer.updateBasicDB-> delete utxos %d, cost: %v", utxoDeled, time.Since(startTime))
 
 	// address -> utxo
+	wantToDeleteMap := make(map[string]uint64)
 	for k, v := range b.addressValueMap {
 		key := db.GetAddressDBKeyV2(k)
 		value := v.ToAddressValueInDBV2()
@@ -437,6 +440,8 @@ func (b *BaseIndexer) UpdateDB() {
 				common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
 			}
 			// brc20 依赖一个不变的id
+			// TODO 数据量太大，最好能让brc20模块，提供一个回调函数，确认哪些地址可以删除
+			wantToDeleteMap[k] = value.AddressId
 			//err = db.UnBindAddressId(k, value.AddressId, wb)
 			//if err != nil {
 			//	common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
@@ -468,6 +473,23 @@ func (b *BaseIndexer) UpdateDB() {
 	b.delUTXOs = make([]*common.TxOutputV2, 0)
 	b.addressValueMap = make(map[string]*common.AddressValueV2)
 	b.idToAddressMap = make(map[uint64]string)
+
+	return wantToDeleteMap
+}
+
+func (b *BaseIndexer) CleanEmptyAddress(wantToDelete map[string]uint64) {
+	wb := b.db.NewWriteBatch()
+	defer wb.Close()
+	for k, v := range wantToDelete {
+		err := db.UnBindAddressId(k, v, wb)
+		if err != nil {
+			common.Log.Errorf("BaseIndexer.CleanEmptyAddress-> Error deleting db: %v\n", err)
+		}
+	}
+	err := wb.Flush()
+	if err != nil {
+		common.Log.Panicf("BaseIndexer.CleanEmptyAddress-> Error satwb flushing writes to db %v", err)
+	}
 }
 
 func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *common.TxOutputV2, txn common.ReadBatch) {

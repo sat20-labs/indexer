@@ -158,6 +158,28 @@ func (s *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*commo
 	return result
 }
 
+
+// 获取某个地址下的资产 return: ticker->amount
+func (s *BRC20Indexer) hasAssetInAddress(addrId uint64) bool {
+	
+	info, ok := s.holderMap[addrId]
+	if !ok {
+		//common.Log.Errorf("can't find holder with utxo %d", utxo)
+		return false
+	}
+
+	for _, v := range info.Tickers {
+		if v.AvailableBalance.Sign() != 0 {
+			return true
+		}
+		if v.TransferableBalance.Sign() != 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 // return: 按铸造时间排序的铸造历史
 func (s *BRC20Indexer) GetMintHistory(tick string, start, limit int) []*common.BRC20MintAbbrInfo {
 	s.mutex.RLock()
@@ -394,4 +416,18 @@ func (s *BRC20Indexer) GetHolderAbbrInfo(addressId uint64, tickerName string) *c
 		return nil
 	}
 	return tickAbbrInfo
+}
+
+func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	hasAssetAddress := make(map[string]bool)
+	for k, v := range wantToDelete {
+		if s.hasAssetInAddress(v) {
+			hasAssetAddress[k] = true
+		}
+	}
+	for k := range hasAssetAddress {
+		delete(wantToDelete, k)
+	}
 }

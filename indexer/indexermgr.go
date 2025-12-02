@@ -351,13 +351,14 @@ func (b *IndexerMgr) checkSelf() {
 	}
 }
 
-func (b *IndexerMgr) forceUpdateDB() {
+func (b *IndexerMgr) forceUpdateDB(wantToDelete map[string]uint64) {
 	startTime := time.Now()
 	b.exotic.UpdateDB()
 	b.nft.UpdateDB()
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
 	b.brc20Indexer.UpdateDB()
+	b.brc20Indexer.CheckEmptyAddress(wantToDelete)
 	b.RunesIndexer.UpdateDB()
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
@@ -437,13 +438,15 @@ func (b *IndexerMgr) updateDB() {
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.cleanDBBuffer() // must before UpdateDB
-	b.compilingBackupDB.UpdateDB()
+	wantToDelete := b.compilingBackupDB.UpdateDB()
 	b.exoticBackupDB.UpdateDB()
 	b.nftBackupDB.UpdateDB()
 	b.nsBackupDB.UpdateDB()
 	b.ftBackupDB.UpdateDB()
 	b.runesBackupDB.UpdateDB()
 	b.brc20BackupDB.UpdateDB()
+	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
+	b.compilingBackupDB.CleanEmptyAddress(wantToDelete)
 
 	b.compiling.SetSyncStats(b.compilingBackupDB.GetSyncStats())
 }
