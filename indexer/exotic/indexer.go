@@ -87,6 +87,7 @@ func (p *HolderInfo) RemoveTickerAsset(name string, assetInfo *common.AssetAbbrI
 
 type ExoticIndexer struct {
 	db          common.KVDB
+	status      *Status
 	baseIndexer *base.BaseIndexer
 
 	mutex sync.RWMutex // 只保护这几个结构
@@ -127,6 +128,7 @@ func NewExoticIndexer(db common.KVDB) *ExoticIndexer {
 
 func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 	p.baseIndexer = baseIndexer
+	p.status = initStatusFromDB(p.db)
 	height := p.baseIndexer.GetSyncHeight()
 	// initEpochSat(p.db, height)
 	// p.newExoticTickerMap(height)
@@ -297,6 +299,10 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 
 	// 生成所有当前区块的稀有聪
 	startTime := time.Now()
+
+	if block.Height == 738 {
+		common.Log.Info("")
+	}
 
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	coinbaseInput.UtxoId = block.Transactions[0].Inputs[0].UtxoId
@@ -528,7 +534,12 @@ func (p *ExoticIndexer) UpdateDB() {
 	}
 	//common.Log.Infof("ExoticIndexer->UpdateDB->SetDB(ticker.HolderActionList(%d), cost: %v",len(p.holderActionList), time.Since(startTime))
 
-	err := wb.Flush()
+	err := db.SetDB([]byte(STATUS_KEY), p.status, wb)
+	if err != nil {
+		common.Log.Panicf("ExoticIndexer->UpdateDB Error setting in db %v", err)
+	}
+
+	err = wb.Flush()
 	if err != nil {
 		common.Log.Panicf("Error ordxwb flushing writes to db %v", err)
 	}

@@ -101,14 +101,23 @@ func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinba
 					txOut.Offsets[asset.Name] = offsets.Clone()
 
 					p.addTickerAsset(name, txOut.UtxoId, offsets)
-					assetInfo := &common.AssetAbbrInfo{BindingSat: int(asset.BindingSat), Offsets: offsets}
+					assetInfo := &common.AssetAbbrInfo{
+						MintingNftId: p.status.Count,
+						BindingSat: int(asset.BindingSat), 
+						Offsets: offsets}
 					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+					p.status.Count++
+
+					tickers := make(map[string]bool)
+					tickers[name] = true
+					action := HolderAction{UtxoId: txOut.UtxoId, AddressId: txOut.UtxoId, Tickers: tickers, Action: 1}
+					p.holderActionList = append(p.holderActionList, &action)
 				}
 			}
 		}
 	}
 
-	// 根据区块奖励聪生成的稀有聪
+	// 根据区块奖励聪生成的稀有聪（在区块的奖励聪中生成的稀有聪，不需要调用addHolder）
 	height := block.Height
 	if coinbaseInput.OutValue.Value == 0 {
 		// empty block

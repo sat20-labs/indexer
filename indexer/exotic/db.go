@@ -8,6 +8,35 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+const (
+	STATUS_KEY = "s-"
+
+	DB_VERSION = "1.0.0"
+)
+
+type Status struct {
+	Version          string
+	Count            int64
+}
+
+func initStatusFromDB(ldb common.KVDB) *Status {
+	stats := &Status{}
+	err := db.GetValueFromDB([]byte(STATUS_KEY), stats, ldb)
+	if err == common.ErrKeyNotFound {
+		common.Log.Info("initStatusFromDB no stats found in db")
+		stats.Version = DB_VERSION
+	} else if err != nil {
+		common.Log.Panicf("initStatusFromDB failed. %v", err)
+	}
+	common.Log.Infof("nft stats: %v", stats)
+
+	if stats.Version != DB_VERSION {
+		common.Log.Panicf("nft data version inconsistent %s", DB_VERSION)
+	}
+
+	return stats
+}
+
 func (p *ExoticIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
 	tickinfo := newTickerInfo(tickerName)
 	tickinfo.Ticker = p.getTickerFromDB(tickerName)
@@ -25,7 +54,7 @@ func (p *ExoticIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 func (p *ExoticIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadHolderInfoFromDB ...")
+	common.Log.Info("ExoticIndexer loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
 	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 

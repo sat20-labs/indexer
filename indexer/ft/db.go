@@ -25,7 +25,7 @@ func (s *FTIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadHolderInfoFromDB ...")
+	common.Log.Info("FTIndexer loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 
