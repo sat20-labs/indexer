@@ -157,6 +157,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 					nft.TransferNft.IsInvalid = true // 仅设置标志位
 				} //else {
 				// 已经转移过的transfer铭文，不需要再处理，直接删除就行
+					//s.removeTransferNft(nft) // 从当前地址中删除数据
 				//}
 				s.removeTransferNft(nft) // 从当前地址中删除数据
 			}
@@ -283,14 +284,19 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 		s.transferNftMap[nft.UtxoId] = nft
 	}
 
+	if nft.TransferNft.IsInvalid {
+		// nft是一个已经使用过的铭文。
+		return
+	}
+
 	holder, ok := s.holderMap[nft.AddressId]
 	if !ok {
-		// 一个transfer铭文转移时的接受地址，其holder可能为空。nft是一个已经使用过的铭文。
-		holder = &HolderInfo{
-			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-		}
-		holder.Tickers[nft.Ticker] = common.NewBRC20TickAbbrInfo(nil, nil)
-		s.holderMap[nft.AddressId] = holder
+		common.Log.Panicf("holder %d should have some brc20 asset %s already", nft.AddressId, nft.Ticker)
+		// holder = &HolderInfo{
+		// 	Tickers: make(map[string]*common.BRC20TickAbbrInfo),
+		// }
+		// holder.Tickers[nft.Ticker] = common.NewBRC20TickAbbrInfo(nil, nil)
+		// s.holderMap[nft.AddressId] = holder
 	}
 
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
@@ -311,7 +317,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV
 			fromAddressId := transferNft.AddressId
 			toAddressId := output.AddressId
 
-			// 在下一次转移时，可以删除，不需要再记录
+			// 先加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
 			transferNft.AddressId = toAddressId
 			transferNft.UtxoId = utxoId
 			s.addTransferNft(transferNft)
