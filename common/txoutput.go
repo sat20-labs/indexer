@@ -214,7 +214,7 @@ func (p *AssetOffsets) Merge(another AssetOffsets) {
 		*p = another.Clone()
 		return
 	}
-	if (*p)[len1-1].End <= another[len2-1].Start {
+	if (*p)[len1-1].End <= another[0].Start {
 		p.Append(another)
 		return
 	}
