@@ -845,7 +845,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 		if mint == nil {
 			return
 		}
-		common.Log.Infof("nft.Base.InscriptionId: %s, nft.Base.Id: %d", nft.Base.InscriptionId, nft.Base.Id)
+		//common.Log.Infof("nft.Base.InscriptionId: %s, nft.Base.Id: %d", nft.Base.InscriptionId, nft.Base.Id)
 		s.brc20Indexer.UpdateInscribeMint(mint)
 
 	case "transfer":
@@ -1010,7 +1010,7 @@ func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
 	if common.IsValidSNSName(name) {
 		info := s.ns.GetNameRegisterInfo(name)
 		if info != nil {
-			common.Log.Warnf("%s Name %s exist, registered at %s",
+			common.Log.Debugf("%s Name %s exist, registered at %s",
 				nft.Base.InscriptionId, name, info.Nft.Base.InscriptionId)
 			return
 		}
