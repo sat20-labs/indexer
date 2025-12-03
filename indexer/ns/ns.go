@@ -110,6 +110,11 @@ func (p *NameService) getNameInBuffer(name string) *NameRegister {
 // 跟base数据库同步
 func (p *NameService) UpdateDB() {
 	//common.Log.Infof("NameService->UpdateDB start...")
+
+	if !p.nftIndexer.IsEnabled() {
+		return
+	}
+
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 

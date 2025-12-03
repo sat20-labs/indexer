@@ -16,6 +16,10 @@ import (
 )
 
 func (s *Indexer) UpdateDB() {
+	if s.baseIndexer.GetHeight() < s.enableHeight {
+		return
+	}
+
 	if s.height == 0 {
 		common.Log.Warnf("RuneIndexer.UpdateDB-> err: height(%d) == 0", s.height)
 		return
@@ -40,7 +44,7 @@ func (s *Indexer) UpdateDB() {
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
-	if s.chaincfgParam.Net == wire.MainNet && block.Height < 840000 {
+	if block.Height < s.enableHeight {
 		return
 	}
 
@@ -320,7 +324,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
 				tx.TxId, vout, s.chaincfgParam.Net, err)
 		}
-		addressId := s.BaseIndexer.GetAddressId(string(address))
+		addressId := s.baseIndexer.GetAddressId(string(address))
 		outpointToBalancesValue := &table.OutpointToBalancesValue{
 			UtxoId:     outpoint.UtxoId,
 			AddressId:  addressId,
@@ -431,7 +435,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
 					tx.TxId, outIndex, s.chaincfgParam.Net, err)
 			} else {
-				addressId := s.BaseIndexer.GetAddressId(string(address))
+				addressId := s.baseIndexer.GetAddressId(string(address))
 				v := &table.RuneIdToMintHistory{
 					RuneId:    mintRuneId,
 					UtxoId:    utxoId,

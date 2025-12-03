@@ -19,6 +19,7 @@ type HolderAction = exotic.HolderAction
 type FTIndexer struct {
 	db         common.KVDB
 	nftIndexer *nft.NftIndexer
+	enableHeight int
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
@@ -34,8 +35,13 @@ type FTIndexer struct {
 }
 
 func NewOrdxIndexer(db common.KVDB) *FTIndexer {
+	enableHeight := 827307
+	if !common.IsMainnet() {
+		enableHeight = 28883
+	}
 	return &FTIndexer{
 		db: db,
+		enableHeight: enableHeight,
 	}
 }
 

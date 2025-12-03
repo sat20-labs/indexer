@@ -131,6 +131,10 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 }
 
 func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
+	if block.Height < s.enableHeight {
+		return
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	startTime := time.Now()
@@ -347,6 +351,10 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV
 
 // 跟basic数据库同步
 func (s *BRC20Indexer) UpdateDB() {
+	if s.nftIndexer.GetBaseIndexer().GetHeight() < s.enableHeight {
+		return
+	}
+
 	//common.Log.Infof("BRC20Indexer->UpdateDB start...")
 	startTime := time.Now()
 

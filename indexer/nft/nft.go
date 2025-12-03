@@ -24,7 +24,7 @@ type SatInfo struct {
 type NftIndexer struct {
 	db           common.KVDB
 	status       *common.NftStatus
-	bEnabled     bool
+	enableHeight int
 	disabledSats map[int64]bool // 所有disabled的satoshi
 
 	baseIndexer *base.BaseIndexer
@@ -51,9 +51,13 @@ type NftIndexer struct {
 }
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
+	enableHeight := 767430
+	if !common.IsMainnet() {
+		enableHeight = 27228
+	}
 	ns := &NftIndexer{
 		db:        db,
-		bEnabled:  true,
+		enableHeight: enableHeight,
 		status:    nil,
 		utxoMap:   nil,
 		satMap:    nil,
@@ -362,7 +366,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 
 // Mint和Transfer需要仔细协调，确保新增加的nft可以正确被转移
 func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
-	if !p.bEnabled {
+	if block.Height < p.enableHeight {
 		return
 	}
 
@@ -709,13 +713,14 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 // 跟base数据库同步
 func (p *NftIndexer) UpdateDB() {
 	//common.Log.Infof("NftIndexer->UpdateDB start...")
-	startTime := time.Now()
-
-	if !p.bEnabled {
+	if !p.IsEnabled() {
 		return
 	}
+
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+
+	startTime := time.Now()
 
 	//nftmap := p.prefetchNftsFromDB()
 	buckDB := NewBuckStore(p.db)

@@ -186,6 +186,11 @@ func (p *FTIndexer) deleteUtxoMap(ticker string, utxo uint64) {
 }
 
 func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
+
+	if block.Height < p.enableHeight {
+		return
+	}
+
 	p.mutex.Lock()
 
 	startTime := time.Now()
@@ -342,6 +347,11 @@ func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction,
 // 跟basic数据库同步
 func (p *FTIndexer) UpdateDB() {
 	//common.Log.Infof("OrdxIndexer->UpdateDB start...")
+
+	if p.nftIndexer.GetBaseIndexer().GetHeight() < p.enableHeight {
+		return
+	}
+
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
