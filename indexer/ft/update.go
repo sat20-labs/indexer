@@ -138,7 +138,9 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block) {
 	common.Log.Infof("OrdxIndexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 
 	p.mutex.Unlock()
-	p.CheckSelf(block.Height)
+	// if !p.CheckSelf(block.Height) {
+	// 	common.Log.Panicf("FTIndexer UpdateTransfer CheckSelf %d failed", block.Height)
+	// }
 }
 
 func (p *FTIndexer) innerUpdateTransfer(output *common.Output) {

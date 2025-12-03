@@ -156,10 +156,8 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 		}
 	}
 
+	newInst.transferNftMap = make(map[uint64]*TransferNftInfo)
 	for key, value := range s.transferNftMap {
-		if newInst.transferNftMap == nil {
-			newInst.transferNftMap = make(map[uint64]*TransferNftInfo)
-		}
 		newInst.transferNftMap[key] = value
 	}
 	return newInst

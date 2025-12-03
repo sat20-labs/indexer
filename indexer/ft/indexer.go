@@ -215,7 +215,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 			return false
 		}
 
-		common.Log.Infof("FTIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
+		common.Log.Debugf("FTIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
 
 		utxos, ok := s.utxoMap[name]
 		if !ok {
