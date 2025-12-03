@@ -280,19 +280,14 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 		s.transferNftMap[nft.UtxoId] = nft
 	}
 
-	if nft.TransferNft.IsInvalid {
-		// nft是一个已经使用过的铭文。
-		return
-	}
-
 	holder, ok := s.holderMap[nft.AddressId]
 	if !ok {
-		common.Log.Panicf("holder %d should have some brc20 asset %s already", nft.AddressId, nft.Ticker)
-		// holder = &HolderInfo{
-		// 	Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-		// }
-		// holder.Tickers[nft.Ticker] = common.NewBRC20TickAbbrInfo(nil, nil)
-		// s.holderMap[nft.AddressId] = holder
+		// 这个nft是一个已经使用过的铭文，但为了继续记录在数据库，还是要保留在holdermap中
+		holder = &HolderInfo{
+			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
+		}
+		holder.Tickers[nft.Ticker] = common.NewBRC20TickAbbrInfo(nil, nil)
+		s.holderMap[nft.AddressId] = holder
 	}
 	
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
