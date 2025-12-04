@@ -384,7 +384,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	newRngs := common.AssetOffsets{
 		{
 			Start: satpoint,
-			End:   satpoint + satsNum, // TODO 如果是稀有聪铸造，这里的范围可能就不对，稀有聪中间可能有白聪存在
+			End:   satpoint + satsNum,
 		},
 	}
 
@@ -397,10 +397,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 				Protocol: common.PROTOCOL_NAME_ORDX,
 				Type:     common.ASSET_TYPE_EXOTIC,
 				Ticker:   deployTicker.Attr.Rarity,
-			}
-			// 如果是稀有聪铸造，其mint数据中的offset可能不够，
-			// 因为中间可能存在白聪：383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143ci4
-			
+			}	
 			exoticranges := in.Offsets[exoticName]
 			newRngs = exoticranges.Pickup(satpoint, satsNum)
 			if len(newRngs) == 0 {
@@ -434,7 +431,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	mint := &common.Mint{
 		Base:    common.CloneBaseContent(nft.Base),
 		Name:    content.Ticker,
-		UtxoId:  nft.UtxoId,
+		UtxoId:  in.UtxoId,  // ordx资产需要从input的聪中分配
 		Offsets: newRngs,
 		Amt:     int64(amt),
 		Desc:    content.Des,
@@ -1052,10 +1049,10 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 			TypeName:           common.ASSET_TYPE_NFT,
 		},
 		OwnerAddressId: addressId2,
-		UtxoId:         input.UtxoId,
+		UtxoId:         output.UtxoId,
 		Offset:         satpoint,
 	}
-	s.nft.NftMint(&nft)
+	s.nft.NftMint(input, &nft)
 	return &nft
 	// }
 	// return nil

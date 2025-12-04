@@ -298,7 +298,7 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 }
 
 // 每个NFT Mint都调用
-func (p *NftIndexer) NftMint(nft *common.Nft) {
+func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -313,11 +313,11 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 		return
 	}
 
-	// 批量铸造时，nft不一样，但是utxoId一致
-	nftmap, ok := p.nftAddedUtxoMap[nft.UtxoId]
+	// 批量铸造时，多个nft来自同一个输入utxo
+	nftmap, ok := p.nftAddedUtxoMap[input.UtxoId]
 	if !ok {
 		nftmap = make(map[int64]*common.Nft)
-		p.nftAddedUtxoMap[nft.UtxoId] = nftmap
+		p.nftAddedUtxoMap[input.UtxoId] = nftmap
 	}
 	nftmap[nft.Base.Id] = nft
 

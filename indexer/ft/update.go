@@ -50,6 +50,8 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 		BindingSat: ticker.Ticker.N, 
 		Offsets: mint.Offsets.Clone(),
 	}
+
+	// ordx协议因为一次铸造多个聪的资产，需要先在输入的聪上做分配
 	if !p.addHolder(&in.TxOutputV2, name, assetInfo) {
 		// 同一个聪上重复铸造导致的失败
 		common.Log.Warnf("FTIndexer UpdateMint %s invalid mint %s", name, in.TxId)
@@ -58,8 +60,6 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 
 	old, ok := ticker.UtxoMap[mint.UtxoId]
 	if ok {
-		// 批量铸造。如果是稀有聪，其offset需要调整
-		// 最合理方案是根据聪的属性调整，但这里还不知道聪的属性
 		old.Merge(mint.Offsets)
 	} else {
 		ticker.UtxoMap[mint.UtxoId] = mint.Offsets
@@ -69,7 +69,6 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 
 	ticker.MintAdded = append(ticker.MintAdded, mint)
 	ticker.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
-
 }
 
 // 将某次无效铸造的结果清除，一般都是在区块处理前先加入，该区块处理过程中发现铸造无效，就清除
@@ -219,28 +218,6 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 					var amt int64
 					var offsets common.AssetOffsets
 					for _, info := range assetVector {
-						// if info.MintingNftId != 0 {
-						// 	// 检查是否满足要求的属性
-						// 	if indexer.IsRaritySatRequired(&tickerInfo.Ticker.Attr) {
-						// 		// 如果是稀有聪铸造，需要有对应的资产
-						// 		if tickerInfo.Ticker.Attr.Rarity != "" {
-						// 			exoticName := common.AssetName{
-						// 				Protocol: common.PROTOCOL_NAME_ORDX,
-						// 				Type:     common.ASSET_TYPE_EXOTIC,
-						// 				Ticker:   tickerInfo.Ticker.Attr.Rarity,
-						// 			}
-						// 			// 如果是稀有聪铸造，其mint数据中的offset可能不够，
-						// 			// 因为中间可能存在白聪：383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143ci4
-									
-						// 			exoticranges := input.Offsets[exoticName]
-						// 			if !common.AssetOffsetsContains(exoticranges, info.Offsets) {
-						// 				common.Log.Infof("utxo %s mint asset %s, but no enough exotic satoshi", input.OutPointStr, ticker)
-						// 				p.removeMint(holder, tickerInfo, input.UtxoId, info) // 修改了 p.holderInfo 需要从头开始
-						// 				goto loopback
-						// 			}
-						// 		}
-						// 	}
-						// }
 						amt += info.AssetAmt()
 						offsets.Merge(info.Offsets)
 					}
