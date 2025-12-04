@@ -1,27 +1,30 @@
 package opcodes
 
+import "fmt"
+
 type Ordinary struct {
-	Opcode All
+	Opcode Opcode
 }
 
-func NewOrdinary(op All) *Ordinary {
+func NewOrdinary(op Opcode) *Ordinary {
 	ord := TryFromAll(op)
 	if ord == nil {
-		return nil
+		str := fmt.Sprintf("construction of `Ordinary` type from non-ordinary opcode %v", op)
+		panic(str)
 	}
 	return ord
 }
 
 func (ord *Ordinary) ToU8() byte {
-	return ord.Opcode.Code
+	return ord.Opcode
 }
 
 func (ord *Ordinary) String() string {
-	return ord.Opcode.String()
+	return All{Code: ord.Opcode}.String()
 }
 
-func TryFromAll(op All) *Ordinary {
-	switch op.Code {
+func TryFromAll(op Opcode) *Ordinary {
+	switch op {
 	/* pushdata */
 	case OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4,
 		/* control flow */

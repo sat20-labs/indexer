@@ -655,19 +655,19 @@ func (op All) Classify(ctx ClassifyContext) ClassifyResult {
 
 	// 76 opcodes of PushBytes class (0x00 到 0x4b)
 	if code <= OP_PUSHBYTES_75 {
-		return ClassifyResult{ClassType: ClassPushBytes, PushBytesCount: uint32(code)}
+		return ClassifyResult{ClassType: ClassPushBytes, PushBytesValue: uint32(code)}
 	}
 
 	// opcodes of Ordinary class: 61 for Legacy and 60 for TapScript context
-	return ClassifyResult{ClassType: ClassOrdinary, OrdinaryData: NewOrdinary(op)}
+	return ClassifyResult{ClassType: ClassOrdinary, OrdinaryValue: NewOrdinary(op.Code)}
 }
 
 func (op All) ToU8() byte {
 	return op.Code
 }
 
-func NewAllFromByte(code byte) All {
-	return All{Code: code}
+func NewAllFromByte(code byte) *All {
+	return &All{Code: code}
 }
 
 var (
@@ -693,8 +693,6 @@ const (
 type ClassifyResult struct {
 	ClassType      Class
 	PushNumValue   int32
-	PushBytesCount uint32
-	OrdinaryData   *Ordinary
+	PushBytesValue uint32
+	OrdinaryValue  *Ordinary
 }
-
-
