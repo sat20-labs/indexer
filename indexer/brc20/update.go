@@ -306,9 +306,11 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	}
 	
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
-	if ok {
-		tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
+	if !ok {
+		tickAbbrInfo = common.NewBRC20TickAbbrInfo(nil, nil)
+		holder.Tickers[nft.Ticker] = tickAbbrInfo
 	}
+	tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
 }
 
 func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV2, inputTransferNfts *map[int64]*TransferNftInfo) {
