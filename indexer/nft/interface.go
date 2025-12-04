@@ -8,32 +8,8 @@ import (
 )
 
 func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	sats, ok := p.utxoMap[utxoId]
-	if !ok {
-		var value NftsInUtxo
-		err := loadUtxoValueFromDB(utxoId, &value, p.db)
-		if err != nil {
-			return false
-		}
-		sats = value.Sats
-	}
-	if len(sats) == 0 {
-		return false
-	}
-
-	// 过滤disabled的sat
-	disableCount := 0
-	for _, sat := range sats {
-		_, ok := p.disabledSats[sat.Sat]
-		if ok {
-			disableCount++
-		}
-	}
-
-	return disableCount != len(sats)
+	sats := p.GetBoundSatsWithUtxo(utxoId)
+	return len(sats) != 0
 }
 
 
@@ -91,42 +67,32 @@ func (p *NftIndexer) GetNftHolderWithInscriptionId(inscriptionId string) uint64 
 
 // key: sat
 func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	value := &NftsInUtxo{}
+	sats, ok := p.utxoMap[utxoId]
+	if !ok {
+		var value NftsInUtxo
+		err := loadUtxoValueFromDB(utxoId, &value, p.db)
+		if err != nil {
+			return nil
+		}
+		sats = value.Sats
+		p.utxoMap[utxoId] = sats
+	}
+	if len(sats) == 0 {
+		return nil
+	}
 
-	loadUtxoValueFromDB(utxoId, value, p.db)
-
-	//if err != nil {
-	// 还没有保存到数据库
-	// return nil
-	//}
-
-	satmap := make(map[int64]bool)
-	for _, sat := range value.Sats {
+	result := make([]int64, len(sats))
+	for i, sat := range sats {
 		if _, ok := p.disabledSats[sat.Sat]; ok {
 			continue
 		}
-		satmap[sat.Sat] = true
+		result[i] = sat.Sat
 	}
 
-	sats, ok := p.utxoMap[utxoId]
-	if ok {
-		for _, sat := range sats {
-			if _, ok := p.disabledSats[sat.Sat]; ok {
-				continue
-			}
-			satmap[sat.Sat] = true
-		}
-	}
-
-	result := make([]int64, 0)
-	for sat := range satmap {
-		result = append(result, sat)
-	}
-
-	return result
+	return result	
 }
 
 func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
@@ -143,12 +109,11 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 		info := p.getNftsWithSat(sat)
 		if info != nil {
 			for _, nftId := range info.Nfts {
-				var nft common.InscribeBaseContent
-				err := p.loadNftFromDB(nftId, &nft)
-				if err != nil {
+				base := p.getNftBaseWithId(nftId)
+				if base == nil {
 					continue
 				}
-				result = append(result, &common.Nft{Base: &nft,
+				result = append(result, &common.Nft{Base: base,
 					OwnerAddressId: info.OwnerAddressId, UtxoId: utxoId})
 			}
 		}
@@ -199,32 +164,19 @@ func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
 	return nil
 }
 
-// return sats
-func (p *NftIndexer) GetNftsWithRanges(rngs []*common.Range) []int64 {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
 
-	result := make([]int64, 0)
-
-	for _, rng := range rngs {
-		startKey := []byte(GetSatKey(rng.Start))
-		endKey := []byte(GetSatKey(rng.Start + rng.Size - 1))
-		err := db.IterateRangeInDB(p.db, nil, startKey, endKey, func(key, value []byte) error {
-			sat, err := ParseSatKey(string(key))
-			if err == nil {
-				if _, ok := p.disabledSats[sat]; ok {
-					return nil
-				}
-				result = append(result, sat)
-			}
-			return err
-		})
-		if err != nil {
-			common.Log.Errorf("IterateRangeInDB failed. %v", err)
-		}
+func (p *NftIndexer) getNftBaseWithId(id int64) *common.InscribeBaseContent {
+	nft := p.getNftInBuffer(id)
+	if nft != nil {
+		return nft.Base
 	}
 
-	return result
+	var base common.InscribeBaseContent
+	err := p.loadNftFromDB(id, &base)
+	if err != nil {
+		return nil
+	}
+	return &base
 }
 
 func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {

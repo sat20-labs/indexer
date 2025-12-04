@@ -85,6 +85,10 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 		return
 	}
 
+	// if transfer.Nft.Base.InscriptionId == "68d47b73d41efc180dec3e2368f373ebe7c52bb48689dcbc8972211a867210f9i0" {
+	// 	common.Log.Infof("nftId = %d, utxoId = %d", transfer.Nft.Base.Id, transfer.Nft.UtxoId)
+	// }//3804104075771904
+
 	tickerName := strings.ToLower(transfer.Name)
 	tickAbbrInfo := holder.Tickers[tickerName]
 	if tickAbbrInfo == nil {
@@ -142,8 +146,15 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	// 检查transferNft转入到哪个输出
 	inputTransferNfts := make(map[int64]*TransferNftInfo)
 	for _, tx := range block.Transactions[1:] {
+		// if tx.TxId == "a28a2f85af19d95f22d48dc8d3d5a1b7c6b0a7ec27eda6b16bd8697d89de629e" {
+		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+		// }
+
 		hasTransfer := false
 		for _, input := range tx.Inputs {
+			// if input.UtxoId == 3804104075509760 || input.UtxoId == 3804104075771904 {
+			// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+			// }
 			nft, ok := s.transferNftMap[input.UtxoId] // transferNftMap 第一次转移时，先不删除，只设置标志位
 			if ok {
 				if !nft.TransferNft.IsInvalid {
@@ -281,7 +292,7 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 		curr.TransferNft.Amount = *curr.TransferNft.Amount.Add(&nft.TransferNft.Amount)
 	} else {
 		curr = nft
-		s.transferNftMap[nft.UtxoId] = nft
+		s.transferNftMap[nft.UtxoId] = curr
 	}
 
 	holder, ok := s.holderMap[nft.AddressId]
@@ -303,6 +314,9 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV2, inputTransferNfts *map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := output.UtxoId
+	// if utxoId == 3804104076034048 {
+	// 	common.Log.Infof("")
+	// }
 	ids := s.nftIndexer.GetNftsWithUtxo(utxoId) // 有可能多个transfer nft，合并输出到一个output中
 	for _, nft := range ids {
 		transferNft, ok := (*inputTransferNfts)[nft.Base.Id]
@@ -363,9 +377,9 @@ func (s *BRC20Indexer) UpdateDB() {
 	defer wb.Close()
 
 	// new ticker for deploy
-	for _, v := range s.tickerAdded {
-		key := GetTickerKey(v.Name)
-		err := db.SetDB([]byte(key), v, wb)
+	for _, ticker := range s.tickerAdded {
+		key := GetTickerKey(ticker.Name)
+		err := db.SetDB([]byte(key), ticker, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}

@@ -300,9 +300,9 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 	// 生成所有当前区块的稀有聪
 	startTime := time.Now()
 
-	if block.Height == 738 {
-		common.Log.Info("")
-	}
+	// if block.Height == 738 {
+	// 	common.Log.Info("")
+	// }
 
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	coinbaseInput.UtxoId = block.Transactions[0].Inputs[0].UtxoId
