@@ -140,6 +140,9 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	for _, tx := range block.Transactions[1:] {
 		hasTransfer := false
 		for _, input := range tx.Inputs {
+			// if input.UtxoId == 3804104075509760 || input.UtxoId == 3804104075771904 {
+			// 	common.Log.Infof("utxoId = %d", common.GetUtxoId(tx.Outputs[0]))
+			// }
 			nft, ok := s.transferNftMap[input.UtxoId] // transferNftMap 第一次转移时，先不删除，只设置标志位
 			if ok {
 				if !nft.TransferNft.IsInvalid {
@@ -254,6 +257,9 @@ func (s *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt commo
 }
 
 func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
+	// if nft.UtxoId == 3804104076034048 {
+	// 	common.Log.Infof("%v", nft)
+	// }
 	delete(s.transferNftMap, nft.UtxoId)
 
 	holder, ok := s.holderMap[nft.AddressId]
@@ -277,7 +283,7 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 		curr.TransferNft.Amount = *curr.TransferNft.Amount.Add(&nft.TransferNft.Amount)
 	} else {
 		curr = nft
-		s.transferNftMap[nft.UtxoId] = nft
+		s.transferNftMap[nft.UtxoId] = curr
 	}
 
 	holder, ok := s.holderMap[nft.AddressId]
@@ -299,6 +305,9 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := common.GetUtxoId(output)
+	// if utxoId == 3804104076034048 {
+	// 	common.Log.Infof("")
+	// }
 	ids := s.nftIndexer.GetNftsWithUtxo(utxoId) // 有可能多个transfer nft，合并输出到一个output中
 	for _, nft := range ids {
 		transferNft, ok := (*inputTransferNfts)[nft.Base.Id]
@@ -355,9 +364,9 @@ func (s *BRC20Indexer) UpdateDB() {
 	defer wb.Close()
 
 	// new ticker for deploy
-	for _, v := range s.tickerAdded {
-		key := GetTickerKey(v.Name)
-		err := db.SetDB([]byte(key), v, wb)
+	for _, ticker := range s.tickerAdded {
+		key := GetTickerKey(ticker.Name)
+		err := db.SetDB([]byte(key), ticker, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}
