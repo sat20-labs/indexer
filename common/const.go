@@ -45,6 +45,10 @@ const (
 var ENABLE_TESTING bool = false
 var CHAIN string = "mainnet"
 
+func IsMainnet() bool {
+	return CHAIN == "mainnet"
+}
+
 func GetBootstrapPubKey() string {
 	if ENABLE_TESTING {
 		return _bootstrapPubKey_testnet

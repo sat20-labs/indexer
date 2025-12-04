@@ -61,6 +61,7 @@ type TransferNftInfo struct {
 type BRC20Indexer struct {
 	db         common.KVDB
 	nftIndexer *nft.NftIndexer
+	enableHeight int
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
@@ -78,8 +79,13 @@ type BRC20Indexer struct {
 }
 
 func NewIndexer(db common.KVDB) *BRC20Indexer {
+	enableHeight := 779832
+	if !common.IsMainnet() {
+		enableHeight = 27228
+	}
 	return &BRC20Indexer{
 		db: db,
+		enableHeight: enableHeight,
 	}
 }
 
