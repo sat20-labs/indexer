@@ -32,6 +32,27 @@ func (p *OffsetRange) Clone() *OffsetRange {
 	return &n
 }
 
+func (p *OffsetRange) ToRange() *Range {
+	if p == nil {
+		return nil
+	}
+	return &Range{
+		Start: p.Start,
+		Size: p.End-p.Start,
+	}
+}
+
+
+func (p *OffsetRange) Size() int64 {
+	if p == nil {
+		return 0
+	}
+	
+	return p.End-p.Start
+}
+
+
+// 有序的数组，
 type AssetOffsets []*OffsetRange
 
 func (p *AssetOffsets) Clone() AssetOffsets {
@@ -42,6 +63,17 @@ func (p *AssetOffsets) Clone() AssetOffsets {
 	result := make([]*OffsetRange, len(*p))
 	for i, u := range *p {
 		result[i] = &OffsetRange{Start: u.Start, End: u.End}
+	}
+	return result
+}
+
+func (p AssetOffsets) ToRanges() []*Range {
+	if len(p) == 0 {
+		return nil
+	}
+	result := make([]*Range, len(p))
+	for i, offset := range p {
+		result[i] = offset.ToRange()
 	}
 	return result
 }
@@ -93,6 +125,7 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 
 	return left, right
 }
+
 
 // 按聪数量分割, Append 的逆操作
 func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
@@ -171,6 +204,76 @@ func (p *AssetOffsets) Insert(r2 *OffsetRange) {
 }
 
 // another 已经调整过偏移值
+func (p *AssetOffsets) Merge(another AssetOffsets) {
+	len1 := len(*p)
+	len2 := len(another)
+	if len2 == 0 {
+		return
+	}
+	if len1 == 0 {
+		*p = another.Clone()
+		return
+	}
+	if (*p)[len1-1].End <= another[0].Start {
+		p.Append(another)
+		return
+	}
+
+	for _, r := range another {
+		p.Insert(r)
+	}
+}
+
+// merge的反操作
+// 从某个位置开始，取出一定数量的资产，偏移值不调整
+func (p *AssetOffsets) Pickup(offset int64, value int64) AssetOffsets {
+	var right AssetOffsets
+
+	if p == nil {
+		return nil
+	}
+	if value == 0 {
+		return nil
+	}
+
+	var total int64
+	for _, r := range *p {
+		if r.End > offset {
+			left := value - total
+			if r.Start >= offset {
+				if r.Size() <= left {
+					n := r.Clone()
+					total += n.Size()
+					right = append(right, n)
+				} else {
+					right = append(right, &OffsetRange{Start: r.Start, End: r.Start + left})
+					total += left
+				}
+			} else {
+				n := r.Clone()
+				n.Start = offset
+				if n.Size() <= left {
+					total += n.Size()
+					right = append(right, n)
+				} else {
+					right = append(right, &OffsetRange{Start: n.Start, End: n.Start + left})
+					total += left
+				}
+			}
+		}
+		if total == value {
+			break
+		}
+	}
+
+	if right.Size() != value {
+		return nil
+	}
+
+	return right
+}
+
+// another 已经调整过偏移值，并且偏移值都大于p
 func (p *AssetOffsets) Append(another AssetOffsets) {
 	var r1, r2 *OffsetRange
 	len1 := len(*p)
@@ -191,6 +294,134 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 		*p = append(*p, another...)
 	}
 }
+
+// Remove 从 p 中移除 another 描述的区间集合（假定 p 与 another 都是按升序、区间不重叠的列表，且 another 已经是相对于 p 的全局坐标）。
+// 该操作相当于用 p - another，结果仍保持有序且不重叠。
+func (p *AssetOffsets) Remove(another AssetOffsets) {
+    if p == nil || len(*p) == 0 || len(another) == 0 {
+        return
+    }
+
+    var res AssetOffsets
+    i, j := 0, 0
+
+    for i < len(*p) && j < len(another) {
+        cur := (*p)[i]
+        rem := another[j]
+
+        // another 在 cur 之前（不可能发生重叠）
+        if rem.End <= cur.Start {
+            j++
+            continue
+        }
+
+        // another 在 cur 之后（cur 完全保留）
+        if rem.Start >= cur.End {
+            res = append(res, cur.Clone())
+            i++
+            continue
+        }
+
+        // 有重叠
+        // 保留 cur 被覆盖前的左边部分（如果有）
+        if rem.Start > cur.Start {
+            res = append(res, &OffsetRange{Start: cur.Start, End: rem.Start})
+        }
+
+        // 根据 rem.End 与 cur.End 的关系决定如何推进指针
+        if rem.End >= cur.End {
+            // rem 覆盖 cur 的右端或完全覆盖 cur
+            if rem.End == cur.End {
+                // 两者在边界对齐，cur 和 rem 同时结束，推进两者
+                i++
+                j++
+            } else {
+                // rem 延伸到 cur 之后，cur 被完全消耗，推进 cur，保持 rem 以继续覆盖后续 cur
+                i++
+            }
+        } else {
+            // rem 在 cur 里面结束（rem.End < cur.End），保留右边剩余部分并推进 rem
+            (*p)[i] = &OffsetRange{Start: rem.End, End: cur.End}
+            j++
+        }
+    }
+
+    // 将剩余未处理的 cur 直接添加
+    for i < len(*p) {
+        res = append(res, (*p)[i].Clone())
+        i++
+    }
+
+    *p = res
+}
+
+// 求包含关系
+func AssetOffsetsContains(container, target AssetOffsets) bool {
+    i, j := 0, 0
+
+    for j < len(target) {
+        if i >= len(container) {
+            return false
+        }
+
+        c := container[i]
+        t := target[j]
+
+        // 如果 container 当前区间完全在 target 之前，跳过它
+        if c.End <= t.Start {
+            i++
+            continue
+        }
+
+        // 如果 container 当前区间完全在 target 后面，则不可能覆盖
+        if c.Start > t.Start {
+            return false
+        }
+
+        // 现在 c.Start <= t.Start < c.End
+
+        if c.End >= t.End {
+            // container[i] 完全覆盖 target[j]，继续下一个 target
+            j++
+        } else {
+            // container[i] 只覆盖了 target[j] 的前半段，target必然有部分没有覆盖到
+			return false
+        }
+    }
+
+    return true
+}
+
+
+// 求两个数组的交集
+func IntersectAssetOffsets(a, b AssetOffsets) AssetOffsets {
+    i, j := 0, 0
+    var res AssetOffsets
+
+    for i < len(a) && j < len(b) {
+        r1 := a[i]
+        r2 := b[j]
+
+        // 计算交集区间
+        start := max(r1.Start, r2.Start)
+        end := min(r1.End,  r2.End)
+
+        // 如果有交集
+        if start < end {
+            res = append(res, &OffsetRange{Start: start, End: end})
+        }
+
+        // 谁先结束就移动谁
+        if r1.End < r2.End {
+            i++
+        } else {
+            j++
+        }
+    }
+
+    return res
+}
+
 
 type TxOutput struct {
 	UtxoId      uint64

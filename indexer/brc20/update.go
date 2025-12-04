@@ -138,6 +138,9 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	// 检查transferNft转入到哪个输出
 	inputTransferNfts := make(map[int64]*TransferNftInfo)
 	for _, tx := range block.Transactions[1:] {
+		// if tx.Txid == "a5ea1001c356b744774fd78eb7e5806ad4acbc90ad2e35ae03944e57106342e3" {
+		// 	common.Log.Infof("%d", common.GetUtxoId(tx.Outputs[0]))
+		// }
 		hasTransfer := false
 		for _, input := range tx.Inputs {
 			// if input.UtxoId == 3804104075509760 || input.UtxoId == 3804104075771904 {
@@ -297,15 +300,17 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	}
 	
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
-	if ok {
-		tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
+	if !ok {
+		tickAbbrInfo = common.NewBRC20TickAbbrInfo(nil, nil)
+		holder.Tickers[nft.Ticker] = tickAbbrInfo
 	}
+	tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
 }
 
 func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, inputTransferNfts *map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := common.GetUtxoId(output)
-	// if utxoId == 3804104076034048 {
+	// if utxoId == 3806990323679232 {
 	// 	common.Log.Infof("")
 	// }
 	ids := s.nftIndexer.GetNftsWithUtxo(utxoId) // 有可能多个transfer nft，合并输出到一个output中

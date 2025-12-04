@@ -60,6 +60,9 @@ func (s *BRC20Indexer) loadHolderInfoFromDB() error {
 					tickerToHolderMap[ticker] = holders
 
 					for utxoId, transferNft := range tickAbbrInfo.TransferableData {
+						// if utxoId == 3806990323679232 {
+						// 	common.Log.Infof("%v", transferNft)
+						// }
 						transferNftMap[utxoId] = &TransferNftInfo{
 							AddressId:   addrId,
 							Ticker:      ticker,
