@@ -70,3 +70,54 @@ func GetInscriptionCurseStatus(blockHeight int, tx *common.Transaction, chainPar
 	}
 	return result
 }
+
+
+func GetInscriptionsInTxInput(input *common.Input, inputIndex int) []*InscriptionResult {
+	result := []*InscriptionResult{}
+
+	jubileeHeight := 824544
+	envelopes := NewEnvelopeIterator(ParseEnvelopesFromTxInput(input, inputIndex))
+	
+	for {
+		envelope, ok := envelopes.Peek()
+		if !ok {
+			break
+		}
+		if envelope.Input != uint32(inputIndex) {
+			break
+		}
+
+		var curse ordCommon.Curse
+		if inputIndex >= jubileeHeight {
+			curse = ordCommon.NoCurse
+		} else if envelope.Payload.UnrecognizedEvenField {
+			curse = ordCommon.UnrecognizedEvenField
+		} else if envelope.Payload.DuplicateField {
+			curse = ordCommon.DuplicateField
+		} else if envelope.Payload.IncompleteField {
+			curse = ordCommon.IncompleteField
+		} else if envelope.Input != 0 {
+			curse = ordCommon.NotInFirstInput
+		} else if envelope.Offset != 0 {
+			curse = ordCommon.NotAtOffsetZero
+		} else if envelope.Payload.Pointer != nil {
+			curse = ordCommon.Pointer
+		} else if envelope.Pushnum {
+			curse = ordCommon.Pushnum
+		} else if envelope.Stutter {
+			curse = ordCommon.Stutter
+		} else {
+			curse = ordCommon.NoCurse
+		} // else reinscription
+		result = append(result,
+			&InscriptionResult{
+				Inscription: envelope.Payload,
+				TxInIndex:   uint32(inputIndex),
+				TxInOffset:  envelope.Offset,
+				CurseReason: curse,
+				IsCursed:    curse != ordCommon.NoCurse,
+			})
+	}
+	
+	return result
+}
