@@ -190,7 +190,7 @@ func (e LogEntry) String() string {
 //go:embed brc20_curse.txt
 var brc20Fs embed.FS
 
-func Work() {
+func Work09() {
 	inputPath := filepath.Join("", "brc20_curse.txt")
 	// inputPath := filepath.Join("", "curse.txt")
 	input, err := brc20Fs.ReadFile(inputPath)
@@ -228,7 +228,7 @@ func Work() {
 			entry.Number, _ = strconv.Atoi(submatches[nameMap["Number"]])
 
 			common.Log.Infof("line %d: entry %s", lineNum, entry)
-			FindCurse(&entry)
+			Find09Curse(&entry)
 			lineNum++
 		} else {
 			common.Log.Panic("unreach")
@@ -236,7 +236,7 @@ func Work() {
 	}
 }
 
-func FindCurse(entry *LogEntry) {
+func Find09Curse(entry *LogEntry) {
 	block := fetchBlock(entry.Height)
 	var findTx *common.Transaction
 	var findTxIndex int
@@ -281,19 +281,105 @@ func FindCurse(entry *LogEntry) {
 			common.Log.Debugf("090 txIndex %d: txId %v, status %v", findTxIndex, findTx.Txid, findCurseStatus090)
 		}
 	}
+}
 
-	curseStatusList0141 := ord0_14_1.GetInscriptionCurseStatus(entry.Height, findTx, &chaincfg.MainNetParams)
-	var findCurseStatus0141 *ord0_14_1.InscriptionResult
-	for _, status := range curseStatusList0141 {
-		if status.TxInOffset == uint32(findTxInOffset) && !status.IsCursed {
-			findCurseStatus0141 = status
+func Work0141() error {
+	startCurseInscriptionNumber := -1
+	endCurseInscriptionNumber := -472043
+	cur_inscriptin_number = startCurseInscriptionNumber
+	for {
+		inscription, err := GetInscription(url_0_14_1, strconv.FormatInt(int64(cur_inscriptin_number), 10))
+		if err != nil {
+			return err
+		}
+		if cur_inscriptin_number == endCurseInscriptionNumber {
 			break
 		}
+
+		height := inscription.GenesisHeight
+
+		block := fetchBlock(height)
+		var findTx *common.Transaction
+		var findTxIndex int
+		var findTxInOffset int
+		for txIndex, tx := range block.Transactions {
+			txid, offset, err := common.ParseOrdInscriptionID(inscription.InscriptionID)
+			if err != nil {
+				common.Log.Panicf("ParseOrdInscriptionID %s failed. %v", inscription.InscriptionID, err)
+			}
+
+			if tx.Txid != txid {
+				continue
+			}
+			common.Log.Infof("txIndex %d: txId %v, offset %d", txIndex, txid, offset)
+			findTx = tx
+			findTxIndex = txIndex
+			findTxInOffset = offset
+			break
+		}
+
+		curseStatusList0141 := ord0_14_1.GetInscriptionCurseStatus(height, findTx, &chaincfg.MainNetParams)
+		var findCurseStatus0141 *ord0_14_1.InscriptionResult
+		for _, status := range curseStatusList0141 {
+			if status.TxInOffset == uint32(findTxInOffset) && !status.IsCursed {
+				findCurseStatus0141 = status
+				break
+			}
+		}
+		if findCurseStatus0141 == nil {
+			common.Log.Panicf("findCurseStatus141 not found, entry: %s", inscription.InscriptionID)
+		} else {
+			common.Log.Debugf("141 txIndex %d: txId %v, status %v", findTxIndex, findTx.Txid, findCurseStatus0141)
+		}
+		cur_inscriptin_number--
 	}
-	if findCurseStatus0141 == nil {
-		common.Log.Panicf("findCurseStatus141 not found, entry: %s", entry)
-	} else {
-		common.Log.Debugf("141 txIndex %d: txId %v, status %v", findTxIndex, findTx.Txid, findCurseStatus090)
+	return nil
+}
+
+func Find0141Curse(entry *LogEntry) {
+	block := fetchBlock(entry.Height)
+	var findTx *common.Transaction
+	var findTxIndex int
+	var findTxInOffset int
+	for txIndex, tx := range block.Transactions {
+		txid, offset, err := common.ParseOrdInscriptionID(entry.ID)
+		if err != nil {
+			common.Log.Panicf("ParseOrdInscriptionID %s failed. %v", entry.ID, err)
+		}
+
+		if tx.Txid != txid {
+			continue
+		}
+		common.Log.Infof("txIndex %d: txId %v, offset %d", txIndex, txid, offset)
+		findTx = tx
+		findTxIndex = txIndex
+		findTxInOffset = offset
+		break
+	}
+
+	curseStatusList090 := ord0_9_0.GetInscriptionCurseStatus(findTx)
+	var findCurseStatus090 *ord0_9_0.InscriptionResult
+	for i, status := range curseStatusList090 {
+		if entry.Type == "nofind" {
+			if status.Err == nil {
+				common.Log.Panicf("status090 must have err,entry: %s, index: %d", entry, i)
+				break
+			} else {
+				common.Log.Debugf("090 txIndex %d: txId %v, status %v, index: %d", findTxIndex, findTx.Txid, status.Err, i)
+			}
+		} else if entry.Type == "curse" {
+			if status.Inscription.TxInOffset == findTxInOffset && status.IsCursed {
+				findCurseStatus090 = status
+				break
+			}
+		}
+	}
+	if entry.Type == "curse" {
+		if findCurseStatus090 == nil {
+			common.Log.Panicf("findCurseStatus090 not found, entry: %s", entry)
+		} else {
+			common.Log.Debugf("090 txIndex %d: txId %v, status %v", findTxIndex, findTx.Txid, findCurseStatus090)
+		}
 	}
 }
 
@@ -305,12 +391,24 @@ func main() {
 		common.Log.Error(err)
 		return
 	}
+	// entry := &LogEntry{
+	// 	ID:     "6958b1c02016a1d02538735f7a8554f9981c75ba6b5ae0ae2d62900cb8c31331i0",
+	// 	Height: 824544,
+	// 	Number: 53393742,
+	// 	Type:   "nofind",
+	// }
+
 	entry := &LogEntry{
-		ID:     "6958b1c02016a1d02538735f7a8554f9981c75ba6b5ae0ae2d62900cb8c31331i0",
-		Height: 824544,
+		ID:     "f526646c8e384bc9f78170f33f10ca82a84f7a90d18d2ab16bb533be1928fd07i0",
+		Height: 824828,
 		Number: 53393742,
 		Type:   "nofind",
 	}
-	FindCurse(entry)
-	// Work()
+
+	Find09Curse(entry)
+	// Work09()
+	// err = Work0141()
+	// if err != nil {
+	// 	common.Log.Panic(err)
+	// }
 }

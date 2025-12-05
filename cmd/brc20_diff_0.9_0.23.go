@@ -188,6 +188,7 @@ func GetInscription(url string, id2number string) (ret *Inscription, err error) 
 const (
 	url_0_9    = "127.0.0.1:80"
 	url_0_23_0 = "127.0.0.1:81"
+	url_0_14_1 = "127.0.0.1:82"
 
 	height_limit        = 925101
 	brc20_curse_out_dir = "./cmd/brc20_curse.txt"

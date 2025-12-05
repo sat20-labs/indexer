@@ -66,18 +66,18 @@ func GetInscriptionCurseStatus(blockHeight int, tx *common.Transaction, chainPar
 					CurseReason: curse,
 					IsCursed:    curse != ordCommon.NoCurse,
 				})
+			envelopes.Next()
 		}
 	}
 	return result
 }
-
 
 func GetInscriptionsInTxInput(input *common.Input, inputIndex int) []*InscriptionResult {
 	result := []*InscriptionResult{}
 
 	jubileeHeight := 824544
 	envelopes := NewEnvelopeIterator(ParseEnvelopesFromTxInput(input, inputIndex))
-	
+
 	for {
 		envelope, ok := envelopes.Peek()
 		if !ok {
@@ -118,6 +118,6 @@ func GetInscriptionsInTxInput(input *common.Input, inputIndex int) []*Inscriptio
 				IsCursed:    curse != ordCommon.NoCurse,
 			})
 	}
-	
+
 	return result
 }

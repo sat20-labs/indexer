@@ -16,7 +16,7 @@ func NewInstructionPushBytes(data []byte) *Instruction {
 	return &Instruction{
 		IsPush:        true,
 		PushBytesData: data,
-		OpCodeData:    &opcodes.All{},
+		OpCodeData:    nil,
 	}
 }
 

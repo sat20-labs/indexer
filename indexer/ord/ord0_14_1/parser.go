@@ -114,7 +114,6 @@ func ParseEnvelopesFromTransaction(tx *common.Transaction) []*ParsedEnvelope {
 	return parsedEnvelopes
 }
 
-
 func ParseEnvelopesFromTxInput(txInput *common.Input, inputindex int) []*ParsedEnvelope {
 	rawEnvelopes := RawEnvelope{}.FromTxInput(txInput, inputindex)
 	parsedEnvelopes := make([]*ParsedEnvelope, 0, len(rawEnvelopes))
@@ -123,7 +122,6 @@ func ParseEnvelopesFromTxInput(txInput *common.Input, inputindex int) []*ParsedE
 	}
 	return parsedEnvelopes
 }
-
 
 func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 	var envelopes []*RawEnvelope
@@ -176,8 +174,6 @@ func (re RawEnvelope) fromTapscript(tapscript []byte, inputIndex int) ([]*RawEnv
 			} else {
 				stuttered = stutter
 			}
-		} else {
-			stuttered = false
 		}
 	}
 
