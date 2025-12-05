@@ -19,7 +19,7 @@ func (s *BRC20Indexer) UpdateInscribeDeploy(ticker *common.BRC20Ticker) {
 	if !ok {
 		ticker.Id = int64(len(s.tickerMap))
 		ticker.TransactionCount++
-		tickinfo := newTickerInfo(ticker.Name)
+		tickinfo := newTickerInfo(name)
 		tickinfo.Ticker = ticker
 		s.tickerMap[name] = tickinfo
 		s.tickerAdded[name] = ticker
@@ -36,7 +36,8 @@ func (s *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	ticker, ok := s.tickerMap[strings.ToLower(mint.Name)]
+	name := strings.ToLower(mint.Name)
+	ticker, ok := s.tickerMap[name]
 	if !ok {
 		// 正常不会走到这里，除非是数据从中间跑
 		return
@@ -45,7 +46,7 @@ func (s *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 	ticker.Ticker.TransactionCount++
 	mintedAmt := ticker.Ticker.Minted.Add(&mint.Amt)
 	ticker.Ticker.Minted = *mintedAmt
-	// if strings.ToLower(mint.Name) == "ordi" {
+	// if name == "ordi" {
 	// 	balanceStr := ticker.Ticker.Minted.String()
 	// 	common.Log.Infof("minted:%s, inscriptionId:%s, id:%d", balanceStr, mint.Nft.Base.InscriptionId, mint.Nft.Base.Id)
 	// }
@@ -53,7 +54,7 @@ func (s *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 	if cmpResult == 0 {
 		ticker.Ticker.EndInscriptionId = mint.Nft.Base.InscriptionId
 	}
-	s.tickerUpdated[strings.ToLower(mint.Name)] = ticker.Ticker
+	s.tickerUpdated[name] = ticker.Ticker
 
 	mint.Id = int64(len(ticker.InscriptionMap))
 	ticker.MintAdded = append(ticker.MintAdded, mint)
@@ -66,12 +67,12 @@ func (s *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 		NftId:    mint.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
 		ToAddr:   mint.Nft.OwnerAddressId,
-		Ticker:   mint.Name,
+		Ticker:   name,
 		Amount:   mint.Amt,
 		Action:   Action_InScribe_Mint,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
-	s.addHolderBalance(mint.Name, mint.Nft.OwnerAddressId, mint.Amt)
+	s.addHolderBalance(name, mint.Nft.OwnerAddressId, mint.Amt)
 }
 
 // transfer
@@ -111,7 +112,7 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 	}
 	transferInfo := &TransferNftInfo{
 		AddressId:   transfer.Nft.OwnerAddressId,
-		Ticker:      strings.ToLower(transfer.Name),
+		Ticker:      tickerName,
 		UtxoId:      transfer.Nft.UtxoId,
 		TransferNft: &nft,
 	}
@@ -124,12 +125,9 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 		NftId:    transfer.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
 		ToAddr:   transfer.Nft.OwnerAddressId,
-		Ticker:   transfer.Name,
+		Ticker:   tickerName,
 		Amount:   transfer.Amt,
 		Action:   Action_InScribe_Transfer,
-	}
-	if action.NftId == 245603 {
-		common.Log.Info("action.NftId == 245603")
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 }
@@ -277,7 +275,7 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 		if ok {
 			delete(tickInfo.TransferableData, nft.UtxoId)
 		} else {
-			common.Log.Panic("can't find ticker info")
+			common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
 		}
 	} else {
 		// 已经转移过的transfer nft不一定能找到

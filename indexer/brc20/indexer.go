@@ -16,7 +16,6 @@ import (
 )
 
 type BRC20TickInfo struct {
-	Id             uint64
 	Name           string
 	InscriptionMap map[string]*common.BRC20MintAbbrInfo // key: inscriptionId
 	MintAdded      []*common.BRC20Mint
@@ -126,7 +125,6 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	newInst.tickerMap = make(map[string]*BRC20TickInfo, 0)
 	for key, value := range s.tickerMap {
 		tick := BRC20TickInfo{}
-		tick.Id = value.Id
 		tick.Name = value.Name
 		tick.Ticker = value.Ticker
 		tick.MintAdded = make([]*common.BRC20Mint, len(value.MintAdded))
@@ -236,17 +234,22 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	startTime := time.Now()
-	for name := range s.tickerMap {
-		common.Log.Infof("checking ticker %s", name)
+	for name, ticker := range s.tickerMap {
+		//common.Log.Infof("checking ticker %s", name)
 		holdermap := s.GetHoldersWithTick(name)
 		var holderAmount *common.Decimal
 		for _, amt := range holdermap {
 			holderAmount = holderAmount.Add(amt)
 		}
+		// if name == "42-c" {
+		// 	common.Log.Info("")
+		// }
 		mintAmount, _ := s.GetMintAmount(name)
-		common.Log.Infof("ticker %s, minted %s", name, mintAmount.String())
+		if ticker.Ticker.Id < 10 {
+			common.Log.Infof("ticker %s, minted %s", name, mintAmount.String())
+		}
 		if holderAmount.Cmp(mintAmount) != 0 {
-			common.Log.Errorf("ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
 			return false
 		}
 	}

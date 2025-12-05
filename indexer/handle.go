@@ -11,6 +11,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
+	//"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 )
 
 func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.Range) {
@@ -28,15 +29,28 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 		id := 0
 		for _, input := range tx.Inputs {
 
+			//inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input)
+
 			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
 			if err != nil {
+				// if len(inscriptions2) != 0 {
+				// 	common.Log.Panicf("find inscription in ord %s", tx.TxId)
+				// }
 				continue
 			}
+
+			// if len(inscriptions2) != len(inscriptions) {
+			// 	common.Log.Panicf("inscription count different %s", tx.TxId)
+			// }
 
 			for j, insc := range inscriptions {
 				s.handleOrd(input, insc, id, envelopes[j], 0, tx, block, coinbase, i)
 				id++
 				count++
+
+				// if inscriptions2[j].IsCursed {
+				// 	common.Log.Errorf("%s:%d is cursed, reason %s", tx.TxId, id, inscriptions2[j].CurseReason.Error())
+				// }
 			}
 		}
 		if id > 0 {
@@ -445,7 +459,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(satpoint int64, out *common.TxOutpu
 
 	ticker := &common.BRC20Ticker{
 		Nft:  nft,
-		Name: content.Ticker,
+		Name: content.Ticker, // 保留原型
 		// Limit:      lim,
 		// SelfMint:   selfmint,
 		// Max:        max,
@@ -545,7 +559,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 		}
 	}
 
-	mint := &common.BRC20Mint{Nft: nft, Name: content.Ticker}
+	mint := &common.BRC20Mint{Nft: nft, Name: strings.ToLower(content.Ticker)}
 
 	// recover for decimal panic
 	defer func() {
@@ -574,6 +588,10 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 		amt = ticker.Max.Sub(&ticker.Minted)
 		common.Log.Warnf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
 	}
+	if amt.Sign() <= 0 {
+		common.Log.Warnf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
+		return nil
+	}
 	mint.Amt = *amt
 	return mint
 }
@@ -590,7 +608,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(satpoint int64, out *common.TxOut
 
 	transfer := &common.BRC20Transfer{
 		Nft:  nft,
-		Name: content.Ticker,
+		Name: strings.ToLower(content.Ticker),
 		// UtxoId: nft.UtxoId,
 	}
 

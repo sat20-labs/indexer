@@ -149,7 +149,7 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 								delete(p.holderInfo, utxo.UtxoId)
 							}
 							return false
-						} else {
+						} else { // 铸造资产无效，直接清除。assetInfo是以前铸造成功的资产
 							p.removeMint(info, tickerInfo, utxo.UtxoId, mintingAsset)
 						}
 						// info 可能被删除，需要重新加进来

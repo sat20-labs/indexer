@@ -23,7 +23,7 @@ type BRC20Transfer struct {
 type BRC20Ticker struct {
 	Nft  *Nft
 	Id   int64
-	Name string
+	Name string // 只有这里保留原型
 	//saʦ sats
 
 	SelfMint bool    `json:"self_mint,omitempty"`
