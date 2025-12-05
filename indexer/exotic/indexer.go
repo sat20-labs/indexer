@@ -14,7 +14,7 @@ type TickInfo struct {
 	Id             uint64
 	Name           string
 	UtxoMap        map[uint64]common.AssetOffsets  // utxoId, 动态的utxo数据
-	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
+	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId TODO 修改为nftId
 	MintAdded      []*common.Mint
 	Ticker         *common.Ticker
 }
