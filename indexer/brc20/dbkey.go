@@ -1,6 +1,7 @@
 package brc20
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -8,20 +9,35 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
+// brc20 的ticker允许的字符比较多，存在分隔符-的可能性，比如主网上的42-2
+// 构建数据库key时，需要对ticker编码
+
+func encodeTickerName(tickerName string) string {
+	return base64.StdEncoding.EncodeToString([]byte(tickerName))
+}
+
+func decoderTickerName(tickerName string) string {
+	b, err := base64.StdEncoding.DecodeString(tickerName)
+	if err != nil {
+		common.Log.Panicf("invalid ticker name %s", tickerName)
+	}
+	return string(b)
+}
+
 func GetTickerKey(tickname string) string {
-	return fmt.Sprintf("%s%s", DB_PREFIX_TICKER, strings.ToLower(tickname))
+	return fmt.Sprintf("%s%s", DB_PREFIX_TICKER, encodeTickerName(strings.ToLower(tickname)))
 }
 
 func GetMintHistoryKey(tickname, inscriptionId string) string {
-	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, strings.ToLower(tickname), inscriptionId)
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, encodeTickerName(strings.ToLower(tickname)), inscriptionId)
 }
 
 // func GetTransferHistoryKey(tickname string, utxo string) string {
-// 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, strings.ToLower(tickname), utxo)
+// 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(strings.ToLower(tickname)), utxo)
 // }
 
 func GetTransferHistoryKey(tickname string, utxoId uint64) string {
-	return fmt.Sprintf("%s%s-%d", DB_PREFIX_TRANSFER_HISTORY, strings.ToLower(tickname), utxoId)
+	return fmt.Sprintf("%s%s-%d", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(strings.ToLower(tickname)), utxoId)
 }
 
 func ParseTransferHistoryKey(input string) (string, string, error) {
@@ -35,14 +51,14 @@ func ParseTransferHistoryKey(input string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid string format")
 	}
 
-	return parts[0], parts[1], nil
+	return decoderTickerName(parts[0]), parts[1], nil
 }
 
 func parseTickListKey(input string) (string, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TICKER) {
 		return "", fmt.Errorf("invalid string format")
 	}
-	return strings.TrimPrefix(input, DB_PREFIX_TICKER), nil
+	return decoderTickerName(strings.TrimPrefix(input, DB_PREFIX_TICKER)), nil
 }
 
 func ParseMintHistoryKey(input string) (string, string, error) {
@@ -50,13 +66,13 @@ func ParseMintHistoryKey(input string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid string format")
 	}
 	str := strings.TrimPrefix(input, DB_PREFIX_MINTHISTORY)
-	parts := strings.Split(str, "-")
+	parts := strings.Split(str, "-") // ticker name 可能有-，比如：42-c
 
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid string format")
 	}
 
-	return parts[0], parts[1], nil
+	return decoderTickerName(parts[0]), parts[1], nil
 }
 
 // func GetHolderInfoKey(addrId uint64, ticker string) string {
