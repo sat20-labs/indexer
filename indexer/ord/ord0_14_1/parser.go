@@ -114,6 +114,17 @@ func ParseEnvelopesFromTransaction(tx *common.Transaction) []*ParsedEnvelope {
 	return parsedEnvelopes
 }
 
+
+func ParseEnvelopesFromTxInput(txInput *common.TxInput) []*ParsedEnvelope {
+	rawEnvelopes := RawEnvelope{}.FromTxInput(txInput)
+	parsedEnvelopes := make([]*ParsedEnvelope, 0, len(rawEnvelopes))
+	for _, raw := range rawEnvelopes {
+		parsedEnvelopes = append(parsedEnvelopes, fromRawEnvelope(raw))
+	}
+	return parsedEnvelopes
+}
+
+
 func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 	var envelopes []*RawEnvelope
 	for i, input := range tx.Inputs {
@@ -123,6 +134,18 @@ func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 			if err == nil {
 				envelopes = append(envelopes, inputEnvelopes...)
 			}
+		}
+	}
+	return envelopes
+}
+
+func (re RawEnvelope) FromTxInput(input *common.TxInput) []*RawEnvelope {
+	var envelopes []*RawEnvelope
+	tapscript := ordCommon.GetTapscriptBytes(input.Witness)
+	if tapscript != nil {
+		inputEnvelopes, err := re.fromTapscript(tapscript, input.TxIndex)
+		if err == nil {
+			envelopes = append(envelopes, inputEnvelopes...)
 		}
 	}
 	return envelopes
