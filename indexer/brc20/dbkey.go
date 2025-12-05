@@ -1,7 +1,7 @@
 package brc20
 
 import (
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,11 +13,11 @@ import (
 // 构建数据库key时，需要对ticker编码
 
 func encodeTickerName(tickerName string) string {
-	return hex.EncodeToString([]byte(tickerName))
+	return base64.StdEncoding.EncodeToString([]byte(tickerName))
 }
 
 func decoderTickerName(tickerName string) string {
-	b, err := hex.DecodeString(tickerName)
+	b, err := base64.StdEncoding.DecodeString(tickerName)
 	if err != nil {
 		common.Log.Panicf("invalid ticker name %s", tickerName)
 	}
