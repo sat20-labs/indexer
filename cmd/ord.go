@@ -246,7 +246,6 @@ func Find09Curse(entry *LogEntry) {
 		if err != nil {
 			common.Log.Panicf("ParseOrdInscriptionID %s failed. %v", entry.ID, err)
 		}
-
 		if tx.Txid != txid {
 			continue
 		}
@@ -262,7 +261,7 @@ func Find09Curse(entry *LogEntry) {
 	for i, status := range curseStatusList090 {
 		if entry.Type == "nofind" {
 			if status.Err == nil {
-				common.Log.Panicf("status090 must have err,entry: %s, index: %d", entry, i)
+				common.Log.Panicf("status090 must have err, entry: %s, index: %d", entry, i)
 				break
 			} else {
 				common.Log.Debugf("090 txIndex %d: txId %v, status %v, index: %d", findTxIndex, findTx.Txid, status.Err, i)
@@ -276,7 +275,7 @@ func Find09Curse(entry *LogEntry) {
 	}
 	if entry.Type == "curse" {
 		if findCurseStatus090 == nil {
-			common.Log.Panicf("findCurseStatus090 not found, entry: %s", entry)
+			common.Log.Warnf("findCurseStatus090 not found (this is reinscription curse), entry: %s", entry)
 		} else {
 			common.Log.Debugf("090 txIndex %d: txId %v, status %v", findTxIndex, findTx.Txid, findCurseStatus090)
 		}
@@ -321,13 +320,13 @@ func Work0141() error {
 		curseStatusList0141 := ord0_14_1.GetInscriptionCurseStatus(height, findTx, &chaincfg.MainNetParams)
 		var findCurseStatus0141 *ord0_14_1.InscriptionResult
 		for _, status := range curseStatusList0141 {
-			if status.TxInOffset == uint32(findTxInOffset) && !status.IsCursed {
+			if status.TxInOffset == uint32(findTxInOffset) && status.IsCursed {
 				findCurseStatus0141 = status
 				break
 			}
 		}
 		if findCurseStatus0141 == nil {
-			common.Log.Panicf("findCurseStatus141 not found, entry: %s", inscription.InscriptionID)
+			common.Log.Warnf("findCurseStatus141 not found (this is reinscription curse), entry: %s", inscription.InscriptionID)
 		} else {
 			common.Log.Debugf("141 txIndex %d: txId %v, status %v", findTxIndex, findTx.Txid, findCurseStatus0141)
 		}
@@ -398,17 +397,17 @@ func main() {
 	// 	Type:   "nofind",
 	// }
 
-	entry := &LogEntry{
-		ID:     "f526646c8e384bc9f78170f33f10ca82a84f7a90d18d2ab16bb533be1928fd07i0",
-		Height: 824828,
-		Number: 53393742,
-		Type:   "nofind",
-	}
-
-	Find09Curse(entry)
-	// Work09()
-	// err = Work0141()
-	// if err != nil {
-	// 	common.Log.Panic(err)
+	// entry := &LogEntry{
+	// 	ID:     "f526646c8e384bc9f78170f33f10ca82a84f7a90d18d2ab16bb533be1928fd07i0", // reinscription
+	// 	Height: 824828,
+	// 	Number: 53393742,
+	// 	Type:   "nofind",
 	// }
+	// Find09Curse(entry)
+
+	err = Work0141()
+	if err != nil {
+		common.Log.Panic(err)
+	}
+	// Work09()
 }
