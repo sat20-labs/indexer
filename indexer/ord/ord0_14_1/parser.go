@@ -114,16 +114,14 @@ func ParseEnvelopesFromTransaction(tx *common.Transaction) []*ParsedEnvelope {
 	return parsedEnvelopes
 }
 
-
-func ParseEnvelopesFromTxInput(txInput *common.TxInput) []*ParsedEnvelope {
-	rawEnvelopes := RawEnvelope{}.FromTxInput(txInput)
+func ParseEnvelopesFromTxInput(txInput *common.TxInput, inputindex int) []*ParsedEnvelope {
+	rawEnvelopes := RawEnvelope{}.FromTxInput(txInput, inputindex)
 	parsedEnvelopes := make([]*ParsedEnvelope, 0, len(rawEnvelopes))
 	for _, raw := range rawEnvelopes {
 		parsedEnvelopes = append(parsedEnvelopes, fromRawEnvelope(raw))
 	}
 	return parsedEnvelopes
 }
-
 
 func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 	var envelopes []*RawEnvelope
@@ -139,11 +137,11 @@ func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 	return envelopes
 }
 
-func (re RawEnvelope) FromTxInput(input *common.TxInput) []*RawEnvelope {
+func (re RawEnvelope) FromTxInput(input *common.TxInput, inputindex int) []*RawEnvelope {
 	var envelopes []*RawEnvelope
 	tapscript := ordCommon.GetTapscriptBytes(input.Witness)
 	if tapscript != nil {
-		inputEnvelopes, err := re.fromTapscript(tapscript, input.TxIndex)
+		inputEnvelopes, err := re.fromTapscript(tapscript, inputindex)
 		if err == nil {
 			envelopes = append(envelopes, inputEnvelopes...)
 		}
@@ -176,8 +174,6 @@ func (re RawEnvelope) fromTapscript(tapscript []byte, inputIndex int) ([]*RawEnv
 			} else {
 				stuttered = stutter
 			}
-		} else {
-			stuttered = false
 		}
 	}
 

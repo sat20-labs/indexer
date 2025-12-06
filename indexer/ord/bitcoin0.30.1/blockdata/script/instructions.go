@@ -28,17 +28,19 @@ var (
 
 type Instructions struct {
 	data           []byte
+	enforceMinimal bool
 	cursor         int
 	peeked         *Instruction
-	EnforceMinimal bool
+	peekedCursor   int
 }
 
 func NewInstructions(script []byte, enforceMinimal bool) *Instructions {
 	return &Instructions{
 		data:           script,
+		enforceMinimal: enforceMinimal,
 		cursor:         0,
 		peeked:         nil,
-		EnforceMinimal: enforceMinimal,
+		peekedCursor:   0,
 	}
 }
 
@@ -85,7 +87,7 @@ func (ins *Instructions) NextPushDataLen(lengthType PushDataLenLen, minPushLen i
 		return nil, ErrNumericOverflow
 	}
 	pushLen := uint32(n)
-	if ins.EnforceMinimal && pushLen < uint32(minPushLen) {
+	if ins.enforceMinimal && pushLen < uint32(minPushLen) {
 		ins.Kill()
 		return nil, ErrNonMinimalPush
 	}
@@ -112,7 +114,7 @@ func (ins *Instructions) internalNext() (*Instruction, error) {
 		n := classification.PushBytesValue
 
 		var isNonMinimal bool
-		if ins.EnforceMinimal && n == 1 {
+		if ins.enforceMinimal && n == 1 {
 			if ins.cursor < len(ins.data) {
 				dataByte := ins.data[ins.cursor]
 				if dataByte == 0x81 || (dataByte > 0 && dataByte <= 16) {
@@ -152,7 +154,9 @@ func (ins *Instructions) internalNext() (*Instruction, error) {
 func (ins *Instructions) Next() (*Instruction, error) {
 	if ins.peeked != nil {
 		instr := ins.peeked
+		ins.cursor = ins.peekedCursor
 		ins.peeked = nil
+		ins.peekedCursor = 0
 		return instr, nil
 	}
 	return ins.internalNext()
@@ -164,14 +168,15 @@ func (ins *Instructions) Peek() (*Instruction, error) {
 	}
 	originalCursor := ins.cursor
 	instr, err := ins.internalNext()
-	
+
 	if err != nil {
-		return nil, err 
+		return nil, err
 	}
 	if instr == nil {
 		return nil, nil
 	}
 	ins.peeked = instr
+	ins.peekedCursor = ins.cursor
 	ins.cursor = originalCursor
 	return ins.peeked, nil
 }
