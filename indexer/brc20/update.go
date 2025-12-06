@@ -326,11 +326,6 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV
 			fromAddressId := transferNft.AddressId
 			toAddressId := output.AddressId
 
-			// 先加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
-			transferNft.AddressId = toAddressId
-			transferNft.UtxoId = utxoId
-			s.addTransferNft(transferNft)
-
 			err := s.subHolderBalance(transferNft.Ticker, fromAddressId,
 				transferNft.TransferNft.Amount)
 			if err == err_no_find_holder {
@@ -360,6 +355,11 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.TxOutputV
 			}
 			s.holderActionList = append(s.holderActionList, &action)
 			delete((*inputTransferNfts), nft.Base.Id)
+
+			// 再继续加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
+			transferNft.AddressId = toAddressId
+			transferNft.UtxoId = utxoId
+			s.addTransferNft(transferNft)
 		}
 	}
 }
@@ -378,7 +378,7 @@ func (s *BRC20Indexer) UpdateDB() {
 
 	// new ticker for deploy
 	for _, ticker := range s.tickerAdded {
-		key := GetTickerKey(ticker.Name)
+		key := GetTickerKey(strings.ToLower(ticker.Name))
 		err := db.SetDB([]byte(key), ticker, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
@@ -387,7 +387,7 @@ func (s *BRC20Indexer) UpdateDB() {
 
 	// static info for ticker for mint/transfer
 	for _, ticker := range s.tickerUpdated {
-		key := GetTickerKey(ticker.Name)
+		key := GetTickerKey(strings.ToLower(ticker.Name))
 		err := db.SetDB([]byte(key), ticker, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
