@@ -325,11 +325,6 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, i
 			fromAddressId := transferNft.AddressId
 			toAddressId := s.nftIndexer.GetBaseIndexer().GetAddressId(output.Address.Addresses[0])
 
-			// 先加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
-			transferNft.AddressId = toAddressId
-			transferNft.UtxoId = utxoId
-			s.addTransferNft(transferNft)
-
 			err := s.subHolderBalance(transferNft.Ticker, fromAddressId,
 				transferNft.TransferNft.Amount)
 			if err == err_no_find_holder {
@@ -359,6 +354,11 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, i
 			}
 			s.holderActionList = append(s.holderActionList, &action)
 			delete((*inputTransferNfts), nft.Base.Id)
+
+			// 继续加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
+			transferNft.AddressId = toAddressId
+			transferNft.UtxoId = utxoId
+			s.addTransferNft(transferNft)
 		}
 	}
 }
