@@ -191,8 +191,8 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 }
 
 // 增加该address下的资产数据
-func (s *BRC20Indexer) addHolderBalance(ticker string, address uint64, amt common.Decimal) {
-	tickerName := strings.ToLower(ticker)
+func (s *BRC20Indexer) addHolderBalance(tickerName string, address uint64, amt common.Decimal) {
+	
 
 	info, ok := s.holderMap[address]
 	zeroAmt, _ := common.NewDecimalFromString("0", int(s.tickerMap[tickerName].Ticker.Decimal))
@@ -227,8 +227,8 @@ var err_no_find_holder = fmt.Errorf("no find holder")
 var err_no_enough_balance = fmt.Errorf("not enough balance")
 
 // 减少该address下的资产数据
-func (s *BRC20Indexer) subHolderBalance(ticker string, address uint64, amt common.Decimal) error {
-	tickerName := strings.ToLower(ticker)
+func (s *BRC20Indexer) subHolderBalance(tickerName string, address uint64, amt common.Decimal) error {
+	
 	holdInfo, ok := s.holderMap[address]
 	if ok {
 		// info.AddressId = address
@@ -487,7 +487,7 @@ func (s *BRC20Indexer) UpdateDB() {
 				Ticker:   action.Ticker,
 				Amount:   action.Amount.String(),
 			}
-			key := GetTransferHistoryKey(strings.ToLower(action.Ticker), action.UtxoId)
+			key := GetTransferHistoryKey(action.Ticker, action.UtxoId)
 			err := db.SetDB([]byte(key), &history, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", key, err)

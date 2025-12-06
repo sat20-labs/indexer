@@ -1,7 +1,6 @@
 package exotic
 
 import (
-	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -169,7 +168,7 @@ func (p *ExoticIndexer) getMintListFromDB(tickname string) map[string]*common.Mi
 
 func (p *ExoticIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
-	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
+	key := GetMintHistoryKey(ticker, inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, p.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
@@ -187,7 +186,7 @@ func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadMintDataFromDB ...")
-	err := p.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+strings.ToLower(tickerName)+"-"), false, func(k, v []byte) error {
+	err := p.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"), false, func(k, v []byte) error {
 
 		key := string(k)
 
@@ -221,7 +220,7 @@ func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common
 func (p *ExoticIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	var result common.Ticker
 
-	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
+	key := DB_PREFIX_TICKER + tickerName
 	err := db.GetValueFromDB([]byte(key), &result, p.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)

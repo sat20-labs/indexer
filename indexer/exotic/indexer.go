@@ -139,7 +139,7 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 
 		p.tickerMap = make(map[string]*TickInfo, 0)
 		for _, ticker := range ticks {
-			p.tickerMap[strings.ToLower(ticker)] = p.initTickInfoFromDB(ticker)
+			p.tickerMap[ticker] = p.initTickInfoFromDB(ticker)
 		}
 
 		p.holderInfo = p.loadHolderInfoFromDB()
@@ -463,7 +463,7 @@ func (p *ExoticIndexer) UpdateDB() {
 	defer wb.Close()
 
 	for _, v := range p.tickerAdded {
-		key := GetTickerKey(v.Name)
+		key := GetTickerKey(strings.ToLower(v.Name))
 		err := db.SetDB([]byte(key), v, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)

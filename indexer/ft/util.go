@@ -60,7 +60,7 @@ func parseTickUtxoKey(input string) (string, uint64, error) {
 
 func newTickerInfo(name string) *TickInfo {
 	return &TickInfo{
-		Name:           strings.ToLower(name),
+		Name:           name,
 		UtxoMap:        make(map[uint64]common.AssetOffsets),
 		InscriptionMap: make(map[string]*common.MintAbbrInfo, 0),
 		MintAdded:      make([]*common.Mint, 0),

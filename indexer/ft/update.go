@@ -17,7 +17,7 @@ func (p *FTIndexer) UpdateTick(ticker *common.Ticker) {
 	org, ok := p.tickerMap[name]
 	if !ok {
 		ticker.Id = int64(len(p.tickerMap))
-		tickinfo := newTickerInfo(ticker.Name)
+		tickinfo := newTickerInfo(name)
 		tickinfo.Ticker = ticker
 		p.tickerMap[name] = tickinfo
 		p.tickerAdded[name] = ticker
@@ -32,9 +32,9 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if strings.Contains(mint.Base.InscriptionId, "383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143c") {
-		common.Log.Infof("")
-	}
+	// if strings.Contains(mint.Base.InscriptionId, "383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143c") {
+	// 	common.Log.Infof("")
+	// }
 
 	name := strings.ToLower(mint.Name)
 
@@ -335,7 +335,7 @@ func (p *FTIndexer) UpdateDB() {
 	defer wb.Close()
 
 	for _, v := range p.tickerAdded {
-		key := GetTickerKey(v.Name)
+		key := GetTickerKey(strings.ToLower(v.Name))
 		err := db.SetDB([]byte(key), v, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)

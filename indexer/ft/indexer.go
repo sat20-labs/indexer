@@ -1,7 +1,6 @@
 package ft
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -179,7 +178,7 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 
 		s.tickerMap = make(map[string]*TickInfo, 0)
 		for _, ticker := range ticks {
-			s.tickerMap[strings.ToLower(ticker)] = s.initTickInfoFromDB(ticker)
+			s.tickerMap[ticker] = s.initTickInfoFromDB(ticker)
 		}
 
 		s.holderInfo = s.loadHolderInfoFromDB()
