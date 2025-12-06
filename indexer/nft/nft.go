@@ -310,6 +310,17 @@ func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
 		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
 		p.status.Unbound++
 		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
+
+		// 直接添加，为了保存sat信息
+		info := &SatInfo{
+			AddressId: nft.OwnerAddressId,
+			UtxoId:    nft.UtxoId,
+			Offset:    nft.Offset,
+			Nfts:      make(map[int64]bool),
+		}
+		info.Nfts[nft.Base.Sat] = true
+		p.satMap[nft.Base.Sat] = info
+
 		return
 	}
 
@@ -643,71 +654,6 @@ func (p *NftIndexer) getNftInBuffer4(sat int64) []*common.Nft {
 		}
 	}
 	return result
-}
-
-// sat -> nfts
-func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
-	nftmap := make(map[int64]*common.NftsInSat)
-
-	p.db.View(func(txn common.ReadBatch) error {
-
-		type pair struct {
-			key   string
-			value *SatInfo
-			sat   int64
-		}
-
-		loadingSats := make([]*pair, 0)
-		for sat, info := range p.satMap {
-			key := GetSatKey(sat)
-			loadingSats = append(loadingSats, &pair{
-				key:   key,
-				value: info,
-				sat:   sat,
-			})
-		}
-		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
-		sort.Slice(loadingSats, func(i, j int) bool {
-			return loadingSats[i].key < loadingSats[j].key
-		})
-		for _, v := range loadingSats {
-			oldvalue := common.NftsInSat{}
-			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &oldvalue)
-			if err == nil {
-				info := v.value
-				oldvalue.OwnerAddressId = info.AddressId
-				oldvalue.UtxoId = info.UtxoId
-				oldvalue.Offset = info.Offset
-				nftmap[v.sat] = &oldvalue
-			} //else {
-			// 在p.nftAdded中，稍等再加载
-			//}
-		}
-
-		for sat, info := range p.satMap {
-			value, ok := nftmap[sat]
-			if ok {
-				for k := range info.Nfts {
-					value.Nfts = append(value.Nfts, k)
-				}
-			} else {
-				value = &common.NftsInSat{}
-				for k := range info.Nfts {
-					value.Nfts = append(value.Nfts, k)
-				}
-				value.Sat = sat
-				value.OwnerAddressId = info.AddressId
-				value.UtxoId = info.UtxoId
-				value.Offset = info.Offset
-
-				nftmap[sat] = value
-			}
-		}
-
-		return nil
-	})
-
-	return nftmap
 }
 
 // 跟base数据库同步

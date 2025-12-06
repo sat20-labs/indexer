@@ -85,6 +85,10 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 				} else {
 					//common.Log.Infof("tx: %s has not std address, pkscript %s", msgTx.TxID(), hex.EncodeToString(v.PkScript))
 				}
+				if len(v.PkScript) == 0 {
+					// testnet4: 47cfff6998e67852eb8c2fe7fbef2a39c8443c9fa480c7b33a87d8dde1d8e3bd
+					v.PkScript = []byte{0x51}
+				}
 			}
 
 			output := common.GenerateTxOutput(msgTx, j)
