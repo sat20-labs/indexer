@@ -84,7 +84,7 @@ func (s *BRC20Indexer) GetTickerMap() (map[string]*common.BRC20Ticker, error) {
 		}
 
 		tickinfo.Ticker = s.getTickerFromDB(tickinfo.Name)
-		ret[strings.ToLower(tickinfo.Name)] = tickinfo.Ticker
+		ret[tickinfo.Name] = tickinfo.Ticker
 	}
 
 	return ret, nil

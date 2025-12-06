@@ -1,7 +1,6 @@
 package ft
 
 import (
-	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -144,7 +143,7 @@ func (s *FTIndexer) getMintListFromDB(tickname string) map[string]*common.Mint {
 
 func (s *FTIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
-	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
+	key := GetMintHistoryKey(ticker, inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
@@ -162,7 +161,7 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 	count := 0
 	startTime := time.Now()
 	common.Log.Info("loadMintDataFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+strings.ToLower(tickerName)+"-"), false, func(k, v []byte) error {
+	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"), false, func(k, v []byte) error {
 
 		key := string(k)
 
@@ -196,7 +195,7 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	var result common.Ticker
 
-	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
+	key := DB_PREFIX_TICKER + tickerName
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)

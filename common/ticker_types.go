@@ -26,7 +26,7 @@ type Mint struct {
 type Ticker struct {
 	Base     *InscribeBaseContent
 	Id       int64
-	Name     string  
+	Name     string   // 保持原型
 	Desc     string   `json:"desc,omitempty"`
 
 	Type       string  `json:"type,omitempty"` // 默认是FT，留待以后扩展

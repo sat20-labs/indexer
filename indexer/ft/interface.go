@@ -38,7 +38,7 @@ func (p *FTIndexer) GetTickerMap() (map[string]*common.Ticker, error) {
 		}
 
 		tickinfo.Ticker = p.getTickerFromDB(tickinfo.Name)
-		ret[strings.ToLower(tickinfo.Name)] = tickinfo.Ticker
+		ret[tickinfo.Name] = tickinfo.Ticker
 	}
 
 	return ret, nil
@@ -71,7 +71,7 @@ func (p *FTIndexer) GetMint(inscriptionId string) *common.Mint {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	ticker := p.tickerMap[strings.ToLower(tickerName)]
+	ticker := p.tickerMap[tickerName]
 	if ticker == nil {
 		return nil
 	}

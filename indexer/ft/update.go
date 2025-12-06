@@ -17,7 +17,7 @@ func (p *FTIndexer) UpdateTick(ticker *common.Ticker) {
 	org, ok := p.tickerMap[name]
 	if !ok {
 		ticker.Id = int64(len(p.tickerMap))
-		tickinfo := newTickerInfo(ticker.Name)
+		tickinfo := newTickerInfo(name)
 		tickinfo.Ticker = ticker
 		p.tickerMap[name] = tickinfo
 		p.tickerAdded[name] = ticker
@@ -32,7 +32,8 @@ func (p *FTIndexer) UpdateMint(inUtxo uint64, mint *common.Mint) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	ticker, ok := p.tickerMap[strings.ToLower(mint.Name)]
+	name := strings.ToLower(mint.Name)
+	ticker, ok := p.tickerMap[name]
 	if !ok {
 		// 正常不会走到这里，除非是数据从中间跑
 		return
@@ -53,16 +54,15 @@ func (p *FTIndexer) UpdateMint(inUtxo uint64, mint *common.Mint) {
 	mintInfo := make(map[string][]*common.Range, 0)
 	mintInfo[mint.Base.InscriptionId] = mint.Ordinals
 	tickers := make(map[string]*common.TickAbbrInfo, 0)
-	tickers[strings.ToLower(mint.Name)] = &common.TickAbbrInfo{N: ticker.Ticker.N, MintInfo: mintInfo}
+	tickers[name] = &common.TickAbbrInfo{N: ticker.Ticker.N, MintInfo: mintInfo}
 	action := HolderAction{UtxoId: inUtxo, AddressId: mint.Base.InscriptionAddress, Tickers: tickers, Action: 1}
 	p.holderActionList = append(p.holderActionList, &action)
 	// 仅仅为了让UpdateTransfer能检查到输入的input中有资产，所以该tx的output才会进行资产检查工作
-	p.addHolder(inUtxo, mint.Name, ticker.Ticker.N, mint.Base.InscriptionAddress, 0, mint.Base.InscriptionId, mint.Ordinals)
+	p.addHolder(inUtxo, name, ticker.Ticker.N, mint.Base.InscriptionAddress, 0, mint.Base.InscriptionId, mint.Ordinals)
 }
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，在mintutxo铸造，资产的聪范围。聪范围可以累加，因为资产都来自不同的utxo。
 func (p *FTIndexer) addHolder(utxo uint64, ticker string, n int, address uint64, index int, inscriptionId string, rngs []*common.Range) {
-	ticker = strings.ToLower(ticker)
 
 	mintinfo := make(map[string][]*common.Range, 0)
 	mintinfo[inscriptionId] = rngs
@@ -172,7 +172,7 @@ func (p *FTIndexer) innerUpdateTransfer(output *common.Output) {
 			bUpdated = true
 		}
 		if len(mintinfo) > 0 {
-			tickers[strings.ToLower(t.Name)] = &common.TickAbbrInfo{N: t.Ticker.N, MintInfo: mintinfo}
+			tickers[t.Name] = &common.TickAbbrInfo{N: t.Ticker.N, MintInfo: mintinfo}
 		}
 	}
 
@@ -194,7 +194,7 @@ func (p *FTIndexer) UpdateDB() {
 	defer wb.Close()
 
 	for _, v := range p.tickerAdded {
-		key := GetTickerKey(v.Name)
+		key := GetTickerKey(strings.ToLower(v.Name))
 		err := db.SetDB([]byte(key), v, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)

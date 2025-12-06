@@ -25,11 +25,11 @@ func decoderTickerName(tickerName string) string {
 }
 
 func GetTickerKey(tickname string) string {
-	return fmt.Sprintf("%s%s", DB_PREFIX_TICKER, encodeTickerName(strings.ToLower(tickname)))
+	return fmt.Sprintf("%s%s", DB_PREFIX_TICKER, encodeTickerName(tickname))
 }
 
 func GetMintHistoryKey(tickname, inscriptionId string) string {
-	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, encodeTickerName(strings.ToLower(tickname)), inscriptionId)
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, encodeTickerName(tickname), inscriptionId)
 }
 
 // func GetTransferHistoryKey(tickname string, utxo string) string {
@@ -37,7 +37,7 @@ func GetMintHistoryKey(tickname, inscriptionId string) string {
 // }
 
 func GetTransferHistoryKey(tickname string, utxoId uint64) string {
-	return fmt.Sprintf("%s%s-%d", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(strings.ToLower(tickname)), utxoId)
+	return fmt.Sprintf("%s%s-%d", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickname), utxoId)
 }
 
 func ParseTransferHistoryKey(input string) (string, string, error) {
