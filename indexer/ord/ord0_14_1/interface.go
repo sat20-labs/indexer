@@ -117,6 +117,7 @@ func GetInscriptionsInTxInput(input *common.Input, inputIndex int) []*Inscriptio
 				CurseReason: curse,
 				IsCursed:    curse != ordCommon.NoCurse,
 			})
+		envelopes.Next()
 	}
 
 	return result
