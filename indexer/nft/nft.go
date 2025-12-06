@@ -318,7 +318,7 @@ func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
 			Offset:    nft.Offset,
 			Nfts:      make(map[int64]bool),
 		}
-		info.Nfts[nft.Base.Sat] = true
+		info.Nfts[nft.Base.Id] = true
 		p.satMap[nft.Base.Sat] = info
 
 		return
