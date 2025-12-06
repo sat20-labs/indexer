@@ -248,10 +248,11 @@ func (s *BRC20Indexer) subHolderBalance(tickerName string, address uint64, amt c
 					s.tickerMap[tickerName].Ticker.HolderCount--
 					s.tickerUpdated[tickerName] = s.tickerMap[tickerName].Ticker
 
-					delete(holdInfo.Tickers, tickerName)
-					if len(holdInfo.Tickers) == 0 {
-						delete(s.holderMap, address)
-					}
+					// 可能有invalid的transfer nft，所以不要删除
+					// delete(holdInfo.Tickers, tickerName)
+					// if len(holdInfo.Tickers) == 0 {
+					// 	delete(s.holderMap, address)
+					// }
 				}
 				return nil
 			} else {
@@ -273,6 +274,13 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 		tickInfo, ok := holder.Tickers[nft.Ticker]
 		if ok {
 			delete(tickInfo.TransferableData, nft.UtxoId)
+			if common.DecimalAdd(tickInfo.AvailableBalance, tickInfo.TransferableBalance).Sign() == 0 &&
+			len(tickInfo.TransferableData) == 0 {
+				delete(holder.Tickers, nft.Ticker)
+			}
+			if len(holder.Tickers) == 0 {
+				delete(s.holderMap, nft.AddressId)
+			}
 		} else {
 			common.Log.Panic("can't find ticker info")
 		}

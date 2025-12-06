@@ -62,9 +62,12 @@ type BRC20Indexer struct {
 	nftIndexer *nft.NftIndexer
 	enableHeight int
 
+	// TODO 参考nft模块，内存中只保存当前区块当前区块预加载数据，不要保存全量数据
+
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
 	// 禁止直接遍历holderInfo和utxoMap，因为数据量太大（ord有亿级数据）
+	// 这些是全量加载的数据，需要尽可能降低内存使用量
 	mutex             sync.RWMutex                // 只保护这几个结构
 	tickerMap         map[string]*BRC20TickInfo   // ticker -> TickerInfo.  name 小写。 数据由mint数据构造
 	holderMap         map[uint64]*HolderInfo      // addrId -> holder 用于动态更新ticker的holder数据，需要备份到数据库

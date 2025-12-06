@@ -11,7 +11,6 @@ import (
 )
 
 type TickInfo struct {
-	Id             uint64
 	Name           string
 	MintInfo       *indexer.RangeRBTree            // mint history: 用于查找某个SatRange是否存在该ticker， Value是RBTreeValue_Mint
 	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
