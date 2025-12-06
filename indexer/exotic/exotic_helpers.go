@@ -157,9 +157,9 @@ func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets commo
 	tickInfo, ok := p.tickerMap[name]
 	if !ok {
 		tickInfo = newExoticTickerInfo(name)
-		tickInfo.Id = uint64(len(p.tickerMap))
 
 		tickInfo.Ticker = newExoticDefaultTicker(name)
+		tickInfo.Ticker.Id = int64(len(p.tickerMap))
 		p.tickerMap[name] = tickInfo
 		p.tickerAdded[name] = tickInfo.Ticker
 	}

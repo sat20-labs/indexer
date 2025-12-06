@@ -144,7 +144,8 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	// 检查transferNft转入到哪个输出
 	inputTransferNfts := make(map[int64]*TransferNftInfo)
 	for _, tx := range block.Transactions[1:] {
-		// if tx.TxId == "a28a2f85af19d95f22d48dc8d3d5a1b7c6b0a7ec27eda6b16bd8697d89de629e" {
+		// if tx.TxId == "e6b2f7b0449f3150df272144ba3bd15aae8312a1b4c32cda419d93525e093be9" ||
+		// tx.TxId == "4e36bd98c36d3a3d676ba5070899e9dc7775839d80609bafcb36de23768b9602" {
 		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 		// }
 
@@ -229,6 +230,10 @@ var err_no_enough_balance = fmt.Errorf("not enough balance")
 // 减少该address下的资产数据
 func (s *BRC20Indexer) subHolderBalance(tickerName string, address uint64, amt common.Decimal) error {
 	
+	// if address == 1378943947 && tickerName == "meme" {
+	// 	common.Log.Infof("")
+	// }
+
 	holdInfo, ok := s.holderMap[address]
 	if ok {
 		// info.AddressId = address
@@ -252,10 +257,11 @@ func (s *BRC20Indexer) subHolderBalance(tickerName string, address uint64, amt c
 					s.tickerMap[tickerName].Ticker.HolderCount--
 					s.tickerUpdated[tickerName] = s.tickerMap[tickerName].Ticker
 
-					delete(holdInfo.Tickers, tickerName)
-					if len(holdInfo.Tickers) == 0 {
-						delete(s.holderMap, address)
-					}
+					// 可能有invalid的transfer nft，所以不要删除
+					// delete(holdInfo.Tickers, tickerName)
+					// if len(holdInfo.Tickers) == 0 {
+					// 	delete(s.holderMap, address)
+					// }
 				}
 				return nil
 			} else {
@@ -267,6 +273,11 @@ func (s *BRC20Indexer) subHolderBalance(tickerName string, address uint64, amt c
 }
 
 func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
+
+	// if nft.TransferNft.NftId == 1058797 || nft.AddressId == 1378943947 {
+	// 	common.Log.Infof("")
+	// }
+
 	delete(s.transferNftMap, nft.UtxoId)
 
 	holder, ok := s.holderMap[nft.AddressId]
@@ -274,6 +285,13 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 		tickInfo, ok := holder.Tickers[nft.Ticker]
 		if ok {
 			delete(tickInfo.TransferableData, nft.UtxoId)
+			if common.DecimalAdd(tickInfo.AvailableBalance, tickInfo.TransferableBalance).Sign() == 0 &&
+			len(tickInfo.TransferableData) == 0 {
+				delete(holder.Tickers, nft.Ticker)
+			}
+			if len(holder.Tickers) == 0 {
+				delete(s.holderMap, nft.AddressId)
+			}
 		} else {
 			common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
 		}
