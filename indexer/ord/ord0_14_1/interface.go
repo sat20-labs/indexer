@@ -2,6 +2,7 @@ package ord0_14_1
 
 import (
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
@@ -66,7 +67,7 @@ func GetInscriptionCurseStatus(blockHeight int, tx *common.Transaction, chainPar
 	return result
 }
 
-func GetInscriptionsInTxInput(input *common.Input, blockHeight, inputIndex int) []*InscriptionResult {
+func GetInscriptionsInTxInput(input wire.TxWitness, blockHeight, inputIndex int) []*InscriptionResult {
 	result := []*InscriptionResult{}
 
 	envelopes := NewEnvelopeIterator(ParseEnvelopesFromTxInput(input, inputIndex))

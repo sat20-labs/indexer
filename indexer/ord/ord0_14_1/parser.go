@@ -1,6 +1,8 @@
 package ord0_14_1
 
 import (
+	"github.com/btcsuite/btcd/wire"
+
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ord/bitcoin0.30.1/blockdata/opcodes"
 	"github.com/sat20-labs/indexer/indexer/ord/bitcoin0.30.1/blockdata/script"
@@ -114,7 +116,7 @@ func ParseEnvelopesFromTransaction(tx *common.Transaction) []*ParsedEnvelope {
 	return parsedEnvelopes
 }
 
-func ParseEnvelopesFromTxInput(txInput *common.Input, inputindex int) []*ParsedEnvelope {
+func ParseEnvelopesFromTxInput(txInput wire.TxWitness, inputindex int) []*ParsedEnvelope {
 	rawEnvelopes := RawEnvelope{}.FromTxInput(txInput, inputindex)
 	parsedEnvelopes := make([]*ParsedEnvelope, 0, len(rawEnvelopes))
 	for _, raw := range rawEnvelopes {
@@ -137,9 +139,9 @@ func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 	return envelopes
 }
 
-func (re RawEnvelope) FromTxInput(input *common.Input, inputindex int) []*RawEnvelope {
+func (re RawEnvelope) FromTxInput(input wire.TxWitness, inputindex int) []*RawEnvelope {
 	var envelopes []*RawEnvelope
-	tapscript := ordCommon.GetTapscriptBytes(input.Witness)
+	tapscript := ordCommon.GetTapscriptBytes(input)
 	if tapscript != nil {
 		inputEnvelopes, err := re.fromTapscript(tapscript, inputindex)
 		if err == nil {
