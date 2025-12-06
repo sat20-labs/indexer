@@ -211,7 +211,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 		s.tickerMap = make(map[string]*BRC20TickInfo, 0)
 		for _, ticker := range ticks {
-			s.tickerMap[strings.ToLower(ticker)] = s.initTickInfoFromDB(ticker)
+			s.tickerMap[ticker] = s.initTickInfoFromDB(ticker)
 		}
 
 		s.loadHolderInfoFromDB()

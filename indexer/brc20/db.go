@@ -1,7 +1,6 @@
 package brc20
 
 import (
-	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -132,7 +131,7 @@ func (s *BRC20Indexer) getMintListFromDB(tickname string) map[string]*common.BRC
 func (s *BRC20Indexer) getMintFromDB(ticker, inscriptionId string) *common.BRC20Mint {
 	var result common.BRC20Mint
 
-	key := GetMintHistoryKey(strings.ToLower(ticker), inscriptionId)
+	key := GetMintHistoryKey(ticker, inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
@@ -151,7 +150,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadMintDataFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+strings.ToLower(tickerName)+"-"),
+	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"),
 		false, func(k, v []byte) error {
 
 			key := string(k)
@@ -188,7 +187,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadTransferHistoryFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY+strings.ToLower(tickerName)+"-"),
+	err := s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY+tickerName+"-"),
 		false, func(k, v []byte) error {
 
 			key := string(k)
@@ -223,7 +222,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 func (s *BRC20Indexer) getTickerFromDB(tickerName string) *common.BRC20Ticker {
 	var result common.BRC20Ticker
 
-	key := DB_PREFIX_TICKER + strings.ToLower(tickerName)
+	key := DB_PREFIX_TICKER + encodeTickerName(tickerName)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
