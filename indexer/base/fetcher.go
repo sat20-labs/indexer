@@ -77,6 +77,10 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 				if scyptClass == txscript.NullDataTy {
 					address = "OP_RETURN"
 				}
+				if len(v.PkScript) == 0 {
+					// testnet4: 47cfff6998e67852eb8c2fe7fbef2a39c8443c9fa480c7b33a87d8dde1d8e3bd
+					v.PkScript = []byte{0x51}
+				}
 				receiver = common.ScriptPubKey{
 					Addresses: []string{address},
 					Type:      int(scyptClass),
