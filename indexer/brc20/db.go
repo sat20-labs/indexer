@@ -150,7 +150,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[string]*common.
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadMintDataFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"),
+	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+encodeTickerName(tickerName)+"-"),
 		false, func(k, v []byte) error {
 
 			key := string(k)
@@ -187,7 +187,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadTransferHistoryFromDB ...")
-	err := s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY+tickerName+"-"),
+	err := s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY+encodeTickerName(tickerName)+"-"),
 		false, func(k, v []byte) error {
 
 			key := string(k)
