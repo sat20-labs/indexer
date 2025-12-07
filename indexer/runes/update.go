@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -154,8 +155,8 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					id = &edict.ID
 				}
 				balance := unallocated.Get(id)
-				if balance == nil || 
-				balance.Value.IsZero() { // 可能在上一个分配指令中就全部分配出去了 tx = 665f669d03dd4517c8ad2d1aac809a0c3b7878ae7b98bdb4842358fcbfac1849
+				if balance == nil ||
+					balance.Value.IsZero() { // 可能在上一个分配指令中就全部分配出去了 tx = 665f669d03dd4517c8ad2d1aac809a0c3b7878ae7b98bdb4842358fcbfac1849
 					continue
 				}
 
@@ -273,7 +274,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if find {
 			for id, balance := range unallocated {
 				if balance.Value.Cmp(uint128.Zero) > 0 {
-					allocated[*outIndex].GetOrDefault(&id).AddAssign(balance) // 
+					allocated[*outIndex].GetOrDefault(&id).AddAssign(balance) //
 				}
 			}
 		} else {
@@ -373,7 +374,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		// 	RuneId:    runeBalance.RuneId,
 		// 	Balance:   runeBalance.Balance,
 		// }
-		
+
 		runeIdAddressToCountKey := &table.RuneIdAddressToCount{
 			RuneId:    runeBalance.RuneId,
 			AddressId: runeBalance.AddressId,
@@ -441,7 +442,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 				s.runeIdToMintHistoryTbl.Insert(v)
 			}
 		} //else {
-			// burned
+		// burned
 		//}
 	}
 
@@ -579,7 +580,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 				} else {
 					s.runeIdAddressToBalanceTbl.Remove(oldruneIdAddressToBalanceValue)
 				}
-				
+
 			}
 		}
 
@@ -645,7 +646,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 		// extracting a tapscript does not indicate that the input being spent
 		// was actually a taproot output. this is checked below, when we load the
 		// output's entry from the database
-		tapscript := parseTapscript(input.Witness)
+		tapscript := ordCommon.GetTapscriptBytes(input.Witness)
 		if tapscript == nil {
 			continue
 		}
