@@ -78,5 +78,6 @@ type Inscription struct {
 	Metadata              []byte // 0.14.1+
 	Metaprotocol          []byte // 0.14.1+
 	Pointer               []byte // 0.14.1+
+	RuneName              []byte // ?
 }
 

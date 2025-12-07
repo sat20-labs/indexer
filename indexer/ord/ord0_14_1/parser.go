@@ -1,6 +1,8 @@
 package ord0_14_1
 
 import (
+	"github.com/btcsuite/btcd/wire"
+
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ord/bitcoin0.30.1/blockdata/opcodes"
 	"github.com/sat20-labs/indexer/indexer/ord/bitcoin0.30.1/blockdata/script"
@@ -64,6 +66,7 @@ func fromRawEnvelope(raw *RawEnvelope) *ParsedEnvelope {
 	metaprotocol := METAPROTOCOL_TAG.removeField(fields)
 	parent := PARENT_TAG.removeField(fields)
 	pointer := POINTER_TAG.removeField(fields)
+	runeName := RUNE_NAME_TAG.removeField(fields)
 
 	unrecognizedEvenField := false
 	for tagStr := range fields {
@@ -94,6 +97,7 @@ func fromRawEnvelope(raw *RawEnvelope) *ParsedEnvelope {
 		Metaprotocol:          metaprotocol,
 		Parent:                parent,
 		Pointer:               pointer,
+		RuneName:              runeName,
 		UnrecognizedEvenField: unrecognizedEvenField,
 	}
 	return &ParsedEnvelope{
@@ -114,7 +118,7 @@ func ParseEnvelopesFromTransaction(tx *common.Transaction) []*ParsedEnvelope {
 	return parsedEnvelopes
 }
 
-func ParseEnvelopesFromTxInput(txInput *common.TxInput, inputindex int) []*ParsedEnvelope {
+func ParseEnvelopesFromTxInput(txInput wire.TxWitness, inputindex int) []*ParsedEnvelope {
 	rawEnvelopes := RawEnvelope{}.FromTxInput(txInput, inputindex)
 	parsedEnvelopes := make([]*ParsedEnvelope, 0, len(rawEnvelopes))
 	for _, raw := range rawEnvelopes {
@@ -137,9 +141,9 @@ func (re RawEnvelope) FromTransaction(tx *common.Transaction) []*RawEnvelope {
 	return envelopes
 }
 
-func (re RawEnvelope) FromTxInput(input *common.TxInput, inputindex int) []*RawEnvelope {
+func (re RawEnvelope) FromTxInput(input wire.TxWitness, inputindex int) []*RawEnvelope {
 	var envelopes []*RawEnvelope
-	tapscript := ordCommon.GetTapscriptBytes(input.Witness)
+	tapscript := ordCommon.GetTapscriptBytes(input)
 	if tapscript != nil {
 		inputEnvelopes, err := re.fromTapscript(tapscript, inputindex)
 		if err == nil {
