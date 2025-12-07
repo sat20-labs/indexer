@@ -49,6 +49,8 @@ func hasWeirdPush(script []byte, inscId int) bool {
 
 // Jubilee 后 vindicated 的条件（简化版）
 func isVindicated(height int) bool {
+	// 816000, 使用ord v0.9版本的定义
+	// 824544，jubilee，cursed 铭文得到vindicated
     // 从 Jubilee 起，部分早期 cursed 被“洗白”
     return height >= 824544
         // ordinals 0.14+ 允许重新索引这些特例

@@ -16,7 +16,7 @@ type Curse int
 
 const (
 	NoCurse               Curse = 0
-	DuplicateField        Curse = 1 // 0.14.1+
+	DuplicateField        Curse = 1 // 0.14.1+ // mainnet: 74f11a182ec96f1f49c7870c5ddc535b46e6faa0879e6b6f94cc2b5a1bd7d358i0
 	IncompleteField       Curse = 2 // 0.14.1+
 	NotAtOffsetZero       Curse = 3 // 0.9.0+
 	NotInFirstInput       Curse = 4 // 0.9.0+
@@ -78,5 +78,6 @@ type Inscription struct {
 	Metadata              []byte // 0.14.1+
 	Metaprotocol          []byte // 0.14.1+
 	Pointer               []byte // 0.14.1+
+	RuneName              []byte // ?
 }
 

@@ -50,4 +50,5 @@ var (
 	METAPROTOCOL_TAG     = Tag{[]byte{0x07}}
 	CONTENT_ENCODING_TAG = Tag{[]byte{0x09}}
 	DELEGATE_TAG         = Tag{[]byte{0x0B}}
+	RUNE_NAME_TAG        = Tag{[]byte{0x0D}}
 )

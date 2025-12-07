@@ -282,7 +282,7 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 				delete(s.holderMap, nft.AddressId)
 			}
 		} else {
-			common.Log.Panic("can't find ticker info")
+			common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
 		}
 	} else {
 		// 已经转移过的transfer nft不一定能找到
@@ -363,7 +363,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output, i
 			s.holderActionList = append(s.holderActionList, &action)
 			delete((*inputTransferNfts), nft.Base.Id)
 
-			// 继续加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
+			// 再继续加入s.transferNftMap，方便跟踪。在下一次转移时，可以删除，不需要再记录
 			transferNft.AddressId = toAddressId
 			transferNft.UtxoId = utxoId
 			s.addTransferNft(transferNft)

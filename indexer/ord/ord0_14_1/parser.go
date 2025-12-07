@@ -66,6 +66,7 @@ func fromRawEnvelope(raw *RawEnvelope) *ParsedEnvelope {
 	metaprotocol := METAPROTOCOL_TAG.removeField(fields)
 	parent := PARENT_TAG.removeField(fields)
 	pointer := POINTER_TAG.removeField(fields)
+	runeName := RUNE_NAME_TAG.removeField(fields)
 
 	unrecognizedEvenField := false
 	for tagStr := range fields {
@@ -96,6 +97,7 @@ func fromRawEnvelope(raw *RawEnvelope) *ParsedEnvelope {
 		Metaprotocol:          metaprotocol,
 		Parent:                parent,
 		Pointer:               pointer,
+		RuneName:              runeName,
 		UnrecognizedEvenField: unrecognizedEvenField,
 	}
 	return &ParsedEnvelope{
