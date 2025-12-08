@@ -13,6 +13,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"lukechampine.com/uint128"
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 func (s *Indexer) UpdateDB() {
@@ -649,7 +650,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 		// extracting a tapscript does not indicate that the input being spent
 		// was actually a taproot output. this is checked below, when we load the
 		// output's entry from the database
-		tapscript := parseTapscript(input.Witness)
+		tapscript := ordCommon.GetTapscriptBytes(input.Witness)
 		if tapscript == nil {
 			continue
 		}

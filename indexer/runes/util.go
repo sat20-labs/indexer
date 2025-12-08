@@ -28,7 +28,8 @@ func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.I
 func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, err error) {
 	var msgTx wire.MsgTx
 	for _, output := range transaction.Outputs {
-		msgTx.AddTxOut(&output.OutValue)
+		pkScript := output.OutValue.PkScript
+		msgTx.AddTxOut(wire.NewTxOut(output.OutValue.Value, pkScript))
 	}
 	runestone := &runestone.Runestone{}
 	ret, err = runestone.DecipherFromTx(&msgTx)
@@ -57,34 +58,6 @@ func parseTxVoutScriptAddress(transaction *common.Transaction, voutIndex int, pa
 	// }
 	address = runestone.Address(addresses[0].EncodeAddress())
 	return
-}
-
-func parseTapscript(witness wire.TxWitness) []byte {
-	// From BIP341:
-	// If there are at least two witness elements, and the first byte of
-	// the last element is 0x50, this last element is called annex a
-	// and is removed from the witness stack.
-	lenWitness := len(witness)
-	if lenWitness < 2 {
-		return nil
-	}
-	lastElement := witness[lenWitness-1]
-	if len(lastElement) < 1 {
-		return nil
-	}
-	if lastElement[0] != txscript.TaprootAnnexTag {
-		// otherwise script is 2nd from last
-		if lenWitness < 2 {
-			return nil
-		}
-		return witness[lenWitness-2]
-	} else {
-		// account for the extra item removed from the end
-		if lenWitness < 3 {
-			return witness[lenWitness-3]
-		}
-	}
-	return nil
 }
 
 func parseTapscriptLegacyInstructions(tapscript []byte, commitment []byte) (ret [][]byte) {

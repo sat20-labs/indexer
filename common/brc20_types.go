@@ -5,19 +5,27 @@ import (
 )
 
 type BRC20Mint struct {
-	Nft  *Nft
-	Id   int64
-	Name string
-	Amt  Decimal `json:"amt"`
+	BRC20MintInDB
+	Nft *Nft
+}
 
-	Satoshi int64 `json:"satoshi"`
+type BRC20MintInDB struct {
+	NftId int64
+	Id    int64
+	Name  string
+	Amt   Decimal
+}
+
+type BRC20TransferInDB struct {
+	NftId int64
+	Id    int64
+	Name  string
+	Amt   Decimal
 }
 
 type BRC20Transfer struct {
+	BRC20TransferInDB
 	Nft *Nft
-	// UtxoId uint64
-	Name string
-	Amt  Decimal `json:"amt"`
 }
 
 type BRC20Ticker struct {
@@ -30,10 +38,11 @@ type BRC20Ticker struct {
 	Limit    Decimal `json:"limit,omitempty"`
 	Max      Decimal `json:"max,omitempty"`
 
-	Decimal uint8 `json:"-"`
+	Decimal uint8 `json:"decimal"`
 
 	DeployTime         int64   `json:"deployTime,omitempty"`
 	Minted             Decimal `json:"minted,omitempty"`
+	MintCount          uint64  `json:"mintCount,omitempty"`
 	StartInscriptionId string  `json:"startInscriptionId,omitempty"`
 	EndInscriptionId   string  `json:"endInscriptionId,omitempty"`
 	HolderCount        uint64  `json:"holders,omitempty"` // TODO: 要算上处理过的，哪怕最终可用余额是0也要算上
@@ -114,17 +123,26 @@ type BRC20TransferContent struct {
 	BRC20AmtContent
 }
 
-type BRC20TransferHistory struct {
+const (
+	// 0: inscribe-mint  1: inscribe-transfer  2: transfer
+	BRC20_Action_InScribe_Mint int = iota
+	BRC20_Action_InScribe_Transfer // 铸造一个transfer铭文
+	BRC20_Action_Transfer // 转移一个transfer铭文
+	BRC20_Action_Transfer_Spent // 一个已经转移的transfer铭文被花费
+)
+
+type BRC20ActionHistory struct {
 	Height int
-	// Utxo   string // transferring utxo
+	Action int
 	UtxoId uint64
 	NftId  int64 // transfer nft
 
+	FromUtxoId uint64
 	FromAddr uint64
 	ToAddr   uint64
 
 	Ticker string
-	Amount string
+	Amount Decimal
 }
 
 type BRC20MintAbbrInfo struct {
@@ -138,6 +156,7 @@ type BRC20MintAbbrInfo struct {
 
 type TransferNFT struct {
 	NftId     int64
+	Id        int64  // transfer id
 	UtxoId    uint64 // 铸造时的utxoId
 	Amount    Decimal
 	IsInvalid bool
@@ -148,7 +167,10 @@ type BRC20TickAbbrInfo struct {
 	AvailableBalance    *Decimal
 	TransferableBalance *Decimal
 	TransferableData    map[uint64]*TransferNFT // key:utxoId
-	// InvalidTransferableData map[uint64]*TransferNFT // key:utxoId
+}
+
+func (p *BRC20TickAbbrInfo) AssetAmt() *Decimal {
+	return DecimalAdd(p.AvailableBalance, p.TransferableBalance)
 }
 
 func NewBRC20TickAbbrInfo(availableAmt, transferableAmt *Decimal) *BRC20TickAbbrInfo {

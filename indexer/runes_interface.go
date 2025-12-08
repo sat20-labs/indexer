@@ -4,7 +4,8 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
+
+func (b *IndexerMgr) GetRunesTickerMap() map[string]*common.TickerInfo {
 	result := make(map[string]*common.TickerInfo)
 	runeInfos := b.RunesIndexer.GetAllRuneInfos()
 	for _, runeInfo := range runeInfos {
@@ -47,20 +48,11 @@ func (b *IndexerMgr) GetRunesTickerMapV2() map[string]*common.TickerInfo {
 		}
 		result[assetName.String()] = tickerInfo
 	}
-	// tickers := b.RunesIndexer.GetAllRuneIds()
-	// for _, tickerName := range tickers {
-	// 	t := b.GetRunesTickerV2(tickerName)
-	// 	if t != nil {
-	// 		assetName := common.TickerName{
-	// 			Protocol: common.PROTOCOL_NAME_RUNES,
-	// 			Type:     common.ASSET_TYPE_FT,
-	// 			Ticker:   tickerName,
-
-	// 		}
-	// 		result[assetName.String()] = t
-	// 	}
-	// }
 	return result
+}
+
+func (b *IndexerMgr) GetRunesTickerMapV2() []string {
+	return b.RunesIndexer.GetAllRuneIds()
 }
 
 func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {

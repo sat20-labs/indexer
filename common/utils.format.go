@@ -241,6 +241,8 @@ func RemoveIndex[T any](slice []T, index int) []T {
     return append(slice[:index], slice[index+1:]...)
 }
 
+// 大端序下，高位字节先比较 → 字节序比较行为与整数比较行为一致。
+// 如果采用pebble数据库，所有数据库的KEY，如果是键值是整数，都转换为这个格式
 func Uint64ToBytes(value uint64) []byte {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, value)

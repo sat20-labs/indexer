@@ -390,8 +390,8 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 }
 
 // FT
-// return: ticker's name -> ticker info
-func (b *IndexerMgr) GetTickerMapV2(protocol string) map[string]*common.TickerInfo {
+// return: 按照铸造顺序排序的完整的资产名称
+func (b *IndexerMgr) GetTickerMapV2(protocol string) []string {
 	b.rpcEnter()
 	defer b.rpcLeft()
 

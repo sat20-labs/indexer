@@ -21,21 +21,8 @@ func (b *IndexerMgr) GetTickerMap() (map[string]*common.Ticker, error) {
 	return b.ftIndexer.GetTickerMap()
 }
 
-func (b *IndexerMgr) GetOrdxTickerMapV2() map[string]*common.TickerInfo {
-	result := make(map[string]*common.TickerInfo)
-	tickers := b.ftIndexer.GetAllTickers()
-	for _, tickerName := range tickers {
-		t := b.GetTickerV2(tickerName, common.ASSET_TYPE_FT)
-		if t != nil {
-			assetName := common.TickerName{
-				Protocol: common.PROTOCOL_NAME_ORDX,
-				Type:     common.ASSET_TYPE_FT,
-				Ticker:   tickerName,
-			}
-			result[assetName.String()] = t
-		}
-	}
-	return result
+func (b *IndexerMgr) GetOrdxTickerMapV2() []string {
+	return b.ftIndexer.GetAllTickers()
 }
 
 func (b *IndexerMgr) GetTicker(ticker string) *common.Ticker {

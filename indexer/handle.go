@@ -11,11 +11,13 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
-	//"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
+var curseCount int
 func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.Range) {
-	s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产
+	s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产，为ordx协议做准备
 
 	if block.Height < s.ordFirstHeight {
 		return
@@ -25,32 +27,46 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	measureStartTime := time.Now()
 	//common.Log.Info("processOrdProtocol ...")
 	count := 0
-	for i, tx := range block.Transactions {
+	for _, tx := range block.Transactions {
 		id := 0
-		for _, input := range tx.Inputs {
+		for i, input := range tx.Inputs {
 
-			//inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input)
+			// if tx.TxId == "fbfa79f18e1132adf767a03f64776e412c13229693a5e6af55f8835f101b7615" {
+			// 	common.Log.Info("")
+			// }
+
+		
+			inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input.Witness, block.Height, i)
+			for k, insc := range inscriptions2 {
+				if insc.IsCursed {
+					curseCount++
+					if insc.CurseReason != ordCommon.NotAtOffsetZero && 
+					insc.CurseReason != ordCommon.Pointer && 
+					insc.CurseReason != ordCommon.Pushnum &&  // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
+					insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
+ 					insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
+					insc.CurseReason != ordCommon.IncompleteField {// testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
+						common.Log.Errorf("%si%d is cursed, reason %d", tx.TxId, k, insc.CurseReason)
+					}
+				}
+			}
 
 			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
 			if err != nil {
-				// if len(inscriptions2) != 0 {
-				// 	common.Log.Panicf("find inscription in ord %s", tx.TxId)
-				// }
+				if len(inscriptions2) != 0 {
+					common.Log.Errorf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
+				}
 				continue
 			}
 
-			// if len(inscriptions2) != len(inscriptions) {
-			// 	common.Log.Panicf("inscription count different %s", tx.TxId)
-			// }
+			if len(inscriptions2) != len(inscriptions) {
+				common.Log.Errorf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
+			}
 
 			for j, insc := range inscriptions {
 				s.handleOrd(input, insc, id, envelopes[j], 0, tx, block, coinbase, i)
 				id++
 				count++
-
-				// if inscriptions2[j].IsCursed {
-				// 	common.Log.Errorf("%s:%d is cursed, reason %s", tx.TxId, id, inscriptions2[j].CurseReason.Error())
-				// }
 			}
 		}
 		if id > 0 {
@@ -58,6 +74,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 		}
 	}
 	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
+	common.Log.Errorf("height: %d, total cursed: %d", block.Height, curseCount)
 
 	//time2 := time.Now()
 	s.nft.UpdateTransfer(block, coinbase)
@@ -559,7 +576,12 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 		}
 	}
 
-	mint := &common.BRC20Mint{Nft: nft, Name: strings.ToLower(content.Ticker)}
+	mint := &common.BRC20Mint{
+		BRC20MintInDB: common.BRC20MintInDB{
+			Name: strings.ToLower(content.Ticker),
+		},
+		Nft: nft, 
+	}
 
 	// recover for decimal panic
 	defer func() {
@@ -607,9 +629,10 @@ func (s *IndexerMgr) handleBrc20TransferTicker(satpoint int64, out *common.TxOut
 	}
 
 	transfer := &common.BRC20Transfer{
+		BRC20TransferInDB: common.BRC20TransferInDB{
+			Name: strings.ToLower(content.Ticker),
+		},
 		Nft:  nft,
-		Name: strings.ToLower(content.Ticker),
-		// UtxoId: nft.UtxoId,
 	}
 
 	// check amount

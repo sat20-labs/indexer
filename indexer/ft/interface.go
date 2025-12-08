@@ -17,10 +17,25 @@ func (p *FTIndexer) TickExisted(ticker string) bool {
 func (p *FTIndexer) GetAllTickers() []string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+	
+	type pair struct {
+		id int64
+		name string
+	}
+	mid := make([]*pair, 0)
+	for name, v := range p.tickerMap {
+		mid = append(mid, &pair{
+			id: v.Ticker.Id,
+			name: name,
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].id < mid[j].id
+	})
+	
 	ret := make([]string, 0)
-
-	for name, _ := range p.tickerMap {
-		ret = append(ret, name)
+	for _, item := range mid {
+		ret = append(ret, item.name)
 	}
 
 	return ret
