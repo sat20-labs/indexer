@@ -987,9 +987,12 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
 		// 	return
 		// }
-		if nft.Base.CurseType != 0 {
+		if nft.Base.CurseType != 0 && block.Height < 824544 { 
 			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
-			return
+			if block.Height < 824544 { // Jubilee
+				return
+			}
+			// vindicated
 		}
 
 		s.handleBrc20(input.UtxoId, satpoint, output, insc, nft)
