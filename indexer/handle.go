@@ -54,13 +54,13 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
 			if err != nil {
 				if len(inscriptions2) != 0 {
-					common.Log.Errorf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
+					common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
 				}
 				continue
 			}
 
 			if len(inscriptions2) != len(inscriptions) {
-				common.Log.Errorf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
+				common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
 			}
 
 			for j, insc := range inscriptions {

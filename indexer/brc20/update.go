@@ -181,14 +181,16 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 			for _, input := range tx.Inputs {
 				var ticker string
 				nft, ok := s.transferNftMap[input.UtxoId]
-				if ok && !nft.TransferNft.IsInvalid {
+				if ok {
 					ticker = nft.Ticker
-					tickers, ok := transferTxMap[tx]
-					if !ok {
-						tickers = make(map[string]bool)
-						transferTxMap[tx] = tickers
+					if !nft.TransferNft.IsInvalid {
+						tickers, ok := transferTxMap[tx]
+						if !ok {
+							tickers = make(map[string]bool)
+							transferTxMap[tx] = tickers
+						}
+						tickers[nft.Ticker] = true // 影响输出的结果
 					}
-					tickers[nft.Ticker] = true // 影响输出的结果
 				}
 				utxoToLoad = append(utxoToLoad, &pair{
 					utxoId: 	input.UtxoId,
@@ -429,9 +431,10 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 				len(tickInfo.TransferableData) == 0 {
 				delete(holder.Tickers, nft.Ticker)
 			}
-			if len(holder.Tickers) == 0 {
-				delete(s.holderMap, nft.AddressId)
-			}
+			// 不能删除，如果删除，就无法删除数据库中对应数据 updateHolderToDB
+			// if len(holder.Tickers) == 0 {
+			// 	delete(s.holderMap, nft.AddressId)
+			// }
 		} else {
 			common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
 		}
@@ -562,6 +565,8 @@ func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB
 			if err != nil {
 				common.Log.Panicf("Error deleting db %s: %v\n", addressTickerKey, err)
 			}
+			delete(holder.Tickers, ticker) // 防止多次删除
+
 			if updateTickerAddr {
 				err = wb.Delete([]byte(tickerAddressKey))
 				if err != nil {
@@ -570,7 +575,8 @@ func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB
 			}
 		}
 	} else {
-		common.Log.Panicf("no find holder info in holderMap :%d", address)
+		// 可能重入
+		//common.Log.Panicf("no find holder info in holderMap :%d", address)
 	}
 }
 
