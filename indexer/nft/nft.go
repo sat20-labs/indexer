@@ -10,6 +10,8 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/db"
+
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 type SatInfo struct {
@@ -301,6 +303,23 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+
+	if nft.Base.Sat >= 0 {
+		// 检查是否同一个聪上有多个铸造
+		nftsInSat := p.getNftsWithSat(nft.Base.Sat)
+		if nftsInSat != nil {
+			for _, nftId := range nftsInSat.Nfts {
+				n := p.getNftWithId(nftId)
+				if n != nil && n.Base.CurseType == 0 {
+					// 已经存在非cursed的铭文，后面的铭文都是cursed
+					nft.Base.CurseType = int32(ordCommon.Reinscription)
+					common.Log.Infof("%s is reinscription in sat %d, the first non-cursed inscription %s",
+					nft.Base.InscriptionId, nft.Base.Sat, n.Base.InscriptionId)
+					break
+				}
+			}
+		}
+	}
 
 	nft.Base.Id = int64(p.status.Count) // 从0开始
 	p.status.Count++
@@ -731,6 +750,9 @@ func (p *NftIndexer) UpdateDB() {
 		for k := range nft.Nfts {
 			info.Nfts = append(info.Nfts, k)
 		}
+		sort.Slice(info.Nfts, func(i, j int) bool {
+			return info.Nfts[i] < info.Nfts[j]
+		})
 
 		err := db.SetDBWithProto3([]byte(key), info, wb)
 		//err := db.SetDB([]byte(key), nft, wb)

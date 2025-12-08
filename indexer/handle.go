@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
+	"github.com/sat20-labs/indexer/indexer/ord"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
-	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 var curseCount int
@@ -23,7 +22,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 		return
 	}
 
-	detectOrdMap := make(map[string]int, 0)
+	//detectOrdMap := make(map[string]int, 0)
 	measureStartTime := time.Now()
 	//common.Log.Info("processOrdProtocol ...")
 	count := 0
@@ -37,41 +36,49 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 
 		
 			inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input.Witness, block.Height, i)
-			for k, insc := range inscriptions2 {
-				if insc.IsCursed {
-					curseCount++
-					if insc.CurseReason != ordCommon.NotAtOffsetZero && 
-					insc.CurseReason != ordCommon.Pointer && 
-					insc.CurseReason != ordCommon.Pushnum &&  // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
-					insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
- 					insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
-					insc.CurseReason != ordCommon.IncompleteField {// testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
-						common.Log.Errorf("%si%d is cursed, reason %d", tx.TxId, k, insc.CurseReason)
-					}
-				}
-			}
-
-			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
-			if err != nil {
-				if len(inscriptions2) != 0 {
-					common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
-				}
-				continue
-			}
-
-			if len(inscriptions2) != len(inscriptions) {
-				common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
-			}
-
-			for j, insc := range inscriptions {
-				s.handleOrd(input, insc, id, envelopes[j], 0, tx, block, coinbase, i)
+			for _, insc := range inscriptions2 {
+				s.handleOrd(input, insc, id, tx, block, coinbase)
 				id++
 				count++
 			}
+			
+			// for k, insc := range inscriptions2 {
+			// 	if insc.IsCursed {
+			// 		curseCount++
+			// 		if insc.CurseReason != ordCommon.NotAtOffsetZero && 
+			// 		insc.CurseReason != ordCommon.Pointer && 
+			// 		insc.CurseReason != ordCommon.Pushnum &&  // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
+			// 		insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
+ 			// 		insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
+			// 		insc.CurseReason != ordCommon.IncompleteField {// testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
+			// 			common.Log.Errorf("%si%d is cursed, reason %d", tx.TxId, k, insc.CurseReason)
+			// 		}
+			// 	}
+			// }
+
+			// inscriptions, envelopes, err := common.ParseInscription(input.Witness)
+			// if err != nil {
+			// 	if len(inscriptions2) != 0 {
+			// 		common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
+			// 	}
+			// 	continue
+			// }
+
+			// if len(inscriptions2) != len(inscriptions) {
+			// 	if tx.TxId != "fbfa79f18e1132adf767a03f64776e412c13229693a5e6af55f8835f101b7615" {
+			// 		common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
+			// 	}
+			// }
+
+			// for j, insc := range inscriptions {
+			// 	s.handleOrd(input, insc, id, envelopes[j], 0, tx, block, coinbase, i)
+			// 	id++
+			// 	count++
+			// }
 		}
-		if id > 0 {
-			detectOrdMap[tx.TxId] = id
-		}
+		// if id > 0 {
+		// 	detectOrdMap[tx.TxId] = id
+		// }
 	}
 	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
 	common.Log.Errorf("height: %d, total cursed: %d", block.Height, curseCount)
@@ -772,8 +779,8 @@ func (s *IndexerMgr) handleNameRouting(content *common.OrdxUpdateContentV2, nft 
 }
 
 func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
-	fields map[int][]byte, nft *common.Nft) {
-	ordxInfo, bOrdx := common.IsOrdXProtocol(fields)
+	insc *ord.InscriptionResult, nft *common.Nft) {
+	ordxInfo, bOrdx := ord.IsOrdXProtocol(insc)
 	if !bOrdx {
 		return
 	}
@@ -824,9 +831,9 @@ func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.
 }
 
 func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.TxOutputV2,
-	fields map[int][]byte, nft *common.Nft) {
+	insc *ord.InscriptionResult, nft *common.Nft) {
 
-	content := string(fields[common.FIELD_CONTENT])
+	content := string(insc.Inscription.Body)
 	ordxBaseContent := common.ParseBrc20BaseContent(content)
 	if ordxBaseContent == nil {
 		common.Log.Errorf("invalid content %s", content)
@@ -910,16 +917,17 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 }
 
 func (s *IndexerMgr) handleOrd(input *common.TxInput,
-	fields map[int][]byte, inscriptionId int, envelope []byte, curseType int, tx *common.Transaction,
-	block *common.Block, coinbase []*common.Range, index int) {
+	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction,
+	block *common.Block, coinbase []*common.Range) {
 
 	satpoint := int64(0)
-	if fields[common.FIELD_POINT] != nil {
-		satpoint = int64(common.GetSatpoint(fields[common.FIELD_POINT]))
+	if insc.Inscription.Pointer != nil {
+		satpoint = int64(common.GetSatpoint(insc.Inscription.Pointer))
 		if int64(satpoint) >= input.OutValue.Value {
 			satpoint = 0
 		}
 	}
+	index := int(insc.TxInIndex)
 
 	var output *common.TxOutputV2
 	// 根据偏移找到对应的输出 注意这里跟ordinals协议的细微区别：ordinals协议是根据输出确定satpoint的位置，
@@ -934,18 +942,18 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	}
 
 	// 1. 先保存nft数据
-	nft := s.handleNft(input, output, satpoint, curseType, fields, inscriptionId, tx, block)
+	nft := s.handleNft(input, output, satpoint, insc, inscriptionId, tx, block)
 	if nft == nil {
 		return
 	}
 
 	// 2. 再看看是否ordx协议
-	protocol, content := common.GetProtocol(fields)
+	protocol, content := ord.GetProtocol(insc)
 	switch protocol {
 	case "ordx":
-		s.handleOrdX(satpoint, input, output, fields, nft)
+		s.handleOrdX(satpoint, input, output, insc, nft)
 	case "sns":
-		domain := common.ParseDomainContent(string(fields[common.FIELD_CONTENT]))
+		domain := common.ParseDomainContent(string(insc.Inscription.Body))
 		if domain == nil {
 			domain = common.ParseDomainContent(string(content))
 		}
@@ -957,7 +965,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 			case "update":
 				var updateInfo *common.OrdxUpdateContentV2
 				// 如果有metadata，那么不处理FIELD_CONTENT的内容
-				if string(fields[common.FIELD_META_PROTOCOL]) == "sns" && fields[common.FIELD_META_DATA] != nil {
+				if string(insc.Inscription.Metaprotocol) == "sns" && len(insc.Inscription.Metadata) != 0 {
 					updateInfo = common.ParseUpdateContent(string(content))
 					updateInfo.P = "sns"
 					value, ok := updateInfo.KVs["key"]
@@ -966,7 +974,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 						updateInfo.KVs[value] = nft.Base.InscriptionId
 					}
 				} else {
-					updateInfo = common.ParseUpdateContent(string(fields[common.FIELD_CONTENT]))
+					updateInfo = common.ParseUpdateContent(string(content))
 				}
 
 				if updateInfo == nil {
@@ -976,22 +984,22 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 			}
 		}
 	case "brc-20":
-		if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
-			return
-		}
-		if brc20.IsCursed(envelope, inscriptionId, block.Height) {
-			common.Log.Infof("%s inscription is cursed", nft.Base.InscriptionId)
+		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
+		// 	return
+		// }
+		if nft.Base.CurseType != 0 {
+			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
 			return
 		}
 
-		s.handleBrc20(input.UtxoId, satpoint, output, fields, nft)
+		s.handleBrc20(input.UtxoId, satpoint, output, insc, nft)
 		// if inscriptionId == 0 {
 		// TODO brc20 只处理tx中的第一个铭文？
 		// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
 		// }
 
 	case "primary-name":
-		primaryNameContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))
+		primaryNameContent := common.ParseCommonContent(string(insc.Inscription.Body))
 		if primaryNameContent != nil {
 			switch primaryNameContent.Op {
 			case "update":
@@ -1008,7 +1016,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		// content: { "p": "sns", "op": "reg", "name": "1866.sats"}
 		// or ： text/plain;charset=utf-8 {"p":"sns","op":"reg","name":"good.sats"}
 	case "btcname":
-		commonContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))
+		commonContent := common.ParseCommonContent(string(insc.Inscription.Body))
 		if commonContent != nil {
 			switch commonContent.Op {
 			case "routing":
@@ -1038,7 +1046,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		// text/plain;charset=utf-8 abc
 		// 或者简单文本 xxx.xx 或者 xx
 		if protocol == "" {
-			s.handleSnsName(string(fields[common.FIELD_CONTENT]), nft)
+			s.handleSnsName(string(insc.Inscription.Body), nft)
 		}
 	}
 
@@ -1061,8 +1069,8 @@ func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
 	}
 }
 
-func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2, satpoint int64, curseType int,
-	fields map[int][]byte, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
+func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2, satpoint int64, 
+	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
 
 	//if s.nft.Base.IsEnabled() {
 	sat := int64(-1)
@@ -1078,15 +1086,15 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 			InscriptionAddress: addressId2, // TODO 这个地址不是铭刻者，模型的问题，比较难改，直接使用输出地址
 			BlockHeight:        int32(block.Height),
 			BlockTime:          block.Timestamp.Unix(),
-			ContentType:        (fields[common.FIELD_CONTENT_TYPE]),
-			Content:            fields[common.FIELD_CONTENT],
-			ContentEncoding:    fields[common.FIELD_CONTENT_ENCODING],
-			MetaProtocol:       (fields[common.FIELD_META_PROTOCOL]),
-			MetaData:           fields[common.FIELD_META_DATA],
-			Parent:             common.ParseInscriptionId(fields[common.FIELD_PARENT]),
-			Delegate:           common.ParseInscriptionId(fields[common.FIELD_DELEGATE]),
+			ContentType:        insc.Inscription.ContentType,
+			Content:            insc.Inscription.Body,
+			ContentEncoding:    insc.Inscription.ContentEncoding,
+			MetaProtocol:       insc.Inscription.Metaprotocol,
+			MetaData:           insc.Inscription.Metadata,
+			Parent:             common.ParseInscriptionId(insc.Inscription.Parent),
+			Delegate:           common.ParseInscriptionId(insc.Inscription.Delegate),
 			Sat:                sat,
-			CurseType:          int32(curseType),
+			CurseType:          int32(insc.CurseReason),
 			TypeName:           common.ASSET_TYPE_NFT,
 		},
 		OwnerAddressId: addressId2,
