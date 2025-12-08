@@ -114,7 +114,7 @@ type Indexer interface {
 
 	// FT
 	// return: ticker's name -> ticker info
-	GetTickerMapV2(protcol string) map[string]*common.TickerInfo
+	GetTickerMapV2(protcol string) []string
 	// return: addressId -> asset amount
 	GetHoldersWithTickV2(tickerName *common.TickerName) map[uint64]*common.Decimal
 	// return: asset amount, mint times

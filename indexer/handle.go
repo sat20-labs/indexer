@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
-	//"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	"github.com/sat20-labs/indexer/indexer/ord"
+	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 )
 
 func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
@@ -19,41 +19,24 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 		return
 	}
 
-	detectOrdMap := make(map[string]int, 0)
 	measureStartTime := time.Now()
 	//common.Log.Info("processOrdProtocol ...")
 	count := 0
 	for _, tx := range block.Transactions {
 		id := 0
-		for _, input := range tx.Inputs {
+		for i, input := range tx.Inputs {
 
-			
-			//inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input, i)
-
-			inscriptions, envelopes, err := common.ParseInscription(input.Witness)
-			if err != nil {
-				// if len(inscriptions2) != 0 {
-				// 	common.Log.Panicf("find inscription in ord %s", tx.Txid)
-				// }
-				continue
-			}
-
-			// if len(inscriptions2) != len(inscriptions) {
-			// 	common.Log.Panicf("inscription count different %s", tx.Txid)
+			// if tx.TxId == "fbfa79f18e1132adf767a03f64776e412c13229693a5e6af55f8835f101b7615" {
+			// 	common.Log.Info("")
 			// }
 
-			for j, insc := range inscriptions {
-				s.handleOrd(input, insc, id, envelopes[j], tx, block)
+			inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input.Witness, block.Height, i)
+			for _, insc := range inscriptions2 {
+				s.handleOrd(input, insc, id, tx, block)
 				id++
 				count++
-
-				// if inscriptions2[j].IsCursed {
-				// 	common.Log.Errorf("%s:%d is cursed, reason %s", tx.Txid, id, inscriptions2[j].CurseReason.Error())
-				// }
 			}
-		}
-		if id > 0 {
-			detectOrdMap[tx.Txid] = id
+			
 		}
 	}
 	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
@@ -542,7 +525,12 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 		}
 	}
 
-	mint := &common.BRC20Mint{Nft: nft, Name: strings.ToLower(content.Ticker)}
+	mint := &common.BRC20Mint{
+		BRC20MintInDB: common.BRC20MintInDB{
+			Name: strings.ToLower(content.Ticker),
+		},
+		Nft: nft, 
+	}
 
 	// recover for decimal panic
 	defer func() {
@@ -590,9 +578,10 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 	}
 
 	transfer := &common.BRC20Transfer{
+		BRC20TransferInDB: common.BRC20TransferInDB{
+			Name: strings.ToLower(content.Ticker),
+		},
 		Nft:  nft,
-		Name: strings.ToLower(content.Ticker),
-		// UtxoId: nft.UtxoId,
 	}
 
 	// check amount
@@ -732,8 +721,8 @@ func (s *IndexerMgr) handleNameRouting(content *common.OrdxUpdateContentV2, nft 
 }
 
 func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint int, out *common.Output,
-	fields map[int][]byte, nft *common.Nft) {
-	ordxInfo, bOrdx := common.IsOrdXProtocol(fields)
+	insc *ord.InscriptionResult, nft *common.Nft) {
+	ordxInfo, bOrdx := ord.IsOrdXProtocol(insc)
 	if !bOrdx {
 		return
 	}
@@ -784,9 +773,9 @@ func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint
 }
 
 func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoint int, out *common.Output,
-	fields map[int][]byte, nft *common.Nft) {
+	insc *ord.InscriptionResult, nft *common.Nft) {
 
-	content := string(fields[common.FIELD_CONTENT])
+	content := string(insc.Inscription.Body)
 	ordxBaseContent := common.ParseBrc20BaseContent(content)
 	if ordxBaseContent == nil {
 		common.Log.Errorf("invalid content %s", content)
@@ -870,11 +859,11 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 }
 
 func (s *IndexerMgr) handleOrd(input *common.Input,
-	fields map[int][]byte, inscriptionId int, envelope []byte, tx *common.Transaction, block *common.Block) {
+	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) {
 
 	satpoint := 0
-	if fields[common.FIELD_POINT] != nil {
-		satpoint = common.GetSatpoint(fields[common.FIELD_POINT])
+	if insc.Inscription.Pointer != nil {
+		satpoint = common.GetSatpoint(insc.Inscription.Pointer)
 		if int64(satpoint) >= common.GetOrdinalsSize(input.Ordinals) {
 			satpoint = 0
 		}
@@ -900,7 +889,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 	}
 
 	// 1. 先保存nft数据
-	nft := s.handleNft(input, output, satpoint, fields, inscriptionId, tx, block)
+	nft := s.handleNft(input, output, satpoint, insc, inscriptionId, tx, block)
 	if nft == nil {
 		return
 	}
@@ -914,12 +903,12 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 	}
 
 	// 2. 再看看是否ordx协议
-	protocol, content := common.GetProtocol(fields)
+	protocol, content := ord.GetProtocol(insc)
 	switch protocol {
 	case "ordx":
-		s.handleOrdX(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		s.handleOrdX(input.UtxoId, input.Ordinals, satpoint, output, insc, nft)
 	case "sns":
-		domain := common.ParseDomainContent(string(fields[common.FIELD_CONTENT]))
+		domain := common.ParseDomainContent(string(insc.Inscription.Body))
 		if domain == nil {
 			domain = common.ParseDomainContent(string(content))
 		}
@@ -931,7 +920,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			case "update":
 				var updateInfo *common.OrdxUpdateContentV2
 				// 如果有metadata，那么不处理FIELD_CONTENT的内容
-				if string(fields[common.FIELD_META_PROTOCOL]) == "sns" && fields[common.FIELD_META_DATA] != nil {
+				if string(insc.Inscription.Metaprotocol) == "sns" && len(insc.Inscription.Metadata) != 0 {
 					updateInfo = common.ParseUpdateContent(string(content))
 					updateInfo.P = "sns"
 					value, ok := updateInfo.KVs["key"]
@@ -940,7 +929,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 						updateInfo.KVs[value] = nft.Base.InscriptionId
 					}
 				} else {
-					updateInfo = common.ParseUpdateContent(string(fields[common.FIELD_CONTENT]))
+					updateInfo = common.ParseUpdateContent(string(content))
 				}
 
 				if updateInfo == nil {
@@ -950,22 +939,25 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			}
 		}
 	case "brc-20":
-		if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
-			return
-		}
-		if brc20.IsCursed(envelope, inscriptionId, block.Height) {
-			common.Log.Infof("%s inscription is cursed", nft.Base.InscriptionId)
-			return
+		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
+		// 	return
+		// }
+		if nft.Base.CurseType != 0 {
+			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
+			if block.Height < 824544 { // Jubilee
+				return
+			}
+			// vindicated
 		}
 
-		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
+		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, insc, nft)
 		// if inscriptionId == 0 {
 		// TODO brc20 只处理tx中的第一个铭文？
 		// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
 		// }
 
 	case "primary-name":
-		primaryNameContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))
+		primaryNameContent := common.ParseCommonContent(string(insc.Inscription.Body))
 		if primaryNameContent != nil {
 			switch primaryNameContent.Op {
 			case "update":
@@ -982,7 +974,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		// content: { "p": "sns", "op": "reg", "name": "1866.sats"}
 		// or ： text/plain;charset=utf-8 {"p":"sns","op":"reg","name":"good.sats"}
 	case "btcname":
-		commonContent := common.ParseCommonContent(string(fields[common.FIELD_CONTENT]))
+		commonContent := common.ParseCommonContent(string(insc.Inscription.Body))
 		if commonContent != nil {
 			switch commonContent.Op {
 			case "routing":
@@ -1012,7 +1004,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		// text/plain;charset=utf-8 abc
 		// 或者简单文本 xxx.xx 或者 xx
 		if protocol == "" {
-			s.handleSnsName(string(fields[common.FIELD_CONTENT]), nft)
+			s.handleSnsName(string(insc.Inscription.Body), nft)
 		}
 	}
 
@@ -1036,7 +1028,7 @@ func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
 }
 
 func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpoint int,
-	fields map[int][]byte, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
+	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
 
 	//if s.nft.Base.IsEnabled() {
 	sat := int64(-1)
@@ -1054,14 +1046,15 @@ func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpo
 			InscriptionAddress: addressId2, // TODO 这个地址不是铭刻者，模型的问题，比较难改，直接使用输出地址
 			BlockHeight:        int32(block.Height),
 			BlockTime:          block.Timestamp.Unix(),
-			ContentType:        (fields[common.FIELD_CONTENT_TYPE]),
-			Content:            fields[common.FIELD_CONTENT],
-			ContentEncoding:    fields[common.FIELD_CONTENT_ENCODING],
-			MetaProtocol:       (fields[common.FIELD_META_PROTOCOL]),
-			MetaData:           fields[common.FIELD_META_DATA],
-			Parent:             common.ParseInscriptionId(fields[common.FIELD_PARENT]),
-			Delegate:           common.ParseInscriptionId(fields[common.FIELD_DELEGATE]),
+			ContentType:        insc.Inscription.ContentType,
+			Content:            insc.Inscription.Body,
+			ContentEncoding:    insc.Inscription.ContentEncoding,
+			MetaProtocol:       insc.Inscription.Metaprotocol,
+			MetaData:           insc.Inscription.Metadata,
+			Parent:             common.ParseInscriptionId(insc.Inscription.Parent),
+			Delegate:           common.ParseInscriptionId(insc.Inscription.Delegate),
 			Sat:                sat,
+			CurseType:          int32(insc.CurseReason),
 			TypeName:           common.ASSET_TYPE_NFT,
 		},
 		OwnerAddressId: addressId2,

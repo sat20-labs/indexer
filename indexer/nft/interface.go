@@ -140,9 +140,14 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 	return result
 }
 
+
 func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+	return p.getNftWithId(id)
+}
+
+func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
 
 	nft := p.getNftInBuffer(id)
 	if nft != nil {

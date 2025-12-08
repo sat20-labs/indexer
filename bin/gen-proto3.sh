@@ -5,5 +5,5 @@
 # protoc --go_out=paths=source_relative:. ./ordinals/pb/*.proto
 
 # protoc --go_out=paths=source_relative:. ./indexer/ns/pb/*.proto
-# protoc --go_out=paths=source_relative:. ./common/pb/*.proto
-protoc --go_out=paths=source_relative:. ./indexer/runes/pb/*.proto
+protoc --go_out=paths=source_relative:. ./common/pb/*.proto
+# protoc --go_out=paths=source_relative:. ./indexer/runes/pb/*.proto

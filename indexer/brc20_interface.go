@@ -6,26 +6,9 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-func (b *IndexerMgr) GetBRC20TickerMap() (map[string]*common.BRC20Ticker, error) {
-	return b.brc20Indexer.GetTickerMap()
-}
 
-
-func (b *IndexerMgr) GetBRC20TickerMapV2() (map[string]*common.TickerInfo) {
-	result := make(map[string]*common.TickerInfo)
-	tickers := b.brc20Indexer.GetAllTickers()
-	for _, tickerName := range tickers {
-		t := b.GetBRC20TickerV2(tickerName)
-		if t != nil {
-			assetName := common.TickerName{
-				Protocol: common.PROTOCOL_NAME_BRC20,
-				Type: common.ASSET_TYPE_FT,
-				Ticker: tickerName,
-			}
-			result[assetName.String()] = t
-		}
-	}
-	return result
+func (b *IndexerMgr) GetBRC20TickerMapV2() []string {
+	return b.brc20Indexer.GetAllTickers()
 }
 
 
@@ -83,7 +66,7 @@ func (p *IndexerMgr) GetBRC20MintHistoryWithAddress(addressId uint64, ticker str
 	result := make([]*common.InscribeBaseContent, 0)
 	infos, total := p.brc20Indexer.GetMintHistoryWithAddress(addressId, ticker, start, limit)
 	for _, info := range infos {
-		mint := p.brc20Indexer.GetMint(ticker, info.InscriptionId)
+		mint := p.brc20Indexer.GetMint(ticker, info.Id)
 		if mint != nil {
 			result = append(result, mint.Nft.Base)
 		}

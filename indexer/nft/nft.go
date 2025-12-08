@@ -9,6 +9,8 @@ import (
 	"github.com/sat20-labs/indexer/indexer/base"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 type SatInfo struct {
@@ -194,6 +196,22 @@ func (p *NftIndexer) Repair() {
 func (p *NftIndexer) NftMint(nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+
+	if nft.Base.Sat >= 0 {
+		// 检查是否同一个聪上有多个铸造
+		nftsInSat := p.getNftsWithSat(nft.Base.Sat)
+		if nftsInSat != nil {
+			for _, n := range nftsInSat.Nfts {
+				if n.CurseType == 0 {
+					// 已经存在非cursed的铭文，后面的铭文都是cursed
+					nft.Base.CurseType = int32(ordCommon.Reinscription)
+					common.Log.Infof("%s is reinscription in sat %d, the first non-cursed inscription %s",
+					nft.Base.InscriptionId, nft.Base.Sat, n.InscriptionId)
+					break
+				}
+			}
+		}
+	}
 
 	nft.Base.Id = int64(p.status.Count)
 	p.status.Count++

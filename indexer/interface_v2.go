@@ -59,7 +59,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 	// common.Log.Infof("GetUTXOs takes %v", time.Since(t1))
 	// t1 = time.Now()
 
-	
 	mid := make([]*common.TxOutput, 0)
 	for utxoId := range utxos {
 		utxo, err := b.rpcService.GetUtxoByID(utxoId)
@@ -102,7 +101,6 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 
 	return result, nil
 }
-
 
 func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *common.TxOutput {
 	b.rpcEnter()
@@ -406,8 +404,8 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 }
 
 // FT
-// return: ticker's name -> ticker info
-func (b *IndexerMgr) GetTickerMapV2(protocol string) map[string]*common.TickerInfo {
+// return: 按照铸造顺序排序的ticker名称，非完整名称
+func (b *IndexerMgr) GetTickerMapV2(protocol string) []string {
 	b.rpcEnter()
 	defer b.rpcLeft()
 
@@ -520,8 +518,6 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 	return 0
 }
 
-
-
 func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 	b.rpcEnter()
 	defer b.rpcLeft()
@@ -551,7 +547,6 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 	}
 	return err
 }
-
 
 func (b *IndexerMgr) IsUtxoSpent(utxo string) bool {
 	return b.miniMempool.IsSpent(utxo)
