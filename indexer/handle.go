@@ -110,18 +110,19 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 		}
 		outValue += txOut.OutValue.Value
 	}
-	// TODO 正式版本直接返回，遵循ordinals协议的规则。
-	//return nil // 遵循ordinals协议的规则
+	if satpoint > 0 {
+		// 如果satpoint大于0，但是不在输出中，就在外面修改satpoint的值，同时直接定位为0
+		return nil // 遵循ordinals协议的规则
+	}
 
-	// 另外一种规则: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f
-	posInFee := int64(satpoint) - outValue
-	// 作为网络费用给到了矿工，位置在手续费的 posInFee 位置
-
+	// 如果satpoint == 0，聪输出在奖励区块中
+	// 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f
+	
+	// 作为网络费用给到了矿工，位置在手续费的0位置
 	var baseOffset int64
-	for i := 0; i < index; i++ { // 0 是奖励聪
+	for i := 0; i < index; i++ { // 0 是奖励聪，跳过前面index-1个交易的手续费，
 		baseOffset += coinbase[i].Size
 	}
-	baseOffset += posInFee
 
 	coinbaseTx := block.Transactions[0]
 	outValue = 0
@@ -617,10 +618,10 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 	cmpResult := mintedAmt.Cmp(&ticker.Max)
 	if cmpResult > 0 {
 		amt = ticker.Max.Sub(&ticker.Minted)
-		common.Log.Warnf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
+		common.Log.Debugf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
 	}
 	if amt.Sign() <= 0 {
-		common.Log.Warnf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
+		common.Log.Debugf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
 		return nil
 	}
 	mint.Amt = *amt
@@ -932,7 +933,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	index := int(insc.TxInIndex)
 
 	var output *common.TxOutputV2
-	// 根据偏移找到对应的输出 注意这里跟ordinals协议的细微区别：ordinals协议是根据输出确定satpoint的位置，
+	// 根据偏移找到对应的输出：ordinals协议根据输出确定satpoint的位置，
 	// 而我们认为是在输入确定satpoint的位置，只要satpoint不超过输入的value，就是有效的satpoint
 	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 最后一个satpoint指向了给矿工的手续费
 	
