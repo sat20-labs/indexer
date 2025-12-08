@@ -12,6 +12,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/ord"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 var curseCount int
@@ -25,7 +26,6 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	//detectOrdMap := make(map[string]int, 0)
 	measureStartTime := time.Now()
 	//common.Log.Info("processOrdProtocol ...")
-	count := 0
 	for _, tx := range block.Transactions {
 		id := 0
 		for i, input := range tx.Inputs {
@@ -39,7 +39,9 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 			for _, insc := range inscriptions2 {
 				s.handleOrd(input, insc, id, tx, block, coinbase)
 				id++
-				count++
+				if insc.IsCursed {
+					curseCount++
+				}
 			}
 			
 			// for k, insc := range inscriptions2 {
@@ -1105,6 +1107,10 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		Offset:         satpoint,
 	}
 	s.nft.NftMint(input, &nft)
+	if !insc.IsCursed && nft.Base.CurseType != 0 {
+		insc.IsCursed = true
+		insc.CurseReason = ordCommon.Curse(nft.Base.CurseType)
+	}
 	return &nft
 	// }
 	// return nil
