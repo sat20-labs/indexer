@@ -875,17 +875,24 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 	if sat > 0 {
 		output = findOutputWithSat(tx, sat)
 		if output == nil {
-			output = findOutputWithSat(block.Transactions[0], sat)
-			if output == nil {
-				common.Log.Errorf("processOrdProtocol: tx: %s, findOutputWithSat %d failed", tx.Txid, sat)
-				return
+			// 按照ordinals协议的规则，如果satpoint>0, 并且不在输出的utxo中，satpoint需要修改为0
+			if satpoint > 0 {
+				satpoint = 0
+				output = tx.Outputs[0]
+			} else {
+				// 如果satpoint为0，而且还找不到，那默认就在奖励区块中
+				output = findOutputWithSat(block.Transactions[0], sat)
+				if output == nil {
+					common.Log.Errorf("processOrdProtocol: tx: %s, findOutputWithSat %d failed", tx.Txid, sat)
+					return
+				}
 			}
 		}
 	} else {
 		// 99e70421ab229d1ccf356e594512da6486e2dd1abdf6c2cb5014875451ee8073:0  788312
 		// c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151:0  788200
 		// 输入为0，输出也只有一个，也为0
-
+		satpoint = 0
 		output = tx.Outputs[0]
 	}
 
