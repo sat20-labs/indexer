@@ -197,7 +197,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if nft.Base.Sat >= 0 {
+	if nft.Base.Sat >= 0 && nft.Base.CurseType == 0{
 		// 检查是否同一个聪上有多个铸造
 		nftsInSat := p.getNftsWithSat(nft.Base.Sat)
 		if nftsInSat != nil {

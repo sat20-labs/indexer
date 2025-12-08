@@ -12,6 +12,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/ord"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
@@ -1061,6 +1062,10 @@ func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpo
 		UtxoId:         utxoId,
 	}
 	s.nft.NftMint(&nft)
+	if !insc.IsCursed && nft.Base.CurseType != 0 {
+		insc.IsCursed = true
+		insc.CurseReason = ordCommon.Curse(nft.Base.CurseType)
+	}
 	return &nft
 	// }
 	// return nil
