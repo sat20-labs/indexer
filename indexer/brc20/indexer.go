@@ -241,23 +241,19 @@ func (s *BRC20Indexer) printHistory(name string) {
 		}
 	}
 	fmt.Printf("total in mint: %s\n", total.String())
-	total = nil
-	for addressId, amt := range holders {
-		fmt.Printf("%x: %s\n", addressId, amt.String())
-		total = total.Add(amt)
-	}
-	fmt.Printf("total in holders: %s\n", total.String())
+
+	printHolders(holders)
 }
 
-func (s *BRC20Indexer) printHolders(name string) {
-	holdermap := s.GetHoldersWithTick(name)
+func printHolders(holders map[uint64]*common.Decimal) {
+	
 	var total *common.Decimal
 	type pair struct {
 		addressId uint64
 		amt *common.Decimal
 	}
 	mid := make([]*pair, 0)
-	for addressId, amt := range holdermap {
+	for addressId, amt := range holders {
 		//fmt.Printf("%x: %s\n", addressId, amt.String())
 		total = total.Add(amt)
 		mid = append(mid, &pair{
@@ -272,6 +268,11 @@ func (s *BRC20Indexer) printHolders(name string) {
 		fmt.Printf("%d: %x %s\n", i, item.addressId, item.amt.String())
 	}
 	fmt.Printf("total in holders: %s\n", total.String())
+}
+
+func (s *BRC20Indexer) printHolders(name string) {
+	holdermap := s.GetHoldersWithTick(name)
+	printHolders(holdermap)
 }
 
 // 自检。如果错误，将停机
