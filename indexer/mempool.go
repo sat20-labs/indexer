@@ -88,8 +88,6 @@ func (p *MiniMemPool) Stop() {
 
 // 通过RPC拉取mempool
 func (p *MiniMemPool) fetchMempoolFromRPC() {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
     start := time.Now()
     common.Log.Infof("start to fetch all tx from mempool")
     txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
@@ -119,8 +117,6 @@ func (p *MiniMemPool) fetchMempoolFromRPC() {
 
 // 重新同步池子
 func (p *MiniMemPool) resyncMempoolFromRPC() {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
     start := time.Now()
     common.Log.Infof("start to fetch all tx from mempool")
     txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
@@ -130,6 +126,7 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
     }
     newMap := make(map[string]bool)
     add := make([]string, 0)
+    p.mutex.Lock()
     for _, txId := range txIds {
         newMap[txId] = true
         _, ok := p.txMap[txId]
@@ -146,14 +143,21 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
         }
         del = append(del, k)
     }
+    p.mutex.Unlock()
 
     common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
     common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
 
     if len(txIds) == len(add) {
         // 全新数据
+        p.mutex.Lock()
         p.init()
+        p.mutex.Unlock()
+
         for _, txId := range txIds {
+            if !p.running {
+                return
+            }
             txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
             if err != nil {
                 common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
@@ -166,17 +170,21 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
             }
             p.txBroadcasted(tx)
         }
-        
     } else {
         // 部分更新
+        p.mutex.Lock()
         for _, txId := range del {
             tx, ok := p.txMap[txId]
             if ok {
                 p.txConfirmed(tx)
             }
         }
+        p.mutex.Unlock()
 
         for _, txId := range add {
+            if !p.running {
+                return
+            }
             txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
             if err != nil {
                 common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
@@ -217,21 +225,31 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
+    p.mutex.RLock()
     _, ok := p.txMap[txId]
     if ok {
+        p.mutex.RUnlock()
         common.Log.Debugf("tx %s already in mempool", txId)
         return 
     }
     p.txMap[txId] = tx
     common.Log.Debugf("add tx %s to mempool %d", txId, len(p.txMap))
 
-    preFectcher := make(map[string]*common.TxOutput)
+    // shallow snapshot of unConfirmedUtxoMap for rebuild
+    preFectcher := make(map[string]*common.TxOutput, len(p.unConfirmedUtxoMap))
+    for k, v := range p.unConfirmedUtxoMap {
+        preFectcher[k] = v
+    }
+    p.mutex.RUnlock()
+
+    // Heavy work OUTSIDE LOCK:
     inputs, outpus, err := p.rebuildTxOutput(tx, preFectcher)
     if err != nil {
         common.Log.Errorf("rebuildTxOutput %s failed, %v", txId, err)
         return 
     }
 
+    p.mutex.Lock()
     for _, info := range inputs {
         addr, err := common.PkScriptToAddr(info.OutValue.PkScript, netParam)
         if err != nil {
@@ -273,6 +291,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         }
         user.UnconfirmedUtxoMap[unconfirmedUtxo] = true
     }
+    p.mutex.Unlock()
 }
 
 
@@ -445,8 +464,6 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 			ChainParams:      instance.GetChainParam(),
 			Listeners: peer.MessageListeners{
 				OnTx: func(_ *peer.Peer, msg *wire.MsgTx) {
-                    p.mutex.Lock()
-                    defer p.mutex.Unlock()
                     if !p.running {
                         return
                     }
@@ -507,13 +524,12 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 
 // 处理已经确认的tx
 func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
-
     start := time.Now()
+    p.mutex.Lock()
     for _, tx := range msg.Transactions {
         p.txConfirmed(tx)
     }
+    p.mutex.Unlock()
      common.Log.Infof("ProcessBlock completed, new size %d. %v", len(p.txMap), time.Since(start).String())
 
     if time.Now().Unix() - p.lastSyncTime >= 36000 {
@@ -740,41 +756,40 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 
 		info, ok := preFectcher[utxo]
 		if !ok {
-            info, ok = p.unConfirmedUtxoMap[utxo]
-            if !ok {
-                info = instance.GetTxOutputWithUtxoV2(utxo, true)
-                if info == nil {
-                    // 递归调用
-                    preTxId := txIn.PreviousOutPoint.Hash.String()
-                    preTx := p.txMap[preTxId]
-                    if preTx == nil {
-                        common.Log.Debugf("rebuildTxOutput GetTx %s failed", preTxId)
-                        txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
-                        if err != nil {
-                            common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
-                            return nil, nil, err
-                        }
-                        preTx, err = DecodeMsgTx(txHex)
-                        if err != nil {
-                            common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
-                            return nil, nil, err
-                        }
-                    }
-                    _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
+            info = instance.GetTxOutputWithUtxoV2(utxo, true)
+            if info == nil {
+                // 递归调用
+                preTxId := txIn.PreviousOutPoint.Hash.String()
+                p.mutex.RLock()
+                preTx := p.txMap[preTxId]
+                p.mutex.RUnlock()
+                if preTx == nil {
+                    common.Log.Debugf("rebuildTxOutput GetTx %s failed", preTxId)
+                    txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
                     if err != nil {
-                        common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
+                        common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
                         return nil, nil, err
                     }
-                    for _, out := range outs {
-                        preFectcher[out.OutPointStr] = out
+                    preTx, err = DecodeMsgTx(txHex)
+                    if err != nil {
+                        common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
+                        return nil, nil, err
                     }
-                    info = outs[txIn.PreviousOutPoint.Index]
                 }
+                _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
+                if err != nil {
+                    common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
+                    return nil, nil, err
+                }
+                for _, out := range outs {
+                    preFectcher[out.OutPointStr] = out
+                }
+                info = outs[txIn.PreviousOutPoint.Index]
             }
             preFectcher[utxo] = info
 		}
 
-        s, err := p.processInscription(tx, i, preFectcher)
+        s, err := processInscription(tx, i, preFectcher)
 		if err == nil {
 			// 处理铸造铸造结果 
             // 将铸造结果当作input的资产数据，直接添加到info中, 在cut中按照sat的位置分配资产结果
@@ -910,7 +925,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 }
 
 // 只处理transfer，并且没有做数据校验
-func (p *MiniMemPool) processInscription(tx *wire.MsgTx, i int, 
+func processInscription(tx *wire.MsgTx, i int, 
     preFectcher map[string]*common.TxOutput) (int, error) {
     
     txIn := tx.TxIn[i]
