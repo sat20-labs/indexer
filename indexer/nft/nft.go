@@ -18,7 +18,25 @@ type SatInfo struct {
 	AddressId uint64
 	UtxoId    uint64
 	Offset    int64
+	CurseCount int
 	Nfts      map[int64]bool // nftId
+}
+
+func (p *SatInfo) ToNftsInSat(sat int64) *common.NftsInSat {
+	nfts := &common.NftsInSat{
+		Sat: sat,
+		OwnerAddressId: p.AddressId,
+		UtxoId: p.UtxoId,
+		Offset: p.Offset,
+		CurseCount: int32(p.CurseCount),
+	}
+	for k := range p.Nfts {
+		nfts.Nfts = append(nfts.Nfts, k)
+	}
+	sort.Slice(nfts.Nfts, func(i, j int) bool {
+		return nfts.Nfts[i] < nfts.Nfts[j]
+	})
+	return nfts
 }
 
 // 所有nft的记录
@@ -47,6 +65,7 @@ type NftIndexer struct {
 	lastContentTypeId  int
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
+	nftBuffer       []*common.Nft // 一个区块内的缓存
 	nftAdded        []*common.Nft                    // 保持顺序
 	nftAddedUtxoMap map[uint64]map[int64]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
 	utxoDeled       []uint64
@@ -122,6 +141,7 @@ func (p *NftIndexer) Clone() *NftIndexer {
 			AddressId: v.AddressId,
 			UtxoId:    v.UtxoId,
 			Offset:    v.Offset,
+			CurseCount: v.CurseCount,
 			Nfts:      make(map[int64]bool),
 		}
 		for nftId := range v.Nfts {
@@ -303,20 +323,21 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+	//p.nftBuffer = append(p.nftBuffer, nft)
+
+	p.nftMint(input, nft)
+}
+
+func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 
 	if nft.Base.Sat >= 0 && nft.Base.CurseType == 0 {
 		// 检查是否同一个聪上有多个铸造
 		nftsInSat := p.getNftsWithSat(nft.Base.Sat)
 		if nftsInSat != nil {
-			for _, nftId := range nftsInSat.Nfts {
-				n := p.getNftWithId(nftId)
-				if n != nil && n.Base.CurseType == 0 {
-					// 已经存在非cursed的铭文，后面的铭文都是cursed
-					nft.Base.CurseType = int32(ordCommon.Reinscription)
-					common.Log.Infof("%s is reinscription in sat %d, the first non-cursed inscription %s",
-					nft.Base.InscriptionId, nft.Base.Sat, n.Base.InscriptionId)
-					break
-				}
+			if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+				// 已经存在非cursed的铭文，后面的铭文都是reinscription
+				nft.Base.CurseType = int32(ordCommon.Reinscription)
+				common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 			}
 		}
 	}
@@ -466,6 +487,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				AddressId: value.OwnerAddressId,
 				UtxoId:    value.UtxoId,
 				Offset:    value.Offset,
+				CurseCount: int(value.CurseCount),
 				Nfts:      make(map[int64]bool),
 			}
 			for _, nftId := range value.Nfts {
@@ -524,6 +546,9 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 						p.satMap[nft.Base.Sat] = info
 					}
 					info.Nfts[nft.Base.Id] = true
+					if nft.Base.CurseType != 0 {
+						info.CurseCount++
+					}
 				}
 			}
 
@@ -749,6 +774,7 @@ func (p *NftIndexer) UpdateDB() {
 			OwnerAddressId: nft.AddressId,
 			UtxoId:         nft.UtxoId,
 			Offset:         nft.Offset,
+			CurseCount:     int32(nft.CurseCount),
 			Nfts:           make([]int64, 0, len(nft.Nfts)),
 		}
 		for k := range nft.Nfts {

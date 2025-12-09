@@ -189,22 +189,20 @@ func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 	if _, ok := p.disabledSats[sat]; ok {
 		return nil
-	}
-	nfts := &common.NftsInSat{}
-	err := loadNftsInSatFromDB(sat, nfts, p.db)
-	addedNfts := p.getNftInBuffer4(sat)
-	if len(addedNfts) != 0 {
-		if err != nil {
-			nfts.OwnerAddressId = addedNfts[0].OwnerAddressId
-			nfts.Sat = addedNfts[0].Base.Sat
-			nfts.UtxoId = addedNfts[0].UtxoId
-			nfts.Offset = addedNfts[0].Offset
-		}
-		for _, nft := range addedNfts {
-			nfts.Nfts = append(nfts.Nfts, nft.Base.Id)
-		}
+	
 	}
 
+	info, ok := p.satMap[sat]
+	if ok {
+		return info.ToNftsInSat(sat)
+	}
+
+	nfts := &common.NftsInSat{}
+	err := loadNftsInSatFromDB(sat, nfts, p.db)
+	if err != nil {
+		return nil
+	}
+	
 	return nfts
 }
 

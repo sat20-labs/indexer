@@ -37,7 +37,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 		
 			inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input.Witness, block.Height, i)
 			for _, insc := range inscriptions2 {
-				s.handleOrd(input, insc, id, tx, block, coinbase)
+				s.handleOrd(input, insc, id, tx, block, coinbase) // 尽可能只缓存，不读数据库
 				id++
 				count++
 				if insc.IsCursed {
@@ -848,12 +848,12 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 	content := string(insc.Inscription.Body)
 	ordxBaseContent := common.ParseBrc20BaseContent(content)
 	if ordxBaseContent == nil {
-		common.Log.Errorf("invalid content %s", content)
+		common.Log.Debugf("invalid content %s", content)
 		return
 	}
 
 	if out.OutValue.Value == 0 {
-		common.Log.Errorf("invalid brc20 inscription %s", nft.Base.InscriptionId)
+		common.Log.Debugf("invalid brc20 inscription %s", nft.Base.InscriptionId)
 		return
 	}
 
@@ -1008,10 +1008,6 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		}
 
 		s.handleBrc20(input.UtxoId, satpoint, output, insc, nft)
-		// if inscriptionId == 0 {
-		// TODO brc20 只处理tx中的第一个铭文？
-		// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
-		// }
 
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(insc.Inscription.Body))

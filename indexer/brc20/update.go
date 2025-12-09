@@ -18,6 +18,16 @@ func (s *BRC20Indexer) UpdateInscribeDeploy(ticker *common.BRC20Ticker) {
 }
 
 func (s *BRC20Indexer) updateInscribeDeploy(ticker *common.BRC20Ticker) {
+	// 再次检查，因为nft可能会修改reinsription状态
+	nft := ticker.Nft
+	if nft.Base.CurseType != 0 { 
+		common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
+		if nft.Base.BlockHeight < 824544 { // Jubilee
+			return
+		}
+		// vindicated
+	}
+
 	name := strings.ToLower(ticker.Name)
 
 	ticker.Id = int64(s.status.TickerCount)
@@ -40,6 +50,14 @@ func (s *BRC20Indexer) UpdateInscribeMint(mint *common.BRC20Mint) {
 }
 
 func (s *BRC20Indexer) updateInscribeMint(mint *common.BRC20Mint) {
+	if mint.Nft.Base.CurseType != 0 { 
+		common.Log.Debugf("%s inscription is cursed, %d", mint.Nft.Base.InscriptionId, mint.Nft.Base.CurseType)
+		if mint.Nft.Base.BlockHeight < 824544 { // Jubilee
+			return
+		}
+		// vindicated
+	}
+
 	name := strings.ToLower(mint.Name)
 	ticker := s.tickerMap[name]
 
@@ -108,6 +126,13 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(transfer *common.BRC20Transfer) {
 }
 
 func (s *BRC20Indexer) updateInscribeTransfer(transfer *common.BRC20Transfer) {
+	if transfer.Nft.Base.CurseType != 0 { 
+		common.Log.Debugf("%s inscription is cursed, %d", transfer.Nft.Base.InscriptionId, transfer.Nft.Base.CurseType)
+		if transfer.Nft.Base.BlockHeight < 824544 { // Jubilee
+			return
+		}
+		// vindicated
+	}
 
 	tickerName := strings.ToLower(transfer.Name)
 	addressId := transfer.Nft.OwnerAddressId
