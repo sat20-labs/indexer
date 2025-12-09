@@ -539,6 +539,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 
 	mint := &common.BRC20Mint{
 		BRC20MintInDB: common.BRC20MintInDB{
+			NftId: nft.Base.Id,
 			Name: strings.ToLower(content.Ticker),
 		},
 		Nft: nft, 

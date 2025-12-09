@@ -8,6 +8,26 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+
+func initStatusFromDB(ldb common.KVDB) *common.BRC20Status {
+	stats := &common.BRC20Status{}
+	err := db.GetValueFromDB([]byte(BRC20_DB_STATUS_KEY), stats, ldb)
+	if err == common.ErrKeyNotFound {
+		common.Log.Info("initStatusFromDB no stats found in db")
+		stats.Version = BRC20_DB_VERSION
+	} else if err != nil {
+		common.Log.Panicf("initStatusFromDB failed. %v", err)
+	}
+	common.Log.Infof("nft stats: %v", stats)
+
+	if stats.Version != BRC20_DB_VERSION {
+		common.Log.Panicf("nft data version inconsistent %s", BRC20_DB_VERSION)
+	}
+
+	return stats
+}
+
+
 func (s *BRC20Indexer) initTickInfoFromDB(tickerName string) *BRC20TickInfo {
 	tickinfo := newTickerInfo(tickerName)
 	ticker := s.loadTickerFromDB(tickerName)

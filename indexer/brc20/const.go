@@ -2,6 +2,7 @@ package brc20
 
 const BRC20_DB_VERSION = "1.0.0"
 const BRC20_DB_VER_KEY = "dbver"
+const BRC20_DB_STATUS_KEY = "status"
 
 const (
 	DB_PREFIX_MINTHISTORY          = "a-"

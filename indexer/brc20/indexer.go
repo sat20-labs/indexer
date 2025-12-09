@@ -43,6 +43,7 @@ type TransferNftInfo struct {
 type BRC20Indexer struct {
 	db           common.KVDB
 	nftIndexer   *nft.NftIndexer
+	status       *common.BRC20Status
 	enableHeight int
 
 	// 缓存数据，非全量数据
@@ -53,7 +54,11 @@ type BRC20Indexer struct {
 	//tickerToHolderMap map[string]map[uint64]bool  // ticker -> addrId. 动态数据，跟随Holder变更，当前区块所需数据
 
 	// 其他辅助信息
+	deployBuffer 	 []*common.BRC20Ticker // 保存一个区块
+	mintOrTransferBuffer []any             // 保存一个区块
+
 	holderActionList []*HolderAction                // 在同一个block中，状态变迁需要按顺序执行
+	tickerAdded      []*common.BRC20Ticker
 	tickerUpdated    map[string]*common.BRC20Ticker // key: ticker
 }
 
@@ -95,6 +100,9 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 
 	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
 	copy(newInst.holderActionList, s.holderActionList)
+
+	newInst.tickerAdded = make([]*common.BRC20Ticker, len(s.tickerAdded))
+	copy(newInst.tickerAdded, s.tickerAdded)
 
 	newInst.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
 	for key, value := range s.tickerUpdated {
@@ -143,6 +151,9 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	for key, value := range s.transferNftMap {
 		newInst.transferNftMap[key] = value
 	}
+
+	newInst.status = s.status.Clone()
+
 	return newInst
 }
 
@@ -151,6 +162,8 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 
 	//s.holderActionList = s.holderActionList[len(another.holderActionList):]
 	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)
+
+	s.tickerAdded = append([]*common.BRC20Ticker(nil), s.tickerAdded[len(another.tickerAdded):]...)
 
 	for key := range another.tickerUpdated {
 		delete(s.tickerUpdated, key)
@@ -177,6 +190,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 	if s.nftIndexer.GetBaseIndexer().IsMainnet() && version == "" {
 		s.initCursorInscriptionsDB()
 	}
+	s.status = initStatusFromDB(s.db)
 	common.Log.Infof("brc20 db version: %s", version)
 	common.Log.Info("InitIndexer ...")
 
@@ -265,6 +279,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		mintAmount, _ := s.GetMintAmount(name)
 		if ticker.Id < 10 {
 			common.Log.Infof("ticker %s, minted %s", name, mintAmount.String())
+			//s.printHistory(name)
+			//s.printHolders(name)
 		}
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
