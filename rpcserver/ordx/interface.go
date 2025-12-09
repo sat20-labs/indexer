@@ -944,7 +944,9 @@ func (s *Model) baseContentToNftItem(info *common.InscribeBaseContent) *rpcwire.
 		InscriptionId:      info.InscriptionId,
 		BlockHeight:        int(info.BlockHeight),
 		BlockTime:          info.BlockTime,
-		InscriptionAddress: s.indexer.GetAddressById(info.InscriptionAddress)}
+		InscriptionAddress: s.indexer.GetAddressById(info.InscriptionAddress),
+		CurseType:          int(info.CurseType),
+	}
 }
 
 func (s *Model) nftToItem(info *common.Nft) *rpcwire.NftItem {

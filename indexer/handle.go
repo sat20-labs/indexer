@@ -51,44 +51,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 					}
 				}
 			}
-			
-			// for k, insc := range inscriptions2 {
-			// 	if insc.IsCursed {
-			// 		curseCount++
-			// 		if insc.CurseReason != ordCommon.NotAtOffsetZero && 
-			// 		insc.CurseReason != ordCommon.Pointer && 
-			// 		insc.CurseReason != ordCommon.Pushnum &&  // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
-			// 		insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
- 			// 		insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
-			// 		insc.CurseReason != ordCommon.IncompleteField {// testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
-			// 			common.Log.Errorf("%si%d is cursed, reason %d", tx.TxId, k, insc.CurseReason)
-			// 		}
-			// 	}
-			// }
-
-			// inscriptions, envelopes, err := common.ParseInscription(input.Witness)
-			// if err != nil {
-			// 	if len(inscriptions2) != 0 {
-			// 		common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
-			// 	}
-			// 	continue
-			// }
-
-			// if len(inscriptions2) != len(inscriptions) {
-			// 	if tx.TxId != "fbfa79f18e1132adf767a03f64776e412c13229693a5e6af55f8835f101b7615" {
-			// 		common.Log.Panicf("inscription count different %s, ord=%d, our=%d", tx.TxId, len(inscriptions2), len(inscriptions))
-			// 	}
-			// }
-
-			// for j, insc := range inscriptions {
-			// 	s.handleOrd(input, insc, id, envelopes[j], 0, tx, block, coinbase, i)
-			// 	id++
-			// 	count++
-			// }
 		}
-		// if id > 0 {
-		// 	detectOrdMap[tx.TxId] = id
-		// }
 	}
 	common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
 	common.Log.Infof("height: %d, total cursed: %d", block.Height, s.nft.GetStatus().CurseCount)
@@ -103,24 +66,21 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 
-	// 检测是否一致，如果不一致，需要进一步调试。
-	// s.detectInconsistent(detectOrdMap, block.Height)
-
 	common.Log.Infof("processOrdProtocol %d is done, cost: %v", block.Height, time.Since(measureStartTime))
 }
 
 func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
-	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2) {
+	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64) {
 	var outValue int64
 	for _, txOut := range tx.Outputs {
 		if outValue+txOut.OutValue.Value >= int64(satpoint) {
-			return txOut
+			return txOut, satpoint
 		}
 		outValue += txOut.OutValue.Value
 	}
 	if satpoint > 0 {
 		// 如果satpoint大于0，但是不在输出中，就在外面修改satpoint的值，同时直接定位为0
-		return nil // 遵循ordinals协议的规则
+		return tx.Outputs[0], 0 // 遵循ordinals协议的规则
 	}
 
 	// 如果satpoint == 0，聪输出在奖励区块中
@@ -136,12 +96,12 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	outValue = 0
 	for _, txOut := range coinbaseTx.Outputs {
 		if outValue+txOut.OutValue.Value >= baseOffset {
-			return txOut
+			return txOut, 0
 		}
 		outValue += txOut.OutValue.Value
 	}
 	// 没有绑定聪的铭文
-	return nil
+	return tx.Outputs[0], 0
 }
 
 func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
@@ -942,20 +902,21 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	index := int(insc.TxInIndex)
 
 	var output *common.TxOutputV2
-	// 根据偏移找到对应的输出：ordinals协议根据输出确定satpoint的位置，
-	// 而我们认为是在输入确定satpoint的位置，只要satpoint不超过输入的value，就是有效的satpoint
-	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 最后一个satpoint指向了给矿工的手续费
 	
-	// 最终，我们决定尽可能遵循ordinals的规则
-	output = findOutputWithSatPoint(block, coinbase, index, tx, satpoint)
-	if output == nil {
-		output = tx.Outputs[0]
-		satpoint = 0
-	}
+	// 遵循ordinals的规则
+	output, satpoint = findOutputWithSatPoint(block, coinbase, index, tx, satpoint)
 
 	// 1. 先保存nft数据
 	nft := s.handleNft(input, output, satpoint, insc, inscriptionId, tx, block)
 	if nft == nil {
+		return
+	}
+
+	if input.OutValue.Value == 0 {
+		// 虽然ordinals.com解析出了这个交易，但是我们认为该交易没有输入的sat，也就是无法将数据绑定到某一个sat上，违背了协议原则
+		// 特殊交易，ordx不支持，不处理
+		// c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151
+		// TODO 0605版本中，没有把这个nft编译进来
 		return
 	}
 
@@ -999,7 +960,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
 		// 	return
 		// }
-		if nft.Base.CurseType != 0 && block.Height < 824544 { 
+		if nft.Base.CurseType != 0 { 
 			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
 			if block.Height < 824544 { // Jubilee
 				return
@@ -1110,7 +1071,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		},
 		OwnerAddressId: addressId2,
 		UtxoId:         output.UtxoId,
-		Offset:         satpoint,
+		Offset:         satpoint, // 在input中的偏移
 	}
 	s.nft.NftMint(input, &nft)
 	if !insc.IsCursed && nft.Base.CurseType != 0 {

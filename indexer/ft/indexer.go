@@ -212,7 +212,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 
 	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
 	startTime := time.Now()
-	for name := range s.tickerMap {
+	for _, name := range s.GetAllTickers() {
 		//common.Log.Infof("checking ticker %s", name)
 		holdermap := s.GetHolderAndAmountWithTick(name)
 		holderAmount := int64(0)

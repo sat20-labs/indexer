@@ -157,6 +157,7 @@ type NftItem struct {
 	BlockHeight        int    `json:"height"`
 	BlockTime          int64  `json:"time"`
 	InscriptionAddress string `json:"inscriptionAddress"`
+	CurseType          int    `json:"curse,omitempty"`
 }
 
 type KVItem struct {

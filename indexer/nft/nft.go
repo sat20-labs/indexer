@@ -66,8 +66,8 @@ type NftIndexer struct {
 
 	// 状态变迁，做为buffer使用时注意数据可能过时
 	nftBuffer       []*common.Nft // 一个区块内的缓存
-	nftAdded        []*common.Nft                    // 保持顺序
-	nftAddedUtxoMap map[uint64]map[int64]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
+	nftAdded        []*common.Nft // 保持顺序
+	nftAddedUtxoMap map[uint64][]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
 	utxoDeled       []uint64
 }
 
@@ -113,7 +113,7 @@ func (p *NftIndexer) reset() {
 	p.utxoMap = make(map[uint64][]*SatOffset)
 	p.satMap = make(map[int64]*SatInfo)
 	p.nftAdded = make([]*common.Nft, 0)
-	p.nftAddedUtxoMap = make(map[uint64]map[int64]*common.Nft)
+	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
 	p.utxoDeled = make([]uint64, 0)
 }
 
@@ -330,17 +330,18 @@ func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
 
 func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 
-	if nft.Base.Sat >= 0 && nft.Base.CurseType == 0 {
-		// 检查是否同一个聪上有多个铸造
-		nftsInSat := p.getNftsWithSat(nft.Base.Sat)
-		if nftsInSat != nil {
-			if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
-				// 已经存在非cursed的铭文，后面的铭文都是reinscription
-				nft.Base.CurseType = int32(ordCommon.Reinscription)
-				common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
-			}
-		}
-	}
+	// sat 还没有调整过，这里无法判断
+	// if nft.Base.Sat >= 0 && nft.Base.CurseType == 0 {
+	// 	// 检查是否同一个聪上有多个铸造
+	// 	nftsInSat := p.getNftsWithSat(nft.Base.Sat)
+	// 	if nftsInSat != nil {
+	// 		if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+	// 			// 已经存在非cursed的铭文，后面的铭文都是reinscription
+	// 			nft.Base.CurseType = int32(ordCommon.Reinscription)
+	// 			common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
+	// 		}
+	// 	}
+	// }
 
 	if nft.Base.CurseType != 0 {
 		p.status.CurseCount++
@@ -369,16 +370,11 @@ func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 	}
 
 	// 批量铸造时，多个nft来自同一个输入utxo
-	nftmap, ok := p.nftAddedUtxoMap[input.UtxoId]
-	if !ok {
-		nftmap = make(map[int64]*common.Nft)
-		p.nftAddedUtxoMap[input.UtxoId] = nftmap
-	}
-	nftmap[nft.Base.Id] = nft
+	p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], nft)
 
 	// 为节省空间作准备
 	ct := string(nft.Base.ContentType)
-	_, ok = p.contentTypeToIdMap[ct]
+	_, ok := p.contentTypeToIdMap[ct]
 	if !ok {
 		p.status.ContentTypeCount++ // 从1开始
 		ctId := p.status.ContentTypeCount
@@ -427,6 +423,10 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+
+	// if block.Height == 30689 {
+	// 	common.Log.Infof("")
+	// }
 
 	// 预加载
 	startTime := time.Now()
@@ -508,8 +508,8 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			// 	common.Log.Infof("")
 			// }
 			input := in.Clone() // 不要影响原来tx的数据
-			sats := p.utxoMap[input.UtxoId]
-			addedNft := p.nftAddedUtxoMap[input.UtxoId]
+			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
+			addedNft := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
 			if addedNft != nil {
 
 				// 合并铸造结果
@@ -519,7 +519,16 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 						if s.Offset == nft.Offset {
 							if s.Sat != nft.Base.Sat {
 								nft.Base.Sat = s.Sat // 同一个聪，需要命名一致
-								fmt.Printf("%s\n", tx.TxId)
+								// 根据ordinals规则，判断是否是reinscription
+								if nft.Base.CurseType == 0 {
+									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
+									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+										// 已经存在非cursed的铭文，后面的铭文都是reinscription
+										nft.Base.CurseType = int32(ordCommon.Reinscription)
+										p.status.CurseCount++
+										common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
+									}
+								}
 							}
 							newSat = false
 							break
@@ -591,7 +600,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		}
 	}
 
-	p.nftAddedUtxoMap = make(map[uint64]map[int64]*common.Nft)
+	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }

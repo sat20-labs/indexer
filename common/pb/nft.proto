@@ -29,5 +29,6 @@ message NftsInSat {
     uint64 owner_address_id = 2;
     uint64 utxo_id = 3;
     int64  offset = 4;
-    repeated int64 nfts = 5; // nftId
+    int32 curseCount = 5;
+    repeated int64 nfts = 6; // nftId
 }

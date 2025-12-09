@@ -261,6 +261,8 @@ func (s *BRC20Indexer) printHolders(name string) {
 // 自检。如果错误，将停机
 func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("BRC20Indexer->CheckSelf ...")
+	common.Log.Infof("stats: %v", s.status)
+
 	startTime := time.Now()
 	allTickers := s.GetAllTickers()
 	for _, name := range allTickers {
@@ -314,6 +316,9 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			return false
 		}
 	}
+
+	//s.printHistory("ordi")
+	//s.printHolders("ordi")
 
 	// special tickers
 	type TickerInfo struct {
