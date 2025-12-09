@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -240,22 +241,37 @@ func (s *BRC20Indexer) printHistory(name string) {
 		}
 	}
 	fmt.Printf("total in mint: %s\n", total.String())
-	total = nil
+	printHolders(holders)
+}
+
+func printHolders(holders map[uint64]*common.Decimal) {
+	
+	var total *common.Decimal
+	type pair struct {
+		addressId uint64
+		amt *common.Decimal
+	}
+	mid := make([]*pair, 0)
 	for addressId, amt := range holders {
-		fmt.Printf("%x: %s\n", addressId, amt.String())
+		//fmt.Printf("%x: %s\n", addressId, amt.String())
 		total = total.Add(amt)
+		mid = append(mid, &pair{
+			addressId: addressId,
+			amt: amt,
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].amt.Cmp(mid[j].amt) > 0
+	})
+	for i, item := range mid {
+		fmt.Printf("%d: %x %s\n", i, item.addressId, item.amt.String())
 	}
 	fmt.Printf("total in holders: %s\n", total.String())
 }
 
 func (s *BRC20Indexer) printHolders(name string) {
 	holdermap := s.GetHoldersWithTick(name)
-	var total *common.Decimal
-	for addressId, amt := range holdermap {
-		fmt.Printf("%x: %s\n", addressId, amt.String())
-		total = total.Add(amt)
-	}
-	fmt.Printf("total in holders: %s\n", total.String())
+	printHolders(holdermap)
 }
 
 // 自检。如果错误，将停机
