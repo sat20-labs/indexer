@@ -213,6 +213,10 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 		}
 	}
 
+	if nft.Base.CurseType != 0 {
+		p.status.CurseCount++
+	}
+
 	nft.Base.Id = int64(p.status.Count)
 	p.status.Count++
 	p.nftAdded = append(p.nftAdded, nft)
