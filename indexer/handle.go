@@ -15,7 +15,6 @@ import (
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
-var curseCount int
 func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.Range) {
 	s.exotic.UpdateTransfer(block, coinbase) // 生成稀有资产，为ordx协议做准备
 
@@ -26,6 +25,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	//detectOrdMap := make(map[string]int, 0)
 	measureStartTime := time.Now()
 	//common.Log.Info("processOrdProtocol ...")
+	count := 0
 	for _, tx := range block.Transactions {
 		id := 0
 		for i, input := range tx.Inputs {
@@ -39,8 +39,16 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 			for _, insc := range inscriptions2 {
 				s.handleOrd(input, insc, id, tx, block, coinbase)
 				id++
+				count++
 				if insc.IsCursed {
-					curseCount++
+					if insc.CurseReason != ordCommon.NotAtOffsetZero && 
+					insc.CurseReason != ordCommon.Pointer && 
+					insc.CurseReason != ordCommon.Pushnum &&  // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
+					insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
+ 					insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
+					insc.CurseReason != ordCommon.IncompleteField {// testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
+						common.Log.Errorf("%si%d is cursed, reason %d", tx.TxId, id, insc.CurseReason)
+					}
 				}
 			}
 			
@@ -82,8 +90,8 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 		// 	detectOrdMap[tx.TxId] = id
 		// }
 	}
-	//common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
-	common.Log.Errorf("height: %d, total cursed: %d", block.Height, curseCount)
+	common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
+	common.Log.Infof("height: %d, total cursed: %d", block.Height, s.nft.GetStatus().CurseCount)
 
 	//time2 := time.Now()
 	s.nft.UpdateTransfer(block, coinbase)
