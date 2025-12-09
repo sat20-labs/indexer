@@ -756,41 +756,40 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 
 		info, ok := preFectcher[utxo]
 		if !ok {
-            info, ok = p.unConfirmedUtxoMap[utxo]
-            if !ok {
-                info = instance.GetTxOutputWithUtxoV2(utxo, true)
-                if info == nil {
-                    // 递归调用
-                    preTxId := txIn.PreviousOutPoint.Hash.String()
-                    preTx := p.txMap[preTxId]
-                    if preTx == nil {
-                        common.Log.Debugf("rebuildTxOutput GetTx %s failed", preTxId)
-                        txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
-                        if err != nil {
-                            common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
-                            return nil, nil, err
-                        }
-                        preTx, err = DecodeMsgTx(txHex)
-                        if err != nil {
-                            common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
-                            return nil, nil, err
-                        }
-                    }
-                    _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
+            info = instance.GetTxOutputWithUtxoV2(utxo, true)
+            if info == nil {
+                // 递归调用
+                preTxId := txIn.PreviousOutPoint.Hash.String()
+                p.mutex.RLock()
+                preTx := p.txMap[preTxId]
+                p.mutex.RUnlock()
+                if preTx == nil {
+                    common.Log.Debugf("rebuildTxOutput GetTx %s failed", preTxId)
+                    txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
                     if err != nil {
-                        common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
+                        common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
                         return nil, nil, err
                     }
-                    for _, out := range outs {
-                        preFectcher[out.OutPointStr] = out
+                    preTx, err = DecodeMsgTx(txHex)
+                    if err != nil {
+                        common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
+                        return nil, nil, err
                     }
-                    info = outs[txIn.PreviousOutPoint.Index]
                 }
+                _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
+                if err != nil {
+                    common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
+                    return nil, nil, err
+                }
+                for _, out := range outs {
+                    preFectcher[out.OutPointStr] = out
+                }
+                info = outs[txIn.PreviousOutPoint.Index]
             }
             preFectcher[utxo] = info
 		}
 
-        s, err := p.processInscription(tx, i, preFectcher)
+        s, err := processInscription(tx, i, preFectcher)
 		if err == nil {
 			// 处理铸造铸造结果 
             // 将铸造结果当作input的资产数据，直接添加到info中, 在cut中按照sat的位置分配资产结果
@@ -926,7 +925,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 }
 
 // 只处理transfer，并且没有做数据校验
-func (p *MiniMemPool) processInscription(tx *wire.MsgTx, i int, 
+func processInscription(tx *wire.MsgTx, i int, 
     preFectcher map[string]*common.TxOutput) (int, error) {
     
     txIn := tx.TxIn[i]
