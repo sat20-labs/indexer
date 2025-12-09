@@ -2,6 +2,7 @@ package runes
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -105,11 +106,27 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 }
 
 func (s *Indexer) GetAllRuneIds() []string {
-	ret := make([]string, 0)
+	type pair struct {
+		id uint64
+		name string
+	}
+	mid := make([]*pair, 0)
 	runeEntrys := s.idToEntryTbl.GetList()
 	for _, v := range runeEntrys {
-		ret = append(ret, v.RuneId.String())
+		mid = append(mid, &pair{
+			id: v.Number,
+			name: v.RuneId.String(),
+		})
 	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].id < mid[j].id
+	})
+	
+	ret := make([]string, 0)
+	for _, item := range mid {
+		ret = append(ret, item.name)
+	}
+
 	return ret
 }
 
