@@ -4,6 +4,19 @@ import (
 	"fmt"
 )
 
+
+type BRC20Status struct {
+	Version          string
+	TickerCount      int
+}
+
+func (p *BRC20Status) Clone() *BRC20Status{
+	return &BRC20Status{
+		Version: p.Version,
+		TickerCount: p.TickerCount,
+	}
+}
+
 type BRC20Mint struct {
 	BRC20MintInDB
 	Nft *Nft

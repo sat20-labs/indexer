@@ -28,8 +28,8 @@ func (s *BRC20Indexer) GetAllTickers() []string {
 	defer s.mutex.RUnlock()
 	ret := s.loadTickListFromDB()
 
-	for name := range s.tickerUpdated {
-		ret = append(ret, name)
+	for _, ticker := range s.tickerAdded {
+		ret = append(ret, ticker.Name)
 	}
 
 	return ret
