@@ -83,9 +83,16 @@ func (s *Model) GetTickerList(protocol string, start, limit int) ([]*common.Tick
 		limit = total
 	}
 
+	assetName := common.AssetName{
+		Protocol: protocol,
+		Type: common.ASSET_TYPE_FT,
+		Ticker: "",
+	}
+
 	for i := start; i < limit; i++ {
 		name := mid[int64(i)]
-		info, err := s.GetTickerInfo(name)
+		assetName.Ticker = name
+		info, err := s.GetTickerInfo(assetName.String())
 		if err != nil {
 			common.Log.Warnf("GetTickerInfon %s failed, %v", name, err)
 		}
