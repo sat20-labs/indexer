@@ -3,7 +3,6 @@ package brc20
 import (
 	"encoding/base64"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -29,15 +28,11 @@ func GetTickerKey(tickname string) string {
 }
 
 func GetMintHistoryKey(tickname string, id int64) string {
-	return fmt.Sprintf("%s%s-%x", DB_PREFIX_MINTHISTORY, encodeTickerName(tickname), id)
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, encodeTickerName(tickname), common.Uint64ToString(uint64(id)))
 }
 
-// func GetTransferHistoryKey(tickname string, utxo string) string {
-// 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(strings.ToLower(tickname)), utxo)
-// }
-
 func GetTransferHistoryKey(tickname string, utxoId uint64) string {
-	return fmt.Sprintf("%s%s-%x", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickname), utxoId)
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickname), common.Uint64ToString(utxoId))
 }
 
 func ParseTransferHistoryKey(input string) (string, string, error) {
@@ -72,12 +67,12 @@ func ParseMintHistoryKey(input string) (string, int64, error) {
 		return "", -1, fmt.Errorf("invalid string format")
 	}
 
-	id, err := strconv.ParseInt(parts[1], 16, 64)
+	id, err := common.StringToUint64(parts[1])
 	if err != nil {
 		return "", -1, err
 	}
 
-	return decoderTickerName(parts[0]), id, nil
+	return decoderTickerName(parts[0]), int64(id), nil
 }
 
 func GetHolderInfoKey(addrId uint64, ticker string) string {
@@ -92,7 +87,7 @@ func parseHolderInfoKey(input string) (uint64, string, error) {
 	if len(parts) != 3 {
 		return common.INVALID_ID, "", fmt.Errorf("invalid string format")
 	}
-	addrId, err := strconv.ParseUint(parts[1], 16, 64)
+	addrId, err := common.StringToUint64(parts[1])
 	if err != nil {
 		return common.INVALID_ID, "", err
 	}
@@ -101,7 +96,7 @@ func parseHolderInfoKey(input string) (uint64, string, error) {
 }
 
 func GetTickerToHolderKey(ticker string, addrId uint64) string {
-	return fmt.Sprintf("%s%s-%x", DB_PREFIX_TICKER_HOLDER, encodeTickerName(ticker), addrId)
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TICKER_HOLDER, encodeTickerName(ticker), common.Uint64ToString(addrId))
 }
 
 func parseTickerToHolderKey(input string) (string, uint64, error) {
@@ -114,7 +109,7 @@ func parseTickerToHolderKey(input string) (string, uint64, error) {
 		return "", common.INVALID_ID, fmt.Errorf("invalid string format")
 	}
 
-	addrId, err := strconv.ParseUint(parts[1], 16, 64)
+	addrId, err := common.StringToUint64(parts[1])
 	if err != nil {
 		return "", common.INVALID_ID, err
 	}
@@ -136,7 +131,7 @@ func GetCurseInscriptionKey(inscriptionId string) string {
 }
 
 func GetUtxoToTransferKey(utxoId uint64) string {
-	return fmt.Sprintf("%s%x", DB_PREFIX_UTXO_TRANSFER, utxoId)
+	return fmt.Sprintf("%s%x", DB_PREFIX_UTXO_TRANSFER, common.Uint64ToString(utxoId))
 }
 
 func parseUtxoToTransferKey(input string) (uint64, error) {
@@ -147,7 +142,7 @@ func parseUtxoToTransferKey(input string) (uint64, error) {
 	if len(parts) != 2 {
 		return common.INVALID_ID, fmt.Errorf("invalid string format")
 	}
-	addrId, err := strconv.ParseUint(parts[1], 16, 64)
+	addrId, err := common.StringToUint64(parts[1])
 	if err != nil {
 		return common.INVALID_ID, err
 	}

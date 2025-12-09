@@ -253,6 +253,44 @@ func BytesToUint64(bytes []byte) uint64 {
 	return binary.BigEndian.Uint64(bytes)
 }
 
+func Uint64ToString(value uint64) string {
+	b := Uint64ToBytes(value)
+	return hex.EncodeToString(b)
+}
+
+func StringToUint64(str string) (uint64, error) {
+	b, err := hex.DecodeString(str)
+	if err != nil {
+		Log.Errorf("DecodeString %s failed, %v", str, err)
+		return 0, err
+	}
+	return BytesToUint64(b), nil
+} 
+
+func Uint32ToBytes(value uint32) []byte {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, value)
+	return bytes
+}
+
+func BytesToUint32(bytes []byte) uint32 {
+	return binary.BigEndian.Uint32(bytes)
+}
+
+func Uint32ToString(value uint32) string {
+	b := Uint32ToBytes(value)
+	return hex.EncodeToString(b)
+}
+
+func StringToUint32(str string) (uint32, error) {
+	b, err := hex.DecodeString(str)
+	if err != nil {
+		Log.Errorf("DecodeString %s failed, %v", str, err)
+		return 0, err
+	}
+	return BytesToUint32(b), nil
+}
+
 func CheckUtxoFormat(utxo string) error {
 	parts := strings.Split(utxo, ":")
 	_, err := hex.DecodeString(parts[0])
