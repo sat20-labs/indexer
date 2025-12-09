@@ -88,8 +88,6 @@ func (p *MiniMemPool) Stop() {
 
 // 通过RPC拉取mempool
 func (p *MiniMemPool) fetchMempoolFromRPC() {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
     start := time.Now()
     common.Log.Infof("start to fetch all tx from mempool")
     txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
@@ -119,8 +117,6 @@ func (p *MiniMemPool) fetchMempoolFromRPC() {
 
 // 重新同步池子
 func (p *MiniMemPool) resyncMempoolFromRPC() {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
     start := time.Now()
     common.Log.Infof("start to fetch all tx from mempool")
     txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
@@ -130,6 +126,7 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
     }
     newMap := make(map[string]bool)
     add := make([]string, 0)
+    p.mutex.Lock()
     for _, txId := range txIds {
         newMap[txId] = true
         _, ok := p.txMap[txId]
@@ -146,14 +143,21 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
         }
         del = append(del, k)
     }
+    p.mutex.Unlock()
 
     common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
     common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
 
     if len(txIds) == len(add) {
         // 全新数据
+        p.mutex.Lock()
         p.init()
+        p.mutex.Unlock()
+
         for _, txId := range txIds {
+            if !p.running {
+                return
+            }
             txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
             if err != nil {
                 common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
@@ -166,17 +170,21 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
             }
             p.txBroadcasted(tx)
         }
-        
     } else {
         // 部分更新
+        p.mutex.Lock()
         for _, txId := range del {
             tx, ok := p.txMap[txId]
             if ok {
                 p.txConfirmed(tx)
             }
         }
+        p.mutex.Unlock()
 
         for _, txId := range add {
+            if !p.running {
+                return
+            }
             txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
             if err != nil {
                 common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
@@ -217,21 +225,31 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
+    p.mutex.RLock()
     _, ok := p.txMap[txId]
     if ok {
+        p.mutex.RUnlock()
         common.Log.Debugf("tx %s already in mempool", txId)
         return 
     }
     p.txMap[txId] = tx
     common.Log.Debugf("add tx %s to mempool %d", txId, len(p.txMap))
 
-    preFectcher := make(map[string]*common.TxOutput)
+    // shallow snapshot of unConfirmedUtxoMap for rebuild
+    preFectcher := make(map[string]*common.TxOutput, len(p.unConfirmedUtxoMap))
+    for k, v := range p.unConfirmedUtxoMap {
+        preFectcher[k] = v
+    }
+    p.mutex.RUnlock()
+
+    // Heavy work OUTSIDE LOCK:
     inputs, outpus, err := p.rebuildTxOutput(tx, preFectcher)
     if err != nil {
         common.Log.Errorf("rebuildTxOutput %s failed, %v", txId, err)
         return 
     }
 
+    p.mutex.Lock()
     for _, info := range inputs {
         addr, err := common.PkScriptToAddr(info.OutValue.PkScript, netParam)
         if err != nil {
@@ -273,6 +291,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         }
         user.UnconfirmedUtxoMap[unconfirmedUtxo] = true
     }
+    p.mutex.Unlock()
 }
 
 
@@ -445,8 +464,6 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 			ChainParams:      instance.GetChainParam(),
 			Listeners: peer.MessageListeners{
 				OnTx: func(_ *peer.Peer, msg *wire.MsgTx) {
-                    p.mutex.Lock()
-                    defer p.mutex.Unlock()
                     if !p.running {
                         return
                     }
@@ -507,13 +524,12 @@ func (p *MiniMemPool) listenP2PTx(addr string) {
 
 // 处理已经确认的tx
 func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
-
     start := time.Now()
+    p.mutex.Lock()
     for _, tx := range msg.Transactions {
         p.txConfirmed(tx)
     }
+    p.mutex.Unlock()
      common.Log.Infof("ProcessBlock completed, new size %d. %v", len(p.txMap), time.Since(start).String())
 
     if time.Now().Unix() - p.lastSyncTime >= 36000 {
