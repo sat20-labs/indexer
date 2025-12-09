@@ -66,7 +66,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block) {
 	// 检测是否一致，如果不一致，需要进一步调试。
 	// s.detectInconsistent(detectOrdMap, block.Height)
 
-	common.Log.Infof("processOrdProtocol %d,is done: cost: %v", block.Height, time.Since(measureStartTime))
+	common.Log.Infof("processOrdProtocol %d is done, cost: %v", block.Height, time.Since(measureStartTime))
 }
 
 func findOutputWithSat(tx *common.Transaction, sat int64) *common.Output {
