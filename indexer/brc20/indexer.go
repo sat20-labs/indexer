@@ -214,8 +214,6 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 	common.Log.Infof("InitIndexer %d ms", elapsed)
 }
 
-
-
 func (s *BRC20Indexer) printHistoryWithAddress(name string, toAddress uint64) {
 	history := s.loadTransferHistoryFromDB(name)
 	var total *common.Decimal
@@ -224,7 +222,7 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, toAddress uint64) {
 	address, _ := rpc.GetAddressByID(toAddress)
 	common.Log.Infof("address %x %s", toAddress, address)
 	for _, item := range history {
-		if item.ToAddr != toAddress || item.FromAddr == toAddress {
+		if item.ToAddr != toAddress && item.FromAddr != toAddress {
 			continue
 		}
 		if item.Action == common.BRC20_Action_InScribe_Mint {
@@ -244,9 +242,16 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, toAddress uint64) {
 		} else {
 			from = fmt.Sprintf("%x", item.FromAddr)
 		}
+
+		var to string
+		if item.ToAddr == common.INVALID_ID {
+			to = "-\t"
+		} else {
+			to = fmt.Sprintf("%x", item.ToAddr)
+		}
 		h, i, j := common.FromUtxoId(item.UtxoId)
-		common.Log.Infof("%d %d %d: %d from %s\t to %x,\tamt = %s, %s \taction = %d", 
-			h, i, j, item.NftId, from, item.ToAddr, item.Amount.String(), total.String(), item.Action)
+		common.Log.Infof("%d %d %d: %d from %s\t to %s,\tamt = %s, %s \taction = %d", 
+			h, i, j, item.NftId, from, to, item.Amount.String(), total.String(), item.Action)
 	
 		count++
 		if count%20 == 0 {
@@ -399,11 +404,11 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	//s.printHistory(name)
 	s.printTicker(name)
 	s.printHolders(name)
-	s.printHistoryWithAddress(name, 0x3fca51)
-	s.printHistoryWithAddress(name, 0x306ce3)
-	s.printHistoryWithAddress(name, 0x38815d)
-	s.printHistoryWithAddress(name, 0x3b37a3)
-	s.printHistoryWithAddress(name, 0x3ff5fe)
+	// s.printHistoryWithAddress(name, 0x3fca51)
+	// s.printHistoryWithAddress(name, 0x306ce3)
+	// s.printHistoryWithAddress(name, 0x38815d)
+	// s.printHistoryWithAddress(name, 0x3b37a3)
+	// s.printHistoryWithAddress(name, 0x3ff5fe)
 	
 
 	// special tickers
