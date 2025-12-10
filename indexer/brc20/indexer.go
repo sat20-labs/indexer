@@ -1,13 +1,8 @@
 package brc20
 
 import (
-	"bufio"
-	"embed"
 	"fmt"
-	"path/filepath"
-	"regexp"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -189,9 +184,9 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	startTime := time.Now()
 	version := s.GetDBVersion()
-	if s.nftIndexer.GetBaseIndexer().IsMainnet() && version == "" {
-		s.initCursorInscriptionsDB()
-	}
+	// if s.nftIndexer.GetBaseIndexer().IsMainnet() && version == "" {
+	// 	s.initCursorInscriptionsDB()
+	// }
 	s.status = initStatusFromDB(s.db)
 	common.Log.Infof("brc20 db version: %s", version)
 	common.Log.Info("InitIndexer ...")
@@ -242,7 +237,6 @@ func (s *BRC20Indexer) printHistory(name string) {
 		}
 	}
 	fmt.Printf("total in mint: %s\n", total.String())
-
 	printHolders(holders)
 }
 
@@ -335,7 +329,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		}
 	}
 
-	name := "test"
+	name := "ordi"
 	//s.printHistory(name)
 	s.printHolders(name)
 
@@ -666,44 +660,44 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 }
 
 //go:embed brc20_curse.txt
-var brc20Fs embed.FS
+//var brc20Fs embed.FS
 
-func (s *BRC20Indexer) initCursorInscriptionsDB() {
-	// first brc inscriptin_number = 348020, cursor end block height = 837090 / last inescription number = 66799147
-	inputPath := filepath.Join("", "brc20_curse.txt")
-	input, err := brc20Fs.ReadFile(inputPath)
-	if err != nil {
-		common.Log.Panicf("Error reading brc20_curse: %v", err)
-	}
-	reader := strings.NewReader(string(input))
-	regex := regexp.MustCompile(`id:([a-z0-9]+)`)
-	scanner := bufio.NewScanner(reader)
+// func (s *BRC20Indexer) initCursorInscriptionsDB() {
+// 	// first brc inscriptin_number = 348020, cursor end block height = 837090 / last inescription number = 66799147
+// 	inputPath := filepath.Join("", "brc20_curse.txt")
+// 	input, err := brc20Fs.ReadFile(inputPath)
+// 	if err != nil {
+// 		common.Log.Panicf("Error reading brc20_curse: %v", err)
+// 	}
+// 	reader := strings.NewReader(string(input))
+// 	regex := regexp.MustCompile(`id:([a-z0-9]+)`)
+// 	scanner := bufio.NewScanner(reader)
 
-	wb := s.db.NewWriteBatch()
-	defer wb.Close()
+// 	wb := s.db.NewWriteBatch()
+// 	defer wb.Close()
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		submatches := regex.FindStringSubmatch(line)
-		if len(submatches) != 2 {
-			common.Log.Panicf("Error parsing brc20_curse: %s", line)
-		}
-		id := submatches[1]
+// 	for scanner.Scan() {
+// 		line := scanner.Text()
+// 		submatches := regex.FindStringSubmatch(line)
+// 		if len(submatches) != 2 {
+// 			common.Log.Panicf("Error parsing brc20_curse: %s", line)
+// 		}
+// 		id := submatches[1]
 
-		key := GetCurseInscriptionKey(id)
-		err := wb.Put([]byte(key), nil)
-		if err != nil {
-			common.Log.Panicf("Error setting %s in db %v", key, err)
-		}
-	}
-	wb.Flush()
-}
+// 		key := GetCurseInscriptionKey(id)
+// 		err := wb.Put([]byte(key), nil)
+// 		if err != nil {
+// 			common.Log.Panicf("Error setting %s in db %v", key, err)
+// 		}
+// 	}
+// 	wb.Flush()
+// }
 
-func (s *BRC20Indexer) IsExistCursorInscriptionInDB(inscriptionId string) bool {
-	key := GetCurseInscriptionKey(inscriptionId)
-	_, err := s.db.Read([]byte(key))
-	return err == nil
-}
+// func (s *BRC20Indexer) IsExistCursorInscriptionInDB(inscriptionId string) bool {
+// 	key := GetCurseInscriptionKey(inscriptionId)
+// 	_, err := s.db.Read([]byte(key))
+// 	return err == nil
+// }
 
 func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 	ret := s.tickerMap[name]
