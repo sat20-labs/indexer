@@ -65,16 +65,15 @@ func (s *BRC20Indexer) updateInscribeMint(mint *common.BRC20Mint) {
 	if mint.NftId < ticker.Ticker.Nft.Base.Id {
 		return
 	}
+	if ticker.Ticker.EndInscriptionId != "" {
+		// 已经足够了
+		return
+	}
 
 	ticker.Ticker.TransactionCount++
 	mintedAmt := ticker.Ticker.Minted.Add(&mint.Amt)
 	ticker.Ticker.Minted = *mintedAmt
-	// if name == "ordi" {
-	// 	balanceStr := ticker.Ticker.Minted.String()
-	// 	common.Log.Infof("minted:%s, inscriptionId:%s, id:%d", balanceStr, mint.Nft.Base.InscriptionId, mint.Nft.Base.Id)
-	// }
-	cmpResult := mintedAmt.Cmp(&ticker.Ticker.Max)
-	if cmpResult == 0 {
+	if mintedAmt.Cmp(&ticker.Ticker.Max) == 0 {
 		ticker.Ticker.EndInscriptionId = mint.Nft.Base.InscriptionId
 	}
 	s.tickerUpdated[name] = ticker.Ticker
@@ -133,7 +132,7 @@ func (s *BRC20Indexer) updateInscribeTransfer(transfer *common.BRC20Transfer) {
 		}
 		// vindicated
 	}
-	
+
 	tickerName := strings.ToLower(transfer.Name)
 	addressId := transfer.Nft.OwnerAddressId
 	holder := s.loadHolderInfo(addressId, tickerName)

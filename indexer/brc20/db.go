@@ -107,7 +107,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
 
 	return &result
 }
@@ -116,7 +116,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
 func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*common.Decimal  {
 	result := make(map[string]*common.Decimal)
 
-	common.Log.Info("BRC20Indexer loadHolderInfoFromDBV2 ...")
+	common.Log.Debug("BRC20Indexer loadHolderInfoFromDBV2 ...")
 	count := 0
 	startTime := time.Now()
 	prefix := fmt.Sprintf("%s%x-", DB_PREFIX_HOLDER_ASSET, addressId)
@@ -144,7 +144,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*comm
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDBV2 loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadHolderInfoFromDBV2 loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -169,7 +169,7 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 	result := make([]string, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("BRC20Indexer loadTickListFromDB ...")
+	common.Log.Debug("BRC20Indexer loadTickListFromDB ...")
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -186,7 +186,7 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -243,7 +243,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[int64]*common.B
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Debugf("loadMintDataFromDB %s loaded %d records in %d ms\n", tickerName, count, elapsed)
+	common.Log.Debugf("loadMintDataFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
 
 	return result
 }
@@ -280,7 +280,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Debugf("loadTransferHistoryFromDB %s loaded %d records in %d ms\n", tickerName, count, elapsed)
+	common.Log.Debugf("loadTransferHistoryFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
 
 	return result
 }
