@@ -98,6 +98,7 @@ func (s *BRC20Indexer) GetDBVersion() string {
 // 只保存UpdateDB需要用的数据
 func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	newInst := NewIndexer(s.db)
+	newInst.nftIndexer = s.nftIndexer
 
 	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
 	copy(newInst.holderActionList, s.holderActionList)
@@ -335,7 +336,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	}
 
 	name := "test"
-	s.printHistory(name)
+	//s.printHistory(name)
 	s.printHolders(name)
 
 	// special tickers

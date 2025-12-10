@@ -357,8 +357,8 @@ func (b *IndexerMgr) forceUpdateDB() {
 	b.nft.UpdateDB()
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
-	b.brc20Indexer.UpdateDB()
 	b.RunesIndexer.UpdateDB()
+	b.brc20Indexer.UpdateDB()
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
 }
