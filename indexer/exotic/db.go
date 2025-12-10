@@ -53,7 +53,7 @@ func (p *ExoticIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 func (p *ExoticIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("ExoticIndexer loadHolderInfoFromDB ...")
+	common.Log.Debug("ExoticIndexer loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
 	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 
@@ -81,7 +81,7 @@ func (p *ExoticIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -89,7 +89,7 @@ func (p *ExoticIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 func (p *ExoticIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadUtxoMapFromDB ...")
+	common.Log.Debug("loadUtxoMapFromDB ...")
 	result := make(map[string]map[uint64]int64, 0)
 	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k, v []byte) error {
 
@@ -126,7 +126,7 @@ func (p *ExoticIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -135,7 +135,7 @@ func (p *ExoticIndexer) loadTickListFromDB() []string {
 	result := make([]string, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadTickListFromDB ...")
+	common.Log.Debug("loadTickListFromDB ...")
 	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -152,7 +152,7 @@ func (p *ExoticIndexer) loadTickListFromDB() []string {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -185,7 +185,7 @@ func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common
 	result := make(map[string]*common.Mint, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadMintDataFromDB ...")
+	common.Log.Debug("loadMintDataFromDB ...")
 	err := p.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -212,7 +212,7 @@ func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadMintDataFromDB %s loaded %d records in %d ms\n", tickerName, count, elapsed)
+	common.Log.Infof("loadMintDataFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
 
 	return result
 }

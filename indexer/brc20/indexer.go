@@ -8,6 +8,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 )
@@ -210,7 +211,49 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 	//s.CheckSelf(height)
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("InitIndexer %d ms\n", elapsed)
+	common.Log.Infof("InitIndexer %d ms", elapsed)
+}
+
+
+
+func (s *BRC20Indexer) printHistoryWithAddress(name string, toAddress uint64) {
+	history := s.loadTransferHistoryFromDB(name)
+	var total *common.Decimal
+	var count int
+	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
+	address, _ := rpc.GetAddressByID(toAddress)
+	common.Log.Infof("address %x %s", toAddress, address)
+	for _, item := range history {
+		if item.ToAddr != toAddress || item.FromAddr == toAddress {
+			continue
+		}
+		if item.Action == common.BRC20_Action_InScribe_Mint {
+			total = total.Add(&item.Amount)
+		}
+		if item.Action == common.BRC20_Action_Transfer {
+			if toAddress == item.FromAddr {
+				total = total.Sub(&item.Amount)
+			} else {
+				total = total.Add(&item.Amount)
+			}
+		}
+
+		var from string
+		if item.FromAddr == common.INVALID_ID {
+			from = "-\t"
+		} else {
+			from = fmt.Sprintf("%x", item.FromAddr)
+		}
+		h, i, j := common.FromUtxoId(item.UtxoId)
+		common.Log.Infof("%d %d %d: %d from %s\t to %x,\tamt = %s, %s \taction = %d", 
+			h, i, j, item.NftId, from, item.ToAddr, item.Amount.String(), total.String(), item.Action)
+	
+		count++
+		if count%20 == 0 {
+			common.Log.Infof("")
+		}
+	}
+	common.Log.Infof("total in mint: %s", total.String())
 }
 
 func (s *BRC20Indexer) printHistory(name string) {
@@ -225,7 +268,7 @@ func (s *BRC20Indexer) printHistory(name string) {
 			from = fmt.Sprintf("%x", item.FromAddr)
 		}
 		h, i, j := common.FromUtxoId(item.UtxoId)
-		fmt.Printf("%d %d %d: %d from %s\t to %x,\tamt = %s, \taction = %d\n", h, i, j, item.NftId, from, item.ToAddr, item.Amount.String(), item.Action)
+		common.Log.Infof("%d %d %d: %d from %s\t to %x,\tamt = %s, \taction = %d", h, i, j, item.NftId, from, item.ToAddr, item.Amount.String(), item.Action)
 	
 		if item.Action == common.BRC20_Action_InScribe_Mint {
 			holders[item.ToAddr] = holders[item.ToAddr].Add(&item.Amount)
@@ -236,12 +279,11 @@ func (s *BRC20Indexer) printHistory(name string) {
 			holders[item.ToAddr] = holders[item.ToAddr].Add(&item.Amount)
 		}
 	}
-	fmt.Printf("total in mint: %s\n", total.String())
-	printHolders(holders)
+	common.Log.Infof("total in mint: %s", total.String())
+	s.printHoldersWithMap(holders)
 }
 
-func printHolders(holders map[uint64]*common.Decimal) {
-	
+func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 	var total *common.Decimal
 	type pair struct {
 		addressId uint64
@@ -249,7 +291,7 @@ func printHolders(holders map[uint64]*common.Decimal) {
 	}
 	mid := make([]*pair, 0)
 	for addressId, amt := range holders {
-		//fmt.Printf("%x: %s\n", addressId, amt.String())
+		//common.Log.Infof("%x: %s", addressId, amt.String())
 		total = total.Add(amt)
 		mid = append(mid, &pair{
 			addressId: addressId,
@@ -259,15 +301,38 @@ func printHolders(holders map[uint64]*common.Decimal) {
 	sort.Slice(mid, func(i, j int) bool {
 		return mid[i].amt.Cmp(mid[j].amt) > 0
 	})
+	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
 	for i, item := range mid {
-		fmt.Printf("%d: %x %s\n", i, item.addressId, item.amt.String())
+		address, err := rpc.GetAddressByID(item.addressId)
+		if err != nil {
+			address = "-\t"
+		}
+		common.Log.Infof("%d: %x %s %s", i, item.addressId, address, item.amt.String())
 	}
-	fmt.Printf("total in holders: %s\n", total.String())
+	common.Log.Infof("total in holders: %s", total.String())
 }
 
 func (s *BRC20Indexer) printHolders(name string) {
 	holdermap := s.GetHoldersWithTick(name)
-	printHolders(holdermap)
+	s.printHoldersWithMap(holdermap)
+}
+
+
+func (s *BRC20Indexer) printTicker(name string) {
+	ticker := s.GetTicker(name)
+	if ticker == nil {
+		common.Log.Infof("can't find brc20 ticker %s", name)
+		return
+	}
+	common.Log.Infof("Ticker: %s", ticker.Name)
+	common.Log.Infof("self mint: %v", ticker.SelfMint)
+	common.Log.Infof("Limit: %s", ticker.Limit.String())
+	common.Log.Infof("Max: %s", ticker.Max.String())
+	common.Log.Infof("Divisibility: %d", ticker.Decimal)
+	common.Log.Infof("Minted: %s", ticker.Minted.String())
+	common.Log.Infof("MintCount: %d", ticker.MintCount)
+	common.Log.Infof("HolderCount: %d", ticker.HolderCount)
+	common.Log.Infof("TX Count: %d", ticker.TransactionCount)
 }
 
 // 自检。如果错误，将停机
@@ -329,9 +394,17 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		}
 	}
 
+	//name := "gc  " 
 	name := "ordi"
 	//s.printHistory(name)
+	s.printTicker(name)
 	s.printHolders(name)
+	s.printHistoryWithAddress(name, 0x3fca51)
+	s.printHistoryWithAddress(name, 0x306ce3)
+	s.printHistoryWithAddress(name, 0x38815d)
+	s.printHistoryWithAddress(name, 0x3b37a3)
+	s.printHistoryWithAddress(name, 0x3ff5fe)
+	
 
 	// special tickers
 	type TickerInfo struct {
@@ -659,8 +732,6 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	return true
 }
 
-//go:embed brc20_curse.txt
-//var brc20Fs embed.FS
 
 // func (s *BRC20Indexer) initCursorInscriptionsDB() {
 // 	// first brc inscriptin_number = 348020, cursor end block height = 837090 / last inescription number = 66799147

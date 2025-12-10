@@ -1492,6 +1492,26 @@ func (b *BaseIndexer) GetAddressIdFromDB(address string) uint64 {
 	return id
 }
 
+// only for RPC interface
+func (b *BaseIndexer) GetAddressByID(id uint64) (string, error) {
+
+	addrStr, ok := b.idToAddressMap[id]
+	if ok {
+		return addrStr, nil
+	}
+
+	address, err := db.GetAddressByIDFromDB(b.db, id)
+	if err != nil {
+		common.Log.Errorf("RpcIndexer->GetAddressByID %d failed, err: %v", id, err)
+		return "", err
+	}
+
+	b.idToAddressMap[id] = address
+
+
+	return address, err
+}
+
 func (p *BaseIndexer) getAddressId(address string) (uint64, int) {
 	value, ok := p.addressValueMap[address]
 	if !ok {

@@ -674,3 +674,22 @@ func TestParser_ord21(t *testing.T) {
 		assert.True(t, false)
 	}
 }
+
+
+func TestParser_ord22(t *testing.T) {
+	// input 0, output 0
+	rawData, err := GetRawData("93d051c5a0ae3b6c34cad59878622993ff6c992fc8b84ca11e435f6496220e64", "testnet4")
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		assert.True(t, false)
+	}
+	fields, _, err := ParseInscription(rawData)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		assert.True(t, false)
+	}
+
+	if len(fields) != 1 {
+		assert.True(t, false)
+	}
+}

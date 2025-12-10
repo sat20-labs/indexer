@@ -24,7 +24,7 @@ func (s *FTIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("FTIndexer loadHolderInfoFromDB ...")
+	common.Log.Debug("FTIndexer loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 
@@ -52,7 +52,7 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -97,7 +97,7 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -106,7 +106,7 @@ func (s *FTIndexer) loadTickListFromDB() []string {
 	result := make([]string, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadTickListFromDB ...")
+	common.Log.Debug("loadTickListFromDB ...")
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -123,7 +123,7 @@ func (s *FTIndexer) loadTickListFromDB() []string {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms\n", count, elapsed)
+	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -156,7 +156,7 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 	result := make(map[string]*common.Mint, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Info("loadMintDataFromDB ...")
+	common.Log.Debug("loadMintDataFromDB ...")
 	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -183,7 +183,7 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadMintDataFromDB %s loaded %d records in %d ms\n", tickerName, count, elapsed)
+	common.Log.Infof("loadMintDataFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
 
 	return result
 }
