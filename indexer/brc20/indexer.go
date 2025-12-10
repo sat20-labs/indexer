@@ -225,12 +225,20 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, toAddress uint64) {
 		if item.ToAddr != toAddress && item.FromAddr != toAddress {
 			continue
 		}
+		if item.Action == common.BRC20_Action_Transfer_Spent {
+			continue
+		}
+		flag := "+"
 		if item.Action == common.BRC20_Action_InScribe_Mint {
 			total = total.Add(&item.Amount)
+		}
+		if item.Action == common.BRC20_Action_InScribe_Transfer {
+			flag = ""
 		}
 		if item.Action == common.BRC20_Action_Transfer {
 			if toAddress == item.FromAddr {
 				total = total.Sub(&item.Amount)
+				flag = "-"
 			} else {
 				total = total.Add(&item.Amount)
 			}
@@ -250,15 +258,15 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, toAddress uint64) {
 			to = fmt.Sprintf("%x", item.ToAddr)
 		}
 		h, i, j := common.FromUtxoId(item.UtxoId)
-		common.Log.Infof("%d %d %d: %d from %s\t to %s,\tamt = %s, %s \taction = %d", 
-			h, i, j, item.NftId, from, to, item.Amount.String(), total.String(), item.Action)
+		common.Log.Infof("%d %d %d: %d from %s\t to %s,\t %s %s, %s \taction = %d", 
+			h, i, j, item.NftId, from, to, flag, item.Amount.String(), total.String(), item.Action)
 	
 		count++
 		if count%20 == 0 {
 			common.Log.Infof("")
 		}
 	}
-	common.Log.Infof("total in mint: %s", total.String())
+	common.Log.Infof("total: %s", total.String())
 }
 
 func (s *BRC20Indexer) printHistory(name string) {
@@ -399,16 +407,29 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		}
 	}
 
-	//name := "gc  " 
-	name := "ordi"
-	//s.printHistory(name)
-	s.printTicker(name)
-	s.printHolders(name)
-	// s.printHistoryWithAddress(name, 0x3fca51)
-	// s.printHistoryWithAddress(name, 0x306ce3)
-	// s.printHistoryWithAddress(name, 0x38815d)
-	// s.printHistoryWithAddress(name, 0x3b37a3)
-	// s.printHistoryWithAddress(name, 0x3ff5fe)
+	names := []string{
+		//"ordi", 
+		"usdt",
+		// "test",
+		// "husk",
+		// "gc  ",
+		// "sats",
+		// "doge",
+		// "rats",
+		// "ttt3",
+		// "tbtc",
+		// "brc20",
+	}
+	for _, name := range names {
+		//s.printHistory(name)
+		s.printTicker(name)
+		s.printHolders(name)
+		s.printHistoryWithAddress(name, 0x228547)
+		// s.printHistoryWithAddress(name, 0x306ce3)
+		// s.printHistoryWithAddress(name, 0x38815d)
+		// s.printHistoryWithAddress(name, 0x3b37a3)
+		// s.printHistoryWithAddress(name, 0x3ff5fe)
+	}
 	
 
 	// special tickers

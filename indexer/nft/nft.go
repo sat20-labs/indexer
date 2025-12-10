@@ -15,8 +15,8 @@ import (
 
 type SatInfo struct {
 	AddressId uint64
-	Index     int
 	UtxoId    uint64
+	Nfts      *common.NftsInSat // 延迟加载
 }
 
 var _using_sattree = true
@@ -230,7 +230,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 
 	// 确保该nft已经加入utxomap中
 	p.addSatToUtxo(nft.UtxoId, nft.Base.Sat)
-	p.satMap[(nft.Base.Sat)] = &SatInfo{AddressId: nft.OwnerAddressId, Index: 0, UtxoId: nft.UtxoId}
+	p.satMap[(nft.Base.Sat)] = &SatInfo{AddressId: nft.OwnerAddressId, UtxoId: nft.UtxoId}
 	p.satTree.Put(nft.Base.Sat, true)
 
 	//action := TransferAction{UtxoId: inputUtxo, Sats: v, Action: -1}
@@ -340,10 +340,10 @@ func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
 		values := p.satTree.FindSatValuesWithRange(r)
 		for k := range values {
 			sats = append(sats, k)
-			for i, address := range output.Address.Addresses {
-				newAddress := p.baseIndexer.GetAddressId(address)
-				p.satMap[k] = &SatInfo{AddressId: newAddress, Index: i, UtxoId: newUtxo}
-			}
+			//for _, address := range output.Address.Addresses {
+				newAddress := p.baseIndexer.GetAddressId(output.Address.Addresses[0])
+				p.satMap[k] = &SatInfo{AddressId: newAddress, UtxoId: newUtxo}
+			//}
 
 			bUpdated = true
 		}
@@ -359,7 +359,7 @@ func (p *NftIndexer) innerUpdateTransfer3(output *common.Output, inputSats []int
 	// 只考虑放在第一个地址上 (output的地址处理过，肯定有值)
 	newUtxo := common.GetUtxoId(output)
 	addressId := p.baseIndexer.GetAddressId(output.Address.Addresses[0])
-	satInfo := &SatInfo{AddressId: addressId, Index: 0, UtxoId: newUtxo}
+	satInfo := &SatInfo{AddressId: addressId, UtxoId: newUtxo}
 
 	sats := make([]int64, 0)
 	i := 0
