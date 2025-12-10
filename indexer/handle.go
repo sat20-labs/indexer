@@ -73,6 +73,9 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	index int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64) {
 	var outValue int64
 	for _, txOut := range tx.Outputs {
+		if txOut.OutValue.Value == 0 {
+			continue
+		}
 		if outValue+txOut.OutValue.Value >= int64(satpoint) {
 			return txOut, satpoint
 		}
@@ -80,7 +83,12 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	}
 	if satpoint > 0 {
 		// 如果satpoint大于0，但是不在输出中，就在外面修改satpoint的值，同时直接定位为0
-		return tx.Outputs[0], 0 // 遵循ordinals协议的规则
+		for _, txOut := range tx.Outputs {
+			if txOut.OutValue.Value != 0 {
+				return txOut, 0
+			}
+		}
+		// 找不到有效的，到奖励聪继续找
 	}
 
 	// 如果satpoint == 0，聪输出在奖励区块中
@@ -95,6 +103,9 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	coinbaseTx := block.Transactions[0]
 	outValue = 0
 	for _, txOut := range coinbaseTx.Outputs {
+		if txOut.OutValue.Value == 0 {
+			continue
+		}
 		if outValue+txOut.OutValue.Value >= baseOffset {
 			return txOut, 0
 		}
@@ -891,6 +902,10 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
+
+	// if tx.TxId == "93d051c5a0ae3b6c34cad59878622993ff6c992fc8b84ca11e435f6496220e64" {
+	// 	common.Log.Infof("")
+	// }
 
 	satpoint := int64(0)
 	if insc.Inscription.Pointer != nil {

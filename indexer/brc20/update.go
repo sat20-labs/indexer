@@ -194,9 +194,9 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	defer s.mutex.Unlock()
 	startTime := time.Now()
 
-	if block.Height == 90419 {
-		common.Log.Infof("")
-	}
+	// if block.Height == 84758 {
+	// 	common.Log.Infof("")
+	// }
 
 	// 预加载相关地址的数据
 	s.db.View(func(txn common.ReadBatch) error {
@@ -444,9 +444,9 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	// 检查transferNft转入到哪个输出
 	inputTransferNfts := make(map[int64]*TransferNftInfo)
 	for _, tx := range block.Transactions[1:] {
-		if tx.TxId == "442c7a43d638a27e7043e6d7a450bd6d14f5836477b7fc5ede302f5e60c905f5" {
-			common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
-		}
+		// if tx.TxId == "93d051c5a0ae3b6c34cad59878622993ff6c992fc8b84ca11e435f6496220e64" {
+		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+		// }
 
 		hasTransfer := false
 		for _, input := range tx.Inputs {
