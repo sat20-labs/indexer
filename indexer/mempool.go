@@ -45,6 +45,8 @@ func NewMiniMemPool() *MiniMemPool {
 }
 
 func (p *MiniMemPool) init() {
+    p.mutex.Lock()
+    defer p.mutex.Unlock()
     p.txMap = make(map[string]*wire.MsgTx)
     p.spentUtxoMap = make(map[string]*common.TxOutput)
     p.unConfirmedUtxoMap = make(map[string]*common.TxOutput)
@@ -143,16 +145,14 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
         }
         del = append(del, k)
     }
-    p.mutex.Unlock()
-
+   
     common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
     common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
+     p.mutex.Unlock()
 
     if len(txIds) == len(add) {
         // 全新数据
-        p.mutex.Lock()
         p.init()
-        p.mutex.Unlock()
 
         for _, txId := range txIds {
             if !p.running {
@@ -200,7 +200,7 @@ func (p *MiniMemPool) resyncMempoolFromRPC() {
     }
 
     p.lastSyncTime = time.Now().Unix()
-    common.Log.Infof("resyncMempoolFromRPC completed, new size %d. %v", len(p.txMap), time.Since(start).String())
+    common.Log.Infof("resyncMempoolFromRPC completed. %v", time.Since(start).String())
 }
 
 func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
@@ -222,6 +222,7 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 	return msgTx, nil
 }
 
+// 外部不加锁
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
@@ -294,7 +295,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     p.mutex.Unlock()
 }
 
-
+// 外部加锁
 func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
     txId := tx.TxID()
     _, ok := p.txMap[txId]
@@ -529,8 +530,8 @@ func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
     for _, tx := range msg.Transactions {
         p.txConfirmed(tx)
     }
+    common.Log.Infof("ProcessBlock completed, new size %d. %v", len(p.txMap), time.Since(start).String())
     p.mutex.Unlock()
-     common.Log.Infof("ProcessBlock completed, new size %d. %v", len(p.txMap), time.Since(start).String())
 
     if time.Now().Unix() - p.lastSyncTime >= 36000 {
         go p.resyncMempoolFromRPC()
@@ -540,10 +541,8 @@ func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
 // 处理回滚
 func (p *MiniMemPool) ProcessReorg() {
     // 清空所有数据
-    p.mutex.Lock()
     p.init()
     p.running = false
-    p.mutex.Unlock()
     // 等主线程通过Start()重新启动
     //p.fetchMempoolFromRPC()
     common.Log.Infof("ProcessReorg, reset mempool")
