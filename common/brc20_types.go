@@ -174,6 +174,16 @@ type TransferNFT struct {
 	IsInvalid bool
 }
 
+func (p *TransferNFT) Clone() *TransferNFT {
+	return &TransferNFT{
+		NftId: p.NftId,
+		Id: p.Id,
+		UtxoId: p.UtxoId,
+		Amount: *p.Amount.Clone(),
+		IsInvalid: p.IsInvalid,
+	}
+}
+
 // key: mint时的inscriptionId。 value: 某个资产对应的数值
 type BRC20TickAbbrInfo struct {
 	AvailableBalance    *Decimal
@@ -183,6 +193,34 @@ type BRC20TickAbbrInfo struct {
 
 func (p *BRC20TickAbbrInfo) AssetAmt() *Decimal {
 	return DecimalAdd(p.AvailableBalance, p.TransferableBalance)
+}
+
+func (p *BRC20TickAbbrInfo) Equal(that *BRC20TickAbbrInfo) bool {
+	if p == nil && that == nil {
+		return true
+	}
+	if p == nil {
+		return false
+	}
+	if that == nil {
+		return false
+	}
+	if p.AvailableBalance.Cmp(that.AvailableBalance) != 0 {
+		return false
+	}
+	if p.TransferableBalance.Cmp(that.TransferableBalance) != 0 {
+		return false
+	}
+	if len(p.TransferableData) != len(that.TransferableData) {
+		return false
+	}
+	for utxoId := range that.TransferableData {
+		_, ok := p.TransferableData[utxoId]
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func NewBRC20TickAbbrInfo(availableAmt, transferableAmt *Decimal) *BRC20TickAbbrInfo {
