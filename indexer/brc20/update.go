@@ -654,6 +654,10 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height int) 
 	
 	fromAddress := transfer.AddressId
 
+	ticker := s.tickerMap[transfer.Ticker]
+	ticker.Ticker.TransactionCount++
+	s.tickerUpdated[transfer.Ticker] = ticker.Ticker
+
 	// 当作发送出去，接受者是自己
 
 	s.removeTransferNft(transfer)

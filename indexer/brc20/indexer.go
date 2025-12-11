@@ -39,6 +39,15 @@ type TransferNftInfo struct {
 	TransferNft *common.TransferNFT // 有可能多个transfer nft在转移时，输出到同一个utxo中，这个时候直接修改Amount
 }
 
+func (p *TransferNftInfo) Clone() *TransferNftInfo {
+	return &TransferNftInfo{
+		AddressId: p.AddressId,
+		UtxoId: p.UtxoId,
+		Ticker: p.Ticker,
+		TransferNft: p.TransferNft.Clone(),
+	}
+}
+
 type BRC20Indexer struct {
 	db           common.KVDB
 	nftIndexer   *nft.NftIndexer
@@ -52,12 +61,12 @@ type BRC20Indexer struct {
 	transferNftMap map[uint64]*TransferNftInfo // utxoId -> HolderInfo中的TransferableData的Nft，当前区块所需数据
 	//tickerToHolderMap map[string]map[uint64]bool  // ticker -> addrId. 动态数据，跟随Holder变更，当前区块所需数据
 
-	// 其他辅助信息
-	actionBufferMap map[uint64]*ActionInfo // key: input的utxoId，保存一个区块
-
 	holderActionList []*HolderAction // 在同一个block中，状态变迁需要按顺序执行
 	tickerAdded      []*common.BRC20Ticker
 	tickerUpdated    map[string]*common.BRC20Ticker // key: ticker
+
+	// 其他辅助信息，不需要clone
+	actionBufferMap map[uint64]*ActionInfo // key: input的utxoId，保存一个区块
 }
 
 func NewIndexer(db common.KVDB) *BRC20Indexer {
@@ -98,17 +107,6 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	newInst := NewIndexer(s.db)
 	newInst.nftIndexer = s.nftIndexer
 
-	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
-	copy(newInst.holderActionList, s.holderActionList)
-
-	newInst.tickerAdded = make([]*common.BRC20Ticker, len(s.tickerAdded))
-	copy(newInst.tickerAdded, s.tickerAdded)
-
-	newInst.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
-	for key, value := range s.tickerUpdated {
-		newInst.tickerUpdated[key] = value
-	}
-
 	newInst.tickerMap = make(map[string]*BRC20TickInfo, 0)
 	for key, value := range s.tickerMap {
 		tick := BRC20TickInfo{}
@@ -124,33 +122,43 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 		newInst.tickerMap[key] = &tick
 	}
 
-	// 保存holderActionList对应的数据，更新数据库需要
-	newInst.holderMap = make(map[uint64]*HolderInfo, 0)
-	//newInst.tickerToHolderMap = make(map[string]map[uint64]bool, 0)
-	for _, action := range s.holderActionList {
-
-		value, ok := s.holderMap[action.FromAddr]
-		if ok {
-			info := HolderInfo{ /*AddressId: value.AddressId,*/ Tickers: value.Tickers}
-			newInst.holderMap[action.FromAddr] = &info
+	newInst.holderMap = make(map[uint64]*HolderInfo)
+	for addressId, holder := range s.holderMap {
+		newHolder := &HolderInfo{
+			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
+		}
+		for name, info := range holder.Tickers {
+			newInfo := &common.BRC20TickAbbrInfo{
+				AvailableBalance: info.AvailableBalance.Clone(),
+				TransferableBalance: info.TransferableBalance.Clone(),
+				TransferableData: make(map[uint64]*common.TransferNFT),
+			}
+			for k, v := range info.TransferableData {
+				newInfo.TransferableData[k] = v.Clone()
+			}
+			newHolder.Tickers[name] = newInfo
 		}
 
-		value, ok = s.holderMap[action.ToAddr]
-		if ok {
-			info := HolderInfo{ /*AddressId: value.AddressId,*/ Tickers: value.Tickers}
-			newInst.holderMap[action.ToAddr] = &info
-		}
-
-		// holders, ok := s.tickerToHolderMap[action.Ticker]
-		// if ok {
-		// 	newInst.tickerToHolderMap[action.Ticker] = holders
-		// }
+		newInst.holderMap[addressId] = newHolder
 	}
 
 	newInst.transferNftMap = make(map[uint64]*TransferNftInfo)
-	for key, value := range s.transferNftMap {
-		newInst.transferNftMap[key] = value
+	for utxoId, transfer := range s.transferNftMap {
+		newInst.transferNftMap[utxoId] = transfer.Clone()
 	}
+
+	// 保存holderActionList对应的数据，更新数据库需要
+	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
+	copy(newInst.holderActionList, s.holderActionList)
+
+	newInst.tickerAdded = make([]*common.BRC20Ticker, len(s.tickerAdded))
+	copy(newInst.tickerAdded, s.tickerAdded)
+
+	newInst.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
+	for key, value := range s.tickerUpdated {
+		newInst.tickerUpdated[key] = value
+	}
+
 
 	newInst.status = s.status.Clone()
 
@@ -160,24 +168,45 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 // update之后，删除原来instance中的数据
 func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 
-	//s.holderActionList = s.holderActionList[len(another.holderActionList):]
-	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)
-
-	s.tickerAdded = append([]*common.BRC20Ticker(nil), s.tickerAdded[len(another.tickerAdded):]...)
-
-	for key := range another.tickerUpdated {
-		delete(s.tickerUpdated, key)
-	}
-
 	for key, value := range another.tickerMap {
 		ticker, ok := s.tickerMap[key]
 		if ok {
-			//ticker.MintAdded = ticker.MintAdded[len(value.MintAdded):]
 			ticker.MintAdded = append([]*common.BRC20Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
 		}
 	}
 
-	// 不需要更新 holderInfo 和 utxoMap
+	for addressId, old := range another.holderMap {
+		n, ok := s.holderMap[addressId]
+		if !ok {
+			continue
+		}
+		for name, oldInfo := range old.Tickers {
+			// 没有更新的ticker资产信息，可以删除
+			newInfo, ok := n.Tickers[name]
+			if ok {
+				if oldInfo.Equal(newInfo) {
+					delete(n.Tickers, name)
+				}
+			}
+		}
+	}
+
+	for utxoId := range another.transferNftMap {
+		delete(s.transferNftMap, utxoId)
+	}
+
+	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)
+	s.tickerAdded = append([]*common.BRC20Ticker(nil), s.tickerAdded[len(another.tickerAdded):]...)
+
+	for name, old := range another.tickerUpdated {
+		n, ok := s.tickerUpdated[name]
+		if !ok {
+			continue
+		}
+		if n.TransactionCount == old.TransactionCount {
+			delete(s.tickerUpdated, name)
+		}
+	}
 }
 
 // 在系统初始化时调用一次，如果有历史数据的话。一般在NewSatIndex之后调用。
@@ -187,30 +216,11 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	startTime := time.Now()
 	version := s.GetDBVersion()
-	// if s.nftIndexer.GetBaseIndexer().IsMainnet() && version == "" {
-	// 	s.initCursorInscriptionsDB()
-	// }
+	
 	s.status = initStatusFromDB(s.db)
 	common.Log.Infof("brc20 db version: %s", version)
 	common.Log.Info("InitIndexer ...")
 
-	//ticks := s.loadTickListFromDB()
-	//if true {
-	//s.mutex.Lock()
-
-	// s.tickerMap = make(map[string]*BRC20TickInfo, 0)
-	// for _, ticker := range ticks {
-	// 	s.tickerMap[ticker] = s.initTickInfoFromDB(ticker)
-	// }
-
-	//s.holderActionList = make([]*HolderAction, 0)
-	//s.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
-
-	//s.mutex.Unlock()
-	//}
-
-	//height := nftIndexer.GetBaseIndexer().GetSyncHeight()
-	//s.CheckSelf(height)
 
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("InitIndexer %d ms", elapsed)
