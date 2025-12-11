@@ -2,6 +2,7 @@ package brc20
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -32,12 +33,8 @@ func (s *BRC20Indexer) initTickInfoFromDB(tickerName string) *BRC20TickInfo {
 	tickinfo := newTickerInfo(tickerName)
 	ticker := s.loadTickerFromDB(tickerName)
 	tickinfo.Ticker = ticker
-	s.loadMintInfoFromDB(tickinfo)
+	s.loadMintDataFromDB(tickerName)
 	return tickinfo
-}
-
-func (s *BRC20Indexer) loadMintInfoFromDB(tickinfo *BRC20TickInfo) map[int64]*common.BRC20Mint {
-	return s.loadMintDataFromDB(tickinfo.Name)
 }
 
 func (s *BRC20Indexer) loadHoldersInTickerFromDB(name string) map[uint64]*common.Decimal {
@@ -79,10 +76,10 @@ func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
 	var result HolderInfo
 	result.Tickers = make(map[string]*common.BRC20TickAbbrInfo)
 
-	common.Log.Info("BRC20Indexer loadHolderInfoFromDB ...")
+	common.Log.Debug("BRC20Indexer loadHolderInfoFromDB ...")
 	count := 0
 	startTime := time.Now()
-	prefix := fmt.Sprintf("%s%x-", DB_PREFIX_HOLDER_ASSET, addressId)
+	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addressId))
 	err := s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
 		// 设置前缀扫描选项
 
@@ -119,7 +116,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*comm
 	common.Log.Debug("BRC20Indexer loadHolderInfoFromDBV2 ...")
 	count := 0
 	startTime := time.Now()
-	prefix := fmt.Sprintf("%s%x-", DB_PREFIX_HOLDER_ASSET, addressId)
+	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addressId))
 	err := s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
 		// 设置前缀扫描选项
 
@@ -166,23 +163,47 @@ func (s *BRC20Indexer) loadTickAbbrInfoFromDB(addressId uint64, ticker string) *
 }
 
 func (s *BRC20Indexer) loadTickListFromDB() []string {
-	result := make([]string, 0)
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadTickListFromDB ...")
+
+	type pair struct {
+		id int64
+		name string
+	}
+
+	tickers := make([]*pair, 0)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
 
-		key := string(k)
-		tickname, err := parseTickListKey(key)
-		if err == nil {
-			result = append(result, tickname)
-		}
+		//key := string(k)
+		//tickname, err := parseTickListKey(key)
+		//if err == nil {
+			var ticker common.BRC20Ticker
+			err := db.DecodeBytes(v, &ticker)
+			if err == nil {
+				tickers = append(tickers, &pair{
+					id: ticker.Id,
+					name: ticker.Name,
+				})
+			} else {
+				common.Log.Panicln("DecodeBytes " + err.Error())
+			}
+		
 		count++
 
 		return nil
 	})
 	if err != nil {
 		common.Log.Panicf("Error prefetching ticklist from db: %v", err)
+	}
+
+	sort.Slice(tickers, func(i, j int) bool {
+		return tickers[i].id < tickers[j].id
+	})
+
+	result := make([]string, len(tickers))
+	for i, t := range tickers {
+		result[i] = t.name
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()

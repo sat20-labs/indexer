@@ -545,14 +545,6 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 		Nft: nft, 
 	}
 
-	// recover for decimal panic
-	defer func() {
-		if r := recover(); r != nil {
-			common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, panic: %v",
-				nft.Base.InscriptionId, content.Ticker, r)
-		}
-	}()
-
 	// check mint amount
 	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
 	if err != nil {
@@ -565,17 +557,17 @@ func (s *IndexerMgr) handleBrc20MintTicker(rngs []*common.Range, satpoint int, o
 		return nil
 	}
 
-	// check max
-	mintedAmt := ticker.Minted.Add(amt)
-	cmpResult := mintedAmt.Cmp(&ticker.Max)
-	if cmpResult > 0 {
-		amt = ticker.Max.Sub(&ticker.Minted)
-		common.Log.Debugf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
-	}
-	if amt.Sign() <= 0 {
-		common.Log.Debugf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
-		return nil
-	}
+	// // check max，需要延迟判断
+	// mintedAmt := ticker.Minted.Add(amt)
+	// cmpResult := mintedAmt.Cmp(&ticker.Max)
+	// if cmpResult > 0 {
+	// 	amt = ticker.Max.Sub(&ticker.Minted)
+	// 	common.Log.Debugf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
+	// }
+	// if amt.Sign() <= 0 {
+	// 	common.Log.Debugf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
+	// 	return nil
+	// }
 	mint.Amt = *amt
 	return mint
 }
@@ -592,6 +584,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(rngs []*common.Range, satpoint in
 
 	transfer := &common.BRC20Transfer{
 		BRC20TransferInDB: common.BRC20TransferInDB{
+			NftId: nft.Base.Id,
 			Name: strings.ToLower(content.Ticker),
 		},
 		Nft:  nft,
@@ -785,7 +778,7 @@ func (s *IndexerMgr) handleOrdX(inUtxoId uint64, input []*common.Range, satpoint
 	}
 }
 
-func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoint int, out *common.Output,
+func (s *IndexerMgr) handleBrc20(in *common.Input, input []*common.Range, satpoint int, out *common.Output,
 	insc *ord.InscriptionResult, nft *common.Nft) {
 
 	content := string(insc.Inscription.Body)
@@ -828,7 +821,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 			return
 		}
 
-		s.brc20Indexer.UpdateInscribeDeploy(ticker)
+		s.brc20Indexer.UpdateInscribeDeploy(in, ticker)
 
 	case "mint":
 		mintInfo := common.ParseBrc20MintContent(content)
@@ -846,7 +839,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 			return
 		}
 		//common.Log.Infof("nft.Base.InscriptionId: %s, nft.Base.Id: %d", nft.Base.InscriptionId, nft.Base.Id)
-		s.brc20Indexer.UpdateInscribeMint(mint)
+		s.brc20Indexer.UpdateInscribeMint(in, mint)
 
 	case "transfer":
 		transferInfo := common.ParseBrc20TransferContent(content)
@@ -864,7 +857,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, input []*common.Range, satpoin
 			return
 		}
 
-		s.brc20Indexer.UpdateInscribeTransfer(transfer)
+		s.brc20Indexer.UpdateInscribeTransfer(in, transfer)
 
 	default:
 		//common.Log.Warnf("handleOrdX unknown ordx type: %s, content: %s, txid: %s", ordxType, content, tx.Txid)
@@ -976,7 +969,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
 		// 	return
 		// }
-		if nft.Base.CurseType != 0 {
+		if nft.Base.CurseType != 0 { 
 			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
 			if block.Height < 824544 { // Jubilee
 				return
@@ -984,11 +977,7 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 			// vindicated
 		}
 
-		s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, insc, nft)
-		// if inscriptionId == 0 {
-		// TODO brc20 只处理tx中的第一个铭文？
-		// s.handleBrc20(input.UtxoId, input.Ordinals, satpoint, output, fields, nft)
-		// }
+		s.handleBrc20(input, input.Ordinals, satpoint, output, insc, nft)
 
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(insc.Inscription.Body))

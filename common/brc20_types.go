@@ -5,13 +5,13 @@ import (
 )
 
 type BRC20Status struct {
-	Version          string
-	TickerCount      int
+	Version     string
+	TickerCount int
 }
 
-func (p *BRC20Status) Clone() *BRC20Status{
+func (p *BRC20Status) Clone() *BRC20Status {
 	return &BRC20Status{
-		Version: p.Version,
+		Version:     p.Version,
 		TickerCount: p.TickerCount,
 	}
 }
@@ -136,25 +136,25 @@ type BRC20TransferContent struct {
 }
 
 const (
-	// 0: inscribe-mint  1: inscribe-transfer  2: transfer
-	BRC20_Action_InScribe_Mint int = iota
+	BRC20_Action_InScribe_Deploy int = iota
+	BRC20_Action_InScribe_Mint
 	BRC20_Action_InScribe_Transfer // 铸造一个transfer铭文
-	BRC20_Action_Transfer // 转移一个transfer铭文
-	BRC20_Action_Transfer_Spent // 一个已经转移的transfer铭文被花费
+	BRC20_Action_Transfer          // 转移一个transfer铭文
+	BRC20_Action_Transfer_Spent    // 一个已经转移的transfer铭文被花费
+	BRC20_Action_Transfer_Canceled // 销毁一个transfer铭文
 )
 
 type BRC20ActionHistory struct {
-	Height int
-	Action int
-	UtxoId uint64
-	NftId  int64 // transfer nft
+	Height   int
+	Action   int
+	NftId    int64 // transfer nft
+	Ticker   string
+	Amount   Decimal
 
 	FromUtxoId uint64
-	FromAddr uint64
-	ToAddr   uint64
-
-	Ticker string
-	Amount Decimal
+	FromAddr   uint64
+	ToUtxoId   uint64
+	ToAddr     uint64
 }
 
 type BRC20MintAbbrInfo struct {

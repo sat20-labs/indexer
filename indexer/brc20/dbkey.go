@@ -76,7 +76,7 @@ func ParseMintHistoryKey(input string) (string, int64, error) {
 }
 
 func GetHolderInfoKey(addrId uint64, ticker string) string {
-	return fmt.Sprintf("%s%x-%s", DB_PREFIX_HOLDER_ASSET, addrId, encodeTickerName(ticker))
+	return fmt.Sprintf("%s%s-%s", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addrId), encodeTickerName(ticker))
 }
 
 func parseHolderInfoKey(input string) (uint64, string, error) {
@@ -131,7 +131,7 @@ func GetCurseInscriptionKey(inscriptionId string) string {
 }
 
 func GetUtxoToTransferKey(utxoId uint64) string {
-	return fmt.Sprintf("%s%x", DB_PREFIX_UTXO_TRANSFER, common.Uint64ToString(utxoId))
+	return fmt.Sprintf("%s%s", DB_PREFIX_UTXO_TRANSFER, common.Uint64ToString(utxoId))
 }
 
 func parseUtxoToTransferKey(input string) (uint64, error) {
