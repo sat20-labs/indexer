@@ -146,6 +146,45 @@ func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*comm
 	return result
 }
 
+
+func (s *BRC20Indexer) checkHolderAssetFromDB(addressId uint64) bool {
+	
+	hasAsset := false
+	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addressId))
+	err := s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+		// 设置前缀扫描选项
+		var info common.BRC20TickAbbrInfo
+		err := db.DecodeBytes(v, &info)
+		if err == nil {
+			if info.AssetAmt().Sign() != 0 {
+				hasAsset = true
+				return fmt.Errorf("found")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		common.Log.Panicf("Error prefetching HolderInfo from db: %v", err)
+	}
+
+	return hasAsset
+}
+
+func (s *BRC20Indexer) checkHolderAssetFromDBV2(addrs []uint64) []uint64 {
+	sort.Slice(addrs, func(i, j int) bool {
+		return addrs[i] < addrs[j]
+	})
+
+	hasAssetAddress := make([]uint64, 0)
+	for _, addressId := range addrs {
+		if s.checkHolderAssetFromDB(addressId) {
+			hasAssetAddress = append(hasAssetAddress, addressId)
+		}
+	}
+	return hasAssetAddress
+}
+
+
 func (s *BRC20Indexer) loadTickAbbrInfoFromDB(addressId uint64, ticker string) *common.BRC20TickAbbrInfo {
 	var result common.BRC20TickAbbrInfo
 
