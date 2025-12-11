@@ -340,10 +340,10 @@ func (b *IndexerMgr) checkSelf() {
 	if b.compiling.CheckSelf() &&
 		b.exotic.CheckSelf() &&
 		b.nft.CheckSelf(b.baseDB) &&
+		b.ns.CheckSelf(b.baseDB) &&
 		b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
-		b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) &&
 		b.RunesIndexer.CheckSelf(b.rpcService) &&
-		b.ns.CheckSelf(b.baseDB) {
+		b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) {
 		common.Log.Infof("IndexerMgr.checkSelf succeed. %v", time.Since(start))
 	} else {
 		b.closeDB()
