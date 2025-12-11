@@ -573,14 +573,6 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 		Nft: nft, 
 	}
 
-	// recover for decimal panic
-	defer func() {
-		if r := recover(); r != nil {
-			common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, panic: %v",
-				nft.Base.InscriptionId, content.Ticker, r)
-		}
-	}()
-
 	// check mint amount
 	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
 	if err != nil {
@@ -593,17 +585,17 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 		return nil
 	}
 
-	// check max
-	mintedAmt := ticker.Minted.Add(amt)
-	cmpResult := mintedAmt.Cmp(&ticker.Max)
-	if cmpResult > 0 {
-		amt = ticker.Max.Sub(&ticker.Minted)
-		common.Log.Debugf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
-	}
-	if amt.Sign() <= 0 {
-		common.Log.Debugf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
-		return nil
-	}
+	// check max，需要延迟判断
+	// mintedAmt := ticker.Minted.Add(amt)
+	// cmpResult := mintedAmt.Cmp(&ticker.Max)
+	// if cmpResult > 0 {
+	// 	amt = ticker.Max.Sub(&ticker.Minted)
+	// 	common.Log.Debugf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
+	// }
+	// if amt.Sign() <= 0 {
+	// 	common.Log.Debugf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
+	// 	return nil
+	// }
 	mint.Amt = *amt
 	return mint
 }
@@ -620,6 +612,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(satpoint int64, out *common.TxOut
 
 	transfer := &common.BRC20Transfer{
 		BRC20TransferInDB: common.BRC20TransferInDB{
+			NftId: nft.Base.Id,
 			Name: strings.ToLower(content.Ticker),
 		},
 		Nft:  nft,
@@ -813,7 +806,7 @@ func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.
 	}
 }
 
-func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.TxOutputV2,
+func (s *IndexerMgr) handleBrc20(input *common.TxInput, satpoint int64, out *common.TxOutputV2,
 	insc *ord.InscriptionResult, nft *common.Nft) {
 
 	content := string(insc.Inscription.Body)
@@ -856,7 +849,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 			return
 		}
 
-		s.brc20Indexer.UpdateInscribeDeploy(ticker)
+		s.brc20Indexer.UpdateInscribeDeploy(input, ticker)
 
 	case "mint":
 		mintInfo := common.ParseBrc20MintContent(content)
@@ -874,7 +867,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 			return
 		}
 		//common.Log.Infof("nft.Base.InscriptionId: %s, nft.Base.Id: %d", nft.Base.InscriptionId, nft.Base.Id)
-		s.brc20Indexer.UpdateInscribeMint(mint)
+		s.brc20Indexer.UpdateInscribeMint(input, mint)
 
 	case "transfer":
 		transferInfo := common.ParseBrc20TransferContent(content)
@@ -892,7 +885,7 @@ func (s *IndexerMgr) handleBrc20(inUtxoId uint64, satpoint int64, out *common.Tx
 			return
 		}
 
-		s.brc20Indexer.UpdateInscribeTransfer(transfer)
+		s.brc20Indexer.UpdateInscribeTransfer(input, transfer)
 
 	default:
 		//common.Log.Warnf("handleOrdX unknown ordx type: %s, content: %s, txid: %s", ordxType, content, tx.Txid)
@@ -983,7 +976,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 			// vindicated
 		}
 
-		s.handleBrc20(input.UtxoId, satpoint, output, insc, nft)
+		s.handleBrc20(input, satpoint, output, insc, nft)
 
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(insc.Inscription.Body))

@@ -365,12 +365,18 @@ func (s *BRC20Indexer) GetHolderAbbrInfo(addressId uint64, tickerName string) *c
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	holder := s.holderMap[addressId]
+	return s.getHolderAbbrInfo(addressId, strings.ToLower(tickerName))
+}
+
+
+// transfer
+func (s *BRC20Indexer) getHolderAbbrInfo(addressId uint64, tickerName string) *common.BRC20TickAbbrInfo {
+
+	holder := s.loadHolderInfo(addressId, tickerName)
 	if holder == nil {
 		return nil
 	}
 
-	tickerName = strings.ToLower(tickerName)
 	tickAbbrInfo := holder.Tickers[tickerName]
 	if tickAbbrInfo == nil {
 		return nil
