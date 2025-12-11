@@ -126,21 +126,18 @@ func (s *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*commo
 func (s *BRC20Indexer) hasAssetInAddress(addrId uint64) bool {
 
 	info, ok := s.holderMap[addrId]
-	if !ok {
-		//common.Log.Errorf("can't find holder with utxo %d", utxo)
-		return false
-	}
-
-	for _, v := range info.Tickers {
-		if v.AvailableBalance.Sign() != 0 {
-			return true
-		}
-		if v.TransferableBalance.Sign() != 0 {
-			return true
+	if ok {
+		for _, v := range info.Tickers {
+			if v.AvailableBalance.Sign() != 0 {
+				return true
+			}
+			if v.TransferableBalance.Sign() != 0 {
+				return true
+			}
 		}
 	}
 
-	return false
+	return s.checkHolderAssetFromDB(addrId)
 }
 
 // return: 按铸造时间排序的铸造历史
@@ -387,12 +384,40 @@ func (s *BRC20Indexer) getHolderAbbrInfo(addressId uint64, tickerName string) *c
 func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	hasAssetAddress := make(map[string]bool)
+	
+	hasAssetAddress := make(map[string]uint64)
+	needCheckInDB := make([]uint64, 0)
+	idToStr := make(map[uint64]string)
 	for k, v := range wantToDelete {
-		if s.hasAssetInAddress(v) {
-			hasAssetAddress[k] = true
+		info, ok := s.holderMap[v]
+		if ok {
+			hasAsset := false
+			for _, v := range info.Tickers {
+				if v.AvailableBalance.Sign() != 0 {
+					hasAsset = true
+					break
+				}
+				if v.TransferableBalance.Sign() != 0 {
+					hasAsset = true
+					break
+				}
+			}
+			if hasAsset {
+				hasAssetAddress[k] = v
+			} else {
+				needCheckInDB = append(needCheckInDB, v)
+				idToStr[v] = k
+			}
 		}
 	}
+
+	if len(needCheckInDB) > 0 {
+		hasAssetList := s.checkHolderAssetFromDBV2(needCheckInDB)
+		for _, addressId := range hasAssetList {
+			hasAssetAddress[idToStr[addressId]] = addressId
+		}
+	}
+
 	for k := range hasAssetAddress {
 		delete(wantToDelete, k)
 	}
