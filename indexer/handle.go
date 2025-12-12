@@ -1084,6 +1084,7 @@ func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpo
 			Parent:             common.ParseInscriptionId(insc.Inscription.Parent),
 			Delegate:           common.ParseInscriptionId(insc.Inscription.Delegate),
 			Sat:                sat,
+			Output:             utxoId,
 			Outpoint:           outpoint,
 			CurseType:          int32(insc.CurseReason),
 			TypeName:           common.ASSET_TYPE_NFT,
