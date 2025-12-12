@@ -152,6 +152,7 @@ type NftItem struct {
 	Sat                int64  `json:"sat"`
 	Address            string `json:"address"`
 	InscriptionId      string `json:"inscriptionId"`
+	Output             uint64 `json:"output"`
 	OutPoint           int64  `json:"outpoint"`
 	Utxo               string `json:"utxo"`
 	Value              int64  `json:"value"`

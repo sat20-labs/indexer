@@ -66,6 +66,7 @@ type nftItem struct {
 	Sat                int64  `json:"sat"`
 	Address            string `json:"address"`
 	InscriptionId      string `json:"inscriptionId"`
+	Output             uint64 `json:"output"`
 	OutPoint           int64  `json:"outpoint"`
 	Utxo               string `json:"utxo"`
 	Value              int64  `json:"value"`
@@ -189,13 +190,13 @@ func main() {
 		return
 	}
 	common.Log.Infof("status2 %d %s", status2.Total, status2.Version)
-	if status.Total != status2.Total {
-		common.Log.Infof("different count")
-		return
-	}
-	total := min(status.Total, status2.Total)
+	// if status.Total != status2.Total {
+	// 	common.Log.Infof("different count")
+	// 	return
+	// }
+	// total := min(status.Total, status2.Total)
 
-	for i := int64(0); i < int64(total); i++ {
+	for i := int64(0); i < 201026; i++ {
 		nft1, err := GetInscription(i, host1)
 		if err != nil {
 			common.Log.Infof("GetInscription failed, %v", err)
@@ -213,8 +214,8 @@ func main() {
 			break
 		}
 
-		if nft1.Utxo != nft2.Utxo {
-			common.Log.Infof("%d: %s utxo different %d %d", i, nft1.InscriptionId, nft1.OutPoint, nft2.OutPoint)
+		if nft1.Output != nft2.Output {
+			common.Log.Infof("%d: %s output different %s %s", i, nft1.InscriptionId, nft1.Output, nft2.Output)
 		}
 
 		if nft1.OutPoint != nft2.OutPoint {

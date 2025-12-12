@@ -942,6 +942,7 @@ func (s *Model) baseContentToNftItem(info *common.InscribeBaseContent) *rpcwire.
 		Name:               info.TypeName,
 		Sat:                info.Sat,
 		InscriptionId:      info.InscriptionId,
+		Output:             info.Output,
 		OutPoint:           info.Outpoint,
 		BlockHeight:        int(info.BlockHeight),
 		BlockTime:          info.BlockTime,
