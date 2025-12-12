@@ -18,7 +18,8 @@ message InscribeBaseContent {
     string parent = 11;
     string delegate = 12;
     int64 id = 13;          // nftId
-    int64 sat = 15;
+    int64 sat = 14;         // ordinal
+    int64 outpoint = 15;    // offset in output when inscribing
     int32 curse_type = 16;
     string typeName = 17;
     bytes user_data = 18;
@@ -28,5 +29,7 @@ message NftsInSat {
     int64 sat = 1;
     uint64 owner_address_id = 2;
     uint64 utxo_id = 3;
-    repeated InscribeBaseContent nfts = 4;
+    int64  offset = 4;
+    int32 curseCount = 5;
+    repeated InscribeBaseContent nfts = 6;
 }

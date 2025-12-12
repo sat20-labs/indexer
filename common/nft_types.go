@@ -9,6 +9,7 @@ type Nft struct {
 	Base           *InscribeBaseContent
 	OwnerAddressId uint64
 	UtxoId         uint64
+	Offset         int64
 }
 
 type NftStatus struct {

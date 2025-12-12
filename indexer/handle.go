@@ -867,6 +867,10 @@ func (s *IndexerMgr) handleBrc20(in *common.Input, input []*common.Range, satpoi
 func (s *IndexerMgr) handleOrd(input *common.Input,
 	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) {
 
+	// if tx.Txid == "ec81dc5b2e62d8bd205da8681995eabcdf2e48a06f17f61abf409b774285831c" {
+	// 	common.Log.Info("")
+	// }
+
 	satpoint := 0
 	if insc.Inscription.Pointer != nil {
 		satpoint = common.GetSatpoint(insc.Inscription.Pointer)
@@ -877,40 +881,32 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 
 	var output *common.Output
 	sat := getSatInRange(input.Ordinals, satpoint)
-	if sat > 0 {
+	if sat > 0 { // satpoint 在输入的范围内
 		output = findOutputWithSat(tx, sat)
 		if output == nil {
 			// 按照ordinals协议的规则，如果satpoint>0, 并且不在输出的utxo中，satpoint需要修改为0
 			if satpoint > 0 {
 				satpoint = 0
-				// 第一个不为零的输出
-				for _, txOut := range tx.Outputs {
-					if txOut.Value != 0 {
-						output = txOut
-						break
-					}
-				}
-				if output == nil {
+				sat = getSatInRange(input.Ordinals, satpoint)
+				output = findOutputWithSat(tx, sat)
+				//if output == nil {
 					// 不可能走到这里
-				}
+				//}
 			} else {
 				// 如果satpoint为0，而且还找不到，那默认就在奖励区块中
 				output = findOutputWithSat(block.Transactions[0], sat)
-				if output == nil {
-					common.Log.Errorf("processOrdProtocol: tx: %s, findOutputWithSat %d failed", tx.Txid, sat)
-					return
-				}
 			}
 		}
-	} else {
+	} else { // 无效的satpoint，重置
 		// 99e70421ab229d1ccf356e594512da6486e2dd1abdf6c2cb5014875451ee8073:0  788312
 		// c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151:0  788200
 		// 输入为0，输出也只有一个，也为0
 		satpoint = 0
-		for _, txOut := range tx.Outputs {
-			if txOut.Value != 0 {
-				output = txOut
-				break
+		if common.GetOrdinalsSize(input.Ordinals) != 0 {
+			sat = getSatInRange(input.Ordinals, satpoint)
+			output = findOutputWithSat(tx, sat)
+			if output == nil {
+				output = findOutputWithSat(block.Transactions[0], sat)
 			}
 		}
 	}
@@ -1053,6 +1049,8 @@ func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
 func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpoint int,
 	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
 
+	// input的value为0，肯定就找不到output，是无绑定铭文，用负数表示
+
 	//if s.nft.Base.IsEnabled() {
 	sat := int64(-1)
 	if len(input.Ordinals) > 0 {
@@ -1060,13 +1058,22 @@ func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpo
 		sat = newRngs[0].Start
 	}
 
-	//addressId1 := s.compiling.GetAddressId(input.Address.Addresses[0])
-	addressId2 := s.compiling.GetAddressId(output.Address.Addresses[0])
-	utxoId := common.GetUtxoId(output)
+	var addressId, utxoId uint64
+	var outpoint int64
+	if output != nil {
+		addressId = s.compiling.GetAddressId(output.Address.Addresses[0])
+		utxoId = common.GetUtxoId(output)
+		outpoint = common.GetSatOffset(output.Ordinals, sat)
+	} else {
+		addressId = common.INVALID_ID
+		utxoId = common.INVALID_ID
+		outpoint = 0
+	}
+	
 	nft := common.Nft{
 		Base: &common.InscribeBaseContent{
 			InscriptionId:      tx.Txid + "i" + strconv.Itoa(inscriptionId),
-			InscriptionAddress: addressId2, // TODO 这个地址不是铭刻者，模型的问题，比较难改，直接使用输出地址
+			InscriptionAddress: addressId, // TODO 这个地址不是铭刻者，模型的问题，比较难改，直接使用输出地址
 			BlockHeight:        int32(block.Height),
 			BlockTime:          block.Timestamp.Unix(),
 			ContentType:        insc.Inscription.ContentType,
@@ -1077,11 +1084,13 @@ func (s *IndexerMgr) handleNft(input *common.Input, output *common.Output, satpo
 			Parent:             common.ParseInscriptionId(insc.Inscription.Parent),
 			Delegate:           common.ParseInscriptionId(insc.Inscription.Delegate),
 			Sat:                sat,
+			Outpoint:           outpoint,
 			CurseType:          int32(insc.CurseReason),
 			TypeName:           common.ASSET_TYPE_NFT,
 		},
-		OwnerAddressId: addressId2,
+		OwnerAddressId: addressId,
 		UtxoId:         utxoId,
+		Offset:         outpoint,
 	}
 	s.nft.NftMint(&nft)
 	if !insc.IsCursed && nft.Base.CurseType != 0 {

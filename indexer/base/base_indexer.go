@@ -86,6 +86,8 @@ func NewBaseIndexer(
 }
 
 func (b *BaseIndexer) Init() {
+	// b.setDBVersion() // enable when reset db version
+
 	dbver := b.GetBaseDBVer()
 	common.Log.Infof("base db version: %s", b.GetBaseDBVer())
 	if dbver != "" && dbver != common.BASE_DB_VERSION {

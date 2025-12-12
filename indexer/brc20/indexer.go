@@ -423,32 +423,34 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	common.Log.Infof("stats: %v", s.status)
 
-	// names := []string{
-	// 	// "ordi",
-	// 	// "usdt",
-	// 	// "test",
-	// 	// "husk",
-	// 	// "gc  ",
-	// 	// "ttt3",
-	// 	// "doge",
-	// 	// "rats",
-	// 	// "ttt3",
-	// 	// "tbtc",
-	// 	// "brc20",
-	// 	"sats",
-	// }
-	// for _, name := range names {
-	// 	//s.printHistory(name)
-	// 	s.printTicker(name)
-	// 	s.printHolders(name)
-	// 	//s.printHistoryWithAddress(name, 0x20e111)
-	// 	// s.printHistoryWithAddress(name, 0x306ce3)
-	// 	// s.printHistoryWithAddress(name, 0x38815d)
-	// 	// s.printHistoryWithAddress(name, 0x3b37a3)
-	// 	// s.printHistoryWithAddress(name, 0x3ff5fe)
-	// 	s.printHistoryWithAddress(name, 0x1569f9)
-	// 	//s.printHistoryWithAddress(name, 0x3b0cee)
-	// }
+	names := []string{
+		"ordi",
+		"usdt",
+		"test",
+		//"husk", 
+		"gc  ",
+		"ttt3",
+		"doge",
+		"rats",
+		"ttt3",
+		"tbtc",
+		"brc20",
+		"sats",
+		"bfun ",
+	    "⚽ ",
+	}
+	for _, name := range names {
+		//s.printHistory(name)
+		s.printTicker(name)
+		s.printHolders(name)
+		//s.printHistoryWithAddress(name, 0x20e111)
+		// s.printHistoryWithAddress(name, 0x306ce3)
+		// s.printHistoryWithAddress(name, 0x38815d)
+		// s.printHistoryWithAddress(name, 0x3b37a3)
+		// s.printHistoryWithAddress(name, 0x3ff5fe)
+		//s.printHistoryWithAddress(name, 0x1569f9)
+		//s.printHistoryWithAddress(name, 0x3b0cee)
+	}
 	
 
 	startTime := time.Now()
@@ -456,7 +458,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	for _, name := range allTickers {
 		//common.Log.Infof("checking ticker %s", name)
 
-		//ticker := s.GetTicker(name)
+		ticker := s.GetTicker(name)
 
 		holdermap := s.GetHoldersWithTick(name)
 		var holderAmount *common.Decimal
@@ -467,20 +469,20 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		// 	common.Log.Info("")
 		// }
 		mintAmount, _ := s.GetMintAmount(name)
-		//if ticker.Id < 10 {
+		if ticker.Id < 10 {
 		common.Log.Infof("ticker %s, minted %s", name, mintAmount.String())
 		//s.printHistory(name)
 		//s.printHolders(name)
-		//}
+		}
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
 			s.printHistory(name)
 			s.printHolders(name)
 			return false
 		}
-		s.printTicker(name)
-		s.printHolders(name)
-		common.Log.Info("")
+		//s.printTicker(name)
+		//s.printHolders(name)
+		//common.Log.Info("")
 	}
 	common.Log.Infof("total tickers %d", len(allTickers))
 
