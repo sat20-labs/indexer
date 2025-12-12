@@ -95,11 +95,18 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 		outValue += txOut.OutValue.Value
 	}
 	if satpoint > 0 {
-		// 找不到输出，默认使用第一个非零输出
+		// 找不到输出，默认使用第一个非零输出（注意需要跳过inputIndex）
+		// testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017bi0
+		// e9099189d9755bc537ff4cdf2c6ea0b5f200005eeac8d85f8490d1cbd45f9c59i0
+		satpoint = baseOffset
 		for _, txOut := range tx.Outputs {
-			if txOut.OutValue.Value != 0 {
-				return txOut, 0, 0
+			if txOut.OutValue.Value == 0 {
+				continue
 			}
+			if outValue+txOut.OutValue.Value > int64(satpoint) {
+				return txOut, satpoint, satpoint-outValue
+			}
+			outValue += txOut.OutValue.Value
 		}
 		// 如果satpoint大于0，但是不在输出中，修改satpoint的值为0
 		// 到奖励聪继续找
@@ -918,14 +925,10 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	satpoint := int64(0)
 	if insc.Inscription.Pointer != nil {
 		satpoint = int64(common.GetSatpoint(insc.Inscription.Pointer))
-		if int64(satpoint) >= input.OutValue.Value {
-			satpoint = 0
-		}
 	}
 	index := int(insc.TxInIndex) // index of input in tx
 
 	var output *common.TxOutputV2
-	
 	// 遵循ordinals的规则
 	var offset int64
 	output, satpoint, offset = findOutputWithSatPoint(block, coinbase, index, txIndex, tx, satpoint)

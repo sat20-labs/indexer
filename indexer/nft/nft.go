@@ -516,7 +516,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			value := common.NftsInSat{}
 			err := loadNftsInSatFromTxn(v, &value, txn)
 			if err != nil {
-				continue
+				common.Log.Panicf("block %d loadNftsInSatFromTxn sat %d failed, %v", block.Height, v, err)
 			}
 
 			info := &SatInfo{

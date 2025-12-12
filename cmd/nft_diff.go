@@ -196,7 +196,7 @@ func main() {
 	// }
 	// total := min(status.Total, status2.Total)
 
-	for i := int64(0); i < 201026; i++ {
+	for i := int64(20000); i < 201026; i++ {
 		nft1, err := GetInscription(i, host1)
 		if err != nil {
 			common.Log.Infof("GetInscription failed, %v", err)
@@ -215,7 +215,7 @@ func main() {
 		}
 
 		if nft1.Output != nft2.Output {
-			common.Log.Infof("%d: %s output different %s %s", i, nft1.InscriptionId, nft1.Output, nft2.Output)
+			common.Log.Infof("%d: %s output different %d %d", i, nft1.InscriptionId, nft1.Output, nft2.Output)
 		}
 
 		if nft1.OutPoint != nft2.OutPoint {
