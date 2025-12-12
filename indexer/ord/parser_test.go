@@ -77,8 +77,14 @@ func GetRawData(txID string, network string) ([][]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", txID, err)
 	}
-	txWitness := data["vin"].([]interface{})[0].(map[string]interface{})["witness"].([]interface{})
 
+	var txWitness []interface{}
+	for _, vin := range data["vin"].([]interface{}) {
+		txWitness = vin.(map[string]interface{})["witness"].([]interface{})
+		if len(txWitness) < 2 {
+			continue
+		}
+	}
 	if len(txWitness) < 2 {
 		return nil, fmt.Errorf("failed to retrieve witness for %s", txID)
 	}
