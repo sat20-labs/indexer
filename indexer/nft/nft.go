@@ -64,11 +64,13 @@ type NftIndexer struct {
 	contentTypeToIdMap map[string]int //
 	lastContentTypeId  int
 
-	// 状态变迁，做为buffer使用时注意数据可能过时
-	nftBuffer       []*common.Nft // 一个区块内的缓存
+	// 状态变迁
 	nftAdded        []*common.Nft // 保持顺序
-	nftAddedUtxoMap map[uint64][]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
 	utxoDeled       []uint64
+
+	// 不需要备份的数据
+	nftBuffer       []*common.Nft // 一个区块内的缓存
+	nftAddedUtxoMap map[uint64][]*common.Nft // 一个区块中，增量的nft在哪个输入的utxo中 utxoId->nftId->nft
 }
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
@@ -122,6 +124,7 @@ func (p *NftIndexer) Clone() *NftIndexer {
 	defer p.mutex.RUnlock()
 
 	newInst := NewNftIndexer(p.db)
+	newInst.baseIndexer = p.baseIndexer
 
 	newInst.disabledSats = p.disabledSats // 仅在rpc中使用
 	newInst.utxoMap = make(map[uint64][]*SatOffset)
@@ -157,6 +160,21 @@ func (p *NftIndexer) Clone() *NftIndexer {
 		newInst.contentToIdMap[v] = k
 	}
 
+	newInst.addedContentIdMap = make(map[uint64]bool)
+	for k, v := range p.addedContentIdMap {
+		newInst.addedContentIdMap[k] = v
+	}
+
+	newInst.inscriptionToNftIdMap = make(map[string]int64)
+	for k, v := range p.inscriptionToNftIdMap {
+		newInst.inscriptionToNftIdMap[k] = v
+	}
+
+	newInst.nftIdToinscriptionMap = make(map[int64]string)
+	for k, v := range p.nftIdToinscriptionMap {
+		newInst.nftIdToinscriptionMap[k] = v
+	}
+
 	newInst.contentTypeMap = make(map[int]string)
 	newInst.contentTypeToIdMap = make(map[string]int)
 	for k, v := range p.contentTypeMap {
@@ -181,12 +199,6 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// 待观察
-	// another.satTree.View(func(k int64, v interface{}) error {
-	// 	p.satTree.Delete(k)
-	// 	return nil
-	// })
-
 	for k := range another.utxoMap {
 		delete(p.utxoMap, k)
 	}
@@ -199,9 +211,29 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 			}
 		}
 	}
-	// p.nftAdded = p.nftAdded[len(another.nftAdded):]
+	for k := range another.contentMap {
+		delete(p.contentMap, k)
+	}
+	for k := range another.contentToIdMap {
+		delete(p.contentToIdMap, k)
+	}
+	for k := range another.addedContentIdMap {
+		delete(p.addedContentIdMap, k)
+	}
+	for k := range another.inscriptionToNftIdMap {
+		delete(p.inscriptionToNftIdMap, k)
+	}
+	for k := range another.nftIdToinscriptionMap {
+		delete(p.nftIdToinscriptionMap, k)
+	}
+	for k := range another.contentTypeMap {
+		delete(p.contentTypeMap, k)
+	}
+	for k := range another.contentTypeToIdMap {
+		delete(p.contentTypeToIdMap, k)
+	}
+	
 	p.nftAdded = append([]*common.Nft(nil), p.nftAdded[len(another.nftAdded):]...)
-	// p.utxoDeled = p.utxoDeled[len(another.utxoDeled):]
 	p.utxoDeled = append([]uint64(nil), p.utxoDeled[len(another.utxoDeled):]...)
 }
 
