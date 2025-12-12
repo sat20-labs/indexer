@@ -540,7 +540,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
 		for _, in := range tx.Inputs {
-			// if input.UtxoId == 1016876457263104 || input.UtxoId == 1022786333310976 || input.UtxoId == 1022958131478528 {
+			// if tx.TxId == "408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74" {
 			// 	common.Log.Infof("")
 			// }
 			input := in.Clone() // 不要影响原来tx的数据
@@ -577,13 +577,13 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		coinbaseInput.Append(change)
 	}
 
-	if len(coinbaseInput.Assets) != 0 {
-		tx := block.Transactions[0]
-		change := p.innerUpdateTransfer3(tx, coinbaseInput)
-		if !change.Zero() {
-			common.Log.Panicf("UpdateTransfer should consume all input assets")
-		}
+	// 处理哪些直接输出到奖励聪的铸造结果
+	tx := block.Transactions[0]
+	change := p.innerUpdateTransfer3(tx, coinbaseInput)
+	if !change.Zero() {
+		common.Log.Panicf("UpdateTransfer should consume all input assets")
 	}
+	
 
 	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
 

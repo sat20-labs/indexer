@@ -233,6 +233,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 
 					if b.maxIndexHeight > 0 {
 						if b.maxIndexHeight <= b.compiling.GetHeight() {
+							b.updateDB()
 							b.checkSelf()
 							common.Log.Infof("reach expected height, set exit flag")
 							bWantExit = true

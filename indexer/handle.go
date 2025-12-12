@@ -106,7 +106,8 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	}
 
 	// 如果satpoint == 0，聪输出在奖励区块中
-	// 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f
+	// testnet4: 408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74 输出为0
+	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 多个输出
 	
 	// 作为网络费用给到了矿工，位置在手续费的0位置
 	baseOffset = 0
@@ -910,7 +911,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
 
-	// if tx.TxId == "ec81dc5b2e62d8bd205da8681995eabcdf2e48a06f17f61abf409b774285831c" {
+	// if tx.TxId == "408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74" {
 	// 	common.Log.Infof("")
 	// }
 

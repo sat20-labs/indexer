@@ -130,7 +130,7 @@ func getBrcContent(url string, inscriptionId string) (ret string, brc *Brc, err 
 	return
 }
 
-func main() {
+func main3() {
 	yamlcfg := config.InitConfig("../testnet.env")
 	config.InitLog(yamlcfg)
 
