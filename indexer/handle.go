@@ -99,6 +99,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 		// testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017bi0
 		// e9099189d9755bc537ff4cdf2c6ea0b5f200005eeac8d85f8490d1cbd45f9c59i0
 		satpoint = baseOffset
+		outValue = 0
 		for _, txOut := range tx.Outputs {
 			if txOut.OutValue.Value == 0 {
 				continue
