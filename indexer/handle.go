@@ -874,9 +874,6 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 	satpoint := 0
 	if insc.Inscription.Pointer != nil {
 		satpoint = common.GetSatpoint(insc.Inscription.Pointer)
-		if int64(satpoint) >= common.GetOrdinalsSize(input.Ordinals) {
-			satpoint = 0
-		}
 	}
 
 	var output *common.Output
@@ -884,7 +881,9 @@ func (s *IndexerMgr) handleOrd(input *common.Input,
 	if sat > 0 { // satpoint 在输入的范围内
 		output = findOutputWithSat(tx, sat)
 		if output == nil {
-			// 按照ordinals协议的规则，如果satpoint>0, 并且不在输出的utxo中，satpoint需要修改为0
+			// 按照ordinals协议的规则，如果satpoint>0, 在输入的range中，但不在输出的range中，satpoint需要修改为0
+			// testnet4: 34fb2f9a984db9700f11fdbca58ac15c51b23fd6225949e881402396ca14e79bi0
+			//           34fb2f9a984db9700f11fdbca58ac15c51b23fd6225949e881402396ca14e79bii
 			if satpoint > 0 {
 				satpoint = 0
 				sat = getSatInRange(input.Ordinals, satpoint)
