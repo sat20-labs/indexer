@@ -504,7 +504,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 			// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 			// }
 
-			// 按顺序执行每一个动作。 每个input最多只有一个动作。先尝试部署，再执行mint，再转移
+			// 按顺序执行每一个动作。 每个input最多只有一个动作。
 			item, ok := s.actionBufferMap[input.UtxoId]
 			if ok {
 				switch item.Action {

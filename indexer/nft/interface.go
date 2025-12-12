@@ -114,7 +114,7 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 					continue
 				}
 				result = append(result, &common.Nft{Base: base,
-					OwnerAddressId: info.OwnerAddressId, UtxoId: utxoId})
+					OwnerAddressId: info.OwnerAddressId, UtxoId: utxoId, Offset: info.Offset})
 			}
 		}
 	}

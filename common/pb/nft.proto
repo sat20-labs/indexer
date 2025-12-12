@@ -18,7 +18,8 @@ message InscribeBaseContent {
     string parent = 11;
     string delegate = 12;
     int64 id = 13;          // nftId
-    int64 sat = 15;
+    int64 sat = 14;
+    int64 outpoint = 15;    // offset in output when inscribing
     int32 curse_type = 16;
     string typeName = 17;
     bytes user_data = 18;

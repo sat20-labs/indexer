@@ -116,6 +116,7 @@ type nftItem struct {
 	Sat                int64  `json:"sat"`
 	Address            string `json:"address"`
 	InscriptionId      string `json:"inscriptionId"`
+	OutPoint           int64  `json:"outpoint"`
 	Utxo               string `json:"utxo"`
 	Value              int64  `json:"value"`
 	BlockHeight        int    `json:"height"`
@@ -243,7 +244,7 @@ func TestCompareInscription(t *testing.T) {
 		return
 	}
 
-	for i := int64(18712); i < int64(status.Total); i++ {
+	for i := int64(0); i < int64(status.Total); i++ {
 		nft1, err := GetInscription(i, host1)
 		if err != nil {
 			t.Fatal(err)
@@ -259,8 +260,12 @@ func TestCompareInscription(t *testing.T) {
 			t.Fatal()
 		}
 
-		if nft1.CurseType != nft2.CurseType {
-			fmt.Printf("%d: curse different %d %d\n", i, nft1.CurseType, nft2.CurseType)
+		if nft1.OutPoint != nft2.OutPoint {
+			fmt.Printf("%d: %s outpoint different %d %d\n", i, nft1.InscriptionId, nft1.OutPoint, nft2.OutPoint)
+		}
+
+		if i % 1000 == 0 {
+			fmt.Printf("%d\n", i)
 		}
 	}
 
