@@ -67,8 +67,8 @@ func (p *NftIndexer) GetNftHolderWithInscriptionId(inscriptionId string) uint64 
 
 // key: sat
 func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
 	sats, ok := p.utxoMap[utxoId]
 	if !ok {
@@ -78,7 +78,7 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 			return nil
 		}
 		sats = value.Sats
-		p.utxoMap[utxoId] = sats
+		// p.utxoMap[utxoId] = sats, 如果设置，就要同步更新satMap，否则会在transfer中导致异常
 	}
 	if len(sats) == 0 {
 		return nil

@@ -1,6 +1,8 @@
 package brc20
 
 import (
+	"strings"
+
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 )
@@ -607,17 +609,19 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		return
 	}
 
-	tickers := p.GetAllTickers()
+	tickers := p.getAllTickers()
 	if len(tickers) != checkpoint.TickerCount {
 		common.Log.Panicf("ticker count different")
 	}
 
 	rpc := base.NewRpcIndexer(p.nftIndexer.GetBaseIndexer())
 	for name, tickerStatus := range checkpoint.Tickers {
-		ticker := p.GetTicker(name)
-		if ticker != nil {
-			common.Log.Panicf("can't find ticker %s", name)
+		name = strings.ToLower(name)
+		tickerInfo := p.loadTickInfo(name)
+		if tickerInfo == nil {
+			common.Log.Panicf("CheckPointWithBlockHeight can't find ticker %s", name)
 		}
+		ticker := tickerInfo.Ticker
 		if tickerStatus.Max != "" && ticker.Max.String() != tickerStatus.Max {
 			common.Log.Panicf("%s Max different, %s %s", name, ticker.Max.String(), tickerStatus.Max)
 		}
@@ -636,10 +640,11 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 
 		for address, amt := range tickerStatus.Holders {
 			addressId := rpc.GetAddressId(address)
-			abbrInfo := p.GetHolderAbbrInfo(addressId, name)
+			abbrInfo := p.getHolderAbbrInfo(addressId, name)
 			if abbrInfo.AssetAmt().String() != amt {
 				common.Log.Panicf("%s holder %s amt different, %s %s", name, address, abbrInfo.AssetAmt().String(), amt)
 			}
 		}
 	}
+	common.Log.Infof("CheckPointWithBlockHeight %d checked", height)
 }

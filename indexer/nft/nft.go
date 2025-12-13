@@ -547,10 +547,12 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			// }
 			input := in.Clone() // 不要影响原来tx的数据
 			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
-
 			if len(sats) > 0 {
 				for _, sat := range sats {
 					info := p.satMap[sat.Sat]
+					if info == nil {
+						common.Log.Panicf("%s should load sat %d before", input.OutPointStr, sat.Sat)
+					}
 					asset := common.AssetInfo{
 						Name: common.AssetName{
 							Protocol: common.PROTOCOL_NAME_ORD,
