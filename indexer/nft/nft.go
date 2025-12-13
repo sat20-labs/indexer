@@ -50,7 +50,7 @@ type NftIndexer struct {
 	baseIndexer *base.BaseIndexer
 	mutex       sync.RWMutex
 
-	// realtime buffer
+	// realtime buffer, utxoMap和satMap必须保持一致，utxo包含的聪，必须在satMap
 	utxoMap           map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
 	satMap            map[int64]*SatInfo      // key: sat, 一个写入周期中新增加的铭文的转移结果，该sat绑定的nft都在这里
 	contentMap        map[uint64]string       // contentId -> content
@@ -208,6 +208,8 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 			if nv.UtxoId == v.UtxoId {
 				// 没有变化就删除
 				delete(p.satMap, k)
+				// 同时必须删除utxoMap中对应的数据，保持一致
+				delete(p.utxoMap, nv.UtxoId)
 			}
 		}
 	}
@@ -619,14 +621,16 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 						common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
 					}
 					offsets := newOut.Offsets[asset.Name]
-					value := p.satMap[sat]
-					value.AddressId = txOut.AddressId
-					value.UtxoId = txOut.UtxoId
-					value.Offset = offsets[0].Start
+
+					// 更新聪的位置
+					satInfo := p.satMap[sat]
+					satInfo.AddressId = txOut.AddressId
+					satInfo.UtxoId = txOut.UtxoId
+					satInfo.Offset = offsets[0].Start
 
 					sats = append(sats, &SatOffset{
 						Sat:    sat,
-						Offset: value.Offset,
+						Offset: satInfo.Offset,
 					})
 				}
 			}
@@ -643,8 +647,8 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 						nft.Base.Sat = s.Sat // 同一个聪，需要命名一致
 						// 根据ordinals规则，判断是否是reinscription
 						if nft.Base.CurseType == 0 {
-							nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
-							if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+							satInfo := p.satMap[nft.Base.Sat] // 预加载，肯定有值
+							if int(satInfo.CurseCount) < len(satInfo.Nfts) {
 								// 已经存在非cursed的铭文，后面的铭文都是reinscription
 								nft.Base.CurseType = int32(ordCommon.Reinscription)
 								p.status.CurseCount++

@@ -194,9 +194,9 @@ func main() {
 	// 	common.Log.Infof("different count")
 	// 	return
 	// }
-	// total := min(status.Total, status2.Total)
+	total := min(status.Total, status2.Total)
 
-	for i := int64(20000); i < 201026; i++ {
+	for i := int64(0); i < int64(total); i++ {
 		nft1, err := GetInscription(i, host1)
 		if err != nil {
 			common.Log.Infof("GetInscription failed, %v", err)
