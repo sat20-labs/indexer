@@ -472,14 +472,13 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 		tickerKeys := make([]string, len(tickerToLoad))
 		for k := range tickerToLoad {
-			tickerKeys = append(tickerKeys, encodeTickerName(k))
+			tickerKeys = append(tickerKeys, GetTickerKey(k))
 		}
 		sort.Slice(tickerKeys, func(i, j int) bool {
 			return tickerKeys[i] < tickerKeys[j]
 		})
 		for _, key := range tickerKeys {
 			var ticker common.BRC20Ticker
-			key := DB_PREFIX_TICKER + key
 			err := db.GetValueFromDB([]byte(key), &ticker, s.db)
 			if err != nil {
 				continue
@@ -556,7 +555,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 	s.actionBufferMap = make(map[uint64]*ActionInfo)
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
-
+	
 	s.CheckPointWithBlockHeight(block.Height)
 }
 

@@ -26,6 +26,10 @@ func (s *BRC20Indexer) TickExisted(tickerName string) bool {
 func (s *BRC20Indexer) GetAllTickers() []string {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
+	return s.getAllTickers()
+}
+
+func (s *BRC20Indexer) getAllTickers() []string {
 	ret := s.loadTickListFromDB()
 
 	for _, ticker := range s.tickerAdded {

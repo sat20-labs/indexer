@@ -384,7 +384,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 	sort.Slice(mid, func(i, j int) bool {
 		return mid[i].amt.Cmp(mid[j].amt) > 0
 	})
-	limit := 20 //len(mid)
+	limit := 40 //len(mid)
 	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
 	for i, item := range mid {
 		if i > limit {

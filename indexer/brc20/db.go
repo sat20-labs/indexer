@@ -3,6 +3,7 @@ package brc20
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -184,7 +185,6 @@ func (s *BRC20Indexer) checkHolderAssetFromDBV2(addrs []uint64) []uint64 {
 	return hasAssetAddress
 }
 
-
 func (s *BRC20Indexer) loadTickAbbrInfoFromDB(addressId uint64, ticker string) *common.BRC20TickAbbrInfo {
 	var result common.BRC20TickAbbrInfo
 
@@ -222,7 +222,7 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 			if err == nil {
 				tickers = append(tickers, &pair{
 					id: ticker.Id,
-					name: ticker.Name,
+					name: strings.ToLower(ticker.Name),
 				})
 			} else {
 				common.Log.Panicln("DecodeBytes " + err.Error())
@@ -348,7 +348,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 func (s *BRC20Indexer) loadTickerFromDB(tickerName string) *common.BRC20Ticker {
 	var result common.BRC20Ticker
 
-	key := DB_PREFIX_TICKER + encodeTickerName(tickerName)
+	key := GetTickerKey(tickerName)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
