@@ -81,13 +81,23 @@ func NewBaseIndexer(
 }
 
 func (b *BaseIndexer) Init() {
+	b.loadSyncStatsFromDB()
+
 	dbver := b.GetBaseDBVer()
 	common.Log.Infof("base db version: %s", b.GetBaseDBVer())
 	if dbver != "" && dbver != common.BASE_DB_VERSION {
-		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
+		if b.lastHeight < 767430 && dbver == "1.6.0" {
+			b.setDBVersion()
+		} else {
+			common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
+		}
 	}
 
-	b.reset()
+	b.blocksChan = make(chan *common.Block, BLOCK_PREFETCH)
+
+	b.blockVector = make([]*common.BlockValueInDB, 0)
+	b.utxoIndex = common.NewUTXOIndex()
+	b.delUTXOs = make([]*common.TxOutputV2, 0)
 }
 
 func (b *BaseIndexer) SetUpdateDBCallback(cb2 UpdateDBCallback) {
@@ -96,16 +106,6 @@ func (b *BaseIndexer) SetUpdateDBCallback(cb2 UpdateDBCallback) {
 
 func (b *BaseIndexer) SetBlockCallback(cb1 BlockProcCallback) {
 	b.blockprocCB = cb1
-}
-
-func (b *BaseIndexer) reset() {
-	b.loadSyncStatsFromDB()
-
-	b.blocksChan = make(chan *common.Block, BLOCK_PREFETCH)
-
-	b.blockVector = make([]*common.BlockValueInDB, 0)
-	b.utxoIndex = common.NewUTXOIndex()
-	b.delUTXOs = make([]*common.TxOutputV2, 0)
 }
 
 // 只保存UpdateDB需要用的数据

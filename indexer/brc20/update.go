@@ -552,9 +552,9 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	}
 
 	s.actionBufferMap = make(map[uint64]*ActionInfo)
-
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
-	//p.CheckSelf(block.Height)
+	
+	s.CheckPointWithBlockHeight(block.Height)
 }
 
 // 增加该address下的资产数据
