@@ -384,13 +384,27 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 	sort.Slice(mid, func(i, j int) bool {
 		return mid[i].amt.Cmp(mid[j].amt) > 0
 	})
+	limit := 20 //len(mid)
 	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
 	for i, item := range mid {
+		if i > limit {
+			break
+		}
 		address, err := rpc.GetAddressByID(item.addressId)
 		if err != nil {
 			address = "-\t"
 		}
-		common.Log.Infof("%d: %x %s %s", i, item.addressId, address, item.amt.String())
+		common.Log.Infof("%d: %x %s: %s", i, item.addressId, address, item.amt.String())
+	}
+	for i, item := range mid {
+		if i > limit {
+			break
+		}
+		address, err := rpc.GetAddressByID(item.addressId)
+		if err != nil {
+			address = "-\t"
+		}
+		fmt.Printf("\"%s\": \"%s\",\n", address, item.amt.String())
 	}
 	common.Log.Infof("total in holders: %s", total.String())
 }
@@ -427,7 +441,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		"ordi",
 		"usdt",
 		"test",
-		//"husk", 
+		"husk", 
 		"gc  ",
 		"ttt3",
 		"doge",
@@ -469,11 +483,12 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		// 	common.Log.Info("")
 		// }
 		mintAmount, _ := s.GetMintAmount(name)
-		if ticker.Id < 10 {
-		common.Log.Infof("ticker %s, minted %s", name, mintAmount.String())
+		//if ticker.Id < 10 {
+		//common.Log.Infof("ticker %s, minted %s, holders %d, TxCount %d", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
+		fmt.Printf("\"%s\": {Minted: \"%s\", HolderCount: %d, TxCount: %d},\n", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
 		//s.printHistory(name)
 		//s.printHolders(name)
-		}
+		//}
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
 			s.printHistory(name)
