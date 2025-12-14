@@ -392,6 +392,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 		}
 		address, err := rpc.GetAddressByID(item.addressId)
 		if err != nil {
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %d failed, %v", item.addressId, err)
 			address = "-\t"
 		}
 		common.Log.Infof("%d: %x %s: %s", i, item.addressId, address, item.amt.String())
