@@ -41,6 +41,18 @@ func (s *BRC20Indexer) updateInscribeDeploy(ticker *common.BRC20Ticker) {
 	s.tickerAdded = append(s.tickerAdded, ticker)
 	s.tickerUpdated[name] = ticker
 
+	action := HolderAction{
+		Height:   int(ticker.Nft.Base.BlockHeight),
+		ToUtxoId: ticker.Nft.UtxoId,
+		NftId:    ticker.Nft.Base.Id,
+		FromAddr: common.INVALID_ID,
+		ToAddr:   ticker.Nft.OwnerAddressId,
+		Ticker:   name,
+		Amount:   *common.NewDefaultDecimal(0),
+		Action:   common.BRC20_Action_InScribe_Deploy,
+	}
+	s.holderActionList = append(s.holderActionList, &action)
+
 	common.Log.Debugf("mint-deploy %d: %x deploy ticker = %s",
 		ticker.Nft.UtxoId, ticker.Nft.OwnerAddressId, ticker.Name)
 }
@@ -94,6 +106,7 @@ func (s *BRC20Indexer) updateInscribeMint(mint *common.BRC20Mint) {
 	// 作为invalid的output
 	nft := common.TransferNFT{
 		NftId:     mint.Nft.Base.Id,
+		Id:        mint.Id,
 		UtxoId:    mint.Nft.UtxoId,
 		Amount:    mint.Amt,
 		IsInvalid: true,
@@ -142,9 +155,9 @@ func (s *BRC20Indexer) updateInscribeTransfer(transfer *common.BRC20Transfer) {
 		}
 		// vindicated
 	}
-	if transfer.Nft.Base.InscriptionId == "b73abee8f9cf28bf58bc45476b32ff1f4bcb01f58d0101ea83a094acdeb73cff" {
-		common.Log.Infof("")
-	}
+	// if transfer.Nft.Base.InscriptionId == "b73abee8f9cf28bf58bc45476b32ff1f4bcb01f58d0101ea83a094acdeb73cff" {
+	// 	common.Log.Infof("")
+	// }
 
 	tickerName := strings.ToLower(transfer.Name)
 	addressId := transfer.Nft.OwnerAddressId
@@ -175,6 +188,7 @@ func (s *BRC20Indexer) updateInscribeTransfer(transfer *common.BRC20Transfer) {
 		Id:     transfer.Id,
 		UtxoId: transfer.Nft.UtxoId,
 		Amount: transfer.Amt,
+		IsInvalid: false,
 	}
 	transferInfo := &TransferNftInfo{
 		AddressId:   transfer.Nft.OwnerAddressId,
@@ -255,35 +269,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 			}
 			tickerToLoad[name] = true
 		}
-		// tickerKeys := make([]string, len(tickerToLoad2))
-		// for k := range tickerToLoad2 {
-		// 	tickerKeys = append(tickerKeys, encodeTickerName(k))
-		// }
-		// sort.Slice(tickerKeys, func(i, j int) bool {
-		// 	return tickerKeys[i] < tickerKeys[j]
-		// })
-		// for _, key := range tickerKeys {
-		// 	var ticker common.BRC20Ticker
-		// 	key := DB_PREFIX_TICKER + key
-		// 	err := db.GetValueFromDB([]byte(key), &ticker, s.db)
-		// 	if err != nil {
-		// 		continue
-		// 	}
 
-		// 	s.tickerMap[strings.ToLower(ticker.Name)] = &BRC20TickInfo{
-		// 		Name: strings.ToLower(ticker.Name),
-		// 		Ticker: &ticker,
-		// 	}
-		// }
-		// 处理所有的deploy
-		// for _, deploy := range s.deployBuffer {
-		// 	name := strings.ToLower(deploy.Name)
-		// 	_, ok := s.tickerMap[name]
-		// 	if ok {
-		// 		continue
-		// 	}
-		// 	s.updateInscribeDeploy(deploy)
-		// }
 		// 加载mint涉及到地址
 		type pair struct {
 			utxoId    uint64
@@ -291,52 +277,6 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 			tx        *common.Transaction
 			ticker    string
 		}
-		// addressToLoadVector := make([]*pair, 0)
-		// for addressId, tickers := range addressToLoad {
-		// 	for name := range tickers {
-		// 		addressToLoadVector = append(addressToLoadVector, &pair{
-		// 			addressId: addressId,
-		// 			ticker: name,
-		// 		})
-		// 	}
-		// }
-		// sort.Slice(addressToLoadVector, func(i, j int) bool {
-		// 	return addressToLoadVector[i].addressId < addressToLoadVector[j].addressId
-		// })
-		// for _, v := range addressToLoadVector {
-		// 	holder, ok := s.holderMap[v.addressId]
-		// 	if !ok {
-		// 		holder = &HolderInfo{
-		// 			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-		// 		}
-		// 		s.holderMap[v.addressId] = holder
-		// 	}
-		// 	_, ok = holder.Tickers[v.ticker]
-		// 	if ok {
-		// 		continue
-		// 	}
-
-		// 	var value common.BRC20TickAbbrInfo
-		// 	key := GetHolderInfoKey(v.addressId, v.ticker)
-		// 	err := db.GetValueFromTxn([]byte(key), &value, txn)
-		// 	if err != nil {
-		// 		continue
-		// 	}
-		// 	holder.Tickers[v.ticker] = &value
-		// }
-		// 处理所有的mint 和 transfer，按顺序
-		// for _, item := range s.mintOrTransferBuffer {
-		// 	mint, ok := item.(*common.BRC20Mint)
-		// 	if ok {
-		// 		// mint 必须在deploy后面
-		// 		s.updateInscribeMint(mint)
-		// 	} else {
-		// 		transfer, ok := item.(*common.BRC20Transfer)
-		// 		if ok {
-		// 			s.updateInscribeTransfer(transfer)
-		// 		}
-		// 	}
-		// }
 
 		// 预处理区块本身的交易
 		utxoToLoad := make([]*pair, 0)

@@ -326,6 +326,7 @@ func (s *BRC20Indexer) printHistory(name string) {
 	history := s.loadTransferHistoryFromDB(name)
 	var total *common.Decimal
 	var count int
+	common.Log.Infof("ticker %s (data from history)", name)
 	holders := make(map[uint64]*common.Decimal)
 	for _, item := range history {
 		flag := ""
@@ -353,8 +354,9 @@ func (s *BRC20Indexer) printHistory(name string) {
 			to = fmt.Sprintf("%x", item.ToAddr)
 		}
 		h, i, j := common.FromUtxoId(item.ToUtxoId)
-		common.Log.Infof("%d %d %d: %d from %s\t to %s,\t %s %s, %s \taction = %d",
-			h, i, j, item.NftId, from, to, flag, item.Amount.String(), total.String(), item.Action)
+		common.Log.Infof("%d %d %d: %d %s -> %s, %s%s, total = %s, %d",
+			h, i, j, item.NftId, from, to, flag, item.Amount.String(), total.String(),
+			item.Action)
 
 		count++
 		if count%20 == 0 {
