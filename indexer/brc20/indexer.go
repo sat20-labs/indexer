@@ -403,6 +403,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 		}
 		address, err := rpc.GetAddressByID(item.addressId)
 		if err != nil {
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %d failed, %v", item.addressId, err)
 			address = "-\t"
 		}
 		fmt.Printf("\"%s\": \"%s\",\n", address, item.amt.String())
@@ -438,21 +439,31 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	common.Log.Infof("stats: %v", s.status)
 
-	names := []string{
-		"ordi",
-		"usdt",
-		"test",
-		"husk", 
-		"gc  ",
-		"ttt3",
-		"doge",
-		"rats",
-		"ttt3",
-		"tbtc",
-		"brc20",
-		"sats",
-		"bfun ",
-	    "⚽ ",
+	isMainnet := s.nftIndexer.GetBaseIndexer().IsMainnet()
+	var names []string
+
+	if isMainnet {
+		names = []string{
+			"ordi",
+			"meme",
+		}
+	} else {
+		names = []string{
+			"ordi",
+			"usdt",
+			"test",
+			"husk", 
+			"gc  ",
+			"ttt3",
+			"doge",
+			"rats",
+			"ttt3",
+			"tbtc",
+			"brc20",
+			"sats",
+			"bfun ",
+			"⚽ ",
+		}
 	}
 	for _, name := range names {
 		//s.printHistory(name)
@@ -503,8 +514,8 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("total tickers %d", len(allTickers))
 
 	// 需要高度到达一定高度才需要检查
-	if (s.nftIndexer.GetBaseIndexer().IsMainnet() && height >= 828800) ||
-		(!s.nftIndexer.GetBaseIndexer().IsMainnet() && height >= 28865) {
+	if (isMainnet && height >= 828800) ||
+		(!isMainnet && height >= 28865) {
 		// 需要区分主网和测试网
 		name := "ordi"
 		ticker := s.GetTicker(name)
@@ -547,7 +558,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 
 	var specialTickers [1]*TickerInfo
 	var checkHeight int
-	if s.nftIndexer.GetBaseIndexer().IsMainnet() {
+	if isMainnet {
 		checkHeight = 923306
 		tickerInfo1 := TickerInfo{
 			Name:               "ordi",
