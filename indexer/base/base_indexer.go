@@ -226,12 +226,16 @@ func (b *BaseIndexer) forceUpdateDB() {
 		startTime := time.Now()
 		wantToDelete := b.UpdateDB()
 		common.Log.Infof("BaseIndexer.updateBasicDB: cost: %v", time.Since(startTime))
+		org := make(map[string]uint64)
+		for k, v := range wantToDelete {
+			org[k] = v
+		}
 
 		// startTime = time.Now()
 		b.updateDBCB(wantToDelete)
 		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
-
-		b.CleanEmptyAddress(wantToDelete)
+		
+		b.CleanEmptyAddress(org, wantToDelete)
 
 		common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
 	} //else {
@@ -429,16 +433,29 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 				common.Log.Panicf("Error setting in db %v", err)
 			}
 			if v.Op == 1 {
-				err = db.BindAddressDBKeyToId(k, v.AddressId, wb)
-				if err != nil {
+				// err = db.BindAddressDBKeyToId(k, v.AddressId, wb)
+				// if err != nil {
+				// 	common.Log.Panicf("Error setting in db %v", err)
+				// }
+				if err := wb.Put(db.GetAddressIdKey(v.AddressId), []byte(k)); err != nil {
 					common.Log.Panicf("Error setting in db %v", err)
 				}
 			}
 		} else {
-			err := wb.Delete((key))
-			if err != nil {
-				common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			empty := &common.AddressValueInDBV2{
+				AddressId: v.AddressId,
+				AddressType: int32(v.AddressType),
 			}
+			err := db.SetDBWithProto3(key, empty, wb)
+			if err != nil {
+				common.Log.Panicf("Error setting in db %v", err)
+			}
+
+			// 删除就会导致绑定关系丢失
+			// err := wb.Delete((key))
+			// if err != nil {
+			// 	common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			// }
 			// brc20 依赖一个不变的id
 			// TODO 数据量太大，最好能让brc20模块，提供一个回调函数，确认哪些地址可以删除
 			wantToDeleteMap[k] = value.AddressId
@@ -477,13 +494,27 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	return wantToDeleteMap
 }
 
-func (b *BaseIndexer) CleanEmptyAddress(wantToDelete map[string]uint64) {
+func (b *BaseIndexer) CleanEmptyAddress(org, wantToDelete map[string]uint64) {
 	wb := b.db.NewWriteBatch()
 	defer wb.Close()
-	for k, v := range wantToDelete {
-		err := db.UnBindAddressId(k, v, wb)
-		if err != nil {
-			common.Log.Errorf("BaseIndexer.CleanEmptyAddress-> Error deleting db: %v\n", err)
+	for k, v := range org {
+		key1 := db.GetAddressDBKeyV2(k)
+		key2 := db.GetAddressIdKey(v)
+		_, ok := wantToDelete[k]
+		if ok {
+			wb.Delete(key1)
+			wb.Delete(key2)
+		} else {
+			empty := &common.AddressValueInDBV2{
+				AddressId: v,  
+			}
+			err := db.SetDBWithProto3(key1, empty, wb) // address->id
+			if err != nil {
+				common.Log.Panicf("Error setting in db %v", err)
+			}
+			if err := wb.Put(key2, []byte(k)); err != nil { // id->address
+				common.Log.Panicf("Error setting in db %v", err)
+			}
 		}
 	}
 	err := wb.Flush()

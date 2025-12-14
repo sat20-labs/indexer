@@ -152,7 +152,7 @@ func (s *BRC20Indexer) checkHolderAssetFromDB(addressId uint64) bool {
 	
 	hasAsset := false
 	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addressId))
-	err := s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+	s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
 		// 设置前缀扫描选项
 		var info common.BRC20TickAbbrInfo
 		err := db.DecodeBytes(v, &info)
@@ -164,9 +164,6 @@ func (s *BRC20Indexer) checkHolderAssetFromDB(addressId uint64) bool {
 		}
 		return nil
 	})
-	if err != nil {
-		common.Log.Panicf("Error prefetching HolderInfo from db: %v", err)
-	}
 
 	return hasAsset
 }

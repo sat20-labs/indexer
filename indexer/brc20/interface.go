@@ -393,9 +393,9 @@ func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 	needCheckInDB := make([]uint64, 0)
 	idToStr := make(map[uint64]string)
 	for k, v := range wantToDelete {
+		hasAsset := false
 		info, ok := s.holderMap[v]
 		if ok {
-			hasAsset := false
 			for _, v := range info.Tickers {
 				if v.AvailableBalance.Sign() != 0 {
 					hasAsset = true
@@ -406,12 +406,12 @@ func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 					break
 				}
 			}
-			if hasAsset {
-				hasAssetAddress[k] = v
-			} else {
-				needCheckInDB = append(needCheckInDB, v)
-				idToStr[v] = k
-			}
+		}
+		if hasAsset {
+			hasAssetAddress[k] = v
+		} else {
+			needCheckInDB = append(needCheckInDB, v)
+			idToStr[v] = k
 		}
 	}
 

@@ -440,6 +440,10 @@ func (b *IndexerMgr) updateDB() {
 func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.cleanDBBuffer() // must before UpdateDB
 	wantToDelete := b.compilingBackupDB.UpdateDB()
+	org := make(map[string]uint64)
+	for k, v := range wantToDelete {
+		org[k] = v
+	}
 	b.exoticBackupDB.UpdateDB()
 	b.nftBackupDB.UpdateDB()
 	b.nsBackupDB.UpdateDB()
@@ -447,7 +451,7 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.runesBackupDB.UpdateDB()
 	b.brc20BackupDB.UpdateDB()
 	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
-	b.compilingBackupDB.CleanEmptyAddress(wantToDelete)
+	b.compilingBackupDB.CleanEmptyAddress(org, wantToDelete)
 
 	b.compiling.SetSyncStats(b.compilingBackupDB.GetSyncStats())
 }

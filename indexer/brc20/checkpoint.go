@@ -475,10 +475,10 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		for address, amt := range tickerStatus.Holders {
 			addressId := rpc.GetAddressId(address)
 			if addressId == common.INVALID_ID {
-				common.Log.Panicf("%s GetAddressId %x failed", name, address)
+				common.Log.Panicf("%s GetAddressId %s failed", name, address)
 			}
 			abbrInfo := p.getHolderAbbrInfo(addressId, name)
-			if addressId == common.INVALID_ID {
+			if abbrInfo == nil {
 				common.Log.Panicf("%s getHolderAbbrInfo %x %s failed", name, addressId, address)
 			}
 			if abbrInfo.AssetAmt().String() != amt {
