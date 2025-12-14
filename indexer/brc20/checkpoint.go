@@ -391,7 +391,6 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 			"ordx": {Minted: "36000000", HolderCount: 6, TxCount: 63},
 		},
 	},
-
 }
 
 var mainnet_checkpoint = map[int]*CheckPoint{
@@ -401,49 +400,11 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Tickers: nil,
 	},
 
+	/*
 	780000: {
-		Height: 30000,
+		Height: 780000,
 		TickerCount: 12,
 		Tickers: map[string]*TickerStatus{
-			"ordi": {
-				Name: "ordi",
-				Max: "2400000000",
-				Minted: "110127",
-				MintCount: 23,
-				HolderCount: 4,
-				TxCount: 66,
-				Holders: map[string]string{
-					"tb1pmm586mlhs35e8ns08trdejpzv02rupx0hp9j8arumg5c29dyrfnq2trqcw": "99000",
-					"tb1p5pmdgkjk2dcpgmme2wx5q0uvwnzk6zhhfkpn5ldtuy3syn07hh4qqm2lsv": "10056",
-					"tb1plts00urlmu2kf7gcnp5225dnh4f0tn7e0r2jlvnd0exrwd03xe4ssykzpj": "1000",
-					"tb1papcjm9pgqvwxrjd2zzft4cr43rvsym7qup2y3cgq7tzhptm0xg6sg04td8": "71",
-				},
-			},
-
-			"usdt": {
-				Name: "usdt",
-				Max: "24000000",
-				Minted: "2000",
-				MintCount: 2,
-				HolderCount: 1,
-				TxCount: 5,
-				Holders: map[string]string{
-					"tb1p48rat08qtandh564ld2fxf85evw5655q3eqd4ttt307c0lf80r9q29l04s": "2000",
-				},
-			},
-
-			"GC  ": {
-				Name: "GC  ",
-				Max: "210000",
-				Minted: "700",
-				MintCount: 7,
-				HolderCount: 2,
-				TxCount: 10,
-				Holders: map[string]string{
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "470",
-					"tb1pgc9wqc2df5t0ec2a25fv45zkh8sgpl8yks236s036jfnhk0jc8nq40kzj2": "230",
-				},
-			},
 		},
 	},
 
@@ -451,48 +412,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Height: 827306,
 		TickerCount: 14,
 		Tickers: map[string]*TickerStatus{
-			"ordi": {
-				Name: "ordi",
-				Max: "2400000000",
-				Minted: "110127",
-				MintCount: 23,
-				HolderCount: 7,
-				TxCount: 76,
-				Holders: map[string]string{
-					"tb1pmm586mlhs35e8ns08trdejpzv02rupx0hp9j8arumg5c29dyrfnq2trqcw": "98000",
-					"tb1p5pmdgkjk2dcpgmme2wx5q0uvwnzk6zhhfkpn5ldtuy3syn07hh4qqm2lsv": "9986",
-					"tb1prt46ejv34r2qaukk3wgnaghcfm7tzm26wt2hkxe95zzrnquacmsqgtmqyt": "1000",
-					"tb1plts00urlmu2kf7gcnp5225dnh4f0tn7e0r2jlvnd0exrwd03xe4ssykzpj": "1000",
-					"tb1papcjm9pgqvwxrjd2zzft4cr43rvsym7qup2y3cgq7tzhptm0xg6sg04td8": "71",
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "60",
-					"tb1p8f5r8ed5nmhw9xgwyus0f6mrp8f8npvszj4x9gee4azd0t94fn9q3rj745": "10",
-				},
-			},
-
-			"usdt": {
-				Name: "usdt",
-				Max: "24000000",
-				Minted: "2000",
-				MintCount: 2,
-				HolderCount: 1,
-				TxCount: 5,
-				Holders: map[string]string{
-					"tb1p48rat08qtandh564ld2fxf85evw5655q3eqd4ttt307c0lf80r9q29l04s": "2000",
-				},
-			},
-
-			"GC  ": {
-				Name: "GC  ",
-				Max: "210000",
-				Minted: "700",
-				MintCount: 7,
-				HolderCount: 2,
-				TxCount: 10,
-				Holders: map[string]string{
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "470",
-					"tb1pgc9wqc2df5t0ec2a25fv45zkh8sgpl8yks236s036jfnhk0jc8nq40kzj2": "230",
-				},
-			},
 		},
 	},
 
@@ -500,48 +419,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Height: 839999,
 		TickerCount: 14,
 		Tickers: map[string]*TickerStatus{
-			"ordi": {
-				Name: "ordi",
-				Max: "2400000000",
-				Minted: "110127",
-				MintCount: 23,
-				HolderCount: 7,
-				TxCount: 76,
-				Holders: map[string]string{
-					"tb1pmm586mlhs35e8ns08trdejpzv02rupx0hp9j8arumg5c29dyrfnq2trqcw": "98000",
-					"tb1p5pmdgkjk2dcpgmme2wx5q0uvwnzk6zhhfkpn5ldtuy3syn07hh4qqm2lsv": "9986",
-					"tb1prt46ejv34r2qaukk3wgnaghcfm7tzm26wt2hkxe95zzrnquacmsqgtmqyt": "1000",
-					"tb1plts00urlmu2kf7gcnp5225dnh4f0tn7e0r2jlvnd0exrwd03xe4ssykzpj": "1000",
-					"tb1papcjm9pgqvwxrjd2zzft4cr43rvsym7qup2y3cgq7tzhptm0xg6sg04td8": "71",
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "60",
-					"tb1p8f5r8ed5nmhw9xgwyus0f6mrp8f8npvszj4x9gee4azd0t94fn9q3rj745": "10",
-				},
-			},
-
-			"usdt": {
-				Name: "usdt",
-				Max: "24000000",
-				Minted: "2000",
-				MintCount: 2,
-				HolderCount: 1,
-				TxCount: 5,
-				Holders: map[string]string{
-					"tb1p48rat08qtandh564ld2fxf85evw5655q3eqd4ttt307c0lf80r9q29l04s": "2000",
-				},
-			},
-
-			"GC  ": {
-				Name: "GC  ",
-				Max: "210000",
-				Minted: "700",
-				MintCount: 7,
-				HolderCount: 2,
-				TxCount: 10,
-				Holders: map[string]string{
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "470",
-					"tb1pgc9wqc2df5t0ec2a25fv45zkh8sgpl8yks236s036jfnhk0jc8nq40kzj2": "230",
-				},
-			},
 		},
 	},
 
@@ -549,52 +426,9 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Height: 920000,
 		TickerCount: 14,
 		Tickers: map[string]*TickerStatus{
-			"ordi": {
-				Name: "ordi",
-				Max: "2400000000",
-				Minted: "110127",
-				MintCount: 23,
-				HolderCount: 7,
-				TxCount: 76,
-				Holders: map[string]string{
-					"tb1pmm586mlhs35e8ns08trdejpzv02rupx0hp9j8arumg5c29dyrfnq2trqcw": "98000",
-					"tb1p5pmdgkjk2dcpgmme2wx5q0uvwnzk6zhhfkpn5ldtuy3syn07hh4qqm2lsv": "9986",
-					"tb1prt46ejv34r2qaukk3wgnaghcfm7tzm26wt2hkxe95zzrnquacmsqgtmqyt": "1000",
-					"tb1plts00urlmu2kf7gcnp5225dnh4f0tn7e0r2jlvnd0exrwd03xe4ssykzpj": "1000",
-					"tb1papcjm9pgqvwxrjd2zzft4cr43rvsym7qup2y3cgq7tzhptm0xg6sg04td8": "71",
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "60",
-					"tb1p8f5r8ed5nmhw9xgwyus0f6mrp8f8npvszj4x9gee4azd0t94fn9q3rj745": "10",
-				},
-			},
-
-			"usdt": {
-				Name: "usdt",
-				Max: "24000000",
-				Minted: "2000",
-				MintCount: 2,
-				HolderCount: 1,
-				TxCount: 5,
-				Holders: map[string]string{
-					"tb1p48rat08qtandh564ld2fxf85evw5655q3eqd4ttt307c0lf80r9q29l04s": "2000",
-				},
-			},
-
-			"GC  ": {
-				Name: "GC  ",
-				Max: "210000",
-				Minted: "700",
-				MintCount: 7,
-				HolderCount: 2,
-				TxCount: 10,
-				Holders: map[string]string{
-					"tb1pj2lgtsa5x9pg7vhugxgumpfs8uu867xhuw28spwrkjzqmmvjm24qwfut59": "470",
-					"tb1pgc9wqc2df5t0ec2a25fv45zkh8sgpl8yks236s036jfnhk0jc8nq40kzj2": "230",
-				},
-			},
 		},
 	},
-	
-
+	*/
 }
 
 
