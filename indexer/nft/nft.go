@@ -16,7 +16,7 @@ import (
 type SatInfo struct { // 该聪的实时位置
 	AddressId uint64 
 	UtxoId    uint64
-	Offset    int64
+	// Offset    int64 
 	Nfts      *common.NftsInSat // 延迟加载
 }
 
@@ -234,7 +234,7 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 	p.satMap[(nft.Base.Sat)] = &SatInfo{
 		AddressId: nft.OwnerAddressId,
 		UtxoId: nft.UtxoId,
-		Offset: nft.Offset,
+		//Offset: nft.Offset,
 	}
 	p.satTree.Put(nft.Base.Sat, true)
 
@@ -316,6 +316,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block) {
 		p.innerUpdateTransfer2(output)
 	}
 
+	p.satTree = indexer.NewSatRBTress()
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
 
@@ -329,8 +330,8 @@ func (p *NftIndexer) innerUpdateTransfer2(output *common.Output) {
 		values := p.satTree.FindSatValuesWithRange(r)
 		for k := range values {
 			sats = append(sats, k)	
-			offset := common.GetSatOffset(output.Ordinals, k)
-			p.satMap[k] = &SatInfo{AddressId: newAddress, UtxoId: newUtxo, Offset: offset}
+			// offset := common.GetSatOffset(output.Ordinals, k) 对大的btc，双重循环就超级慢了
+			p.satMap[k] = &SatInfo{AddressId: newAddress, UtxoId: newUtxo, /*Offset: offset*/}
 			bUpdated = true
 		}
 	}
@@ -373,7 +374,7 @@ func (p *NftIndexer) refreshNft(nft *common.Nft) {
 	if ok {
 		nft.OwnerAddressId = satinfo.AddressId
 		nft.UtxoId = satinfo.UtxoId
-		nft.Offset = satinfo.Offset
+		//nft.Offset = satinfo.Offset
 	}
 }
 
@@ -442,7 +443,7 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 				info := v.value
 				oldvalue.OwnerAddressId = info.AddressId
 				oldvalue.UtxoId = info.UtxoId
-				oldvalue.Offset = info.Offset
+				//oldvalue.Offset = info.Offset
 				nftmap[v.sat] = &oldvalue
 			} //else {
 			// 在p.nftAdded中，稍等再加载
@@ -463,11 +464,11 @@ func (p *NftIndexer) prefetchNftsFromDB() map[int64]*common.NftsInSat {
 					// updated
 					value.OwnerAddressId = satInfo.AddressId
 					value.UtxoId = satInfo.UtxoId
-					value.Offset = satInfo.Offset
+					//value.Offset = satInfo.Offset
 				} else {
 					value.OwnerAddressId = nft.OwnerAddressId
 					value.UtxoId = nft.UtxoId
-					value.Offset = nft.Offset
+					//value.Offset = nft.Offset
 				}
 				nftmap[base.Sat] = value
 			}
@@ -561,7 +562,6 @@ func (p *NftIndexer) UpdateDB() {
 	}
 
 	// reset memory buffer
-	p.satTree = indexer.NewSatRBTress()
 	p.nftAdded = make([]*common.Nft, 0)
 	p.utxoMap = make(map[uint64][]int64)
 	p.utxoDeled = make([]uint64, 0)

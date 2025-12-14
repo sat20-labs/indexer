@@ -62,7 +62,7 @@ func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 						Base:           nft,
 						OwnerAddressId: nfts.OwnerAddressId, 
 						UtxoId: nfts.UtxoId,
-						Offset: nfts.Offset,
+						//Offset: nfts.Offset,
 					}
 				}
 			}
@@ -138,7 +138,7 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 					Base: nft,
 					OwnerAddressId: info.OwnerAddressId, 
 					UtxoId: utxoId,
-					Offset: info.Offset,
+					//Offset: info.Offset,
 				})
 			}
 		}
@@ -179,7 +179,7 @@ func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
 				Base:           nft,
 				OwnerAddressId: nfts.OwnerAddressId, 
 				UtxoId: nfts.UtxoId,
-				Offset: nfts.Offset,
+				//Offset: nfts.Offset,
 			}
 		}
 	}
@@ -234,7 +234,7 @@ func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 			nfts.OwnerAddressId = addedNfts[0].OwnerAddressId
 			nfts.Sat = addedNfts[0].Base.Sat
 			nfts.UtxoId = addedNfts[0].UtxoId
-			nfts.Offset = addedNfts[0].Offset
+			//nfts.Offset = addedNfts[0].Offset
 		}
 		for _, nft := range addedNfts {
 			nfts.Nfts = append(nfts.Nfts, nft.Base)

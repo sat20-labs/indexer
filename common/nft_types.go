@@ -9,7 +9,7 @@ type Nft struct {
 	Base           *InscribeBaseContent
 	OwnerAddressId uint64
 	UtxoId         uint64
-	Offset         int64
+	Offset         int64 // 在对外接口时重新获取，内部不要用也不要重新
 }
 
 type NftStatus struct {
