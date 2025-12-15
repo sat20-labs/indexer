@@ -352,7 +352,7 @@ func (b *IndexerMgr) checkSelf() {
 	}
 }
 
-func (b *IndexerMgr) forceUpdateDB() {
+func (b *IndexerMgr) forceUpdateDB(wantToDelete map[string]uint64) {
 	startTime := time.Now()
 	b.exotic.UpdateDB()
 	b.nft.UpdateDB()
@@ -360,6 +360,7 @@ func (b *IndexerMgr) forceUpdateDB() {
 	b.ftIndexer.UpdateDB()
 	b.RunesIndexer.UpdateDB()
 	b.brc20Indexer.UpdateDB()
+	b.brc20Indexer.CheckEmptyAddress(wantToDelete)
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
 }
@@ -367,12 +368,13 @@ func (b *IndexerMgr) forceUpdateDB() {
 func (b *IndexerMgr) handleReorg(height int) {
 	common.Log.Infof("IndexerMgr handleReorg enter...")
 	// 需要等rpc都完成，再重新启动
+	atomic.AddInt32(&b.reloading, 1)
 	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
 		time.Sleep(10*time.Millisecond)
 	}
 	atomic.AddInt32(&b.reloading, 1)
 	defer func() {
-		atomic.AddInt32(&b.reloading, -1)
+		atomic.AddInt32(&b.reloading, -2)
 	}()
 
 	// 要确保下面的调用，没有rpc的调用
@@ -387,9 +389,16 @@ func (b *IndexerMgr) handleReorg(height int) {
 
 func (b *IndexerMgr) rpcEnter() {
 	for atomic.LoadInt32(&b.reloading) > 0 {
-		time.Sleep(10*time.Microsecond)
+		time.Sleep(10 * time.Microsecond)
 	}
 	atomic.AddInt32(&b.rpcProcessing, 1)
+	if atomic.LoadInt32(&b.reloading) > 0 {
+		atomic.AddInt32(&b.rpcProcessing, -1)
+		for atomic.LoadInt32(&b.reloading) > 0 {
+			time.Sleep(10*time.Microsecond)
+		}
+		atomic.AddInt32(&b.rpcProcessing, 1)
+	}
 }
 
 func (b *IndexerMgr) rpcLeft() {
@@ -430,38 +439,44 @@ func (b *IndexerMgr) updateDB() {
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.cleanDBBuffer() // must before UpdateDB
-	b.compilingBackupDB.UpdateDB()
+	wantToDelete := b.compilingBackupDB.UpdateDB()
+	org := make(map[string]uint64)
+	for k, v := range wantToDelete {
+		org[k] = v
+	}
 	b.exoticBackupDB.UpdateDB()
 	b.nftBackupDB.UpdateDB()
 	b.nsBackupDB.UpdateDB()
 	b.ftBackupDB.UpdateDB()
 	b.runesBackupDB.UpdateDB()
 	b.brc20BackupDB.UpdateDB()
+	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
+	b.compilingBackupDB.CleanEmptyAddress(org, wantToDelete)
 
 	b.compiling.SetSyncStats(b.compilingBackupDB.GetSyncStats())
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
-	b.compilingBackupDB = b.compiling.Clone()
-
-	b.exoticBackupDB = b.exotic.Clone()
+	b.brc20BackupDB = b.brc20Indexer.Clone()
+	b.runesBackupDB = b.RunesIndexer.Clone()
 	b.ftBackupDB = b.ftIndexer.Clone()
 	b.nsBackupDB = b.ns.Clone()
 	b.nftBackupDB = b.nft.Clone()
-	b.brc20BackupDB = b.brc20Indexer.Clone()
-	b.runesBackupDB = b.RunesIndexer.Clone()
+	b.exoticBackupDB = b.exotic.Clone()
+	b.compilingBackupDB = b.compiling.Clone()
+	
 	common.Log.Infof("prepareDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
-	b.compiling.Subtract(b.compilingBackupDB)
-	b.exotic.Subtract(b.exoticBackupDB)
-	b.nft.Subtract(b.nftBackupDB)
-	b.ns.Subtract(b.nsBackupDB)
-	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
 	b.RunesIndexer.Subtract(b.runesBackupDB)
-
+	b.ftIndexer.Subtract(b.ftBackupDB)
+	b.ns.Subtract(b.nsBackupDB)
+	b.nft.Subtract(b.nftBackupDB)
+	b.exotic.Subtract(b.exoticBackupDB)
+	b.compiling.Subtract(b.compilingBackupDB)
+	
 	common.Log.Infof("cleanDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
 }
 

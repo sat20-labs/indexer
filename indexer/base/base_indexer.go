@@ -25,7 +25,7 @@ type AddressStatus struct {
 }
 
 type BlockProcCallback func(*common.Block)
-type UpdateDBCallback func()
+type UpdateDBCallback func(wantToDelete map[string]uint64)
 
 type BaseIndexer struct {
 	db    common.KVDB
@@ -210,20 +210,26 @@ func (b *BaseIndexer) forceUpdateDB() {
 
 	*/
 	if b.updateDBCB != nil {
-		// startTime = time.Now()
-		b.updateDBCB()
-		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
-
 		startTime := time.Now()
-		b.UpdateDB()
-		common.Log.Infof("BaseIndexer.updateBasicDB: cost: %v", time.Since(startTime))
+		wantToDelete := b.UpdateDB()
+		common.Log.Infof("BaseIndexer.UpdateDB: cost: %v", time.Since(startTime))
+		
+		org := make(map[string]uint64)
+		for k, v := range wantToDelete {
+			org[k] = v
+		}
+
+		startTime = time.Now()
+		b.updateDBCB(wantToDelete)
+		common.Log.Infof("BaseIndexer.updateDBCB: cost: %v", time.Since(startTime))
+		
+		b.CleanEmptyAddress(org, wantToDelete)
 
 		common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
 	} //else {
 	// 	common.Log.Infof("don't run forceUpdateDB after entering service mode")
 	// }
 }
-
 
 func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
 	// 测试下提前取的所有地址
@@ -242,12 +248,6 @@ func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
 		b.addUtxo(&addressValueMap, v)
 	}
 
-	type deleteUtxo struct {
-		key   []byte
-		value *UtxoValue
-	}
-
-	
 	for _, utxo := range b.delUTXOs {
 		utxoId := utxo.UtxoId
 		for _, address := range utxo.Address.Addresses {
@@ -281,90 +281,28 @@ func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
 }
 
 
-func (b *BaseIndexer) prefechAddress() map[string]*common.AddressValueInDB {
-	// 测试下提前取的所有地址
-	addressValueMap := make(map[string]*common.AddressValueInDB)
-
-	// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
-	startTime := time.Now()
-	b.db.View(func(txn common.ReadBatch) error {
-		for _, v := range b.utxoIndex.Index {
-			if v.Address.Type == int(txscript.NullDataTy) {
-				// 只有OP_RETURN 才不记录
-				if v.Value == 0 {
-					continue
-				}
-			}
-			b.addUtxo(&addressValueMap, v)
-		}
-
-		type deleteUtxo struct {
-			key   []byte
-			value *UtxoValue
-		}
-
-		deleteUtxos := make([]*deleteUtxo, len(b.delUTXOs))
-		for i, value := range b.delUTXOs {
-			deleteUtxos[i] = &deleteUtxo{
-				key:   db.GetUtxoIdKey(value.UtxoId),
-				value: value,
-			}
-		}
-		sort.Slice(deleteUtxos, func(i, j int) bool {
-			return bytes.Compare(deleteUtxos[i].key, deleteUtxos[j].key) < 0
-		})
-		for _, v := range deleteUtxos {
-			_, err := txn.GetRef(v.key)
-			bExist := err == nil
-			utxo := v.value
-			utxoId := v.value.UtxoId
-			for _, address := range utxo.Address.Addresses {
-				value, ok := addressValueMap[address]
-				if ok {
-					if bExist {
-						// 存在数据库中，等会去删除
-						value.Utxos[utxoId] = &common.UtxoValue{Op: -1}
-					} else {
-						// 仅从缓存数据中删除
-						delete(value.Utxos, utxoId)
-					}
-				} else {
-					if bExist {
-						// 存在数据库中，等会去删除
-						utxos := make(map[uint64]*common.UtxoValue)
-						utxos[utxoId] = &common.UtxoValue{Op: -1}
-
-						id, op := b.getAddressId(address)
-						if op >= 0 {
-							value = &common.AddressValueInDB{
-								AddressType: uint32(utxo.Address.Type),
-								AddressId:   id,
-								Op:          op,
-								Utxos:       utxos,
-							}
-							addressValueMap[address] = value
-						} else {
-							common.Log.Panicf("utxo %x exists but address %s not exists.", utxoId, address)
-						}
-					}
-				}
-			}
-		}
-
-		return nil
-	})
-
-	common.Log.Infof("BaseIndexer.prefechAddress add %d, del %d, address %d in %v",
-		len(b.utxoIndex.Index), len(b.delUTXOs), len(addressValueMap), time.Since(startTime))
-
-	return addressValueMap
-}
-
-func (b *BaseIndexer) UpdateDB() {
+func (b *BaseIndexer) UpdateDB() map[string]uint64  {
 	common.Log.Infof("BaseIndexer->updateBasicDB %d start...", b.lastHeight)
 
 	// 拿到所有的addressId
 	addressValueMap := b.prefechAddressV2()
+
+	// 有一些没有保存下来的地址，可能有brc20资产，需要保存下来
+	wantToDeleteMap := make(map[string]uint64)
+	for k, v := range addressValueMap {
+		if v.Op > 0 { // 目前只有0和1两种状态
+			toDelete := true
+			for _, utxo := range v.Utxos {
+				if utxo.Op > 0 { // 在保存utxo时会保存对应的地址
+					toDelete = false
+					break
+				}
+			}
+			if toDelete {
+				wantToDeleteMap[k] = v.AddressId
+			}
+		}
+	}
 
 	//////
 	// 测试一个异常问题：blockVector 区块丢失，导致exotic索引失败
@@ -392,17 +330,6 @@ func (b *BaseIndexer) UpdateDB() {
 		totalSubsidySats += value.OutputSats - value.InputSats
 		AllUtxoAdded += uint64(value.OutputUtxo)
 	}
-
-	// 所有的地址都保存起来，数据太多。只保存nft相关的地址。
-	// TODO 需要先询问nft模块有哪些地址需要保存
-	// for k, v := range b.addressIdMap {
-	// 	if v.Op > 0 {
-	// 		err := db.BindAddressDBKeyToId(k, v.AddressId, wb)
-	// 		if err != nil {
-	// 			common.Log.Panicf("Error setting in db %v", err)
-	// 		}
-	// 	}
-	// }
 
 	startTime := time.Now()
 	// Add the new utxos first
@@ -497,7 +424,6 @@ func (b *BaseIndexer) UpdateDB() {
 				//common.Log.Infof("address %s not exists", value.Address)
 			}
 		}
-
 	}
 	common.Log.Infof("BaseIndexer.updateBasicDB-> delete utxos %d, cost: %v", utxoDeled, time.Since(startTime))
 
@@ -524,6 +450,29 @@ func (b *BaseIndexer) UpdateDB() {
 	b.utxoIndex = common.NewUTXOIndex()
 	b.delUTXOs = make([]*UtxoValue, 0)
 	b.addressToIdMap = make(map[string]*AddressStatus)
+
+	return wantToDeleteMap
+}
+
+
+func (b *BaseIndexer) CleanEmptyAddress(org, wantToDelete map[string]uint64) {
+	wb := b.db.NewWriteBatch()
+	defer wb.Close()
+	for k, v := range org {
+		_, ok := wantToDelete[k]
+		if ok {
+			db.UnBindAddressId(k, v, wb)
+		} else {
+			err := db.BindAddressDBKeyToId(k, v, wb)
+			if err != nil {
+				common.Log.Panicf("Error setting in db %v", err)
+			}
+		}
+	}
+	err := wb.Flush()
+	if err != nil {
+		common.Log.Panicf("BaseIndexer.CleanEmptyAddress-> Error satwb flushing writes to db %v", err)
+	}
 }
 
 func (b *BaseIndexer) removeUtxo(addrmap *map[string]*common.AddressValueInDB, utxo *UtxoValue, txn common.ReadBatch) {
@@ -582,7 +531,7 @@ func (b *BaseIndexer) addUtxo(addrmap *map[string]*common.AddressValueInDB, outp
 		} else {
 			utxos := make(map[uint64]*common.UtxoValue)
 			utxos[utxoId] = &common.UtxoValue{Op: 1, Value: sats}
-			id, op := b.getAddressId(address)
+			id, op := b.getAddressId(address) // 前面分配过
 			value = &common.AddressValueInDB{
 				AddressType: uint32(output.Address.Type),
 				AddressId:   id,
