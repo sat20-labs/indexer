@@ -68,6 +68,7 @@ type BRC20Indexer struct {
 	// 其他辅助信息，不需要clone
 	actionBufferMap map[uint64]*ActionInfo // key: input的utxoId，保存一个区块
 
+	// checkpoint 临时使用
 	holdermap map[uint64]*common.Decimal
 }
 
@@ -464,7 +465,13 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	if isMainnet {
 		names = []string{
 			"ordi",
-			"meme",
+			"sats",
+			"doge",
+			"rats",
+			"𝛑",
+			"pizza",
+			"ligo",
+			"piin",
 		}
 	} else {
 		names = []string{

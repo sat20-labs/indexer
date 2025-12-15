@@ -43,7 +43,7 @@ func (s *BRC20Indexer) loadHoldersInTickerFromDB(name string) map[uint64]*common
 	//count := 0
 	//startTime := time.Now()
 	holderMap := make(map[uint64]*common.Decimal, 0)
-	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER+encodeTickerName(name)), false, func(k, v []byte) error {
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER+encodeTickerName(name)+"-"), false, func(k, v []byte) error {
 		// 设置前缀扫描选项
 
 		key := string(k)
