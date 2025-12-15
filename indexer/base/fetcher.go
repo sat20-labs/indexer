@@ -4,12 +4,13 @@ import (
 	"encoding/hex"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 )
 
 // 不要panic，可能会影响写数据库
-func (b *BaseIndexer) fetchBlock(height int) *common.Block {
+func FetchBlock(height int, chainParams *chaincfg.Params) *common.Block {
 	hash, err := getBlockHash(uint64(height))
 	if err != nil {
 		common.Log.Errorf("getBlockHash %d failed. %v", height, err)
@@ -54,7 +55,7 @@ func (b *BaseIndexer) fetchBlock(height int) *common.Block {
 		// parse the raw tx values
 		for j, v := range tx.MsgTx().TxOut {
 			// Determine the type of the script and extract the address
-			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, b.chaincfgParam)
+			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, chainParams)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
 				return nil
@@ -127,7 +128,7 @@ func (b *BaseIndexer) spawnBlockFetcher(startHeigh int, endHeight int, stopChan 
 		case <-stopChan:
 			return
 		default:
-			block := b.fetchBlock(currentHeight)
+			block := FetchBlock(currentHeight, b.chaincfgParam)
 			b.blocksChan <- block
 			currentHeight += 1
 		}

@@ -7,14 +7,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"github.com/stretchr/testify/assert"
 )
-
 
 func GetRawData(txID string, network string) ([][]byte, error) {
 	url := ""
@@ -90,103 +88,7 @@ func GetBlock(height int, isMainnet bool) (*common.Block, error) {
 		return nil, err
 	}
 
-	hash, err := bitcoin_rpc.ShareBitconRpc.GetBlockHash(uint64(height))
-	if err != nil {
-		return nil, err
-	}
-
-	rawBlock, err := bitcoin_rpc.ShareBitconRpc.GetRawBlock(hash)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("block %d size: %d\n", height, len(rawBlock))
-
-	blockData, err := hex.DecodeString(rawBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	// Deserialize the bytes into a btcutil.Block.
-	block, err := btcutil.NewBlockFromBytes(blockData)
-	if err != nil {
-		return nil, err
-	}
-
-	transactions := block.Transactions()
-	txs := make([]*common.Transaction, len(transactions))
-	for i, tx := range transactions {
-		inputs := []*common.Input{}
-		outputs := []*common.Output{}
-
-		for _, v := range tx.MsgTx().TxIn {
-			txid := v.PreviousOutPoint.Hash.String()
-			vout := v.PreviousOutPoint.Index
-			input := &common.Input{Txid: txid, Vout: int64(vout), Witness: v.Witness}
-			inputs = append(inputs, input)
-		}
-
-		// parse the raw tx values
-		for j, v := range tx.MsgTx().TxOut {
-			// Determine the type of the script and extract the address
-			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, param)
-			if err != nil {
-				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
-				return nil, err
-				//common.Log.Panicf("BaseIndexer.fetchBlock-> Failed to extract address: %v", err)
-			}
-
-			addrsString := make([]string, len(addrs))
-			for i, x := range addrs {
-				if scyptClass == txscript.MultiSigTy {
-					addrsString[i] = hex.EncodeToString(x.ScriptAddress()) // pubkey
-				} else {
-					addrsString[i] = x.EncodeAddress()
-				}
-			}
-
-			var receiver common.ScriptPubKey
-
-			if len(addrs) == 0 {
-				address := "UNKNOWN"
-				if scyptClass == txscript.NullDataTy {
-					address = "OP_RETURN"
-				}
-				receiver = common.ScriptPubKey{
-					Addresses: []string{address},
-					Type:      int(scyptClass),
-					PkScript: v.PkScript,
-					ReqSig:   reqSig,
-				}
-			} else {
-				receiver = common.ScriptPubKey{
-					Addresses: addrsString,
-					Type:      int(scyptClass),
-					PkScript: v.PkScript,
-					ReqSig:   reqSig,
-				}
-			}
-
-			output := &common.Output{Height: height, TxId: i, Value: v.Value, Address: &receiver, N: int64(j)}
-			outputs = append(outputs, output)
-		}
-
-		txs[i] = &common.Transaction{
-			Txid:    tx.Hash().String(),
-			Inputs:  inputs,
-			Outputs: outputs,
-		}
-	}
-
-	t := block.MsgBlock().Header.Timestamp
-	bl := &common.Block{
-		Timestamp:     t,
-		Height:        height,
-		Hash:          block.Hash().String(),
-		PrevBlockHash: block.MsgBlock().Header.PrevBlock.String(),
-		Transactions:  txs,
-	}
-
-	return bl, nil
+	return base.FetchBlock(height, param), nil
 }
 
 func TestParser_ord(t *testing.T) {
@@ -203,14 +105,12 @@ func TestParser_ord(t *testing.T) {
 	assert.True(t, len(fields) == 1)
 }
 
-
 func TestParser_block(t *testing.T) {
 	// input 0, output 0
 	block, err := GetBlock(616107, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 
 	fmt.Printf("tx: %d\n", len(block.Transactions))
 	var inCount, outCount int
@@ -220,5 +120,33 @@ func TestParser_block(t *testing.T) {
 	}
 	fmt.Printf("inCount %d\n", inCount)
 	fmt.Printf("outCount %d\n", outCount)
+
+}
+
+
+func TestParseTxFromUtxoId(t *testing.T) {
+	// input 0, output 0
+	//utxoId := uint64(27031631197372416)
+	utxoId := common.ToUtxoId(788753,48,2)
+	height, txIndex, vout := common.FromUtxoId(utxoId)
+	block, err := GetBlock(height, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Printf("TxCount: %d\n", len(block.Transactions))
+	for i, tx := range block.Transactions {
+		if i != txIndex {
+			continue
+		}
+
+		for j := range tx.Outputs {
+			if j != vout {
+				continue
+			}
+			fmt.Printf("found %s:%d for utxoId %d\n", tx.Txid, j, utxoId)
+		}
+		break
+	}
 
 }

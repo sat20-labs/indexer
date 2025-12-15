@@ -1022,7 +1022,7 @@ func (p *IndexerMgr) generate88Strings(prefix string, length int, count8 int) {
 	// 添加其他数字（0-9，但不包括 4 和 8）并递归调用
 	for i := 0; i < 10; i++ {
 		if i != 4 && i != 8 {
-			p.generate88Strings(prefix+string('0'+i), length+1, count8)
+			p.generate88Strings(prefix+string(rune('0'+i)), length+1, count8)
 		}
 	}
 }
