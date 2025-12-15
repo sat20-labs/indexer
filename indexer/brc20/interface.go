@@ -94,6 +94,11 @@ func (s *BRC20Indexer) GetHoldersWithTick(tickerName string) map[uint64]*common.
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
+	return s.getHoldersWithTick(tickerName)
+}
+
+func (s *BRC20Indexer) getHoldersWithTick(tickerName string) map[uint64]*common.Decimal {
+
 	name := strings.ToLower(tickerName)
 	result := s.loadHoldersInTickerFromDB(name)
 
@@ -253,7 +258,7 @@ func (s *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	result := s.loadTransferHistoryFromDB(tick)
+	result := s.loadTickerHistory(tick)
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].NftId < result[j].NftId

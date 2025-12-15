@@ -67,6 +67,8 @@ type BRC20Indexer struct {
 
 	// 其他辅助信息，不需要clone
 	actionBufferMap map[uint64]*ActionInfo // key: input的utxoId，保存一个区块
+
+	holdermap map[uint64]*common.Decimal
 }
 
 func NewIndexer(db common.KVDB) *BRC20Indexer {
@@ -227,7 +229,7 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 }
 
 func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
-	history := s.loadTransferHistoryFromDB(name)
+	history := s.loadTickerHistory(name)
 	var total, available, transferrable *common.Decimal
 	var count int
 	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
@@ -323,7 +325,7 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
 }
 
 func (s *BRC20Indexer) printHistory(name string) {
-	history := s.loadTransferHistoryFromDB(name)
+	history := s.loadTickerHistory(name)
 	var total *common.Decimal
 	var count int
 	common.Log.Infof("ticker %s (data from history)", name)
@@ -386,15 +388,18 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 	sort.Slice(mid, func(i, j int) bool {
 		return mid[i].amt.Cmp(mid[j].amt) > 0
 	})
-	limit := len(mid) // 40
+	limit := 20//len(mid) // 40
 	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
 	for i, item := range mid {
 		if i > limit {
 			break
 		}
+		if item.amt.Sign() == 0 {
+			continue
+		}
 		address, err := rpc.GetAddressByID(item.addressId)
 		if err != nil {
-			common.Log.Panicf("printHoldersWithMap GetAddressByID %d failed, %v", item.addressId, err)
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
 			address = "-\t"
 		}
 		common.Log.Infof("%d: %x %s: %s", i, item.addressId, address, item.amt.String())
@@ -405,7 +410,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 		}
 		address, err := rpc.GetAddressByID(item.addressId)
 		if err != nil {
-			common.Log.Panicf("printHoldersWithMap GetAddressByID %d failed, %v", item.addressId, err)
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
 			address = "-\t"
 		}
 		fmt.Printf("\"%s\": \"%s\",\n", address, item.amt.String())
@@ -443,6 +448,18 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 
 	isMainnet := s.nftIndexer.GetBaseIndexer().IsMainnet()
 	var names []string
+
+	// holdermap := s.GetHoldersWithTick("meme")
+	// for k, v := range holdermap {
+	// 	old, ok := s.holdermap[k]
+	// 	if ok {
+	// 		if old.Cmp(v) != 0 {
+	// 			common.Log.Infof("%x changed %s -> %s", k, old.String(), v.String())
+	// 		}
+	// 	} else {
+	// 		common.Log.Infof("%x added %s -> %s", k, old.String(), v.String())
+	// 	}
+	// }
 
 	if isMainnet {
 		names = []string{
@@ -953,4 +970,15 @@ func (s *BRC20Indexer) loadTransferNft(utxoId uint64) *TransferNftInfo {
 	}
 
 	return transfer
+}
+
+
+func (s *BRC20Indexer) loadTickerHistory(name string) []*common.BRC20ActionHistory {
+	history := s.loadTransferHistoryFromDB(name)
+	for _, item := range s.holderActionList {
+		if item.Ticker == name {
+			history = append(history, item)
+		}
+	}
+	return history
 }

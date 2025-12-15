@@ -432,7 +432,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 	// 检查transferNft转入到哪个输出
 	for _, tx := range block.Transactions[1:] {
-		// if tx.TxId == "19206e5c580194fce3a513682998e918e40b9c2a2afaa64f63e55a217b7ec023" {
+		// if tx.TxId == "467a7bc26caabe810ff7df05dd080ebb2410cbc35dcaf927e07bd2d850119da8" {
 		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 		// }
 
@@ -638,10 +638,10 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 		tickInfo, ok := holder.Tickers[nft.Ticker]
 		if ok {
 			delete(tickInfo.TransferableData, nft.UtxoId)
-			if tickInfo.AssetAmt().Sign() == 0 &&
-				len(tickInfo.TransferableData) == 0 {
-				delete(holder.Tickers, nft.Ticker)
-			}
+			// if tickInfo.AssetAmt().Sign() == 0 &&
+			// 	len(tickInfo.TransferableData) == 0 {
+			// 	delete(holder.Tickers, nft.Ticker) // 不能删除，删除会导致 loadHolderInfo 重新加载老的数据
+			// }
 			// 不能删除，如果删除，就无法删除数据库中对应数据 updateHolderToDB
 			// if len(holder.Tickers) == 0 {
 			// 	delete(s.holderMap, nft.AddressId)
@@ -747,14 +747,21 @@ func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB
 	if ok {
 		value, ok := holder.Tickers[ticker]
 		if ok {
+			amt := value.AssetAmt()
 			if writeToDB {
-				err := db.SetDB([]byte(addressTickerKey), value, wb)
-				if err != nil {
-					common.Log.Panicf("Error setting %s in db %v", addressTickerKey, err)
+				if amt.Sign() == 0 && len(value.TransferableData) == 0 {
+					err := wb.Delete([]byte(addressTickerKey))
+					if err != nil {
+						common.Log.Panicf("Error deleting db %s: %v\n", addressTickerKey, err)
+					}
+				} else {
+					err := db.SetDB([]byte(addressTickerKey), value, wb)
+					if err != nil {
+						common.Log.Panicf("Error setting %s in db %v", addressTickerKey, err)
+					}
 				}
 			}
 			if updateTickerAddr {
-				amt := value.AssetAmt()
 				if amt.Sign() > 0 {
 					if writeToDB {
 						err := db.SetDB([]byte(tickerAddressKey), amt, wb)

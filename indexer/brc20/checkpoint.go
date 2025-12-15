@@ -2,9 +2,9 @@ package brc20
 
 import (
 	"strings"
+	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/base"
 )
 
 
@@ -394,6 +394,12 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 }
 
 var mainnet_checkpoint = map[int]*CheckPoint{
+	0: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {},
+		},
+	},
+
 	779831: {
 		Height: 779831,
 		TickerCount: 0,
@@ -433,22 +439,36 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 
 
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
+	startTime := time.Now()
 	var checkpoint *CheckPoint
-	if p.nftIndexer.GetBaseIndexer().IsMainnet() {
+	matchHeight := height
+	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
+	if isMainnet {
 		checkpoint = mainnet_checkpoint[height]
+		if checkpoint == nil {
+			matchHeight = 0
+			checkpoint = mainnet_checkpoint[0]
+		}
 	} else {
 		checkpoint = testnet4_checkpoint[height]
+		if checkpoint == nil {
+			matchHeight = 0
+			checkpoint = testnet4_checkpoint[0]
+		}
 	}
 	if checkpoint == nil {
 		return
 	}
 
-	tickers := p.getAllTickers()
-	if len(tickers) != checkpoint.TickerCount {
-		common.Log.Panicf("ticker count different")
+	if matchHeight != 0 {
+		tickers := p.getAllTickers()
+		if len(tickers) != checkpoint.TickerCount {
+			common.Log.Panicf("ticker count different")
+		}
 	}
-
-	rpc := base.NewRpcIndexer(p.nftIndexer.GetBaseIndexer())
+	// 太花时间
+	//rpc := base.NewRpcIndexer(p.nftIndexer.GetBaseIndexer())
+	baseIndexer := p.nftIndexer.GetBaseIndexer()
 	for name, tickerStatus := range checkpoint.Tickers {
 		name = strings.ToLower(name)
 		tickerInfo := p.loadTickInfo(name)
@@ -473,7 +493,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		}
 
 		for address, amt := range tickerStatus.Holders {
-			addressId := rpc.GetAddressId(address)
+			addressId := baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
 				common.Log.Panicf("%s GetAddressId %s failed", name, address)
 			}
@@ -485,6 +505,39 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 				common.Log.Panicf("%s holder %s amt different, %s %s", name, address, abbrInfo.AssetAmt().String(), amt)
 			}
 		}
+
+		holdermap := p.getHoldersWithTick(name)
+		var holderAmount *common.Decimal
+		for _, amt := range holdermap {
+			holderAmount = holderAmount.Add(amt)
+		}
+		if holderAmount.Cmp(&ticker.Minted) != 0 {
+			common.Log.Infof("block %d, ticker %s, asset amount different %s %s", 
+				height, name, ticker.Minted.String(), holderAmount.String())
+			
+			printAddress := make(map[uint64]bool)
+			for k, v := range holdermap {
+				old, ok := p.holdermap[k]
+				if ok {
+					if old.Cmp(v) != 0 {
+						common.Log.Infof("%x changed %s -> %s", k, old.String(), v.String())
+						printAddress[k] = true
+					}
+				} else {
+					common.Log.Infof("%x added %s -> %s", k, old.String(), v.String())
+					printAddress[k] = true
+				}
+			}
+			for k := range printAddress {
+				p.printHistoryWithAddress(name, k)
+			}
+
+			//p.printHistory(name)
+			//p.printHistoryWithAddress(name, 0x52b1777c)
+			common.Log.Panicf("%s amount different %s %s", name, ticker.Minted.String(), holderAmount.String())
+		}
+		p.holdermap = holdermap
+		
 	}
-	common.Log.Infof("CheckPointWithBlockHeight %d checked", height)
+	common.Log.Infof("CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }

@@ -122,3 +122,31 @@ func TestParser_block(t *testing.T) {
 	fmt.Printf("outCount %d\n", outCount)
 
 }
+
+
+func TestParseTxFromUtxoId(t *testing.T) {
+	// input 0, output 0
+	//utxoId := uint64(27031631197372416)
+	utxoId := common.ToUtxoId(788753,48,2)
+	height, txIndex, vout := common.FromUtxoId(utxoId)
+	block, err := GetBlock(height, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Printf("TxCount: %d\n", len(block.Transactions))
+	for i, tx := range block.Transactions {
+		if i != txIndex {
+			continue
+		}
+
+		for j, txOut := range tx.Outputs {
+			if j != vout {
+				continue
+			}
+			fmt.Printf("found %s for utxoId %d\n", txOut.OutPointStr, utxoId)
+		}
+		break
+	}
+
+}
