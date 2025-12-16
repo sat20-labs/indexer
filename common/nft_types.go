@@ -4,6 +4,8 @@ import (
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
+const Jubilee_Height int = 824544
+
 type InscribeBaseContent = pb.InscribeBaseContent
 type Nft struct {
 	Base           *InscribeBaseContent
@@ -23,9 +25,10 @@ func (p *Nft) Clone() *Nft {
 
 type NftStatus struct {
 	Version          string
-	Count            uint64
+	// 所有铭文数量 = Count + CurseCount
+	Count            uint64 // blessed，vindicated
+	CurseCount       uint64 // cursed
 	Unbound          uint64 // 负数铭文数量，指没有绑定到聪上的铭文。能检索到，但无法转移。
-	CurseCount       uint64 
 	ContentCount     uint64 // content count
 	ContentTypeCount int    // content type count
 }
