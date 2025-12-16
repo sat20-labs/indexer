@@ -213,16 +213,23 @@ func (p *NftIndexer) NftMint(nft *common.Nft) {
 		}
 	}
 
-	if nft.Base.CurseType != 0 {
-		p.status.CurseCount++
+	if nft.Base.CurseType != 0 && nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
+		nft.Base.CurseType = 0
 	}
 
-	nft.Base.Id = int64(p.status.Count)
-	p.status.Count++
+	if nft.Base.CurseType != 0 {
+		p.status.CurseCount++
+		nft.Base.Id = -int64(p.status.CurseCount) // 从-1开始
+	} else {
+		nft.Base.Id = int64(p.status.Count) // 从0开始
+		p.status.Count++
+	}
 	p.nftAdded = append(p.nftAdded, nft)
 
 	if nft.Base.Sat < 0 {
+		// mainnet: c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151
 		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
+		// 在Jubilee之前属于cursed铭文，Jubilee之后，正常编号
 		p.status.Unbound++
 		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
 		return
