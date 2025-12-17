@@ -550,9 +550,10 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
-			if tx.TxId == "2c898453ced8a8aef58ee7d18413ade93c9c3d722cae39b24d793e25d56b0a41" {
-				common.Log.Infof("")
-			}
+			// if tx.TxId == "f2274c1dff0007a46ef0f0bffd8dc6076680dbb593d87d8a297b2f703387ee5f" ||
+			// tx.TxId == "e76579a2587e1fa5d8972ca2885a39d9dff05585188125e9d1bb09a30e124461" {
+			// 	common.Log.Infof("")
+			// }
 			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
 			if len(sats) > 0 {
 				for _, sat := range sats {
@@ -673,10 +674,24 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 								for i, t := range p.nftAdded {
 									if t.Base.InscriptionId == nft.Base.InscriptionId {
 										// 后面的都要修改
-										t.Base.Id = -int64(p.status.CurseCount)
-										for i++; i < len(p.nftAdded); i++ {
-											m := p.nftAdded[i]
+										delete(p.nftIdToinscriptionMap, t.Base.Id)
+										// 后面还有诅咒铭文？
+										newId := -int64(p.status.CurseCount)
+										for j := i+1; j < len(p.nftAdded); j++ {
+											if p.nftAdded[j].Base.CurseType != 0 {
+												newId = p.nftAdded[j].Base.Id
+												break
+											}
+										}
+										t.Base.Id = newId
+										p.inscriptionToNftIdMap[t.Base.InscriptionId] = t.Base.Id
+										p.nftIdToinscriptionMap[t.Base.Id] = t.Base.InscriptionId
+										for j := i+1; j < len(p.nftAdded); j++ {
+											m := p.nftAdded[j]
+											delete(p.nftIdToinscriptionMap, m.Base.Id)
 											m.Base.Id-- // 无论是否cursed
+											p.inscriptionToNftIdMap[m.Base.InscriptionId] = m.Base.Id
+											p.nftIdToinscriptionMap[m.Base.Id] = m.Base.InscriptionId
 										}
 										break
 									}
@@ -956,7 +971,9 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	// wg.Add(3)
 
 
+	blessCount := 0
 	curseCount := 0
+	nftMap := make(map[int64]bool)
 	p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
 		//defer wg.Done()
 
@@ -966,13 +983,23 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 			common.Log.Panicf("item.Value error: %v", err)
 		}
 		if value.CurseType != 0 {
+			nftMap[value.Id] = true
 			curseCount++
 			//common.Log.Infof("%d %s is cursed %d", value.Id, value.InscriptionId, value.CurseType)
+		} else {
+			blessCount++
 		}
+		
 
 		return nil
 	})
-	common.Log.Infof("curse count %d", curseCount)
+	common.Log.Infof("count %d, curse count %d", blessCount, curseCount)
+	for i := int64(1); i < int64(p.status.CurseCount); i++ {
+		_, ok := nftMap[-i]
+		if !ok {
+			common.Log.Panicf("missing nft id -%d", i)
+		}
+	}
 
 
 	addressesInT1 := make(map[uint64]bool, 0)
@@ -1053,7 +1080,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	getbuck()
 
 	//wg.Wait()
-	common.Log.Infof("nft count: %d %d %d", p.status.Count-uint64(len(p.nftAdded)), len(nftsInT1), lastkey+1)
+	common.Log.Infof("nft count: %d %d %d", p.status.Count+p.status.CurseCount-uint64(len(p.nftAdded)), len(nftsInT1), len(buckmap))
 
 	wrongAddress := make([]uint64, 0)
 	wrongUtxo1 := make([]uint64, 0)

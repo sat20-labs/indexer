@@ -697,7 +697,20 @@ func (p *BRC20Indexer) validateHistory(height int) {
 
 	if len(validateRecords) != len(tobeValidating) {
 		more := p.loadTransferHistoryWithHeightFromDB(name, height)
-		tobeValidating = append(tobeValidating, more...)
+		for _, item := range more {
+			if item.Action == common.BRC20_Action_Transfer_Spent {
+				continue
+			}
+			key := fmt.Sprintf("%d-%x", item.NftId, item.ToUtxoId)
+			tobeMap[key] = item
+			tobeValidating = append(tobeValidating, item)
+		}
+		sort.Slice(tobeValidating, func(i, j int) bool {
+			if tobeValidating[i].ToUtxoId == tobeValidating[j].ToUtxoId {
+				return tobeValidating[i].TxInIndex < tobeValidating[j].TxInIndex
+			}
+			return tobeValidating[i].ToUtxoId < tobeValidating[j].ToUtxoId
+		})
 		if len(validateRecords) != len(tobeValidating) {
 			diff1 := findDiffInMap(validateMap, tobeMap)
 			if len(diff1) > 0 {
