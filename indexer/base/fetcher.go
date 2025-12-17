@@ -41,7 +41,7 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 
 	transactions := block.Transactions()
 	txs := make([]*common.Transaction, len(transactions))
-	for i, tx := range transactions {
+	for txIndex, tx := range transactions {
 		inputs := []*common.TxInput{}
 		outputs := []*common.TxOutputV2{}
 
@@ -56,10 +56,12 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 						SatBindingMap: make(map[int64]*common.AssetInfo),
 						Invalids:      make(map[common.AssetName]bool),
 					},
-					Vout: int(txIn.PreviousOutPoint.Index),
+					TxOutIndex: int(txIn.PreviousOutPoint.Index),
 				},
-				Witness: txIn.Witness,
-				TxId:    txIn.PreviousOutPoint.Hash.String(),
+				Witness:   txIn.Witness,
+				TxId:      txIn.PreviousOutPoint.Hash.String(),
+				InHeight:  height,
+				InTxIndex: txIndex,
 				TxInIndex: index,
 			}
 			inputs = append(inputs, input)
@@ -93,17 +95,17 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 			}
 
 			output := common.GenerateTxOutput(msgTx, j)
-			output.UtxoId = common.ToUtxoId(height, i, j)
+			output.UtxoId = common.ToUtxoId(height, txIndex, j)
 			outputs = append(outputs, &common.TxOutputV2{
 				TxOutput:    *output,
-				TxIndex:     i,
-				Vout:        j,
-				Height:      height,
+				OutTxIndex:  txIndex,
+				TxOutIndex:  j,
+				OutHeight:   height,
 				AddressType: int(scyptClass),
 			})
 		}
 
-		txs[i] = &common.Transaction{
+		txs[txIndex] = &common.Transaction{
 			TxId:    tx.Hash().String(),
 			Inputs:  inputs,
 			Outputs: outputs,

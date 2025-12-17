@@ -43,17 +43,17 @@ func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *commo
 	s.tickerUpdated[name] = ticker
 
 	action := HolderAction{
-		Height:   int(ticker.Nft.Base.BlockHeight),
-		TxIndex:  input.TxIndex,
-		TxInIndex: input.TxInIndex,
-		NftId:    ticker.Nft.Base.Id,
-		FromAddr: common.INVALID_ID,
+		Height:     int(ticker.Nft.Base.BlockHeight),
+		TxIndex:    input.InTxIndex,
+		TxInIndex:  input.TxInIndex,
+		NftId:      ticker.Nft.Base.Id,
+		FromAddr:   common.INVALID_ID,
 		FromUtxoId: input.UtxoId,
-		ToAddr:   ticker.Nft.OwnerAddressId,
-		ToUtxoId: ticker.Nft.UtxoId,
-		Ticker:   name,
-		Amount:   *common.NewDefaultDecimal(0),
-		Action:   common.BRC20_Action_InScribe_Deploy,
+		ToAddr:     ticker.Nft.OwnerAddressId,
+		ToUtxoId:   ticker.Nft.UtxoId,
+		Ticker:     name,
+		Amount:     *common.NewDefaultDecimal(0),
+		Action:     common.BRC20_Action_InScribe_Deploy,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
@@ -124,17 +124,17 @@ func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BR
 	s.addTransferNft(transferInfo)
 
 	action := HolderAction{
-		Height:   int(mint.Nft.Base.BlockHeight),
-		TxIndex:  input.TxIndex,
-		TxInIndex: input.TxInIndex,
-		NftId:    mint.Nft.Base.Id,
-		FromAddr: common.INVALID_ID,
+		Height:     int(mint.Nft.Base.BlockHeight),
+		TxIndex:    input.InTxIndex,
+		TxInIndex:  input.TxInIndex,
+		NftId:      mint.Nft.Base.Id,
+		FromAddr:   common.INVALID_ID,
 		FromUtxoId: input.UtxoId,
-		ToAddr:   mint.Nft.OwnerAddressId,
-		ToUtxoId: mint.Nft.UtxoId,
-		Ticker:   name,
-		Amount:   mint.Amt,
-		Action:   common.BRC20_Action_InScribe_Mint,
+		ToAddr:     mint.Nft.OwnerAddressId,
+		ToUtxoId:   mint.Nft.UtxoId,
+		Ticker:     name,
+		Amount:     mint.Amt,
+		Action:     common.BRC20_Action_InScribe_Mint,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
@@ -191,10 +191,10 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	s.tickerUpdated[tickerName] = ticker.Ticker
 
 	nft := common.TransferNFT{
-		NftId:  transfer.Nft.Base.Id,
-		Id:     transfer.Id,
-		UtxoId: transfer.Nft.UtxoId,
-		Amount: transfer.Amt,
+		NftId:     transfer.Nft.Base.Id,
+		Id:        transfer.Id,
+		UtxoId:    transfer.Nft.UtxoId,
+		Amount:    transfer.Amt,
 		IsInvalid: false,
 	}
 	transferInfo := &TransferNftInfo{
@@ -206,17 +206,17 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	s.addTransferNft(transferInfo)
 
 	action := HolderAction{
-		Height:   int(transfer.Nft.Base.BlockHeight),
-		TxIndex:  input.TxIndex,
-		TxInIndex: input.TxInIndex,
-		NftId:    transfer.Nft.Base.Id,
-		FromAddr: common.INVALID_ID,
+		Height:     int(transfer.Nft.Base.BlockHeight),
+		TxIndex:    input.InTxIndex,
+		TxInIndex:  input.TxInIndex,
+		NftId:      transfer.Nft.Base.Id,
+		FromAddr:   common.INVALID_ID,
 		FromUtxoId: input.UtxoId,
-		ToAddr:   transfer.Nft.OwnerAddressId,
-		ToUtxoId: transfer.Nft.UtxoId,
-		Ticker:   tickerName,
-		Amount:   transfer.Amt,
-		Action:   common.BRC20_Action_InScribe_Transfer,
+		ToAddr:     transfer.Nft.OwnerAddressId,
+		ToUtxoId:   transfer.Nft.UtxoId,
+		Ticker:     tickerName,
+		Amount:     transfer.Amt,
+		Action:     common.BRC20_Action_InScribe_Transfer,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
@@ -441,7 +441,10 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	})
 
 	// 检查transferNft转入到哪个输出
-	for i, tx := range block.Transactions[1:] {
+	for txIndex, tx := range block.Transactions {
+		if txIndex == 0 {
+			continue
+		}
 		if tx.TxId == "2c898453ced8a8aef58ee7d18413ade93c9c3d722cae39b24d793e25d56b0a41" {
 			common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 		}
@@ -484,7 +487,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 		if hasTransfer {
 			for _, output := range tx.Outputs {
-				s.innerUpdateTransfer(i, tx.TxId, output, inputTransferNfts)
+				s.innerUpdateTransfer(txIndex, tx.TxId, output, inputTransferNfts)
 			}
 
 			// testnet4: 19206e5c580194fce3a513682998e918e40b9c2a2afaa64f63e55a217b7ec023
@@ -494,7 +497,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 				for _, transfer := range inputTransferNfts {
 					if !transfer.TransferNft.IsInvalid {
 						transfer.TransferNft.IsInvalid = true
-						s.cancelTransferNft(transfer, block.Height, i, tx)
+						s.cancelTransferNft(transfer, block.Height, txIndex, tx)
 					}
 				}
 			}
@@ -503,7 +506,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 	s.actionBufferMap = make(map[uint64]*ActionInfo)
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
-	
+
 	s.CheckPointWithBlockHeight(block.Height)
 }
 
@@ -599,7 +602,7 @@ func (s *BRC20Indexer) subHolderBalance(transfer *TransferNftInfo, address uint6
 // 将一个transfer nft取消，原因可能是作为手续费转给了矿工
 func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height, index int,
 	tx *common.Transaction) {
-	
+
 	fromAddress := transfer.AddressId
 
 	ticker := s.tickerMap[transfer.Ticker]
@@ -618,17 +621,17 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height, inde
 	nft := s.nftIndexer.GetNftWithId(transfer.TransferNft.Id)
 
 	action := HolderAction{
-		Height:   height,
-		TxIndex:  index,
-		TxInIndex: transfer.TxInIndex,
-		NftId:    transfer.TransferNft.NftId,
+		Height:     height,
+		TxIndex:    index,
+		TxInIndex:  transfer.TxInIndex,
+		NftId:      transfer.TransferNft.NftId,
 		FromUtxoId: transfer.UtxoId, // old utxo
-		FromAddr: fromAddress,
-		ToAddr:   fromAddress,
-		ToUtxoId: nft.UtxoId,
-		Ticker:   transfer.Ticker,
-		Amount:   transfer.TransferNft.Amount,
-		Action:   common.BRC20_Action_Transfer,
+		FromAddr:   fromAddress,
+		ToAddr:     fromAddress,
+		ToUtxoId:   nft.UtxoId,
+		Ticker:     transfer.Ticker,
+		Amount:     transfer.TransferNft.Amount,
+		Action:     common.BRC20_Action_Transfer,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
@@ -708,7 +711,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 
 	for _, asset := range output.Assets {
 		if asset.Name.Protocol != common.PROTOCOL_NAME_ORD ||
-		asset.Name.Type != common.ASSET_TYPE_NFT {
+			asset.Name.Type != common.ASSET_TYPE_NFT {
 			continue
 		}
 		sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
@@ -745,23 +748,23 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 					s.addTransferNft(transfer)
 				}
 				action := HolderAction{
-					Height:   output.Height,
-					TxIndex:  index,
-					TxInIndex: transfer.TxInIndex,
-					ToUtxoId: utxoId,
-					NftId:    transfer.TransferNft.NftId,
-					FromAddr: fromAddressId,
-					ToAddr:   toAddressId,
-					Ticker:   transfer.Ticker,
-					Amount:   transfer.TransferNft.Amount,
-					Action:   flag,
+					Height:     output.OutHeight,
+					TxIndex:    index,
+					TxInIndex:  transfer.TxInIndex,
+					ToUtxoId:   utxoId,
+					NftId:      transfer.TransferNft.NftId,
+					FromAddr:   fromAddressId,
+					ToAddr:     toAddressId,
+					Ticker:     transfer.Ticker,
+					Amount:     transfer.TransferNft.Amount,
+					Action:     flag,
 					FromUtxoId: transfer.UtxoId, // old utxo
 				}
 				s.holderActionList = append(s.holderActionList, &action)
 				delete(inputTransferNfts, nftId)
 
 				common.Log.Debugf("%s %d: %x -> %x, ticker = %s, %s",
-					method, action.NftId, action.FromAddr, action.ToAddr, action.Ticker, 
+					method, action.NftId, action.FromAddr, action.ToAddr, action.Ticker,
 					action.Amount.String())
 			}
 		}

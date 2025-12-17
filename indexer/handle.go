@@ -11,8 +11,8 @@ import (
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/ord"
-	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
+	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 )
 
 func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.Range) {
@@ -34,19 +34,18 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 			// 	common.Log.Info("")
 			// }
 
-		
 			inscriptions2 := ord0_14_1.GetInscriptionsInTxInput(input.Witness, block.Height, i)
 			for _, insc := range inscriptions2 {
 				s.handleOrd(input, insc, id, txIndex, tx, block, coinbase) // 尽可能只缓存，不读数据库
 				id++
 				count++
 				if insc.IsCursed {
-					if insc.CurseReason != ordCommon.NotAtOffsetZero && 
-					insc.CurseReason != ordCommon.Pointer && 
-					insc.CurseReason != ordCommon.Pushnum &&  // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
-					insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
- 					insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
-					insc.CurseReason != ordCommon.IncompleteField {// testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
+					if insc.CurseReason != ordCommon.NotAtOffsetZero &&
+						insc.CurseReason != ordCommon.Pointer &&
+						insc.CurseReason != ordCommon.Pushnum && // testnet4: 809cd75a7525b47d49782316cda02dffff83d93702902b037215b4010619dbdei0
+						insc.CurseReason != ordCommon.NotInFirstInput && // testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017b
+						insc.CurseReason != ordCommon.UnrecognizedEvenField && // testnet4: b37170d58cac08c65b82d3df9f096bfc2735787fd61b8731a3a57966e136ace8i0 025245e9010c68646a5240115b705381df06bd94730e5d894632771d214a263ci0 6dd8d2b5f1753bc6ea3d193c707b74b6452e1fb38e55fd654544ff5de65203e7i0
+						insc.CurseReason != ordCommon.IncompleteField { // testnet4: 55b0a3b554ec73a1a5d9194bef921e9d25b9e729dcd7ad21deb6e68817d620d3i0 b23b28002527ddad7b850ac4544fb7f74b012f109e498f3d4d06096f7d366da4i0
 						common.Log.Errorf("%si%d is cursed, reason %d", tx.TxId, id, insc.CurseReason)
 					}
 				}
@@ -71,7 +70,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 
 func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	inputIndex, txIndex int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64, int64) {
-	
+
 	// non first input in tx
 	var baseOffset int64
 	if inputIndex != 0 {
@@ -90,7 +89,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 			continue
 		}
 		if outValue+txOut.OutValue.Value > int64(satpoint) {
-			return txOut, satpoint, satpoint-outValue
+			return txOut, satpoint, satpoint - outValue
 		}
 		outValue += txOut.OutValue.Value
 	}
@@ -105,7 +104,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 				continue
 			}
 			if outValue+txOut.OutValue.Value > int64(satpoint) {
-				return txOut, satpoint, satpoint-outValue
+				return txOut, satpoint, satpoint - outValue
 			}
 			outValue += txOut.OutValue.Value
 		}
@@ -116,7 +115,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	// 如果satpoint == 0，聪输出在奖励区块中
 	// testnet4: 408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74 输出为0
 	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 多个输出
-	
+
 	// 作为网络费用给到了矿工，位置在手续费的0位置
 	baseOffset = 0
 	for i := 0; i < txIndex; i++ { // 0 是奖励聪，跳过前面index-1个交易的手续费，
@@ -130,7 +129,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 			continue
 		}
 		if outValue+txOut.OutValue.Value > baseOffset {
-			return txOut, 0, baseOffset-outValue
+			return txOut, 0, baseOffset - outValue
 		}
 		outValue += txOut.OutValue.Value
 	}
@@ -431,7 +430,6 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 		},
 	}
 
-								
 	if indexer.IsRaritySatRequired(&deployTicker.Attr) {
 		// 如果是稀有聪铸造，需要调整稀有聪范围
 		// 因为中间可能存在白聪：383ef74030578308823d524b5ae24820c68b82f6109324da82b6c6e79e3b143ci4
@@ -440,7 +438,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 				Protocol: common.PROTOCOL_NAME_ORDX,
 				Type:     common.ASSET_TYPE_EXOTIC,
 				Ticker:   deployTicker.Attr.Rarity,
-			}	
+			}
 			exoticranges := in.Offsets[exoticName]
 			newRngs = exoticranges.Pickup(satpoint, satsNum)
 			if len(newRngs) == 0 {
@@ -474,7 +472,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	mint := &common.Mint{
 		Base:    common.CloneBaseContent(nft.Base),
 		Name:    content.Ticker,
-		UtxoId:  in.UtxoId,  // ordx资产需要从input的聪中分配
+		UtxoId:  in.UtxoId, // ordx资产需要从input的聪中分配
 		Offsets: newRngs,
 		Amt:     int64(amt),
 		Desc:    content.Des,
@@ -591,9 +589,9 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 	mint := &common.BRC20Mint{
 		BRC20MintInDB: common.BRC20MintInDB{
 			NftId: nft.Base.Id,
-			Name: strings.ToLower(content.Ticker),
+			Name:  strings.ToLower(content.Ticker),
 		},
-		Nft: nft, 
+		Nft: nft,
 	}
 
 	// check mint amount
@@ -636,9 +634,9 @@ func (s *IndexerMgr) handleBrc20TransferTicker(satpoint int64, out *common.TxOut
 	transfer := &common.BRC20Transfer{
 		BRC20TransferInDB: common.BRC20TransferInDB{
 			NftId: nft.Base.Id,
-			Name: strings.ToLower(content.Ticker),
+			Name:  strings.ToLower(content.Ticker),
 		},
-		Nft:  nft,
+		Nft: nft,
 	}
 
 	// check amount
@@ -919,7 +917,8 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
 
-	// if tx.TxId == "408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74" {
+	// if tx.TxId == "f2274c1dff0007a46ef0f0bffd8dc6076680dbb593d87d8a297b2f703387ee5f" ||
+	// 	tx.TxId == "e76579a2587e1fa5d8972ca2885a39d9dff05585188125e9d1bb09a30e124461" {
 	// 	common.Log.Infof("")
 	// }
 
@@ -1069,13 +1068,13 @@ func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
 	}
 }
 
-func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2, satpoint, offset int64, 
+func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2, satpoint, offset int64,
 	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
 
 	var addressId, utxoId uint64
 	var sat, outpoint int64
 	if output != nil {
-		sat = int64(common.ToUtxoId(output.Height, output.TxIndex, inscriptionId))
+		sat = int64(common.ToUtxoId(output.OutHeight, output.OutTxIndex, inscriptionId))
 		addressId = output.AddressId
 		utxoId = output.UtxoId
 		outpoint = offset

@@ -9,11 +9,11 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
+	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"lukechampine.com/uint128"
-	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
 func (s *Indexer) UpdateDB() {
@@ -676,7 +676,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			}
 
 			txInfo, _ := resp.(*bitcoind.RawTransaction)
-			hexStr := txInfo.Vout[input.Vout].ScriptPubKey.Hex
+			hexStr := txInfo.Vout[input.TxOutIndex].ScriptPubKey.Hex
 			// is_p2tr
 			taproot := false
 			hexBytes, err := hex.DecodeString(hexStr)

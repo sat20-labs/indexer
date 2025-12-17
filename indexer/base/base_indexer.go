@@ -234,7 +234,7 @@ func (b *BaseIndexer) forceUpdateDB() {
 		// startTime = time.Now()
 		b.updateDBCB(wantToDelete)
 		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
-		
+
 		b.CleanEmptyAddress(org, wantToDelete)
 
 		common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
@@ -443,7 +443,7 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 			}
 		} else {
 			empty := &common.AddressValueInDBV2{
-				AddressId: v.AddressId,
+				AddressId:   v.AddressId,
 				AddressType: int32(v.AddressType),
 			}
 			err := db.SetDBWithProto3(key, empty, wb)
@@ -506,7 +506,7 @@ func (b *BaseIndexer) CleanEmptyAddress(org, wantToDelete map[string]uint64) {
 			wb.Delete(key2)
 		} else {
 			empty := &common.AddressValueInDBV2{
-				AddressId: v,  
+				AddressId: v,
 			}
 			err := db.SetDBWithProto3(key1, empty, wb) // address->id
 			if err != nil {
@@ -770,7 +770,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 		var inValue int64
 		for _, input := range tx.Inputs {
 			// the utxo to be spent in the format txid:vout
-			utxo := common.GetUtxo(block.Height, input.TxId, int(input.Vout))
+			utxo := common.GetUtxo(block.Height, input.TxId, int(input.TxOutIndex))
 
 			// delete the utxo from the utxo index
 			inputUtxo, ok := b.utxoIndex.Index[utxo]
@@ -792,7 +792,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 		var outValue int64
 		for _, output := range tx.Outputs {
 			// add the output to the utxo index
-			u := common.GetUtxo(block.Height, tx.TxId, int(output.Vout))
+			u := common.GetUtxo(block.Height, tx.TxId, int(output.TxOutIndex))
 			b.utxoIndex.Index[u] = output
 			addedUtxoCount++
 			outValue += output.OutValue.Value
@@ -810,7 +810,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 	}
 
 	for _, output := range block.Transactions[0].Outputs {
-		u := common.GetUtxo(block.Height, block.Transactions[0].TxId, int(output.Vout))
+		u := common.GetUtxo(block.Height, block.Transactions[0].TxId, int(output.TxOutIndex))
 		b.utxoIndex.Index[u] = output
 		addedUtxoCount++
 		satsOutput += output.OutValue.Value
@@ -933,11 +933,11 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	for _, tx := range block.Transactions {
 		//
 		for _, input := range tx.Inputs {
-			if input.Vout >= 0xffffffff {
+			if input.TxOutIndex >= 0xffffffff {
 				continue
 			}
 
-			utxo := common.GetUtxo(block.Height, input.TxId, int(input.Vout))
+			utxo := common.GetUtxo(block.Height, input.TxId, int(input.TxOutIndex))
 			if _, ok := b.utxoIndex.Index[utxo]; !ok {
 				inputsToLoad = append(inputsToLoad, &pair{
 					key:  db.GetUTXODBKey(utxo),
@@ -985,9 +985,9 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			h, i, j := common.FromUtxoId(utxoValue.UtxoId)
 			output := &common.TxOutputV2{
 				TxOutput:    *common.NewTxOutput(utxoValue.Value),
-				Height:      h,
-				TxIndex:     i,
-				Vout:        j,
+				OutHeight:   h,
+				OutTxIndex:  i,
+				TxOutIndex:  j,
 				AddressId:   utxoValue.AddressId,
 				AddressType: -1, // 最后填
 			}
@@ -1504,7 +1504,6 @@ func (p *BaseIndexer) GetBlockInBuffer(height int) *common.BlockValueInDB {
 	return nil
 }
 
-
 // only for RPC interface
 func (b *BaseIndexer) GetAddressIdFromDB(address string) uint64 {
 
@@ -1538,7 +1537,6 @@ func (b *BaseIndexer) GetAddressByID(id uint64) (string, error) {
 	}
 
 	b.idToAddressMap[id] = address
-
 
 	return address, err
 }

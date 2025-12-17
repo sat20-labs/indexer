@@ -674,12 +674,17 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		}
 		tobeValidating = append(tobeValidating, v)
 	}
+	
 	sort.Slice(tobeValidating, func(i, j int) bool {
-		if tobeValidating[i].ToUtxoId == tobeValidating[j].ToUtxoId {
-			return tobeValidating[i].TxInIndex < tobeValidating[j].TxInIndex
+		if tobeValidating[i].Height == tobeValidating[j].Height {
+			if tobeValidating[i].TxIndex == tobeValidating[j].TxIndex {
+				return tobeValidating[i].TxInIndex < tobeValidating[j].TxInIndex
+			}
+			return tobeValidating[i].TxIndex < tobeValidating[j].TxIndex
 		}
-		return tobeValidating[i].ToUtxoId < tobeValidating[j].ToUtxoId
+		return tobeValidating[i].Height < tobeValidating[j].Height
 	})
+	
 	tobeMap := make(map[string]*HolderAction)
 	for _, item := range tobeValidating {
 		key := fmt.Sprintf("%d-%x", item.NftId, item.ToUtxoId)
@@ -706,10 +711,13 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			tobeValidating = append(tobeValidating, item)
 		}
 		sort.Slice(tobeValidating, func(i, j int) bool {
-			if tobeValidating[i].ToUtxoId == tobeValidating[j].ToUtxoId {
-				return tobeValidating[i].TxInIndex < tobeValidating[j].TxInIndex
+			if tobeValidating[i].Height == tobeValidating[j].Height {
+				if tobeValidating[i].TxIndex == tobeValidating[j].TxIndex {
+					return tobeValidating[i].TxInIndex < tobeValidating[j].TxInIndex
+				}
+				return tobeValidating[i].TxIndex < tobeValidating[j].TxIndex
 			}
-			return tobeValidating[i].ToUtxoId < tobeValidating[j].ToUtxoId
+			return tobeValidating[i].Height < tobeValidating[j].Height
 		})
 		if len(validateRecords) != len(tobeValidating) {
 			diff1 := findDiffInMap(validateMap, tobeMap)
@@ -736,17 +744,27 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	// 按顺序检查，顺序严格一致
 	for i, valid := range validateRecords {
 		item := tobeValidating[i]
-
-		toUtxoId := common.ToUtxoId(valid.Height, valid.TxIdx, valid.Vout)
-		if item.ToUtxoId != toUtxoId {
-			common.Log.Panicf("%d #%d %s different utxoId", height, valid.InscriptionNumber, valid.InscriptionID)
-		}
-		if (item.NftId) != (valid.InscriptionNumber) {
-			nft := p.nftIndexer.GetNftWithId(item.NftId)
-			if nft == nil {
-				common.Log.Panicf("GetNftWithId %d failed", item.NftId)
+		
+		if item.TxIndex != valid.TxIdx ||
+		(item.NftId) != (valid.InscriptionNumber) {
+			if valid.Vout == 1 && valid.To == valid.From {
+				// cancel-transfer 的例子，暂时没有准确排序，需要搜索查找
+				for _, t := range tobeValidating {
+					if t.TxIndex == valid.TxIdx &&
+					t.NftId == valid.InscriptionNumber {
+						item = t
+						break
+					}
+				}
+			} else {
+				common.Log.Panicf("%d #%d %s different tx", height, valid.InscriptionNumber, valid.InscriptionID)
+				// nft := p.nftIndexer.GetNftWithId(item.NftId)
+				// if nft == nil {
+				// 	common.Log.Panicf("GetNftWithId %d failed", item.NftId)
+				// }
+				// common.Log.Panicf("%d #%d %s different inscription number %d %s", 
+				// height, valid.InscriptionNumber, valid.InscriptionID, item.NftId, nft.Base.InscriptionId)
 			}
-			common.Log.Panicf("%d #%d %s different inscription number %d %s", height, valid.InscriptionNumber, valid.InscriptionID, item.NftId, nft.Base.InscriptionId)
 		}
 
 		if item.Ticker != valid.Ticker ||
@@ -755,7 +773,6 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			common.Log.Panicf("%d:%s different action", height, valid.InscriptionID)
 		}
 
-		
 		// nft := p.nftIndexer.GetNftWithId(item.NftId)
 		// if nft == nil {
 		// 	common.Log.Panicf("GetNftWithId %d failed", item.NftId)

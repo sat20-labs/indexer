@@ -141,7 +141,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 		}
 
 		utxoId := common.ToUtxoId(rec.Height, rec.TxIdx, rec.Vout)
-		key := fmt.Sprintf("%d-%x", rec.InscriptionNumber, utxoId)
+		key := fmt.Sprintf("%d-%x-%d", rec.InscriptionNumber, utxoId, rec.Offset)
 
 		old, ok := result[key]
 		if ok {

@@ -494,10 +494,10 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	}
 	for _, name := range names {
 		s.printTicker(name)
-		s.printHistory(name)
+		//s.printHistory(name)
 		s.printHolders(name)
-		s.printHistoryWithAddress(name, 0x51cd94cd)
-		s.printHistoryWithAddress(name, 0x306ce3)
+		//s.printHistoryWithAddress(name, 0x51cd94cd)
+		//s.printHistoryWithAddress(name, 0x306ce3)
 		// s.printHistoryWithAddress(name, 0x38815d)
 		// s.printHistoryWithAddress(name, 0x3b37a3)
 		// s.printHistoryWithAddress(name, 0x3ff5fe)
@@ -522,12 +522,12 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		// 	common.Log.Info("")
 		// }
 		mintAmount, _ := s.GetMintAmount(name)
-		//if ticker.Id < 10 {
-		//common.Log.Infof("ticker %s, minted %s, holders %d, TxCount %d", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
-		fmt.Printf("\"%s\": {Minted: \"%s\", HolderCount: %d, TxCount: %d},\n", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
-		//s.printHistory(name)
-		//s.printHolders(name)
-		//}
+		if ticker.Id < 10 {
+			common.Log.Infof("ticker %s, minted %s, holders %d, TxCount %d", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
+			//s.printHistory(name)
+			//s.printHolders(name)
+		}
+		//fmt.Printf("\"%s\": {Minted: \"%s\", HolderCount: %d, TxCount: %d},\n", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
 			s.printHistory(name)

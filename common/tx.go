@@ -42,17 +42,20 @@ type Output struct {
 }
 
 type TxInput struct {
-	TxOutputV2
-	Witness wire.TxWitness
-	TxId    string
+	TxOutputV2 // 作为输入的utxo的信息
+	Witness    wire.TxWitness
+	// 当前交易的输入信息
+	TxId      string // 作为输入时的交易
+	InHeight  int
+	InTxIndex int
 	TxInIndex int
 }
 
 type TxOutputV2 struct {
 	TxOutput
-	Vout        int
-	TxIndex     int
-	Height      int
+	TxOutIndex  int
+	OutTxIndex  int
+	OutHeight   int
 	AddressId   uint64
 	AddressType int
 }
@@ -99,7 +102,6 @@ func GetPkScriptFromAddress(address string) ([]byte, error) {
 	}
 	return pkScript, err
 }
-
 
 func GetAddressTypeFromAddress(address string) int {
 	pkScript, err := GetPkScriptFromAddress(address)
