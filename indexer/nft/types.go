@@ -13,7 +13,7 @@ const (
 	DB_PREFIX_UTXO     = "u-"  // utxo -> []sat  所有存在资产的utxo
 	DB_PREFIX_BUCK     = "bk-" // buck ->
 	DB_PREFIX_INSC     = "i-"  // inscriptionId -> sat
-	DB_PREFIX_INSCADDR = "a-"  // addressId -> sat
+	DB_PREFIX_INSCADDR = "a_"  // addressId+nftId -> sat
 
 	DB_PREFIX_DISABLED_SAT = "ds-" // disabled sat
 )

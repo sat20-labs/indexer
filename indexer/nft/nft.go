@@ -590,6 +590,25 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	// var wg sync.WaitGroup
 	// wg.Add(3)
 
+	curseCount := 0
+	p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
+		//defer wg.Done()
+
+		var value common.InscribeBaseContent
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
+		}
+		if value.CurseType != 0 {
+			curseCount++
+			//common.Log.Infof("%d %s is cursed %d", value.Id, value.InscriptionId, value.CurseType)
+		}
+
+		return nil
+	})
+	common.Log.Infof("curse count %d", curseCount)
+
+
 	addressesInT1 := make(map[uint64]bool, 0)
 	utxosInT1 := make(map[uint64]bool, 0)
 	satsInT1 := make(map[uint64]uint64, 0)

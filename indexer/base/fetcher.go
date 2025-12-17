@@ -45,10 +45,10 @@ func FetchBlock(height int, chainParams *chaincfg.Params) *common.Block {
 		inputs := []*common.Input{}
 		outputs := []*common.Output{}
 
-		for _, v := range tx.MsgTx().TxIn {
+		for txInIndex, v := range tx.MsgTx().TxIn {
 			txid := v.PreviousOutPoint.Hash.String()
 			vout := v.PreviousOutPoint.Index
-			input := &common.Input{Txid: txid, Vout: int64(vout), Witness: v.Witness}
+			input := &common.Input{Txid: txid, TxIndex: i, TxInIndex: txInIndex, Vout: int64(vout), Witness: v.Witness}
 			inputs = append(inputs, input)
 		}
 

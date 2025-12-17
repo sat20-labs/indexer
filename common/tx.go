@@ -11,18 +11,21 @@ type Range = pb.MyRange
 
 type Input struct {
 	Txid     string         `json:"txid"`
+	TxIndex  int
+	TxInIndex int
 	UtxoId   uint64         `json:"utxoid"`
 	Address  *ScriptPubKey  `json:"scriptPubKey"`
 	Vout     int64          `json:"vout"`
+	Value    int64          `json:"value"`
 	Ordinals []*Range       `json:"ordinals"`
 	Witness  wire.TxWitness `json:"witness"`
 }
 
 type ScriptPubKey struct {
-	Addresses []string             `json:"addresses"`
-	Type     int                   `json:"type"`
-	ReqSig   int                   `json:"reqSig"`
-	PkScript []byte        		   `json:"pkscript"`
+	Addresses []string `json:"addresses"`
+	Type      int      `json:"type"`
+	ReqSig    int      `json:"reqSig"`
+	PkScript  []byte   `json:"pkscript"`
 }
 
 type Output struct {
