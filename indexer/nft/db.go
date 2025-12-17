@@ -30,7 +30,7 @@ func initStatusFromDB(ldb common.KVDB) *common.NftStatus {
 
 func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	result := make([]int64, 0)
-	err := db.BatchRead([]byte(fmt.Sprintf("%s%d-", DB_PREFIX_INSCADDR, addressId)),
+	err := db.BatchRead([]byte(fmt.Sprintf("%s%d_", DB_PREFIX_INSCADDR, addressId)),
 		false, func(k, v []byte) error {
 
 			key := string(k)
@@ -136,7 +136,7 @@ func GetInscriptionIdKey(id string) string {
 }
 
 func GetInscriptionAddressKey(addrId uint64, nftId int64) string {
-	return fmt.Sprintf("%s%d-%d", DB_PREFIX_INSCADDR, addrId, nftId)
+	return fmt.Sprintf("%s%d_%d", DB_PREFIX_INSCADDR, addrId, nftId) // nftId 有负数，需要更改分界符
 }
 
 func GetDisabledSatKey(sat int64) string {
@@ -194,7 +194,7 @@ func ParseAddressKey(input string) (uint64, int64, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_INSCADDR) {
 		return common.INVALID_ID, -1, fmt.Errorf("invalid string format, %s", input)
 	}
-	parts := strings.Split(input, "-")
+	parts := strings.Split(input, "_")
 	if len(parts) != 3 {
 		return common.INVALID_ID, -1, fmt.Errorf("invalid string format, %s", input)
 	}

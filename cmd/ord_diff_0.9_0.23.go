@@ -47,7 +47,7 @@ var (
 	brc20CurseFile        *os.File
 )
 
-func getInscription(url string, id2number string) (ret *Inscription, err error) {
+func getInscription_ord(url string, id2number string) (ret *Inscription, err error) {
 	for {
 		req, _ := http.NewRequest("GET", fmt.Sprintf("http://%s/inscription/%s", url, id2number), nil)
 		req.Header.Set("Accept", "application/json")
@@ -130,7 +130,7 @@ func getBrcContent(url string, inscriptionId string) (ret string, brc *Brc, err 
 	return
 }
 
-func main3() {
+func OrdDiff_Test() {
 	yamlcfg := config.InitConfig("../testnet.env")
 	config.InitLog(yamlcfg)
 
@@ -167,7 +167,7 @@ func main3() {
 
 func CheckInscriptionId(lastOrdUrl, oldOrdUrl string, height_limit int) error {
 	for {
-		lastOrdVersionServiceInscription, err := getInscription(lastOrdUrl, strconv.FormatInt(int64(cur_inscriptin_number), 10))
+		lastOrdVersionServiceInscription, err := getInscription_ord(lastOrdUrl, strconv.FormatInt(int64(cur_inscriptin_number), 10))
 		if err != nil {
 			common.Log.Info(err)
 			return err
@@ -242,7 +242,7 @@ func CheckInscriptionId(lastOrdUrl, oldOrdUrl string, height_limit int) error {
 			return err
 		}
 
-		oldVersionOrdServiceInscription, err := getInscription(oldOrdUrl, lastOrdVersionServiceInscription.ID)
+		oldVersionOrdServiceInscription, err := getInscription_ord(oldOrdUrl, lastOrdVersionServiceInscription.ID)
 		if err != nil {
 			format := "not find in 09, id:%s，num:%d, tick:%s, op:%s"
 			printStr := fmt.Sprintf(format, lastOrdVersionServiceInscription.ID, lastOrdVersionServiceInscription.Number, brc.Ticker, brc.Op)
@@ -263,6 +263,81 @@ func CheckInscriptionId(lastOrdUrl, oldOrdUrl string, height_limit int) error {
 			format := "curse, id:%s，num:%d, address:%s, 09Num:%d, tick:%s, op:%s"
 			printStr := fmt.Sprintf(format, lastOrdVersionServiceInscription.ID, lastOrdVersionServiceInscription.Number, lastOrdVersionServiceInscription.Address, oldVersionOrdServiceInscription.Number, brc.Ticker, brc.Op)
 			_, err = brc20CurseFile.Write([]byte(printStr + "\n"))
+			if err != nil {
+				return err
+			}
+			cur_inscriptin_number++
+			continue
+		}
+		cur_inscriptin_number++
+
+	}
+
+	return nil
+}
+
+
+func OrdNumDiff_Test() {
+	yamlcfg := config.InitConfig("../mainnet.env")
+	config.InitLog(yamlcfg)
+
+	const (
+		url_0_23_0 = "192.168.1.104:81"
+		url_ordx = "192.168.1.103:8009"
+
+		height_limit_1 = 824544
+		height_limit_2 = 923108
+		out_dir  = "./cmd/number_diff.txt"
+	)
+
+	numberDiffFile, err := os.OpenFile((out_dir), os.O_APPEND|os.O_WRONLY|os.O_CREATE /*|os.O_TRUNC*/, 0644)
+	if err != nil {
+		common.Log.Fatal(err)
+	}
+	defer numberDiffFile.Close()
+
+	// 760000(767430)-816000，使用ord0.9版本的数据，诅咒铭文无效 (最新版本与ord0.9对比)
+	// 816001-824544，使用ord0.9版本的数据，诅咒铭文无效  (最新版本与ord0.9对比)
+	err = CheckInscriptionNum(url_0_23_0, url_ordx, height_limit_1, numberDiffFile)
+	if err != nil {
+		common.Log.Fatal(err)
+	}
+}
+
+func CheckInscriptionNum(ordUrl, ordxUrl string, height_limit int, outfile *os.File) error {
+	num := 0
+	for {
+		ord, err := getInscription_ord(ordUrl, strconv.FormatInt(int64(num), 10))
+		if err != nil {
+			common.Log.Info(err)
+			return err
+		}
+
+		if ord.Height == 0 {
+			break
+		}
+
+		if ord.Height == height_limit+1 {
+			break
+		}
+
+
+		ordx, err := GetInscription_ordx(int64(num), ordxUrl)
+		if err != nil {
+			format := "not find num: %d %s in ordx"
+			printStr := fmt.Sprintf(format, ord.Number, ord.InscriptionID)
+			_, err = outfile.Write([]byte(printStr + "\n"))
+			if err != nil {
+				return err
+			}
+			common.Log.Infof(printStr)
+			continue
+		}
+
+		if ordx.InscriptionId != ord.InscriptionID {
+			format := "#%d has different inscription id ord= %s , ordx = %s"
+			printStr := fmt.Sprintf(format, ord.Number, ord.InscriptionID, ordx.InscriptionId)
+			_, err = outfile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
 			}

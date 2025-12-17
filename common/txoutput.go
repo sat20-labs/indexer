@@ -601,6 +601,7 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 	return offset.Size() - n + n * 330
 }
 
+// 添加一个output，按照value值将其合并到原来的output中，形成更大的output
 func (p *TxOutput) Append(another *TxOutput) error {
 	if another == nil {
 		return nil
@@ -611,6 +612,7 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	}
 	value := p.OutValue.Value
 	for _, asset := range another.Assets {
+		// 只将有效的资产合并进来，否则会影响原来可能存在的同名字资产
 		if invalid, ok := another.Invalids[asset.Name]; ok && invalid {
 			continue
 		}
@@ -636,6 +638,9 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		p.Offsets[asset.Name] = existingOffsets
 	}
 	for k, v := range another.SatBindingMap {
+		if invalid, ok := another.Invalids[v.Name]; ok && invalid {
+			continue
+		}
 		p.SatBindingMap[k+value] = v.Clone()
 	}
 
@@ -753,6 +758,9 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 		satmap1 := make(map[int64]*AssetInfo)
 		satmap2 := make(map[int64]*AssetInfo)
 		for k, v := range p.SatBindingMap {
+			if invalid, ok := p.Invalids[v.Name]; ok && invalid {
+				continue
+			}
 			if k < offset {
 				satmap1[k] = v.Clone()
 			} else {
@@ -889,10 +897,52 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 }
 
 
+// 仅将资产合并，不扩大原来的value
+func (p *TxOutput) Merge(another *TxOutput) error {
+	if another == nil {
+		return nil
+	}
+
+	for _, asset := range another.Assets {
+		// 只将有效的资产合并进来，否则会影响原来可能存在的同名字资产
+		if invalid, ok := another.Invalids[asset.Name]; ok && invalid {
+			continue
+		}
+
+		err := p.Assets.Add(&asset)
+		if err != nil {
+			return err
+		}
+		offset, ok := another.Offsets[asset.Name]
+		if ok {
+			existing, ok := p.Offsets[asset.Name]
+			if ok {
+				existing.Merge(offset)
+			} else {
+				existing = offset
+			}
+			p.Offsets[asset.Name] = existing
+		}
+	}
+
+	for k, v := range another.SatBindingMap {
+		if invalid, ok := another.Invalids[v.Name]; ok && invalid {
+			continue
+		}
+		p.SatBindingMap[k] = v.Clone()
+	}
+	return nil
+}
+
 // 将output中的某一类资产完全清除
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) RemoveAsset(name *AssetName) {
 	if name == nil || *name == ASSET_PLAIN_SAT {
+		return
+	}
+
+	if invalid, ok := p.Invalids[*name]; ok && invalid {
+		Log.Errorf("can't remove an invalid asset")
 		return
 	}
 
@@ -921,6 +971,10 @@ func (p *TxOutput) RemoveAsset(name *AssetName) {
 func (p *TxOutput) RemoveAssetWithAmt(name *AssetName, amt *Decimal) (*Decimal, error) {
 	if name == nil || *name == ASSET_PLAIN_SAT {
 		return amt, fmt.Errorf("not support")
+	}
+
+	if invalid, ok := p.Invalids[*name]; ok && invalid {
+		return nil, fmt.Errorf("can't remove an invalid asset")
 	}
 
 	if len(p.Assets) == 0 {

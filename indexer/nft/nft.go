@@ -70,7 +70,7 @@ type NftIndexer struct {
 
 	// 不需要备份的数据
 	nftBuffer       []*common.Nft // 一个区块内的缓存
-	nftAddedUtxoMap map[uint64][]*common.Nft // 一个区块中，增量的nft在哪个输出的utxo中 utxoId->nftId->nft
+	nftAddedUtxoMap map[uint64][]*common.Nft // 一个区块中，增量的nft在哪个输出的utxo中 utxoId->nfts
 }
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
@@ -545,33 +545,22 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		return nil
 	})
 
-	// 计算新位置
+	// 计算新位置，资产直接加入block的交易数据中，方便后面模块直接处理资产数据
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
-		for _, in := range tx.Inputs {
-			// if tx.TxId == "408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74" {
-			// 	common.Log.Infof("")
-			// }
-			input := in.Clone() // 不要影响原来tx的数据
+		for _, input := range tx.Inputs {
+			if tx.TxId == "2c898453ced8a8aef58ee7d18413ade93c9c3d722cae39b24d793e25d56b0a41" {
+				common.Log.Infof("")
+			}
 			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
 			if len(sats) > 0 {
 				for _, sat := range sats {
-					info := p.satMap[sat.Sat]
-					if info == nil {
-						common.Log.Panicf("%s should load sat %d before", input.OutPointStr, sat.Sat)
-					}
-					asset := common.AssetInfo{
-						Name: common.AssetName{
-							Protocol: common.PROTOCOL_NAME_ORD,
-							Type:     common.ASSET_TYPE_NFT,
-							Ticker:   fmt.Sprintf("%d", sat.Sat), // 绑定了资产的聪
-						},
-						Amount:     *common.NewDecimal(1, 0),
-						BindingSat: uint32(len(info.Nfts)),
-					}
-					input.Assets.Add(&asset)
-					input.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: sat.Offset, End: sat.Offset + 1}}
+					// info := p.satMap[sat.Sat]
+					// if info == nil {
+					// 	common.Log.Panicf("%s should load sat %d before", input.OutPointStr, sat.Sat)
+					// }
+					addSatInfoToOutput(&input.TxOutput, sat)
 				}
 
 				delete(p.utxoMap, input.UtxoId)
@@ -581,7 +570,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			if allInput == nil {
 				allInput = input.Clone()
 			} else {
-				allInput.Append(input)
+				allInput.Append(&input.TxOutput)
 			}
 		}
 
@@ -600,6 +589,20 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
+}
+
+func addSatInfoToOutput(output *common.TxOutput, sat *SatOffset) {
+	asset := common.AssetInfo{
+		Name: common.AssetName{
+			Protocol: common.PROTOCOL_NAME_ORD,
+			Type:     common.ASSET_TYPE_NFT,
+			Ticker:   fmt.Sprintf("%d", sat.Sat), // 绑定了资产的聪
+		},
+		Amount:     *common.NewDecimal(1, 0),
+		BindingSat: 1,
+	}
+	output.Assets.Add(&asset)
+	output.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: sat.Offset, End: sat.Offset + 1}}
 }
 
 func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
@@ -638,10 +641,12 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 					satInfo.UtxoId = txOut.UtxoId
 					satInfo.Offset = offsets[0].Start
 
-					sats = append(sats, &SatOffset{
+					satOffset := &SatOffset{
 						Sat:    sat,
 						Offset: satInfo.Offset,
-					})
+					}
+					sats = append(sats, satOffset)
+					addSatInfoToOutput(&txOut.TxOutput, satOffset) // 合并资产信息，供下一个模块处理
 				}
 			}
 		}
@@ -656,12 +661,27 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 					if s.Sat != nft.Base.Sat {
 						nft.Base.Sat = s.Sat // 同一个聪，需要命名一致
 						// 根据ordinals规则，判断是否是reinscription
-						if nft.Base.CurseType == 0 {
+						if nft.Base.CurseType == 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
 							satInfo := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 							if int(satInfo.CurseCount) < len(satInfo.Nfts) {
 								// 已经存在非cursed的铭文，后面的铭文都是reinscription
 								nft.Base.CurseType = int32(ordCommon.Reinscription)
+
+								// 对本区块的后续inscription number做调整
 								p.status.CurseCount++
+								p.status.Count--
+								for i, t := range p.nftAdded {
+									if t.Base.InscriptionId == nft.Base.InscriptionId {
+										// 后面的都要修改
+										t.Base.Id = -int64(p.status.CurseCount)
+										for i++; i < len(p.nftAdded); i++ {
+											m := p.nftAdded[i]
+											m.Base.Id-- // 无论是否cursed
+										}
+										break
+									}
+								}
+
 								common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 							}
 						}
@@ -671,10 +691,12 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 				}
 			}
 			if newSat {
-				sats = append(sats, &SatOffset{
+				satOffset := &SatOffset{
 					Sat:    nft.Base.Sat,
 					Offset: nft.Offset,
-				})
+				}
+				sats = append(sats, satOffset)
+				addSatInfoToOutput(&txOut.TxOutput, satOffset)
 			}
 
 			// 添加到satMap
@@ -934,20 +956,23 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	// wg.Add(3)
 
 
-	// p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
-	// 	//defer wg.Done()
+	curseCount := 0
+	p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
+		//defer wg.Done()
 
-	// 	var value common.InscribeBaseContent
-	// 	err := db.DecodeBytesWithProto3(v, &value)
-	// 	if err != nil {
-	// 		common.Log.Panicf("item.Value error: %v", err)
-	// 	}
-	// 	if value.CurseType != 0 {
-	// 		common.Log.Infof("%d %s is cursed %d", value.Id, value.InscriptionId, value.CurseType)
-	// 	}
+		var value common.InscribeBaseContent
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
+		}
+		if value.CurseType != 0 {
+			curseCount++
+			//common.Log.Infof("%d %s is cursed %d", value.Id, value.InscriptionId, value.CurseType)
+		}
 
-	// 	return nil
-	// })
+		return nil
+	})
+	common.Log.Infof("curse count %d", curseCount)
 
 
 	addressesInT1 := make(map[uint64]bool, 0)
@@ -1016,7 +1041,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	common.Log.Infof("2: utxo %d, sats %d", len(utxosInT2), len(satsInT2))
 
 	bs := NewBuckStore(p.db)
-	lastkey := bs.GetLastKey()
+	lastkey := bs.GetLastKey() // 仅仅是正数铭文id
 	var buckmap map[int64]*BuckValue
 	getbuck := func() {
 		//defer wg.Done()
@@ -1124,8 +1149,8 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		result = false
 	}
 
-	count := p.status.Count - uint64(len(p.nftAdded))
-	if count != uint64(len(nftsInT1)) || count != uint64(lastkey+1) {
+	count := p.status.Count + p.status.CurseCount - uint64(len(p.nftAdded))
+	if count != uint64(len(nftsInT1)) || p.status.Count != uint64(lastkey+1) {
 		common.Log.Errorf("nft count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
 		result = false
 	}

@@ -1,10 +1,14 @@
 package brc20
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+
+	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
 
@@ -23,6 +27,11 @@ type TickerStatus struct {
 	TxCount int
 	Holders map[string]string
 }
+
+
+var _enable_validate bool = true
+var _validateData map[string]*validate.BRC20CSVRecord
+var _heightToRecords map[int][]*validate.BRC20CSVRecord // 按顺序
 
 var testnet4_checkpoint = map[int]*CheckPoint{
 	27227: {
@@ -405,6 +414,84 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		TickerCount: 0,
 		Tickers: nil,
 	},
+	780070: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{
+			}},
+		},
+	},
+
+	790693: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{
+				"16G1xYBbiNG78LSuZdMqp6tux5xvVp9Wxh": "1677449",
+			}},
+		},
+	},
+
+	790694: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{
+				"16G1xYBbiNG78LSuZdMqp6tux5xvVp9Wxh": "1669003",
+			}},
+		},
+	},
+
+	/*
+	bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d
+824529 d3403337d6c9a3f1e49441a8e1548079baacdb63cb1022ab7d886c92c5c79df1  9,128,777.40996118
+816000 581ff2994658dc4106a141a46873775dcfbb93f0ac2d4f641bcf6de10cc0a7fc  2,111,923.4701435
+815999 45073d9a7d3ea48a005015af2a5691182785038277568c77a26a1967563ab26b  2,118,609.09
+815993 6cc59ea9198df8cac9c04dff0894ccddc4e1e87be79291193a7fb57df5608e83 2,118,615.09 
+815875 81bcc98b34bb1a0f481d318274c39bccfca3562def32937993f6fb30f58d6236 2,235,818.51
+815725 d57f1df667ab8823827b989987fc37be0aa79b044f17012383391a4b0902791c  567,663.0989
+813844 98945cd4d6d88b1f787338dd7adc417b7fbc157b96fee7f3eb0557919484a891 51
+*/
+
+	800000: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{
+				"bc1qggf48ykykz996uv5vsp5p9m9zwetzq9run6s64hm6uqfn33nhq0ql9t85q": "757425.9231",
+				"bc1q6tj4wm295pndmx4dywkg27rj6vqfxl5gn8j7zr": "197331.5223",
+			}},
+		},
+	},
+
+	813844: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "51"}},
+		},
+	},
+	815725: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "567663.0989"}},
+		},
+	},
+	815875: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2235818.51"}},
+		},
+	},
+	815993: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2118615.09"}},
+		},
+	},
+	815999: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2118609.09"}},
+		},
+	},
+	816000: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2111923.4701435"}},
+		},
+	},
+	824529: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "9128777.40996118"}},
+		},
+	},
 
 	/*
 	780000: {
@@ -438,7 +525,11 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 }
 
 
+
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
+
+	p.validateHistory(height)
+
 	startTime := time.Now()
 	var checkpoint *CheckPoint
 	matchHeight := height
@@ -462,7 +553,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 
 	if matchHeight != 0 {
 		tickers := p.getAllTickers()
-		if len(tickers) != checkpoint.TickerCount {
+		if checkpoint.TickerCount != 0 && len(tickers) != checkpoint.TickerCount {
 			common.Log.Panicf("ticker count different")
 		}
 	}
@@ -495,13 +586,14 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		for address, amt := range tickerStatus.Holders {
 			addressId := baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
-				common.Log.Panicf("%s GetAddressId %s failed", name, address)
+				common.Log.Panicf("%s GetAddressIdFromDB %s failed", name, address)
 			}
 			abbrInfo := p.getHolderAbbrInfo(addressId, name)
 			if abbrInfo == nil {
 				common.Log.Panicf("%s getHolderAbbrInfo %x %s failed", name, addressId, address)
 			}
 			if abbrInfo.AssetAmt().String() != amt {
+				p.printHistoryWithAddress(name, addressId)
 				common.Log.Panicf("%s holder %s amt different, %s %s", name, address, abbrInfo.AssetAmt().String(), amt)
 			}
 		}
@@ -540,4 +632,137 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		
 	}
 	common.Log.Infof("CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
+}
+
+// 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
+func (p *BRC20Indexer) validateHistory(height int) {
+	if !_enable_validate {
+		return
+	}
+	if height < 779832 {
+		return
+	}
+	name := "ordi"
+	if _validateData == nil {
+		var err error
+		_validateData, err = validate.ReadBRC20CSV("./indexer/brc20/validate/ordi.csv")
+		if err != nil {
+			common.Log.Panicf("ReadBRC20CSV failed, %v", err)
+		}
+		
+		_heightToRecords = make(map[int][]*validate.BRC20CSVRecord)
+		for _, record := range _validateData {
+			v := _heightToRecords[record.Height]
+			if len(v) == 0 {
+				_heightToRecords[record.Height] = append([]*validate.BRC20CSVRecord(nil), record)
+			} else {
+				_heightToRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
+			}
+		}
+	}
+	if len(_validateData) == 0 {
+		return
+	}
+
+	tobeValidating := make([]*HolderAction, 0)
+	for _, v := range p.holderActionList {
+		if v.Height != height || v.Ticker != name {
+			continue
+		}
+		if v.Action == common.BRC20_Action_Transfer_Spent {
+			continue
+		}
+		tobeValidating = append(tobeValidating, v)
+	}
+	sort.Slice(tobeValidating, func(i, j int) bool {
+		if tobeValidating[i].ToUtxoId == tobeValidating[j].ToUtxoId {
+			return tobeValidating[i].TxInIndex < tobeValidating[j].TxInIndex
+		}
+		return tobeValidating[i].ToUtxoId < tobeValidating[j].ToUtxoId
+	})
+	tobeMap := make(map[string]*HolderAction)
+	for _, item := range tobeValidating {
+		key := fmt.Sprintf("%d-%x", item.NftId, item.ToUtxoId)
+		tobeMap[key] = item
+	}
+
+	// 执行验证
+	validateRecords := _heightToRecords[height]
+	validateMap := make(map[string]*validate.BRC20CSVRecord)
+	for _, item := range validateRecords {
+		utxoId := common.ToUtxoId(item.Height, item.TxIdx, item.Vout)
+		key := fmt.Sprintf("%d-%x", item.InscriptionNumber, utxoId)
+		validateMap[key] = item
+	}
+
+	if len(validateRecords) != len(tobeValidating) {
+		more := p.loadTransferHistoryWithHeightFromDB(name, height)
+		tobeValidating = append(tobeValidating, more...)
+		if len(validateRecords) != len(tobeValidating) {
+			diff1 := findDiffInMap(validateMap, tobeMap)
+			if len(diff1) > 0 {
+				common.Log.Infof("in validate data but missing in our process")
+				for _, v := range diff1 {
+					common.Log.Infof("%v", validateMap[v])
+				}
+			}
+
+			diff2 := findDiffInMap(tobeMap, validateMap)
+			if len(diff2) > 0 {
+				common.Log.Infof("not in validate data but occur in our process")
+				for _, v := range diff2 {
+					common.Log.Infof("%v", tobeMap[v])
+				}
+			}
+
+			common.Log.Panicf("transfer count different in block %d, %d %d", height, 
+				len(validateRecords), len(tobeValidating))
+		}
+	}
+
+	// 按顺序检查，顺序严格一致
+	for i, valid := range validateRecords {
+		item := tobeValidating[i]
+
+		toUtxoId := common.ToUtxoId(valid.Height, valid.TxIdx, valid.Vout)
+		if item.ToUtxoId != toUtxoId {
+			common.Log.Panicf("%d #%d %s different utxoId", height, valid.InscriptionNumber, valid.InscriptionID)
+		}
+		if (item.NftId) != (valid.InscriptionNumber) {
+			nft := p.nftIndexer.GetNftWithId(item.NftId)
+			if nft == nil {
+				common.Log.Panicf("GetNftWithId %d failed", item.NftId)
+			}
+			common.Log.Panicf("%d #%d %s different inscription number %d %s", height, valid.InscriptionNumber, valid.InscriptionID, item.NftId, nft.Base.InscriptionId)
+		}
+
+		if item.Ticker != valid.Ticker ||
+		item.Amount.String() != valid.Amount ||
+		item.Action != validate.ActionToInt[valid.Type] {
+			common.Log.Panicf("%d:%s different action", height, valid.InscriptionID)
+		}
+
+		
+		// nft := p.nftIndexer.GetNftWithId(item.NftId)
+		// if nft == nil {
+		// 	common.Log.Panicf("GetNftWithId %d failed", item.NftId)
+		// }
+		// if nft.Base.InscriptionId != valid.InscriptionID {
+		// 	common.Log.Panicf("inscription Id different in block %d, %s %s", height,
+		// 		valid.InscriptionID, nft.Base.InscriptionId)
+		// }
+	}
+
+}
+
+// 找出T1中key不在T2的元素
+func findDiffInMap[T1 any, T2 any](t1 map[string]T1, t2 map[string]T2) []string {
+	result := make([]string, 0)
+	for k := range t1 {
+		_, ok := t2[k]
+		if !ok {
+			result = append(result, k)
+		}
+	}
+	return result
 }

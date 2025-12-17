@@ -141,11 +141,12 @@ const (
 	BRC20_Action_InScribe_Transfer // 铸造一个transfer铭文
 	BRC20_Action_Transfer          // 转移一个transfer铭文
 	BRC20_Action_Transfer_Spent    // 一个已经转移的transfer铭文被花费
-	BRC20_Action_Transfer_Canceled // 销毁一个transfer铭文
 )
 
 type BRC20ActionHistory struct {
 	Height   int
+	TxIndex  int
+	TxInIndex int
 	Action   int
 	NftId    int64 // transfer nft
 	Ticker   string
@@ -153,6 +154,7 @@ type BRC20ActionHistory struct {
 
 	FromUtxoId uint64
 	FromAddr   uint64
+	
 	ToUtxoId   uint64
 	ToAddr     uint64
 }

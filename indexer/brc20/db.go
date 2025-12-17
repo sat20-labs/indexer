@@ -342,6 +342,35 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 	return result
 }
 
+func (s *BRC20Indexer) loadTransferHistoryWithHeightFromDB(tickerName string, height int) []*common.BRC20ActionHistory {
+	result := make([]*common.BRC20ActionHistory, 0)
+	count := 0
+	startTime := time.Now()
+	common.Log.Debug("BRC20Indexer loadTransferHistoryWithHeightFromDB ...")
+	prefix := fmt.Sprintf("%s%s-%x-", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickerName), height)
+	err := s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+		var history common.BRC20ActionHistory
+		err := db.DecodeBytes(v, &history)
+		if err == nil {
+			result = append(result, &history)
+		} else {
+			common.Log.Errorln("loadTransferHistoryWithHeightFromDB DecodeBytes " + err.Error())
+		}
+		count++
+
+		return nil
+	})
+
+	if err != nil {
+		common.Log.Panicf("loadTransferHistoryWithHeightFromDB %s from db: %v", tickerName, err)
+	}
+
+	elapsed := time.Since(startTime).Milliseconds()
+	common.Log.Debugf("loadTransferHistoryWithHeightFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
+
+	return result
+}
+
 func (s *BRC20Indexer) loadTickerFromDB(tickerName string) *common.BRC20Ticker {
 	var result common.BRC20Ticker
 

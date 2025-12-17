@@ -45,6 +45,7 @@ type TxInput struct {
 	TxOutputV2
 	Witness wire.TxWitness
 	TxId    string
+	TxInIndex int
 }
 
 type TxOutputV2 struct {

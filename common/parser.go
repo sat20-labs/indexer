@@ -299,15 +299,45 @@ func ParseMintContent(content string) *OrdxMintContent {
 	return &ret
 }
 
-func StrictlyUnmarshal(jsonString string, targetStructPtr interface{}) error {
-	decoder := json.NewDecoder(strings.NewReader(jsonString))
-	decoder.DisallowUnknownFields()
-	return decoder.Decode(targetStructPtr)
+func UnmarshalBRC20BaseContent(raw map[string]json.RawMessage, content *BRC20BaseContent) error {
+	// 只接受小写 "p"
+	if v, ok := raw["p"]; ok {
+		if err := json.Unmarshal(v, &content.P); err != nil {
+			return err
+		}
+	}
+
+	if v, ok := raw["op"]; ok {
+		if err := json.Unmarshal(v, &content.Op); err != nil {
+			return err
+		}
+	}
+
+	if v, ok := raw["tick"]; ok {
+		if err := json.Unmarshal(v, &content.Ticker); err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
+func UnmarshalBRC20BaseContentStrict(data []byte, content *BRC20BaseContent) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	err := UnmarshalBRC20BaseContent(raw, content)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 
 func ParseBrc20BaseContent(content string) *BRC20BaseContent {
 	var ret BRC20BaseContent
-	err := json.Unmarshal([]byte(content), &ret)
+	err := UnmarshalBRC20BaseContentStrict([]byte(content), &ret)
 	if err != nil {
 		Log.Warnf("invalid json: %s, %v", content, err)
 		return nil
@@ -318,9 +348,49 @@ func ParseBrc20BaseContent(content string) *BRC20BaseContent {
 	return &ret
 }
 
+func UnmarshalBRC2DeployContentStrict(data string, content *BRC20DeployContent) (error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		return err
+	}
+
+	err := UnmarshalBRC20BaseContent(raw, &content.BRC20BaseContent)
+	if err != nil {
+		return err
+	}
+
+
+	// 只接受小写
+	if v, ok := raw["lim"]; ok {
+		if err := json.Unmarshal(v, &content.Lim); err != nil {
+			return err
+		}
+	}
+
+	if v, ok := raw["max"]; ok {
+		if err := json.Unmarshal(v, &content.Max); err != nil {
+			return err
+		}
+	}
+
+	if v, ok := raw["dec"]; ok {
+		if err := json.Unmarshal(v, &content.Decimal); err != nil {
+			return err
+		}
+	}
+
+	if v, ok := raw["self_mint"]; ok {
+		if err := json.Unmarshal(v, &content.SelfMint); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func ParseBrc20DeployContent(content string) *BRC20DeployContent {
 	var ret BRC20DeployContent
-	err := StrictlyUnmarshal(content, &ret)
+	err := UnmarshalBRC2DeployContentStrict(content, &ret)
 	if err != nil {
 		return nil
 	}
@@ -328,11 +398,34 @@ func ParseBrc20DeployContent(content string) *BRC20DeployContent {
 		return nil
 	}
 	return &ret
+}
+
+
+func UnmarshalBRC2AmtContentStrict(data string, content *BRC20AmtContent) (error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		return err
+	}
+
+	err := UnmarshalBRC20BaseContent(raw, &content.BRC20BaseContent)
+	if err != nil {
+		return err
+	}
+
+
+	// 只接受小写
+	if v, ok := raw["amt"]; ok {
+		if err := json.Unmarshal(v, &content.Amt); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ParseBBRC20AmtContent(content string) *BRC20AmtContent {
 	var ret BRC20AmtContent
-	err := StrictlyUnmarshal(content, &ret)
+	err := UnmarshalBRC2AmtContentStrict(content, &ret)
 	if err != nil {
 		return nil
 	}
@@ -340,11 +433,15 @@ func ParseBBRC20AmtContent(content string) *BRC20AmtContent {
 		return nil
 	}
 	return &ret
+}
+
+func UnmarshalBRC2MintContentStrict(data string, content *BRC20MintContent) (error) {
+	return UnmarshalBRC2AmtContentStrict(data, &content.BRC20AmtContent)
 }
 
 func ParseBrc20MintContent(content string) *BRC20MintContent {
 	var ret BRC20MintContent
-	err := StrictlyUnmarshal(content, &ret)
+	err := UnmarshalBRC2MintContentStrict(content, &ret)
 	if err != nil {
 		return nil
 	}
@@ -354,9 +451,14 @@ func ParseBrc20MintContent(content string) *BRC20MintContent {
 	return &ret
 }
 
+
+func UnmarshalBRC2TransferContentStrict(data string, content *BRC20TransferContent) (error) {
+	return UnmarshalBRC2AmtContentStrict(data, &content.BRC20AmtContent)
+}
+
 func ParseBrc20TransferContent(content string) *BRC20TransferContent {
 	var ret BRC20TransferContent
-	err := StrictlyUnmarshal(content, &ret)
+	err := UnmarshalBRC2TransferContentStrict(content, &ret)
 	if err != nil {
 		return nil
 	}

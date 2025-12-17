@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,55 +8,6 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 )
-
-
-func GetRawData(txID string, network string) ([][]byte, error) {
-	url := ""
-	switch network {
-	case "testnet":
-		url = fmt.Sprintf("https://mempool.space/testnet/api/tx/%s", txID)
-	case "testnet4":
-		url = fmt.Sprintf("https://mempool.space/testnet4/api/tx/%s", txID)
-	case "mainnet":
-		url = fmt.Sprintf("https://mempool.space/api/tx/%s", txID)
-	default:
-		return nil, fmt.Errorf("unsupported network: %s", network)
-	}
-
-	response, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
-
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
-	}
-
-	var data map[string]interface{}
-	err = json.NewDecoder(response.Body).Decode(&data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", txID, err)
-	}
-	txWitness := data["vin"].([]interface{})[0].(map[string]interface{})["witness"].([]interface{})
-
-	if len(txWitness) < 2 {
-		return nil, fmt.Errorf("failed to retrieve witness for %s", txID)
-	}
-
-	var rawData [][]byte = make([][]byte, len(txWitness))
-	for i, v := range txWitness {
-		rawData[i], err = hex.DecodeString(v.(string))
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode hex string to byte array for %s, error: %v", txID, err)
-		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode hex string to byte array for %s, error: %v", txID, err)
-	}
-	return rawData, nil
-}
 
 
 type nftItem struct {
@@ -99,7 +49,7 @@ type NftInfoResp struct {
 
 
 
-func GetInscription(id int64, host string) (*nftInfo, error) {
+func GetInscription_ordx(id int64, host string) (*nftInfo, error) {
 	
 	url := fmt.Sprintf("%s/nft/nftid/%d", host, id)
 
@@ -172,7 +122,7 @@ func GetNftStatus(host string) (*NftStatusData, error) {
 }
 
 
-func main() {
+func NftDiff_Test() {
 	//url0 := "http://192.168.1.101:8019/btc/testnet"
 	host1 := "http://127.0.0.1:8019/btc/testnet"
 	host2 := "http://127.0.0.1:8029/btc/testnet"
@@ -197,13 +147,13 @@ func main() {
 	total := min(status.Total, status2.Total)
 
 	for i := int64(0); i < int64(total); i++ {
-		nft1, err := GetInscription(i, host1)
+		nft1, err := GetInscription_ordx(i, host1)
 		if err != nil {
 			common.Log.Infof("GetInscription failed, %v", err)
 			break
 		}
 		
-		nft2, err := GetInscription(i, host2)
+		nft2, err := GetInscription_ordx(i, host2)
 		if err != nil {
 			common.Log.Infof("GetInscription failed, %v", err)
 			break
