@@ -19,7 +19,7 @@ func (s *BRC20Indexer) UpdateInscribeDeploy(input *common.Input, ticker *common.
 	}
 }
 
-func (s *BRC20Indexer) updateInscribeDeploy(ticker *common.BRC20Ticker) {
+func (s *BRC20Indexer) updateInscribeDeploy(input *common.Input, ticker *common.BRC20Ticker) {
 	// 再次检查，因为nft可能会修改reinsription状态
 	nft := ticker.Nft
 	if nft.Base.CurseType != 0 {
@@ -43,10 +43,13 @@ func (s *BRC20Indexer) updateInscribeDeploy(ticker *common.BRC20Ticker) {
 
 	action := HolderAction{
 		Height:   int(ticker.Nft.Base.BlockHeight),
-		ToUtxoId: ticker.Nft.UtxoId,
+		TxIndex:  input.TxIndex,
+		TxInIndex: input.TxInIndex,
 		NftId:    ticker.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
+		FromUtxoId: input.UtxoId,
 		ToAddr:   ticker.Nft.OwnerAddressId,
+		ToUtxoId: ticker.Nft.UtxoId,
 		Ticker:   name,
 		Amount:   *common.NewDefaultDecimal(0),
 		Action:   common.BRC20_Action_InScribe_Deploy,
@@ -67,7 +70,7 @@ func (s *BRC20Indexer) UpdateInscribeMint(input *common.Input, mint *common.BRC2
 	}
 }
 
-func (s *BRC20Indexer) updateInscribeMint(mint *common.BRC20Mint) {
+func (s *BRC20Indexer) updateInscribeMint(input *common.Input, mint *common.BRC20Mint) {
 	if mint.Nft.Base.CurseType != 0 {
 		common.Log.Debugf("%s inscription is cursed, %d", mint.Nft.Base.InscriptionId, mint.Nft.Base.CurseType)
 		if mint.Nft.Base.BlockHeight < 824544 { // Jubilee
@@ -121,10 +124,13 @@ func (s *BRC20Indexer) updateInscribeMint(mint *common.BRC20Mint) {
 
 	action := HolderAction{
 		Height:   int(mint.Nft.Base.BlockHeight),
-		ToUtxoId: mint.Nft.UtxoId,
+		TxIndex:  input.TxIndex,
+		TxInIndex: input.TxInIndex,
 		NftId:    mint.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
+		FromUtxoId: input.UtxoId,
 		ToAddr:   mint.Nft.OwnerAddressId,
+		ToUtxoId: mint.Nft.UtxoId,
 		Ticker:   name,
 		Amount:   mint.Amt,
 		Action:   common.BRC20_Action_InScribe_Mint,
@@ -147,7 +153,7 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.Input, transfer *com
 	}
 }
 
-func (s *BRC20Indexer) updateInscribeTransfer(transfer *common.BRC20Transfer) {
+func (s *BRC20Indexer) updateInscribeTransfer(input *common.Input, transfer *common.BRC20Transfer) {
 	if transfer.Nft.Base.CurseType != 0 {
 		common.Log.Debugf("%s inscription is cursed, %d", transfer.Nft.Base.InscriptionId, transfer.Nft.Base.CurseType)
 		if transfer.Nft.Base.BlockHeight < 824544 { // Jubilee
@@ -200,10 +206,13 @@ func (s *BRC20Indexer) updateInscribeTransfer(transfer *common.BRC20Transfer) {
 
 	action := HolderAction{
 		Height:   int(transfer.Nft.Base.BlockHeight),
-		ToUtxoId: transfer.Nft.UtxoId,
+		TxIndex:  input.TxIndex,
+		TxInIndex: input.TxInIndex,
 		NftId:    transfer.Nft.Base.Id,
 		FromAddr: common.INVALID_ID,
+		FromUtxoId: input.UtxoId,
 		ToAddr:   transfer.Nft.OwnerAddressId,
+		ToUtxoId: transfer.Nft.UtxoId,
 		Ticker:   tickerName,
 		Amount:   transfer.Amt,
 		Action:   common.BRC20_Action_InScribe_Transfer,
@@ -434,14 +443,14 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 	})
 
 	// 检查transferNft转入到哪个输出
-	for _, tx := range block.Transactions[1:] {
+	for i, tx := range block.Transactions[1:] {
 		// if tx.Txid == "19206e5c580194fce3a513682998e918e40b9c2a2afaa64f63e55a217b7ec023" {
 		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 		// }
 
 		inputTransferNfts := make(map[int64]*TransferNftInfo)
 		hasTransfer := false
-		for _, input := range tx.Inputs {
+		for index, input := range tx.Inputs {
 			// if input.UtxoId == 3804104075509760 || input.UtxoId == 3804104075771904 {
 			// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 			// }
@@ -457,18 +466,19 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 					if ok {
 						continue
 					}
-					s.updateInscribeDeploy(deploy)
+					s.updateInscribeDeploy(input, deploy)
 				case common.BRC20_Action_InScribe_Mint:
 					mint := item.Info.(*common.BRC20Mint)
-					s.updateInscribeMint(mint)
+					s.updateInscribeMint(input, mint)
 				case common.BRC20_Action_InScribe_Transfer:
 					transfer := item.Info.(*common.BRC20Transfer)
-					s.updateInscribeTransfer(transfer)
+					s.updateInscribeTransfer(input, transfer)
 				}
 			}
 
 			transfer, ok := s.transferNftMap[input.UtxoId] // transferNftMap 第一次转移时，先不删除，只设置标志位
 			if ok {
+				transfer.TxInIndex = index
 				inputTransferNfts[transfer.TransferNft.NftId] = transfer
 				hasTransfer = true
 			}
@@ -476,7 +486,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 
 		if hasTransfer {
 			for _, output := range tx.Outputs {
-				s.innerUpdateTransfer(tx.Txid, output, inputTransferNfts)
+				s.innerUpdateTransfer(i, tx.Txid, output, inputTransferNfts)
 			}
 
 			// testnet4: 19206e5c580194fce3a513682998e918e40b9c2a2afaa64f63e55a217b7ec023
@@ -486,7 +496,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 				for _, transfer := range inputTransferNfts {
 					if !transfer.TransferNft.IsInvalid {
 						transfer.TransferNft.IsInvalid = true
-						s.cancelTransferNft(transfer, block.Height)
+						s.cancelTransferNft(transfer, block.Height, i, tx)
 					}
 				}
 			}
@@ -589,7 +599,8 @@ func (s *BRC20Indexer) subHolderBalance(transfer *TransferNftInfo, address uint6
 }
 
 // 将一个transfer nft取消，原因可能是作为手续费转给了矿工
-func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height int) {
+func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height, index int,
+	tx *common.Transaction) {
 	
 	fromAddress := transfer.AddressId
 
@@ -610,7 +621,8 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height int) 
 
 	action := HolderAction{
 		Height:   height,
-		
+		TxIndex:  index,
+		TxInIndex: transfer.TxInIndex,
 		NftId:    transfer.TransferNft.NftId,
 		FromUtxoId: transfer.UtxoId, // old utxo
 		FromAddr: fromAddress,
@@ -618,7 +630,7 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height int) 
 		ToUtxoId: nft.UtxoId,
 		Ticker:   transfer.Ticker,
 		Amount:   transfer.TransferNft.Amount,
-		Action:   common.BRC20_Action_Transfer_Canceled,
+		Action:   common.BRC20_Action_Transfer,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
@@ -686,7 +698,7 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
 }
 
-func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output,
+func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *common.Output,
 	inputTransferNfts map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := common.GetUtxoId(output)
@@ -724,6 +736,8 @@ func (s *BRC20Indexer) innerUpdateTransfer(txId string, output *common.Output,
 			}
 			action := HolderAction{
 				Height:   output.Height,
+				TxIndex:  index,
+				TxInIndex: transfer.TxInIndex,
 				ToUtxoId: utxoId,
 				NftId:    transfer.TransferNft.NftId,
 				FromAddr: fromAddressId,
@@ -876,14 +890,10 @@ func (s *BRC20Indexer) UpdateDB() {
 		case common.BRC20_Action_Transfer_Spent:
 			s.updateHolderToDB(action.FromAddr, action.Ticker, false, true, wb)
 			s.updateUtxoToDB(action.FromUtxoId, false, wb)
-		
-		case common.BRC20_Action_Transfer_Canceled:
-			s.updateHolderToDB(action.FromAddr, action.Ticker, false, true, wb)
-			s.updateUtxoToDB(action.FromUtxoId, false, wb)
 		}
 
 		// 保存历史记录
-		key := GetTransferHistoryKey(action.Ticker, action.ToUtxoId)
+		key := GetTransferHistoryKey(action.Ticker, action.ToUtxoId, action.NftId)
 		err := db.SetDB([]byte(key), action, wb)
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)

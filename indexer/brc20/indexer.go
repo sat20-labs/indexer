@@ -33,6 +33,7 @@ type HolderInfo struct {
 }
 
 type TransferNftInfo struct {
+	TxInIndex   int    // 在当前交易中，作为第几个输入进入TX
 	AddressId   uint64 // 当前地址
 	UtxoId      uint64 // 当前utxo
 	Ticker      string
@@ -41,6 +42,7 @@ type TransferNftInfo struct {
 
 func (p *TransferNftInfo) Clone() *TransferNftInfo {
 	return &TransferNftInfo{
+		TxInIndex: p.TxInIndex,
 		AddressId: p.AddressId,
 		UtxoId: p.UtxoId,
 		Ticker: p.Ticker,
@@ -272,21 +274,6 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
 				flag = ""
 			}
 			method = "transfer"
-		
-		case common.BRC20_Action_Transfer_Canceled:
-			if addressId == item.FromAddr {
-				flag = "-"
-				total = total.Sub(&item.Amount)
-				transferrable = transferrable.Sub(&item.Amount)
-			}
-			if addressId == item.ToAddr {
-				total = total.Add(&item.Amount)
-				available = available.Add(&item.Amount)
-			}
-			if item.FromAddr == item.ToAddr {
-				flag = ""
-			}
-			method = "cancel"
 
 		}
 
@@ -303,9 +290,14 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
 		} else {
 			to = fmt.Sprintf("%x", item.ToAddr)
 		}
-		h, i, j := common.FromUtxoId(item.ToUtxoId)
-		common.Log.Infof("%d %d %d: %d %s -> %s, %s%s, total = %s (%s, %s), %s",
-			h, i, j, item.NftId, from, to, flag, item.Amount.String(), total.String(),
+		// h, i, j := common.FromUtxoId(item.ToUtxoId)
+		// common.Log.Infof("%d %d %d: %d %s -> %s, %s%s, total = %s (%s, %s), %s",
+		// 	h, i, j, item.NftId, from, to, flag, item.Amount.String(), total.String(),
+		// 	available.String(), transferrable.String(), method)
+
+		nft := s.nftIndexer.GetNftWithId(item.NftId)
+		common.Log.Infof("%s: %s -> %s, %s%s, total = %s (%s, %s), %s",
+			nft.Base.InscriptionId, from, to, flag, item.Amount.String(), total.String(),
 			available.String(), transferrable.String(), method)
 
 		count++
@@ -331,6 +323,7 @@ func (s *BRC20Indexer) printHistory(name string) {
 	var count int
 	common.Log.Infof("ticker %s (data from history)", name)
 	holders := make(map[uint64]*common.Decimal)
+	baseIndexer := s.nftIndexer.GetBaseIndexer()
 	for _, item := range history {
 		flag := ""
 		if item.Action == common.BRC20_Action_InScribe_Mint {
@@ -347,18 +340,24 @@ func (s *BRC20Indexer) printHistory(name string) {
 		if item.FromAddr == common.INVALID_ID {
 			from = "-\t"
 		} else {
-			from = fmt.Sprintf("%x", item.FromAddr)
+			addr, _ := baseIndexer.GetAddressByID(item.FromAddr)
+			from = fmt.Sprintf("%s(0x%x)", addr, item.FromAddr)
 		}
 
 		var to string
 		if item.ToAddr == common.INVALID_ID {
 			to = "-\t"
 		} else {
-			to = fmt.Sprintf("%x", item.ToAddr)
+			addr, _ := baseIndexer.GetAddressByID(item.ToAddr)
+			to = fmt.Sprintf("%s(0x%x)", addr, item.ToAddr)
 		}
-		h, i, j := common.FromUtxoId(item.ToUtxoId)
-		common.Log.Infof("%d %d %d: %d %s -> %s, %s%s, total = %s, %d",
-			h, i, j, item.NftId, from, to, flag, item.Amount.String(), total.String(),
+		// h, i, j := common.FromUtxoId(item.ToUtxoId)
+		// common.Log.Infof("%d %d %d: %d %s -> %s, %s%s, %s, total = %s, %d",
+		// 	h, i, j, item.NftId, from, to, flag, item.Amount.String(), holders[item.ToAddr].String(), total.String(),
+		// 	item.Action)
+		nft := s.nftIndexer.GetNftWithId(item.NftId)
+		common.Log.Infof("%s: %s -> %s, %s%s, %s, total = %s, %d",
+			nft.Base.InscriptionId, from, to, flag, item.Amount.String(), holders[item.ToAddr].String(), total.String(),
 			item.Action)
 
 		count++
@@ -465,7 +464,13 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	if isMainnet {
 		names = []string{
 			"ordi",
-			"meme",
+			// "sats",
+			// "doge",
+			// "rats",
+			// "𝛑",
+			// "pizza",
+			// "ligo",
+			// "piin",
 		}
 	} else {
 		names = []string{

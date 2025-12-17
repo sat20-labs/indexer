@@ -3,6 +3,7 @@ package brc20
 import (
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -31,22 +32,27 @@ func GetMintHistoryKey(tickname string, id int64) string {
 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, encodeTickerName(tickname), common.Uint64ToString(uint64(id)))
 }
 
-func GetTransferHistoryKey(tickname string, utxoId uint64) string {
-	return fmt.Sprintf("%s%s-%s", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickname), common.Uint64ToString(utxoId))
+func GetTransferHistoryKey(tickname string, utxoId uint64, nftId int64) string {
+	height, txIndx, _ := common.FromUtxoId(utxoId)
+	return fmt.Sprintf("%s%s-%x-%x-%x", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickname), height, txIndx, nftId)
 }
 
-func ParseTransferHistoryKey(input string) (string, string, error) {
+func ParseTransferHistoryKey(input string) (string, int, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TRANSFER_HISTORY) {
-		return "", "", fmt.Errorf("invalid string format")
+		return "", 0, fmt.Errorf("invalid string format")
 	}
-	str := strings.TrimPrefix(input, DB_PREFIX_TRANSFER_HISTORY)
-	parts := strings.Split(str, "-")
+	parts := strings.Split(input, "-")
 
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid string format")
+	if len(parts) != 5 {
+		return "", 0, fmt.Errorf("invalid string format")
 	}
 
-	return decoderTickerName(parts[0]), parts[1], nil
+	height, err := strconv.ParseInt(parts[2], 16, 32)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return decoderTickerName(parts[1]), int(height), nil
 }
 
 func parseTickListKey(input string) (string, error) {
