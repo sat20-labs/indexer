@@ -455,27 +455,27 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	815725: {
 		Tickers: map[string]*TickerStatus{
-			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "567663.0989"}},
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "567663.09894504"}},
 		},
 	},
 	815875: {
 		Tickers: map[string]*TickerStatus{
-			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2235818.51"}},
-		},
-	},
-	815993: {
-		Tickers: map[string]*TickerStatus{
-			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2118615.09"}},
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2235818.5101435"}},
 		},
 	},
 	815999: {
 		Tickers: map[string]*TickerStatus{
-			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2118609.09"}},
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2118609.0901435"}},
 		},
 	},
 	816000: {
 		Tickers: map[string]*TickerStatus{
 			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2111923.4701435"}},
+		},
+	},
+	816100: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "2522435.48090314"}},
 		},
 	},
 	824529: {
