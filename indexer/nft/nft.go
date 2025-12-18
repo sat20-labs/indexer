@@ -622,6 +622,8 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 
 	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
 
+	p.CheckPointWithBlockHeight(block.Height)
+
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
 
