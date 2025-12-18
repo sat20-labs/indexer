@@ -10,6 +10,9 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
+
+	"github.com/sat20-labs/indexer/indexer"
+	"github.com/sat20-labs/indexer/share/base_indexer"
 )
 
 /*
@@ -281,12 +284,15 @@ func OrdNumDiff_Test() {
 	yamlcfg := config.InitConfig("../mainnet.env")
 	config.InitLog(yamlcfg)
 
+	indexer := InitOrdx(yamlcfg)
+	if indexer == nil {
+		common.Log.Fatal("")
+	}
+
 	const (
 		url_0_23_0 = "192.168.1.104:81"
 		url_ordx = "192.168.1.103:8009"
 
-		height_limit_1 = 824544
-		height_limit_2 = 923108
 		out_dir  = "./cmd/number_diff.txt"
 	)
 
@@ -298,32 +304,24 @@ func OrdNumDiff_Test() {
 
 	// 760000(767430)-816000，使用ord0.9版本的数据，诅咒铭文无效 (最新版本与ord0.9对比)
 	// 816001-824544，使用ord0.9版本的数据，诅咒铭文无效  (最新版本与ord0.9对比)
-	err = CheckInscriptionNum(url_0_23_0, url_ordx, height_limit_1, numberDiffFile)
+	err = CheckInscriptionNum(url_0_23_0, indexer, 3492721, 3644015, numberDiffFile)
 	if err != nil {
 		common.Log.Fatal(err)
 	}
 }
 
-func CheckInscriptionNum(ordUrl, ordxUrl string, height_limit int, outfile *os.File) error {
-	num := 0
-	for {
+func CheckInscriptionNum(ordUrl string, indexer *indexer.IndexerMgr, start, end int64, outfile *os.File) error {
+	
+	for num := start; num < end; num++{
 		ord, err := getInscription_ord(ordUrl, strconv.FormatInt(int64(num), 10))
 		if err != nil {
 			common.Log.Info(err)
 			return err
 		}
 
-		if ord.Height == 0 {
-			break
-		}
-
-		if ord.Height == height_limit+1 {
-			break
-		}
-
-
-		ordx, err := GetInscription_ordx(int64(num), ordxUrl)
-		if err != nil {
+		ordx := indexer.GetNftInfo(int64(num))
+		//ordx, err := GetInscription_ordx(int64(num), ordxUrl)
+		if ordx == nil {
 			format := "not find num: %d %s in ordx"
 			printStr := fmt.Sprintf(format, ord.Number, ord.InscriptionID)
 			_, err = outfile.Write([]byte(printStr + "\n"))
@@ -334,9 +332,9 @@ func CheckInscriptionNum(ordUrl, ordxUrl string, height_limit int, outfile *os.F
 			continue
 		}
 
-		if ordx.InscriptionId != ord.InscriptionID {
+		if ordx.Base.InscriptionId != ord.InscriptionID {
 			format := "#%d has different inscription id ord= %s , ordx = %s"
-			printStr := fmt.Sprintf(format, ord.Number, ord.InscriptionID, ordx.InscriptionId)
+			printStr := fmt.Sprintf(format, ord.Number, ord.InscriptionID, ordx.Base.InscriptionId)
 			_, err = outfile.Write([]byte(printStr + "\n"))
 			if err != nil {
 				return err
@@ -349,4 +347,12 @@ func CheckInscriptionNum(ordUrl, ordxUrl string, height_limit int, outfile *os.F
 	}
 
 	return nil
+}
+
+
+func InitOrdx(yamcfg *config.YamlConf) *indexer.IndexerMgr {
+	indexerMgr := indexer.NewIndexerMgr(yamcfg)
+	base_indexer.InitBaseIndexer(indexerMgr)
+	indexerMgr.Init()
+	return indexerMgr
 }

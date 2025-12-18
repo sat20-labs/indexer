@@ -379,6 +379,8 @@ func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 	// }
 	if nft.Base.Sat < 0 {
 		// unbound铭文，先缓存，本区块最后处理
+		// 788200: c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151
+		// 788312: 99e70421ab229d1ccf356e594512da6486e2dd1abdf6c2cb5014875451ee8073
 		p.unboundNfts = append(p.unboundNfts, nft)
 		return
 	}
@@ -486,7 +488,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	// 处理unbound铭文
 	for _, nft := range p.unboundNfts {
 		p.status.Unbound++
-		nft.Base.Sat = -int64(p.status.Unbound) 
+		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
 
 		nft.Base.Id = int64(p.status.Count) 
 		p.status.Count++
@@ -723,6 +725,16 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 											m.Base.Id-- // 无论是否cursed
 											p.inscriptionToNftIdMap[m.Base.InscriptionId] = m.Base.Id
 											p.nftIdToinscriptionMap[m.Base.Id] = m.Base.InscriptionId
+
+											if m.Base.Sat < 0 {
+												// 该sat已经放在satmap中
+												satInfo, ok := p.satMap[m.Base.Sat]
+												if ok {
+													oldId := m.Base.Id+1
+													delete(satInfo.Nfts, oldId)
+													satInfo.Nfts[m.Base.Id] = true
+												}
+											}
 										}
 										break
 									}
@@ -1180,7 +1192,8 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		if i > 10 {
 			break
 		}
-		common.Log.Infof("wrong id %d: %d", i, value)
+		base := p.getNftBaseWithId(value)
+		common.Log.Infof("wrong id %d: %d %v", i, value, base)
 	}
 	for i, value := range wrongSats {
 		if i > 10 {
