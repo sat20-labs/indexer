@@ -917,8 +917,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
 
-	// if tx.TxId == "f2274c1dff0007a46ef0f0bffd8dc6076680dbb593d87d8a297b2f703387ee5f" ||
-	// 	tx.TxId == "e76579a2587e1fa5d8972ca2885a39d9dff05585188125e9d1bb09a30e124461" {
+	// if tx.TxId == "c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151" {
 	// 	common.Log.Infof("")
 	// }
 
@@ -931,7 +930,9 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	var output *common.TxOutputV2
 	// 遵循ordinals的规则
 	var offset int64
-	output, satpoint, offset = findOutputWithSatPoint(block, coinbase, index, txIndex, tx, satpoint)
+	if input.OutValue.Value != 0 {
+		output, satpoint, offset = findOutputWithSatPoint(block, coinbase, index, txIndex, tx, satpoint)
+	}
 
 	// 1. 先保存nft数据
 	nft := s.handleNft(input, output, satpoint, offset, insc, inscriptionId, tx, block)

@@ -29,7 +29,7 @@ type BRC20CSVRecord struct {
 	From               string
 	To                 string
 
-	Satoshi            int64
+	Value            int64
 	Fee                int64
 
 	Amount             string
@@ -124,7 +124,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 			From:    row[col["from"]],
 			To:      row[col["to"]],
 
-			Satoshi: parseI64(row[col["satoshi"]]),
+			Value:   parseI64(row[col["satoshi"]]),
 			Fee:     parseI64(row[col["fee"]]),
 
 			Amount:           row[col["amount"]],
@@ -160,8 +160,11 @@ func InsertByInscriptionNumber(records []*BRC20CSVRecord, newRec *BRC20CSVRecord
 	// 二分查找插入位置
 	idx := sort.Search(len(records), func(i int) bool {
 		if records[i].TxIdx == newRec.TxIdx {
-			// vout 正常的transfer，vout=0；取消的transfer，vout=1
 			if records[i].Vout == newRec.Vout {
+				if newRec.Value == 0 && newRec.Offset == 0 {
+					// 取消的transfer，vout超出tx的txOut数量，offset=0，value=0
+					return true
+				}
 				if records[i].Offset == newRec.Offset {
 					// 后面加入的放后面
 					return true

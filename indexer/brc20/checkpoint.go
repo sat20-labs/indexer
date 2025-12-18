@@ -747,7 +747,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		
 		if item.TxIndex != valid.TxIdx ||
 		(item.NftId) != (valid.InscriptionNumber) {
-			if valid.Vout == 1 && valid.To == valid.From {
+			if valid.Value == 0 && valid.Offset == 0 && valid.To == valid.From {
 				// cancel-transfer 的例子，暂时没有准确排序，需要搜索查找
 				for _, t := range tobeValidating {
 					if t.TxIndex == valid.TxIdx &&
@@ -757,7 +757,33 @@ func (p *BRC20Indexer) validateHistory(height int) {
 					}
 				}
 			} else {
-				common.Log.Panicf("%d #%d %s different tx", height, valid.InscriptionNumber, valid.InscriptionID)
+				common.Log.Errorf("%d #%d %s different in tx  %s, %d", height, 
+					valid.InscriptionNumber, valid.InscriptionID, valid.TxID, valid.TxIdx)
+				nft := p.nftIndexer.GetNftWithId(item.NftId)
+				if nft != nil {
+					common.Log.Infof("local: %d -> %s", nft.Base.Id, nft.Base.InscriptionId)
+				}
+
+				nft2 := p.nftIndexer.GetNftWithInscriptionId(valid.InscriptionID)
+				if nft2 != nil {
+					common.Log.Infof("validate: %d -> %s", nft2.Base.Id, nft2.Base.InscriptionId)
+				}
+				
+				for _, tobe := range tobeValidating {
+					if tobe.TxIndex == valid.TxIdx {
+						common.Log.Infof("id: %d", tobe.NftId)
+					}
+				}
+				common.Log.Infof("validate:")
+				for _, v := range validateRecords {
+					if v.TxIdx == valid.TxIdx {
+						common.Log.Infof("id: %d", v.InscriptionNumber)
+					}
+				}
+				
+				common.Log.Panic("")
+				
+
 				// nft := p.nftIndexer.GetNftWithId(item.NftId)
 				// if nft == nil {
 				// 	common.Log.Panicf("GetNftWithId %d failed", item.NftId)
