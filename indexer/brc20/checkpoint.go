@@ -687,7 +687,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	
 	tobeMap := make(map[string]*HolderAction)
 	for _, item := range tobeValidating {
-		key := fmt.Sprintf("%d-%x", item.NftId, item.ToUtxoId)
+		key := fmt.Sprintf("%d-%x", item.NftId, item.TxIndex)
 		tobeMap[key] = item
 	}
 
@@ -695,8 +695,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	validateRecords := _heightToRecords[height]
 	validateMap := make(map[string]*validate.BRC20CSVRecord)
 	for _, item := range validateRecords {
-		utxoId := common.ToUtxoId(item.Height, item.TxIdx, item.Vout)
-		key := fmt.Sprintf("%d-%x", item.InscriptionNumber, utxoId)
+		key := fmt.Sprintf("%d-%x", item.InscriptionNumber, item.TxIdx)
 		validateMap[key] = item
 	}
 
@@ -706,7 +705,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			if item.Action == common.BRC20_Action_Transfer_Spent {
 				continue
 			}
-			key := fmt.Sprintf("%d-%x", item.NftId, item.ToUtxoId)
+			key := fmt.Sprintf("%d-%x", item.NftId, item.TxIndex)
 			tobeMap[key] = item
 			tobeValidating = append(tobeValidating, item)
 		}
@@ -800,8 +799,13 @@ func (p *BRC20Indexer) validateHistory(height int) {
 
 		if item.Amount.String() != valid.Amount {
 			// validate的数据，最多8位小数，并且做了4舍5入
-			if item.Amount.Precision > 8 {
-				amt := item.Amount.SetPrecisionWithRound(8)
+			parts := strings.Split(valid.Amount, ".")
+			d := 8
+			if len(parts) == 2 {
+				d = len(parts[1])
+			}
+			if item.Amount.Precision > d {
+				amt := item.Amount.SetPrecisionWithRound(d)
 				if amt.String() != valid.Amount {
 					common.Log.Panicf("%d #%d %s different asset amount %s-%s in tx  %s, %d", height, 
 						valid.InscriptionNumber, valid.InscriptionID, amt.String(), valid.Amount, valid.TxID, valid.TxIdx)

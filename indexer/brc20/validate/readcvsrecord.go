@@ -94,6 +94,9 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 		col[h] = i
 	}
 
+	height := 790577
+	invalidCount := 0
+	count := 0
 	result := make(map[string]*BRC20CSVRecord)
 	for {
 		row, err := r.Read()
@@ -104,7 +107,12 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 			return nil, err
 		}
 
+		h := parseInt32(row[col["height"]])
+
 		if row[col["valid"]] == "0" {
+			if h == height {
+				invalidCount++
+			}
 			continue
 		}
 
@@ -132,12 +140,16 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 			TransferBalance:  row[col["transferBalance"]],
 			AvailableBalance: row[col["availableBalance"]],
 
-			Height:    parseInt32(row[col["height"]]),
+			Height:    h,
 			TxIdx:     parseInt32(row[col["txidx"]]),
 			BlockHash: row[col["blockhash"]],
 			BlockTime: parseI64(row[col["blocktime"]]),
 
 			H: parseInt32(row[col["h"]]),
+		}
+
+		if rec.Height == height {
+			count++
 		}
 
 		utxoId := common.ToUtxoId(rec.Height, rec.TxIdx, rec.Vout)
@@ -152,6 +164,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 
 		result[key] = rec
 	}
+	common.Log.Infof("block %d: %d %d", height,count, invalidCount)
 	return result, nil
 }
 
