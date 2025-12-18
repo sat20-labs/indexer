@@ -305,6 +305,62 @@ func (d *Decimal) SetPrecision(precision int) *Decimal {
     return d
 }
 
+// 精度调整，同时四舍五入
+func (d *Decimal) SetPrecisionWithRound(targetPrecision int) Decimal {
+    if d.Precision == targetPrecision {
+        return Decimal{
+            Precision: targetPrecision,
+            Value:     new(big.Int).Set(d.Value),
+        }
+    }
+
+    if d.Precision < targetPrecision {
+        // 精度提升：直接补 0
+        factor := new(big.Int).Exp(
+            big.NewInt(10),
+            big.NewInt(int64(targetPrecision-d.Precision)),
+            nil,
+        )
+
+        return Decimal{
+            Precision: targetPrecision,
+            Value:     new(big.Int).Mul(d.Value, factor),
+        }
+    }
+
+    // from.Precision > targetPrecision → 需要 round
+    diff := d.Precision - targetPrecision
+
+    factor := new(big.Int).Exp(
+        big.NewInt(10),
+        big.NewInt(int64(diff)),
+        nil,
+    )
+
+    q := new(big.Int)
+    r := new(big.Int)
+
+    q.QuoRem(d.Value, factor, r)
+
+    // |r| * 2 >= factor → round half up
+    absR := new(big.Int).Abs(r)
+    absR.Mul(absR, big.NewInt(2))
+
+    if absR.Cmp(factor) >= 0 {
+        if d.Value.Sign() >= 0 {
+            q.Add(q, big.NewInt(1))
+        } else {
+            q.Sub(q, big.NewInt(1))
+        }
+    }
+
+    return Decimal{
+        Precision: targetPrecision,
+        Value:     q,
+    }
+}
+
+
 func (d *Decimal) Add(other *Decimal) *Decimal {
 	if d == nil && other == nil {
 		return nil

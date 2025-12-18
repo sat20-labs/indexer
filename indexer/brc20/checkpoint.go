@@ -757,7 +757,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 					}
 				}
 			} else {
-				common.Log.Errorf("%d #%d %s different in tx  %s, %d", height, 
+				common.Log.Errorf("%d #%d %s different item in tx  %s, %d", height, 
 					valid.InscriptionNumber, valid.InscriptionID, valid.TxID, valid.TxIdx)
 				nft := p.nftIndexer.GetNftWithId(item.NftId)
 				if nft != nil {
@@ -793,10 +793,28 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			}
 		}
 
-		if item.Ticker != valid.Ticker ||
-		item.Amount.String() != valid.Amount ||
-		item.Action != validate.ActionToInt[valid.Type] {
-			common.Log.Panicf("%d:%s different action", height, valid.InscriptionID)
+		if item.Ticker != valid.Ticker {
+			common.Log.Panicf("%d #%d %s different asset in tx  %s, %d", height, 
+					valid.InscriptionNumber, valid.InscriptionID, valid.TxID, valid.TxIdx)
+		}
+
+		if item.Amount.String() != valid.Amount {
+			// validate的数据，最多8位小数，并且做了4舍5入
+			if item.Amount.Precision > 8 {
+				amt := item.Amount.SetPrecisionWithRound(8)
+				if amt.String() != valid.Amount {
+					common.Log.Panicf("%d #%d %s different asset amount %s-%s in tx  %s, %d", height, 
+						valid.InscriptionNumber, valid.InscriptionID, amt.String(), valid.Amount, valid.TxID, valid.TxIdx)
+				}
+			} else {
+				common.Log.Panicf("%d #%d %s different asset amount %s in tx  %s, %d", height, 
+						valid.InscriptionNumber, valid.InscriptionID, item.Amount.String(), valid.TxID, valid.TxIdx)
+			}
+		}
+
+		if item.Action != validate.ActionToInt[valid.Type] {
+			common.Log.Panicf("%d #%d %s different action in tx  %s, %d", height, 
+					valid.InscriptionNumber, valid.InscriptionID, valid.TxID, valid.TxIdx)
 		}
 
 		// nft := p.nftIndexer.GetNftWithId(item.NftId)
