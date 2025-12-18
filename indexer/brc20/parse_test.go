@@ -310,3 +310,32 @@ func TestParseValidateDir(t *testing.T) {
 
 	fmt.Printf("len %d", len(_heightToHolderRecords))
 }
+
+
+func TestParseCompressFile(t *testing.T) {
+	err := validate.SplitCSVFile("./validate/ordi.csv", "./validate/ordi", 40000, "ordi")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+
+func TestParseValidateDir_history(t *testing.T) {
+	var err error
+	validateData, err := validate.ReadBRC20CSVDir("./validate/ordi")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	}
+
+	fmt.Printf("len %d", len(validateData))
+}
+
+
+func TestParseValidateData_history(t *testing.T) {
+	validateHolderData, err := validate.ReadBRC20CSV("./validate/ordi.csv")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20CSV failed, %v", err)
+	}
+
+	fmt.Printf("len %d", len(validateHolderData))
+}

@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"compress/gzip"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -73,6 +74,15 @@ func parseI64(s string) int64 {
 
 
 func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
+	if strings.HasSuffix(path, ".gz") {
+		csvPath, cleanup, err := DecompressToTempCSV(path)
+		if err != nil {
+			panic(err)
+		}
+		defer cleanup()
+		path = csvPath
+	}
+	
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -170,6 +180,49 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 	return result, nil
 }
 
+
+func ReadBRC20CSVDir(dir string) (map[string]*BRC20CSVRecord, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(strings.ToLower(name), ".csv") {
+			files = append(files, filepath.Join(dir, name))
+		}
+	}
+
+	// 保证确定性顺序
+	sort.Strings(files)
+
+	result := make(map[string]*BRC20CSVRecord, 0)
+	for _, path := range files {
+		records, err := ReadBRC20CSV(path)
+		if err != nil {
+			common.Log.Errorf("read csv file %s failed, %v", path, err)
+			continue
+		}
+		for k, v := range records {
+			old, ok := result[k]
+			if ok {
+				common.Log.Infof("duplicated key %s", k)
+				common.Log.Infof("old: %v", old)
+				common.Log.Infof("new: %v", v)
+			}
+
+			result[k] = v
+		}
+	}
+
+	return result, nil
+}
+
 // height 必须相同
 func InsertByInscriptionNumber(records []*BRC20CSVRecord, newRec *BRC20CSVRecord) []*BRC20CSVRecord {
 	// 二分查找插入位置
@@ -227,6 +280,15 @@ type BRC20HolderCSVRecord struct {
 const holderTimeLayout = "2006/01/02 15:04"
 
 func ReadBRC20HolderCSV(path string) ([]*BRC20HolderCSVRecord, error) {
+
+	if strings.HasSuffix(path, ".gz") {
+		csvPath, cleanup, err := DecompressToTempCSV(path)
+		if err != nil {
+			panic(err)
+		}
+		defer cleanup()
+		path = csvPath
+	}
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -324,4 +386,169 @@ func ReadBRC20HolderCSVDir(dir string) ([]*BRC20HolderCSVRecord, error) {
 	}
 
 	return result, nil
+}
+
+func CompressCSVFile(srcCSV, dstGZ string) error {
+	in, err := os.Open(srcCSV)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dstGZ)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	gw := gzip.NewWriter(out)
+	defer gw.Close()
+
+	// 流式拷贝，几乎不占内存
+	_, err = io.Copy(gw, in)
+	return err
+}
+
+func DecompressToTempCSV(srcGZ string) (string, func(), error) {
+	in, err := os.Open(srcGZ)
+	if err != nil {
+		return "", nil, err
+	}
+
+	gr, err := gzip.NewReader(in)
+	if err != nil {
+		in.Close()
+		return "", nil, err
+	}
+
+	tmp, err := os.CreateTemp("", "brc20_*.csv")
+	if err != nil {
+		gr.Close()
+		in.Close()
+		return "", nil, err
+	}
+
+	_, err = io.Copy(tmp, gr)
+
+	// 关闭顺序很重要
+	gr.Close()
+	in.Close()
+	tmp.Close()
+
+	if err != nil {
+		os.Remove(tmp.Name())
+		return "", nil, err
+	}
+
+	cleanup := func() {
+		_ = os.Remove(tmp.Name())
+	}
+
+	return tmp.Name(), cleanup, nil
+}
+
+
+func SplitCSVFile(
+	srcCSV string,
+	dstDir string,
+	rowsPerFile int,
+	prefix string,
+) error {
+
+	if rowsPerFile <= 0 {
+		return fmt.Errorf("rowsPerFile must be > 0")
+	}
+
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return err
+	}
+
+	in, err := os.Open(srcCSV)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	reader := csv.NewReader(in)
+	reader.ReuseRecord = true
+
+	// ===== 关键修复点：header 深拷贝 =====
+	rawHeader, err := reader.Read()
+	if err != nil {
+		return fmt.Errorf("read header failed: %w", err)
+	}
+
+	header := make([]string, len(rawHeader))
+	copy(header, rawHeader)
+	// ===================================
+
+	var (
+		fileIdx   = 0
+		rowCount  = 0
+		outFile   *os.File
+		outWriter *csv.Writer
+	)
+
+	closeCurrent := func() {
+		if outWriter != nil {
+			outWriter.Flush()
+		}
+		if outFile != nil {
+			outFile.Close()
+		}
+	}
+
+	openNewFile := func() error {
+		closeCurrent()
+
+		fileIdx++
+		rowCount = 0
+
+		name := fmt.Sprintf("%s_%05d.csv", prefix, fileIdx)
+		path := filepath.Join(dstDir, name)
+
+		f, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+
+		w := csv.NewWriter(f)
+
+		// 写 header（现在是稳定的）
+		if err := w.Write(header); err != nil {
+			f.Close()
+			return err
+		}
+
+		outFile = f
+		outWriter = w
+		return nil
+	}
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			closeCurrent()
+			return err
+		}
+
+		if outWriter == nil || rowCount >= rowsPerFile {
+			if err := openNewFile(); err != nil {
+				return err
+			}
+		}
+
+		if err := outWriter.Write(record); err != nil {
+			closeCurrent()
+			return err
+		}
+
+		rowCount++
+	}
+
+	closeCurrent()
+	return nil
 }
