@@ -33,6 +33,8 @@ var _enable_validate bool = true
 var _validateData map[string]*validate.BRC20CSVRecord
 var _heightToRecords map[int][]*validate.BRC20CSVRecord // 按顺序
 
+var _heightToHolderRecords map[int]map[string]*validate.BRC20HolderCSVRecord 
+
 var testnet4_checkpoint = map[int]*CheckPoint{
 	27227: {
 		Height: 27227,
@@ -518,6 +520,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 
 	p.validateHistory(height)
+	p.validateHolderData(height)
 
 	startTime := time.Now()
 	var checkpoint *CheckPoint
@@ -832,4 +835,64 @@ func findDiffInMap[T1 any, T2 any](t1 map[string]T1, t2 map[string]T2) []string 
 		}
 	}
 	return result
+}
+
+func readHolderDataToMap(dir string) {
+	validateHolderData, err := validate.ReadBRC20HolderCSVDir(dir)
+	if err != nil {
+		common.Log.Panicf("ReadBRC20HolderCSVDir %s failed, %v", dir, err)
+	}
+	
+	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
+	for _, record := range validateHolderData {
+		holders, ok := _heightToHolderRecords[record.LastHeight]
+		if !ok {
+			holders = make(map[string]*validate.BRC20HolderCSVRecord)
+			_heightToHolderRecords[record.LastHeight] = holders
+		}
+		holders[record.Address] = record
+	}
+}
+
+// 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
+func (p *BRC20Indexer) validateHolderData(height int) {
+	if !_enable_validate {
+		return
+	}
+	if height < 779832 {
+		return
+	}
+	
+	if _heightToHolderRecords == nil {
+		readHolderDataToMap("./indexer/brc20/validate/holders")
+	}
+	if len(_heightToHolderRecords) == 0 {
+		return
+	}
+
+	holders, ok := _heightToHolderRecords[height]
+	if !ok {
+		return
+	}
+
+	// 执行验证
+	baseIndexer := p.nftIndexer.GetBaseIndexer()
+	for address, record := range holders {
+		addressId := baseIndexer.GetAddressIdFromDB(address)
+		if addressId == common.INVALID_ID {
+			common.Log.Panicf("validateHolderData GetAddressIdFromDB %s failed", address)
+		}
+		info := p.getHolderAbbrInfo(addressId, record.Token)
+		if info == nil {
+			common.Log.Panicf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Token)
+		}
+		if info.AvailableBalance.String() != record.AvailableBalance {
+			common.Log.Panicf("validateHolderData %s %s available balance different %s %s", 
+			address, record.Token, record.AvailableBalance, info.AvailableBalance.String())
+		}
+		if info.TransferableBalance.String() != record.TransferableBalance {
+			common.Log.Panicf("validateHolderData %s %s transferable balance different %s %s", 
+			address, record.Token, record.TransferableBalance, info.TransferableBalance.String())
+		}
+	}
 }

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sat20-labs/indexer/common"
 )
@@ -117,7 +119,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 		}
 
 		rec := &BRC20CSVRecord{
-			Ticker:   row[col["ticker"]],
+			Ticker:   strings.ToLower(row[col["ticker"]]),
 			Type:     row[col["type"]],
 			Valid:    row[col["valid"]] == "1",
 
@@ -207,4 +209,119 @@ var ActionToInt = map[string]int {
 	"inscribe-transfer": 2,
 	"transfer": 3,
 	"transfer-cancel": 4,
+}
+
+
+type BRC20HolderCSVRecord struct {
+	Address                  string
+	OverallBalance           string
+	TransferableBalance      string
+	AvailableBalance         string
+	AvailableBalanceSafe     string
+	AvailableBalanceUnsafe   string
+	LastHeight               int
+	UpdatedAt                time.Time
+	Token                    string
+}
+
+const holderTimeLayout = "2006/01/02 15:04"
+
+func ReadBRC20HolderCSV(path string) ([]*BRC20HolderCSVRecord, error) {
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.FieldsPerRecord = -1
+	r.LazyQuotes = true
+	r.TrimLeadingSpace = true
+
+	// 读取 header
+	header, err := r.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	col := make(map[string]int)
+	for i, h := range header {
+		h = strings.TrimPrefix(h, "\ufeff")
+		col[h] = i
+	}
+
+	result := make([]*BRC20HolderCSVRecord, 0)
+	for {
+		row, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		rec := &BRC20HolderCSVRecord{
+			Address:                row[col["address"]],
+			OverallBalance:         row[col["overall_balance"]],
+			TransferableBalance:    row[col["transferable_balance"]],
+			AvailableBalance:       row[col["available_balance"]],
+			AvailableBalanceSafe:   row[col["available_balance_safe"]],
+			AvailableBalanceUnsafe: row[col["available_balance_unsafe"]],
+			LastHeight:             parseInt32(row[col["last_height"]]),
+			Token:                  strings.ToLower(row[col["token"]]),
+		}
+
+		// 时间字段单独解析
+		if s := row[col["updated_at"]]; s != "" {
+			t, err := time.ParseInLocation(
+				holderTimeLayout,
+				s,
+				time.Local,
+			)
+			if err != nil {
+				//return nil, err
+			}
+			rec.UpdatedAt = t
+		}
+
+		result = append(result, rec)
+
+	}
+
+	return result, nil
+}
+
+
+func ReadBRC20HolderCSVDir(dir string) ([]*BRC20HolderCSVRecord, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(strings.ToLower(name), ".csv") {
+			files = append(files, filepath.Join(dir, name))
+		}
+	}
+
+	// 保证确定性顺序
+	sort.Strings(files)
+
+	result := make([]*BRC20HolderCSVRecord, 0)
+	for _, path := range files {
+		records, err := ReadBRC20HolderCSV(path)
+		if err != nil {
+			common.Log.Errorf("read csv file %s failed, %v", path, err)
+			continue
+		}
+		result = append(result, records...)
+	}
+
+	return result, nil
 }

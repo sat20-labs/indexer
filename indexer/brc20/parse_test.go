@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -269,4 +270,43 @@ func TestCompareInscription(t *testing.T) {
 		}
 	}
 
+}
+
+func TestParseValidateData(t *testing.T) {
+	validateHolderData, err := validate.ReadBRC20HolderCSV("./validate/ordi-holders.csv")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20HolderCSV failed, %v", err)
+	}
+	
+	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
+	for _, record := range validateHolderData {
+		holders, ok := _heightToHolderRecords[record.LastHeight]
+		if !ok {
+			holders = make(map[string]*validate.BRC20HolderCSVRecord)
+			_heightToHolderRecords[record.LastHeight] = holders
+		}
+		holders[record.Address] = record
+	}
+
+	fmt.Printf("len %d", len(_heightToHolderRecords))
+}
+
+func TestParseValidateDir(t *testing.T) {
+	var err error
+	validateHolderData, err := validate.ReadBRC20HolderCSVDir("../../brc20-top")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20HolderCSVDir failed, %v", err)
+	}
+	
+	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
+	for _, record := range validateHolderData {
+		holders, ok := _heightToHolderRecords[record.LastHeight]
+		if !ok {
+			holders = make(map[string]*validate.BRC20HolderCSVRecord)
+			_heightToHolderRecords[record.LastHeight] = holders
+		}
+		holders[record.Address] = record
+	}
+
+	fmt.Printf("len %d", len(_heightToHolderRecords))
 }
