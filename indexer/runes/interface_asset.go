@@ -246,6 +246,9 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 	ret := make([]*UtxoAsset, len(outpointToBalancesValue.RuneIdLots))
 	for i, runeIdLot := range outpointToBalancesValue.RuneIdLots {
 		r := s.idToEntryTbl.Get(&runeIdLot.RuneId)
+		if r == nil {
+			continue
+		}
 		symbol := defaultRuneSymbol
 		if r.Symbol != nil {
 			symbol = *r.Symbol
