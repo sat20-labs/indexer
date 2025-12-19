@@ -616,10 +616,10 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
-		for i, input := range tx.Inputs {
-			if tx.TxId == "5f3beb0d677f8fbd167d933f63cd9992a747c2bc5dc009d6f8cba55750819163" {
-				common.Log.Infof("%d", i)
-			}
+		for _, input := range tx.Inputs {
+			// if tx.TxId == "5f3beb0d677f8fbd167d933f63cd9992a747c2bc5dc009d6f8cba55750819163" {
+			// 	common.Log.Infof("%d", i)
+			// }
 			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
 			addedNft, ok := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
 			if ok {
@@ -637,8 +637,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
 										// 已经存在非cursed的铭文，后面的铭文都是reinscription
 										nft.Base.CurseType = int32(ordCommon.Reinscription)
-										//p.status.CurseCount++
-										common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
+										common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 									}
 								}
 							}
