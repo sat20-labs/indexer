@@ -84,6 +84,7 @@ func (p *HolderInfo) RemoveTickerAsset(name string, assetInfo *common.AssetAbbrI
 	}
 }
 
+// TODO 加载所有数据，太耗时间和内存，需要优化，参考nft和brc20模块
 type ExoticIndexer struct {
 	db          common.KVDB
 	status      *Status

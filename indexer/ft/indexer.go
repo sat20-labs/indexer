@@ -15,6 +15,7 @@ type HolderInfo = exotic.HolderInfo
 
 type HolderAction = exotic.HolderAction
 
+// TODO 加载所有数据，太耗时间和内存，需要优化，参考nft和brc20模块 (目前数据量少，问题不大)
 type FTIndexer struct {
 	db         common.KVDB
 	nftIndexer *nft.NftIndexer

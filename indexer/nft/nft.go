@@ -1108,19 +1108,19 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	})
 
 	// 耗时很长，90w的高度，基本要10-20分钟
-	baseDB.View(func(txn common.ReadBatch) error {
-		//defer wg.Done()
-		startTime2 = time.Now()
-		for utxo := range utxosInT2 {
-			key := db.GetUtxoIdKey(utxo)
-			_, err := txn.Get(key)
-			if err != nil {
-				wrongUtxo2 = append(wrongUtxo2, utxo)
-			}
-		}
-		common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
-		return nil
-	})
+	// baseDB.View(func(txn common.ReadBatch) error {
+	// 	//defer wg.Done()
+	// 	startTime2 = time.Now()
+	// 	for utxo := range utxosInT2 {
+	// 		key := db.GetUtxoIdKey(utxo)
+	// 		_, err := txn.Get(key)
+	// 		if err != nil {
+	// 			wrongUtxo2 = append(wrongUtxo2, utxo)
+	// 		}
+	// 	}
+	// 	common.Log.Infof("check utxosInT2 in baseDB takes %v", time.Since(startTime2))
+	// 	return nil
+	// })
 
 	//wg.Wait()
 	common.Log.Infof("check in baseDB completed")
