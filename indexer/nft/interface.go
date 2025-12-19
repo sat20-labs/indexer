@@ -67,7 +67,7 @@ func (p *NftIndexer) GetNftHolderWithInscriptionId(inscriptionId string) uint64 
 }
 
 // key: sat
-func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
+func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) map[int64]int64 {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -78,19 +78,22 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) []int64 {
 		if err != nil {
 			return nil
 		}
-		sats = value.Sats
+		sats = make(map[int64]int64)
+		for _, item := range value.Sats {
+			sats[item.Sat] = item.Offset
+		}
 		// p.utxoMap[utxoId] = sats, 如果设置，就要同步更新satMap，否则会在transfer中导致异常
 	}
 	if len(sats) == 0 {
 		return nil
 	}
 
-	result := make([]int64, len(sats))
-	for i, sat := range sats {
-		if _, ok := p.disabledSats[sat.Sat]; ok {
+	result := make(map[int64]int64)
+	for sat, offset := range sats {
+		if _, ok := p.disabledSats[sat]; ok {
 			continue
 		}
-		result[i] = sat.Sat
+		result[sat] = offset
 	}
 
 	return result	
@@ -103,7 +106,7 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 	defer p.mutex.RUnlock()
 
 	result := make([]*common.Nft, 0)
-	for _, sat := range sats {
+	for sat := range sats {
 		if _, ok := p.disabledSats[sat]; ok {
 			continue
 		}
@@ -183,16 +186,14 @@ func (p *NftIndexer) getNftBaseWithId(id int64) *common.InscribeBaseContent {
 func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+	if _, ok := p.disabledSats[sat]; ok {
+		return nil
+	}
 
 	return p.getNftsWithSat(sat)
 }
 
 func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
-	if _, ok := p.disabledSats[sat]; ok {
-		return nil
-	
-	}
-
 	info, ok := p.satMap[sat]
 	if ok {
 		return info.ToNftsInSat(sat)
@@ -272,7 +273,7 @@ func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, proof []byte) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	for _, sat := range sats {
+	for sat := range sats {
 		p.disabledSats[sat] = true
 		saveDisabledSatToDB(sat, proof, p.db)
 	}

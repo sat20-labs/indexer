@@ -102,6 +102,13 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			
 		},
 	},
+	
+	824361: {
+		InscriptionMap: map[string]int64{
+			"49b3e21c2652d1ddc9e574c2b1cefb37ce2be63c0caf1800e6c627e12c429a43i0": -419018,
+			"cd36e1d3c3a9a763a579d07c1cc80b242d655894b51a8a2f008a22c34a5c9300i0": 53217736,
+		},
+	},
 
 	830000: {
 		InscriptionMap: map[string]int64{

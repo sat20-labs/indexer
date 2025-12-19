@@ -15,6 +15,10 @@ func init() {
 
 func main() {
 	yamlcfg := config.InitConfig("")
+	if yamlcfg == nil {
+		common.Log.Info("parse cfg failed")
+		return
+	}
 	config.InitLog(yamlcfg)
 
 	common.Log.Info("Starting...")

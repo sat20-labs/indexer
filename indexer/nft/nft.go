@@ -14,12 +14,20 @@ import (
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
+
+type InscribeInfo struct {
+	Input *common.TxInput
+	InOffset int64
+	UtxoId uint64
+	Nft  *common.Nft
+}
+
 type SatInfo struct {
 	AddressId uint64
 	UtxoId    uint64
 	Offset    int64
 	CurseCount int
-	Nfts      map[int64]bool // nftId
+	Nfts      map[*common.Nft]bool
 }
 
 func (p *SatInfo) ToNftsInSat(sat int64) *common.NftsInSat {
@@ -31,7 +39,7 @@ func (p *SatInfo) ToNftsInSat(sat int64) *common.NftsInSat {
 		CurseCount: int32(p.CurseCount),
 	}
 	for k := range p.Nfts {
-		nfts.Nfts = append(nfts.Nfts, k)
+		nfts.Nfts = append(nfts.Nfts, k.Base.Id)
 	}
 	sort.Slice(nfts.Nfts, func(i, j int) bool {
 		return nfts.Nfts[i] < nfts.Nfts[j]
@@ -51,7 +59,7 @@ type NftIndexer struct {
 	mutex       sync.RWMutex
 
 	// realtime buffer, utxoMap和satMap必须保持一致，utxo包含的聪，必须在satMap
-	utxoMap           map[uint64][]*SatOffset // utxo->sats  确保utxo中包含的所有nft都列在这里
+	utxoMap           map[uint64]map[int64]int64 // utxo->sat->offset  确保utxo中包含的所有nft都列在这里
 	satMap            map[int64]*SatInfo      // key: sat, 一个写入周期中新增加的铭文的转移结果，该sat绑定的nft都在这里
 	contentMap        map[uint64]string       // contentId -> content
 	contentToIdMap    map[string]uint64       //
@@ -65,13 +73,13 @@ type NftIndexer struct {
 	lastContentTypeId  int
 
 	// 状态变迁
-	unboundNfts     []*common.Nft
+	//unboundNfts     []*common.Nft
 	nftAdded        []*common.Nft // 保持顺序
 	utxoDeled       []uint64
 
 	// 不需要备份的数据
-	nftBuffer       []*common.Nft // 一个区块内的缓存
-	nftAddedUtxoMap map[uint64][]*common.Nft // 一个区块中，增量的nft在哪个输出的utxo中 utxoId->nfts
+	actionBufferMap map[int][]*InscribeInfo   // txIndex
+	nftAddedUtxoMap map[uint64][]*InscribeInfo // 一个区块中，增量的nft在哪个输入中 utxoId->nft
 }
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
@@ -83,11 +91,7 @@ func NewNftIndexer(db common.KVDB) *NftIndexer {
 		db:        db,
 		enableHeight: enableHeight,
 		status:    nil,
-		utxoMap:   nil,
-		satMap:    nil,
-		utxoDeled: nil,
 	}
-	ns.reset()
 	return ns
 }
 
@@ -97,6 +101,11 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 	p.status = initStatusFromDB(p.db)
 	p.disabledSats = loadAllDisalbedSatsFromDB(p.db)
 
+	p.utxoMap = make(map[uint64]map[int64]int64)
+	p.satMap = make(map[int64]*SatInfo)
+	p.nftAdded = make([]*common.Nft, 0)
+	p.utxoDeled = make([]uint64, 0)
+	
 	p.contentMap = make(map[uint64]string)
 	p.contentToIdMap = make(map[string]uint64)
 	p.addedContentIdMap = make(map[uint64]bool)
@@ -109,15 +118,9 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 		p.contentTypeToIdMap[v] = k
 	}
 	p.lastContentTypeId = p.status.ContentTypeCount
-}
 
-func (p *NftIndexer) reset() {
-	//p.disabledSats = make(map[int64]bool)
-	p.utxoMap = make(map[uint64][]*SatOffset)
-	p.satMap = make(map[int64]*SatInfo)
-	p.nftAdded = make([]*common.Nft, 0)
-	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
-	p.utxoDeled = make([]uint64, 0)
+	p.actionBufferMap = make(map[int][]*InscribeInfo)
+	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
 }
 
 func (p *NftIndexer) Clone() *NftIndexer {
@@ -128,14 +131,11 @@ func (p *NftIndexer) Clone() *NftIndexer {
 	newInst.baseIndexer = p.baseIndexer
 
 	newInst.disabledSats = p.disabledSats // 仅在rpc中使用
-	newInst.utxoMap = make(map[uint64][]*SatOffset)
+	newInst.utxoMap = make(map[uint64]map[int64]int64)
 	for k, v := range p.utxoMap {
-		nv := make([]*SatOffset, len(v))
-		for i, s := range v {
-			nv[i] = &SatOffset{
-				Sat:    s.Sat,
-				Offset: s.Offset,
-			}
+		nv := make(map[int64]int64)
+		for s, o := range v {
+			nv[s] = o
 		}
 		newInst.utxoMap[k] = nv
 	}
@@ -146,7 +146,7 @@ func (p *NftIndexer) Clone() *NftIndexer {
 			UtxoId:    v.UtxoId,
 			Offset:    v.Offset,
 			CurseCount: v.CurseCount,
-			Nfts:      make(map[int64]bool),
+			Nfts:      make(map[*common.Nft]bool),
 		}
 		for nftId := range v.Nfts {
 			newV.Nfts[nftId] = true
@@ -354,37 +354,100 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 }
 
 // 每个NFT Mint都调用
-func (p *NftIndexer) NftMint(input *common.TxInput, nft *common.Nft) {
+func (p *NftIndexer) NftMint(input *common.TxInput, satpoint int64, nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	//p.nftBuffer = append(p.nftBuffer, nft)
 
-	p.nftMint(input, nft)
-}
-
-func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
-
-	// sat 还没有调整过，这里无法判断
-	// if nft.Base.Sat >= 0 && nft.Base.CurseType == 0 {
-	// 	// 检查是否同一个聪上有多个铸造
-	// 	nftsInSat := p.getNftsWithSat(nft.Base.Sat)
-	// 	if nftsInSat != nil {
-	// 		if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
-	// 			// 已经存在非cursed的铭文，后面的铭文都是reinscription
-	// 			nft.Base.CurseType = int32(ordCommon.Reinscription)
-	// 			common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
-	// 		}
-	// 	}
-	// }
 	if nft.Base.Sat < 0 {
-		// unbound铭文，先缓存，本区块最后处理
 		// 788200: c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151
 		// 788312: 99e70421ab229d1ccf356e594512da6486e2dd1abdf6c2cb5014875451ee8073
-		p.unboundNfts = append(p.unboundNfts, nft)
-		return
+		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
+		// 在Jubilee之前属于cursed铭文，Jubilee之后，正常编号
+		p.status.Unbound++
+		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
 	}
 
-	if nft.Base.CurseType != 0 && nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
+	info := &InscribeInfo{
+		Input: input,
+		InOffset: satpoint,
+		UtxoId: nft.UtxoId,
+		Nft:   nft,
+	}
+
+	p.actionBufferMap[input.InTxIndex] = append(p.actionBufferMap[input.InTxIndex], info)
+	p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
+	p.nftAdded = append(p.nftAdded, nft)
+}
+
+// 必须先加载satmap和utxomap
+func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
+	// 对所有铸造信息排序
+	type pair struct {
+		seq    uint64
+		info   *InscribeInfo
+	}
+
+	totalTxs := len(block.Transactions)
+	mid := make([]*pair, 0)
+	for txIndex, txIndexVector := range p.actionBufferMap {
+		for idx2, info := range txIndexVector {
+			idx := txIndex
+			if info.Nft.Base.Sat < 0 { 
+				// unbound
+				idx += totalTxs + 1
+			}
+			_, outTxIndex, _ := common.FromUtxoId(info.UtxoId)
+			if outTxIndex == 0 {
+				// fee spent
+				idx += totalTxs
+			}
+			if info.InOffset > 0xffffffff {
+				common.Log.Panicf("%s has too big offset %x", info.Input.TxId, info.InOffset)
+			}
+			if idx > 0xffff {
+				common.Log.Panicf("%s has too big index %x", info.Input.TxId, idx)
+			}
+
+			// txIn内部铭文顺序
+			if idx2 > 0xffff {
+				common.Log.Panicf("%s has too big TxIn index %x", info.Input.TxId, idx2)
+			}
+			seq := (uint64(idx)<<48 | uint64(idx2)<<32 | uint64(info.InOffset)) 
+			item := &pair{
+				seq:    seq,
+				info:   info,
+			}
+			mid = append(mid, item)
+		}
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].seq < mid[j].seq
+	})
+
+	traceTaget := int64(0)
+	for _, item := range mid {
+		nft := item.info.Nft
+
+		p.nftMint(item.info)
+
+		if nft.Base.InscriptionId == "6c0f375ddfd2f24e4cf96e21a817a84ddc133ce0ad6b382ac90e8e6de3a11712i0" {
+			traceTaget = nft.Base.Id
+		}
+	}
+
+	if traceTaget != 0 {
+		for i := traceTaget - 100; i <= traceTaget; i++ {
+			nft := p.getNftWithId(i)
+			common.Log.Infof("%d %s", i, nft.Base.InscriptionId)
+		}
+	}
+
+}
+
+func (p *NftIndexer) nftMint(info *InscribeInfo) {
+	nft := info.Nft
+
+	if nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
 		nft.Base.CurseType = 0
 	}
 
@@ -396,32 +459,8 @@ func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 		p.status.Count++
 	}
 
-	p.nftAdded = append(p.nftAdded, nft)
-
 	common.Log.Debugf("nftMint add nft #%d %s", nft.Base.Id, nft.Base.InscriptionId)
 
-	// if nft.Base.Sat < 0 {
-	// 	// mainnet: c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151
-	// 	// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
-	// 	// 在Jubilee之前属于cursed铭文，Jubilee之后，正常编号
-	// 	p.status.Unbound++
-	// 	nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
-
-	// 	// 直接添加，为了保存sat信息
-	// 	info := &SatInfo{
-	// 		AddressId: nft.OwnerAddressId,
-	// 		UtxoId:    nft.UtxoId,
-	// 		Offset:    nft.Offset,
-	// 		Nfts:      make(map[int64]bool),
-	// 	}
-	// 	info.Nfts[nft.Base.Id] = true
-	// 	p.satMap[nft.Base.Sat] = info
-
-	// 	return
-	// }
-
-	// 批量铸造时，多个nft输出到同一个utxo
-	p.nftAddedUtxoMap[nft.UtxoId] = append(p.nftAddedUtxoMap[nft.UtxoId], nft)
 	
 	// 为节省空间作准备
 	p.inscriptionToNftIdMap[nft.Base.InscriptionId] = nft
@@ -484,27 +523,6 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	// 	common.Log.Infof("")
 	// }
 
-	// 处理unbound铭文
-	for _, nft := range p.unboundNfts {
-		p.status.Unbound++
-		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
-
-		nft.Base.Id = int64(p.status.Count) 
-		p.status.Count++
-		p.nftAdded = append(p.nftAdded, nft)
-		common.Log.Debugf("nftMint add unbound nft #%d %s", nft.Base.Id, nft.Base.InscriptionId)
-
-		// 直接添加，为了保存sat信息
-		info := &SatInfo{
-			AddressId: nft.OwnerAddressId,
-			UtxoId:    nft.UtxoId,
-			Offset:    nft.Offset,
-			Nfts:      make(map[int64]bool),
-		}
-		info.Nfts[nft.Base.Id] = true
-		p.satMap[nft.Base.Sat] = info
-	}
-	p.unboundNfts = nil
 
 	// 预加载
 	startTime := time.Now()
@@ -513,6 +531,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			key    string
 			utxoId uint64 // utxoId
 		}
+		// 预加载utxomap
 		inputsToLoad := make([]*pair, 0)
 		for _, tx := range block.Transactions[1:] {
 			for _, input := range tx.Inputs {
@@ -537,12 +556,18 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			if err != nil {
 				continue
 			}
-			p.utxoMap[v.utxoId] = value.Sats
-			for _, sat := range value.Sats {
-				satsToLoad[sat.Sat] = true
+			satoffsetMap := make(map[int64]int64)
+			for _, item := range value.Sats {
+				if item.Sat == 0 { // TODO 检查下为何老数据中有很多sat=0的值在里面
+					continue
+				}
+				satoffsetMap[item.Sat] = item.Offset
+				satsToLoad[item.Sat] = true
 			}
+			p.utxoMap[v.utxoId] = satoffsetMap
 		}
 
+		// 预加载satmap
 		satLoadingVector := make([]int64, 0, len(satsToLoad))
 		for k := range satsToLoad {
 			satLoadingVector = append(satLoadingVector, k)
@@ -566,10 +591,20 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				UtxoId:    value.UtxoId,
 				Offset:    value.Offset,
 				CurseCount: int(value.CurseCount),
-				Nfts:      make(map[int64]bool),
+				Nfts:      make(map[*common.Nft]bool),
 			}
 			for _, nftId := range value.Nfts {
-				info.Nfts[nftId] = true
+				// 不需要加载数据，只是生成一个临时对象
+				nft := &common.Nft{
+					Base: &common.InscribeBaseContent{
+						Id: nftId,
+						Sat: v,
+					},
+					Offset: value.Offset,
+					OwnerAddressId: value.OwnerAddressId,
+					UtxoId: value.UtxoId,
+				}
+				info.Nfts[nft] = true
 			}
 			p.satMap[v] = info
 		}
@@ -581,18 +616,49 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
-		for _, input := range tx.Inputs {
-			if tx.TxId == "fef75422456e29c39238abc145abbf38c644809378def4156b19a9a8ce0da118" {
-				common.Log.Infof("")
+		for i, input := range tx.Inputs {
+			if tx.TxId == "5f3beb0d677f8fbd167d933f63cd9992a747c2bc5dc009d6f8cba55750819163" {
+				common.Log.Infof("%d", i)
 			}
 			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
+			addedNft, ok := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
+			if ok {
+				// 合并铸造结果
+				for _, info := range addedNft {
+					nft := info.Nft
+					newSat := true
+					for sat, offset := range sats {
+						if offset == info.InOffset {
+							if sat != nft.Base.Sat {
+								nft.Base.Sat = sat // 同一个聪，需要命名一致
+								// 根据ordinals规则，判断是否是reinscription
+								if nft.Base.CurseType == 0 {
+									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
+									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+										// 已经存在非cursed的铭文，后面的铭文都是reinscription
+										nft.Base.CurseType = int32(ordCommon.Reinscription)
+										//p.status.CurseCount++
+										common.Log.Infof("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
+									}
+								}
+							}
+							newSat = false
+							break
+						}
+					}
+					if newSat {
+						if sats == nil {
+							sats = make(map[int64]int64)
+						}
+						sats[nft.Base.Sat] = info.InOffset
+					}
+					p.addNftToSatMap(nft)
+				}
+			}
+
 			if len(sats) > 0 {
-				for _, sat := range sats {
-					// info := p.satMap[sat.Sat]
-					// if info == nil {
-					// 	common.Log.Panicf("%s should load sat %d before", input.OutPointStr, sat.Sat)
-					// }
-					addSatInfoToOutput(&input.TxOutput, sat)
+				for sat, offset := range sats {
+					addSatInfoToOutput(&input.TxOutput, sat, offset)
 				}
 
 				delete(p.utxoMap, input.UtxoId)
@@ -606,40 +672,74 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			}
 		}
 
-		change := p.innerUpdateTransfer3(tx, allInput)
+		change := p.innerUpdateTransfer(tx, allInput)
 		coinbaseInput.Append(change)
 	}
 
 	// 处理哪些直接输出到奖励聪的铸造结果
 	tx := block.Transactions[0]
-	change := p.innerUpdateTransfer3(tx, coinbaseInput)
+	change := p.innerUpdateTransfer(tx, coinbaseInput)
 	if !change.Zero() {
 		common.Log.Panicf("UpdateTransfer should consume all input assets")
 	}
-	
 
-	p.nftAddedUtxoMap = make(map[uint64][]*common.Nft)
+	// 更新铭文的编号，更新satmap
+	p.processInscribeInBlock(block)
+
+	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
+	p.actionBufferMap = make(map[int][]*InscribeInfo)
 
 	p.CheckPointWithBlockHeight(block.Height)
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
 
-func addSatInfoToOutput(output *common.TxOutput, sat *SatOffset) {
+// 需要预加载satmap
+func (p *NftIndexer) addNftToSatMap(nft *common.Nft) {
+	info, ok := p.satMap[nft.Base.Sat]
+	if !ok {
+		info = &SatInfo{
+			AddressId: nft.OwnerAddressId,
+			UtxoId:    nft.UtxoId,
+			Offset:    nft.Offset,
+			CurseCount: 0,
+			Nfts:      make(map[*common.Nft]bool),
+		}
+		p.satMap[nft.Base.Sat] = info
+	}
+	info.Nfts[nft] = true
+	if nft.Base.CurseType != 0 {
+		info.CurseCount++
+	}
+}
+
+func (p *NftIndexer) addSatToUtxoMap(sat, offset int64, utxoId uint64) {
+	if utxoId == common.INVALID_ID {
+		return
+	}
+	satoffsetMap, ok := p.utxoMap[utxoId]
+	if !ok {
+		satoffsetMap = make(map[int64]int64)
+		p.utxoMap[utxoId] = satoffsetMap
+	}
+	satoffsetMap[sat] = offset
+}
+
+func addSatInfoToOutput(output *common.TxOutput, sat, offset int64) {
 	asset := common.AssetInfo{
 		Name: common.AssetName{
 			Protocol: common.PROTOCOL_NAME_ORD,
 			Type:     common.ASSET_TYPE_NFT,
-			Ticker:   fmt.Sprintf("%d", sat.Sat), // 绑定了资产的聪
+			Ticker:   fmt.Sprintf("%d", sat), // 绑定了资产的聪
 		},
 		Amount:     *common.NewDecimal(1, 0),
 		BindingSat: 1,
 	}
 	output.Assets.Add(&asset)
-	output.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: sat.Offset, End: sat.Offset + 1}}
+	output.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: offset, End: offset + 1}}
 }
 
-func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
+func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 	input *common.TxOutput) *common.TxOutput {
 	// 只考虑放在第一个地址上 (output的地址处理过，肯定有值)
 
@@ -654,10 +754,9 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 
 		newOut, newChange, err := change.Cut(txOut.OutValue.Value)
 		if err != nil {
-			common.Log.Panicf("innerUpdateTransfer3 Cut failed, %v", err)
+			common.Log.Panicf("innerUpdateTransfer Cut failed, %v", err)
 		}
 
-		sats := make([]*SatOffset, 0)
 		change = newChange
 		if len(newOut.Assets) != 0 {
 			for _, asset := range newOut.Assets {
@@ -665,116 +764,24 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 				asset.Name.Type == common.ASSET_TYPE_NFT {
 					sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
 					if err != nil {
-						common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
+						common.Log.Panicf("innerUpdateTransfer ParseInt %s failed, %v", asset.Name.Ticker, err)
+					}
+					if sat == 0 {
+						common.Log.Panicf("innerUpdateTransfer invalid sat %s", asset.Name.Ticker)
 					}
 					offsets := newOut.Offsets[asset.Name]
+					offset := offsets[0].Start
 
 					// 更新聪的位置
 					satInfo := p.satMap[sat]
 					satInfo.AddressId = txOut.AddressId
 					satInfo.UtxoId = txOut.UtxoId
-					satInfo.Offset = offsets[0].Start
+					satInfo.Offset = offset
 
-					satOffset := &SatOffset{
-						Sat:    sat,
-						Offset: satInfo.Offset,
-					}
-					sats = append(sats, satOffset)
-					addSatInfoToOutput(&txOut.TxOutput, satOffset) // 合并资产信息，供下一个模块处理
+					p.addSatToUtxoMap(sat, offset, txOut.UtxoId)
+					addSatInfoToOutput(&txOut.TxOutput, sat, offset) // 合并资产信息，供下一个模块处理
 				}
 			}
-		}
-
-		// 合并本次铸造的资产
-		addedNft := p.nftAddedUtxoMap[txOut.UtxoId] // 本次区块中铭刻的聪
-		for _, nft := range addedNft {
-			newSat := true
-			// 检查是否是重复铭刻
-			for _, s := range sats {
-				if s.Offset == nft.Offset { // 偏移相同，是同一个聪
-					if s.Sat != nft.Base.Sat {
-						nft.Base.Sat = s.Sat // 同一个聪，需要命名一致
-						// 根据ordinals规则，判断是否是reinscription
-						if nft.Base.CurseType == 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
-							satInfo := p.satMap[nft.Base.Sat] // 预加载，肯定有值
-							if int(satInfo.CurseCount) < len(satInfo.Nfts) {
-								// 已经存在非cursed的铭文，后面的铭文都是reinscription
-								nft.Base.CurseType = int32(ordCommon.Reinscription)
-
-								// 对本区块的后续inscription number做调整
-								p.status.CurseCount++
-								p.status.Count--
-								for i, t := range p.nftAdded {
-									if t.Base.InscriptionId == nft.Base.InscriptionId {
-										// 后面的都要修改
-										delete(p.nftIdToinscriptionMap, t.Base.Id)
-										// 后面还有诅咒铭文？
-										newId := -int64(p.status.CurseCount)
-										for j := i+1; j < len(p.nftAdded); j++ {
-											if p.nftAdded[j].Base.CurseType != 0 {
-												newId = p.nftAdded[j].Base.Id
-												break
-											}
-										}
-										t.Base.Id = newId
-										p.nftIdToinscriptionMap[t.Base.Id] = t
-										
-										for j := i+1; j < len(p.nftAdded); j++ {
-											m := p.nftAdded[j]
-											delete(p.nftIdToinscriptionMap, m.Base.Id)
-											m.Base.Id-- // 无论是否cursed
-											p.nftIdToinscriptionMap[m.Base.Id] = m
-
-											if m.Base.Sat < 0 {
-												// 该sat已经放在satmap中
-												satInfo, ok := p.satMap[m.Base.Sat]
-												if ok {
-													oldId := m.Base.Id+1
-													delete(satInfo.Nfts, oldId)
-													satInfo.Nfts[m.Base.Id] = true
-												}
-											}
-										}
-										break
-									}
-								}
-
-								common.Log.Infof("#%d %s is reinscription in sat %d", nft.Base.Id, nft.Base.InscriptionId, nft.Base.Sat)
-							}
-						}
-					}
-					newSat = false
-					break
-				}
-			}
-			if newSat {
-				satOffset := &SatOffset{
-					Sat:    nft.Base.Sat,
-					Offset: nft.Offset,
-				}
-				sats = append(sats, satOffset)
-				addSatInfoToOutput(&txOut.TxOutput, satOffset)
-			}
-
-			// 添加到satMap
-			info, ok := p.satMap[nft.Base.Sat]
-			if !ok {
-				info = &SatInfo{
-					AddressId: nft.OwnerAddressId,
-					UtxoId:    nft.UtxoId,
-					Offset:    nft.Offset,
-					Nfts:      make(map[int64]bool),
-				}
-				p.satMap[nft.Base.Sat] = info
-			}
-			info.Nfts[nft.Base.Id] = true
-			if nft.Base.CurseType != 0 {
-				info.CurseCount++
-			}
-		}
-		
-		if len(sats) > 0 {
-			p.utxoMap[txOut.UtxoId] = sats
 		}
 	}
 	return change
@@ -863,7 +870,7 @@ func (p *NftIndexer) UpdateDB() {
 			Nfts:           make([]int64, 0, len(nft.Nfts)),
 		}
 		for k := range nft.Nfts {
-			info.Nfts = append(info.Nfts, k)
+			info.Nfts = append(info.Nfts, k.Base.Id)
 		}
 		sort.Slice(info.Nfts, func(i, j int) bool {
 			return info.Nfts[i] < info.Nfts[j]
@@ -886,7 +893,16 @@ func (p *NftIndexer) UpdateDB() {
 
 	for utxoId, sats := range p.utxoMap {
 		utxokey := GetUtxoKey(utxoId)
-		utxoValue := NftsInUtxo{Sats: sats}
+		satv := make([]*SatOffset, len(sats))
+		i := 0
+		for sat, offset := range sats {
+			satv[i] = &SatOffset{
+				Sat: sat,
+				Offset: offset,
+			}
+			i++
+		}
+		utxoValue := NftsInUtxo{Sats: satv}
 		// err := db.SetDB([]byte(utxokey), &utxoValue, wb)
 		err := db.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
 		if err != nil {
@@ -935,7 +951,7 @@ func (p *NftIndexer) UpdateDB() {
 	// reset memory buffer
 	//p.satTree = indexer.NewSatRBTress()
 	p.nftAdded = make([]*common.Nft, 0)
-	p.utxoMap = make(map[uint64][]*SatOffset)
+	p.utxoMap = make(map[uint64]map[int64]int64)
 	p.utxoDeled = make([]uint64, 0)
 	p.satMap = make(map[int64]*SatInfo)
 	p.contentMap = make(map[uint64]string)

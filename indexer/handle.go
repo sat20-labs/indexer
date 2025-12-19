@@ -68,6 +68,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	common.Log.Infof("processOrdProtocol %d is done, cost: %v", block.Height, time.Since(measureStartTime))
 }
 
+// satpoint 是聪在输入端TxIn中的位置，offset是聪在输出端TxOut的位置
 func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	inputIndex, txIndex int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64, int64) {
 
@@ -1109,7 +1110,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		UtxoId:         utxoId,
 		Offset:         offset,
 	}
-	s.nft.NftMint(input, &nft)
+	s.nft.NftMint(input, satpoint, &nft)
 	if !insc.IsCursed && nft.Base.CurseType != 0 {
 		insc.IsCursed = true
 		insc.CurseReason = ordCommon.Curse(nft.Base.CurseType)

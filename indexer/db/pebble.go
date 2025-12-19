@@ -46,6 +46,10 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 					lvls[i].BlockSize = 8 << 10       // 8 KiB（小 value， 适合点查）
 					lvls[i].FilterPolicy = bloom.FilterPolicy(10) // 10 bits/entry
 					lvls[i].FilterType = pebble.TableFilter
+
+					// if i > 0 {
+					// 	lvls[i].Compression = pebble.ZstdCompression // 压缩更大 TODO 后面测试后开启
+					// }
 				}
 				// 逐层放大 TargetFileSize（非必须，但对大数据集更友好）
 				for i := 1; i < len(lvls); i++ { 
