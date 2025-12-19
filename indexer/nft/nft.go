@@ -56,8 +56,8 @@ type NftIndexer struct {
 	contentMap        map[uint64]string       // contentId -> content
 	contentToIdMap    map[string]uint64       //
 	addedContentIdMap map[uint64]bool
-	inscriptionToNftIdMap map[string]int64        // inscriptionId->nftId
-	nftIdToinscriptionMap map[int64]string        // nftId->inscriptionId
+	inscriptionToNftIdMap map[string]*common.Nft  // inscriptionId->nftId
+	nftIdToinscriptionMap map[int64]*common.Nft   // nftId->inscriptionId
 
 	// 暂时不需要清理
 	contentTypeMap     map[int]string // ctId -> content type
@@ -100,8 +100,8 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 	p.contentMap = make(map[uint64]string)
 	p.contentToIdMap = make(map[string]uint64)
 	p.addedContentIdMap = make(map[uint64]bool)
-	p.inscriptionToNftIdMap = make(map[string]int64)
-	p.nftIdToinscriptionMap = make(map[int64]string)
+	p.inscriptionToNftIdMap = make(map[string]*common.Nft)
+	p.nftIdToinscriptionMap = make(map[int64]*common.Nft)
 
 	p.contentTypeMap = getContentTypesFromDB(p.db)
 	p.contentTypeToIdMap = make(map[string]int)
@@ -166,12 +166,12 @@ func (p *NftIndexer) Clone() *NftIndexer {
 		newInst.addedContentIdMap[k] = v
 	}
 
-	newInst.inscriptionToNftIdMap = make(map[string]int64)
+	newInst.inscriptionToNftIdMap = make(map[string]*common.Nft)
 	for k, v := range p.inscriptionToNftIdMap {
 		newInst.inscriptionToNftIdMap[k] = v
 	}
 
-	newInst.nftIdToinscriptionMap = make(map[int64]string)
+	newInst.nftIdToinscriptionMap = make(map[int64]*common.Nft)
 	for k, v := range p.nftIdToinscriptionMap {
 		newInst.nftIdToinscriptionMap[k] = v
 	}
@@ -338,20 +338,19 @@ func (b *NftIndexer) getContentById(id uint64) (string, error) {
 
 
 func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
-	inscriptionId, ok := b.nftIdToinscriptionMap[id]
+	nft, ok := b.nftIdToinscriptionMap[id]
 	if ok {
-		return inscriptionId, nil
+		return nft.Base.InscriptionId, nil
 	}
 
 	var err error
-	nft := b.getNftWithId(id)
+	nft = b.getNftWithId(id)
 	if nft != nil {
-		inscriptionId = nft.Base.InscriptionId
-		b.inscriptionToNftIdMap[inscriptionId] = id
-		b.nftIdToinscriptionMap[id] = inscriptionId
+		b.inscriptionToNftIdMap[nft.Base.InscriptionId] = nft
+		b.nftIdToinscriptionMap[id] = nft
 	}
 
-	return inscriptionId, err
+	return nft.Base.InscriptionId, err
 }
 
 // 每个NFT Mint都调用
@@ -425,8 +424,8 @@ func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 	p.nftAddedUtxoMap[nft.UtxoId] = append(p.nftAddedUtxoMap[nft.UtxoId], nft)
 	
 	// 为节省空间作准备
-	p.inscriptionToNftIdMap[nft.Base.InscriptionId] = nft.Base.Id
-	p.nftIdToinscriptionMap[nft.Base.Id] = nft.Base.InscriptionId
+	p.inscriptionToNftIdMap[nft.Base.InscriptionId] = nft
+	p.nftIdToinscriptionMap[nft.Base.Id] = nft
 
 	ct := string(nft.Base.ContentType)
 	_, ok := p.contentTypeToIdMap[ct]
@@ -457,16 +456,16 @@ func (p *NftIndexer) nftMint(input *common.TxInput, nft *common.Nft) {
 	if nft.Base.Delegate != "" {
 		delegate := p.getNftWithInscriptionId(nft.Base.Delegate)
 		if delegate != nil {
-			p.inscriptionToNftIdMap[nft.Base.Delegate] = delegate.Base.Id
-			p.nftIdToinscriptionMap[delegate.Base.Id] = nft.Base.Delegate
+			p.inscriptionToNftIdMap[nft.Base.Delegate] = delegate
+			p.nftIdToinscriptionMap[delegate.Base.Id] = delegate
 		}
 	}
 
 	if nft.Base.Parent != "" {
 		parent := p.getNftWithInscriptionId(nft.Base.Parent)
 		if parent != nil {
-			p.inscriptionToNftIdMap[nft.Base.Parent] = parent.Base.Id
-			p.nftIdToinscriptionMap[parent.Base.Id] = nft.Base.Parent
+			p.inscriptionToNftIdMap[nft.Base.Parent] = parent
+			p.nftIdToinscriptionMap[parent.Base.Id] = parent
 		}
 	}
 	
@@ -583,10 +582,9 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
-			// if tx.TxId == "f2274c1dff0007a46ef0f0bffd8dc6076680dbb593d87d8a297b2f703387ee5f" ||
-			// tx.TxId == "e76579a2587e1fa5d8972ca2885a39d9dff05585188125e9d1bb09a30e124461" {
-			// 	common.Log.Infof("")
-			// }
+			if tx.TxId == "fef75422456e29c39238abc145abbf38c644809378def4156b19a9a8ce0da118" {
+				common.Log.Infof("")
+			}
 			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
 			if len(sats) > 0 {
 				for _, sat := range sats {
@@ -719,14 +717,13 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 											}
 										}
 										t.Base.Id = newId
-										p.inscriptionToNftIdMap[t.Base.InscriptionId] = t.Base.Id
-										p.nftIdToinscriptionMap[t.Base.Id] = t.Base.InscriptionId
+										p.nftIdToinscriptionMap[t.Base.Id] = t
+										
 										for j := i+1; j < len(p.nftAdded); j++ {
 											m := p.nftAdded[j]
 											delete(p.nftIdToinscriptionMap, m.Base.Id)
 											m.Base.Id-- // 无论是否cursed
-											p.inscriptionToNftIdMap[m.Base.InscriptionId] = m.Base.Id
-											p.nftIdToinscriptionMap[m.Base.Id] = m.Base.InscriptionId
+											p.nftIdToinscriptionMap[m.Base.Id] = m
 
 											if m.Base.Sat < 0 {
 												// 该sat已经放在satmap中
@@ -783,64 +780,13 @@ func (p *NftIndexer) innerUpdateTransfer3(tx *common.Transaction,
 	return change
 }
 
-// fast
-func (p *NftIndexer) getBindingSatsWithUtxo(utxoId uint64) []*SatOffset {
-	sats, ok := p.utxoMap[utxoId]
-	if ok {
-		return sats
-	}
-
-	value := NftsInUtxo{}
-	err := p.db.View(func(txn common.ReadBatch) error {
-		return loadUtxoValueFromTxn(utxoId, &value, txn)
-	})
-	if err != nil {
-		return nil
-	}
-
-	p.utxoMap[utxoId] = value.Sats
-	return value.Sats
-}
-
-func (p *NftIndexer) refreshNft(nft *common.Nft) {
-	satinfo, ok := p.satMap[nft.Base.Sat]
-	if ok {
-		nft.OwnerAddressId = satinfo.AddressId
-		nft.UtxoId = satinfo.UtxoId
-		nft.Offset = satinfo.Offset
-	}
-}
-
 // 注意
 func (p *NftIndexer) getNftInBuffer(id int64) *common.Nft {
-	for _, nft := range p.nftAdded {
-		if nft.Base.Id == id {
-			p.refreshNft(nft)
-			return nft
-		}
-	}
-	return nil
+	return p.nftIdToinscriptionMap[id]
 }
 
 func (p *NftIndexer) getNftInBuffer2(inscriptionId string) *common.Nft {
-	for _, nft := range p.nftAdded {
-		if nft.Base.InscriptionId == inscriptionId {
-			p.refreshNft(nft)
-			return nft
-		}
-	}
-	return nil
-}
-
-func (p *NftIndexer) getNftInBuffer4(sat int64) []*common.Nft {
-	result := make([]*common.Nft, 0)
-	for _, nft := range p.nftAdded {
-		if nft.Base.Sat == sat {
-			p.refreshNft(nft)
-			result = append(result, nft)
-		}
-	}
-	return result
+	return p.inscriptionToNftIdMap[inscriptionId]
 }
 
 // 跟base数据库同步
@@ -994,8 +940,8 @@ func (p *NftIndexer) UpdateDB() {
 	p.satMap = make(map[int64]*SatInfo)
 	p.contentMap = make(map[uint64]string)
 	p.contentToIdMap = make(map[string]uint64)
-	p.inscriptionToNftIdMap = make(map[string]int64)
-	p.nftIdToinscriptionMap = make(map[int64]string)
+	p.inscriptionToNftIdMap = make(map[string]*common.Nft)
+	p.nftIdToinscriptionMap = make(map[int64]*common.Nft)
 	p.addedContentIdMap = make(map[uint64]bool)
 	p.lastContentTypeId = p.status.ContentTypeCount
 

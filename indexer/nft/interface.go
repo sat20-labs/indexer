@@ -34,25 +34,26 @@ func (p *NftIndexer) getNftWithInscriptionId(inscriptionId string) *common.Nft {
 	err := db.GetValueFromDB([]byte(key), &value, p.db)
 	if err != nil {
 		//common.Log.Errorf("GetValueFromDB with inscription %s failed. %v", inscriptionId, err)
-		//return nil
-	} else {
-		nfts := p.getNftsWithSat(value.Sat)
-		if nfts != nil {
-			for _, nftId := range nfts.Nfts {
-				if nftId == value.Id {
-					var nft common.InscribeBaseContent
-					err := p.loadNftFromDB(nftId, &nft)
-					if err != nil {
-						return nil
-					}
-
-					return &common.Nft{
-						Base:           &nft,
-						OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId, Offset: nfts.Offset}
+		return nil
+	} 
+	
+	nfts := p.getNftsWithSat(value.Sat)
+	if nfts != nil {
+		for _, nftId := range nfts.Nfts {
+			if nftId == value.Id {
+				var nft common.InscribeBaseContent
+				err := p.loadNftFromDB(nftId, &nft)
+				if err != nil {
+					return nil
 				}
+
+				return &common.Nft{
+					Base:           &nft,
+					OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId, Offset: nfts.Offset}
 			}
 		}
 	}
+	
 
 	return nil
 }

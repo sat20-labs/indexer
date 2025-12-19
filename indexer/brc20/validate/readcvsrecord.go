@@ -18,7 +18,7 @@ import (
 
 type BRC20CSVRecord struct {
 	Ticker             string
-	Type               string
+	Type               int
 	Valid              bool
 
 	TxID               string
@@ -46,6 +46,15 @@ type BRC20CSVRecord struct {
 	BlockTime           int64
 
 	H                   int
+}
+
+
+var ActionToInt = map[string]int {
+	"inscribe-deploy": 0,
+	"inscribe-mint": 1,
+	"inscribe-transfer": 2,
+	"transfer": 3,
+	"transfer-cancel": 4,
 }
 
 func parseInt32(s string) int {
@@ -130,7 +139,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 
 		rec := &BRC20CSVRecord{
 			Ticker:   strings.ToLower(row[col["ticker"]]),
-			Type:     row[col["type"]],
+			Type:     ActionToInt[row[col["type"]]],
 			Valid:    row[col["valid"]] == "1",
 
 			TxID:     row[col["txid"]],
@@ -254,14 +263,6 @@ func InsertByInscriptionNumber(records []*BRC20CSVRecord, newRec *BRC20CSVRecord
 	records[idx] = newRec
 
 	return records
-}
-
-var ActionToInt = map[string]int {
-	"inscribe-deploy": 0,
-	"inscribe-mint": 1,
-	"inscribe-transfer": 2,
-	"transfer": 3,
-	"transfer-cancel": 4,
 }
 
 

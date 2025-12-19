@@ -32,6 +32,9 @@ type TickerStatus struct {
 var _enable_validate bool = true
 var _validateData map[string]*validate.BRC20CSVRecord
 var _heightToRecords map[int][]*validate.BRC20CSVRecord // 按顺序
+var _validateInscriptionIdToNum map[string]int64
+var _validateInscriptionNumToId map[int64]string
+var _heightToInscriptionMap map[int]map[string]int64
 
 var _heightToHolderRecords map[int]map[string]*validate.BRC20HolderCSVRecord 
 
@@ -643,12 +646,27 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		}
 		
 		_heightToRecords = make(map[int][]*validate.BRC20CSVRecord)
+		_validateInscriptionIdToNum = make(map[string]int64)
+		_validateInscriptionNumToId = make(map[int64]string)
+		_heightToInscriptionMap = make(map[int]map[string]int64)
 		for _, record := range _validateData {
 			v := _heightToRecords[record.Height]
 			if len(v) == 0 {
 				_heightToRecords[record.Height] = append([]*validate.BRC20CSVRecord(nil), record)
 			} else {
 				_heightToRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
+			}
+			_validateInscriptionIdToNum[record.InscriptionID] = record.InscriptionNumber
+			_validateInscriptionNumToId[record.InscriptionNumber] = record.InscriptionID
+			if record.Type == common.BRC20_Action_InScribe_Deploy ||
+			record.Type == common.BRC20_Action_InScribe_Mint ||
+			record.Type == common.BRC20_Action_InScribe_Transfer {
+				inscs, ok := _heightToInscriptionMap[record.Height]
+				if !ok {
+					inscs = make(map[string]int64)
+					_heightToInscriptionMap[record.Height] = inscs
+				}
+				inscs[record.InscriptionID] = record.InscriptionNumber
 			}
 		}
 	}
@@ -684,6 +702,24 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	}
 
 	// 执行验证
+
+	// 确保本区块铸造的铭文和number一致
+	inscriptionMap, ok := _heightToInscriptionMap[height]
+	if ok {
+		nftIndexer := p.nftIndexer
+		for id, num := range inscriptionMap {
+			nft := nftIndexer.GetNftWithInscriptionId(id)
+			if nft == nil {
+				common.Log.Panicf("height %d can't find inscription %s", height, id)
+			}
+			if num != nft.Base.Id {
+				common.Log.Panicf("height %d inscription %s different number %d %d",
+					height, id, num, nft.Base.Id)
+			}
+		}
+	}
+
+
 	validateRecords := _heightToRecords[height]
 	validateMap := make(map[string]*validate.BRC20CSVRecord)
 	for _, item := range validateRecords {
@@ -736,8 +772,11 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	for i, valid := range validateRecords {
 		item := tobeValidating[i]
 		
-		if item.TxIndex != valid.TxIdx ||
-		(item.NftId) != (valid.InscriptionNumber) {
+		if item.TxIndex != valid.TxIdx {
+			common.Log.Panicf("%d #%d %s different txIndex %d %d in tx %s", height, 
+					valid.InscriptionNumber, valid.InscriptionID, valid.TxIdx, item.TxIndex, valid.TxID)
+		}
+		if (item.NftId) != (valid.InscriptionNumber) {
 			if valid.Value == 0 && valid.Offset == 0 && valid.To == valid.From {
 				// cancel-transfer 的例子，暂时没有准确排序，需要搜索查找
 				for _, t := range tobeValidating {
@@ -748,17 +787,13 @@ func (p *BRC20Indexer) validateHistory(height int) {
 					}
 				}
 			} else {
-				common.Log.Errorf("%d #%d %s different item in tx  %s, %d", height, 
-					valid.InscriptionNumber, valid.InscriptionID, valid.TxID, valid.TxIdx)
+				common.Log.Errorf("%d #%d %s different nftId %d %d in tx %s, %d", height, 
+					valid.InscriptionNumber, valid.InscriptionID, valid.InscriptionNumber, item.NftId, valid.TxID, valid.TxIdx)
 				nft := p.nftIndexer.GetNftWithId(item.NftId)
 				if nft != nil {
 					common.Log.Infof("local: %d -> %s", nft.Base.Id, nft.Base.InscriptionId)
 				}
-
-				nft2 := p.nftIndexer.GetNftWithInscriptionId(valid.InscriptionID)
-				if nft2 != nil {
-					common.Log.Infof("validate: %d -> %s", nft2.Base.Id, nft2.Base.InscriptionId)
-				}
+				common.Log.Infof("validate: %d -> %s", valid.InscriptionNumber, valid.InscriptionID)
 				
 				for _, tobe := range tobeValidating {
 					if tobe.TxIndex == valid.TxIdx {
@@ -808,7 +843,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			}
 		}
 
-		if item.Action != validate.ActionToInt[valid.Type] {
+		if item.Action != valid.Type {
 			common.Log.Panicf("%d #%d %s different action in tx  %s, %d", height, 
 					valid.InscriptionNumber, valid.InscriptionID, valid.TxID, valid.TxIdx)
 		}
