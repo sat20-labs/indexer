@@ -18,6 +18,11 @@ func (p *FTIndexer) GetAllTickers() []string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	
+	return p.getAllTickers()
+}
+
+func (p *FTIndexer) getAllTickers() []string {
+	
 	type pair struct {
 		id int64
 		name string
@@ -63,6 +68,11 @@ func (p *FTIndexer) GetTicker(tickerName string) *common.Ticker {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
+	return p.getTicker(tickerName)
+}
+
+func (p *FTIndexer) getTicker(tickerName string) *common.Ticker {
+
 	ret := p.tickerMap[strings.ToLower(tickerName)]
 	if ret == nil {
 		return nil
@@ -105,6 +115,10 @@ func (p *FTIndexer) GetHoldersWithTick(tickerName string) map[uint64][]uint64 {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	tickerName = strings.ToLower(tickerName)
+	return p.getHoldersWithTick(tickerName)
+}
+
+func (p *FTIndexer) getHoldersWithTick(tickerName string) map[uint64][]uint64 {
 	mp := make(map[uint64][]uint64, 0)
 
 	utxos, ok := p.utxoMap[tickerName]
@@ -130,6 +144,10 @@ func (p *FTIndexer) GetHolderAndAmountWithTick(tickerName string) map[uint64]int
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	tickerName = strings.ToLower(tickerName)
+	return p.getHolderAndAmountWithTick(tickerName)
+}
+
+func (p *FTIndexer) getHolderAndAmountWithTick(tickerName string) map[uint64]int64 {
 	mp := make(map[uint64]int64, 0)
 
 	utxos, ok := p.utxoMap[tickerName]
@@ -196,6 +214,29 @@ func (p *FTIndexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]
 		}
 	}
 
+	return result
+}
+
+
+// 获取某个地址下的资产 return: ticker->amount
+func (p *FTIndexer) getAssetAmtByAddress(address uint64, tickerName string) int64 {
+	utxos := p.nftIndexer.GetBaseIndexer().GetUTXOs(address)
+	var result int64
+	for utxo := range utxos {
+		info, ok := p.holderInfo[utxo]
+		if !ok {
+			continue
+		}
+
+		tickers, ok := info.Tickers[tickerName]
+		if !ok {
+			continue
+		}
+
+		for _, v := range tickers {
+			result += v.AssetAmt()
+		}
+	}
 	return result
 }
 
@@ -454,6 +495,12 @@ func (p *FTIndexer) GetMintAmountWithAddressId(addressId uint64, tick string) in
 func (p *FTIndexer) GetMintAmount(tick string) (int64, int64) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+
+	return p.getMintAmount(tick)
+}
+
+// return: mint的总量和次数
+func (p *FTIndexer) getMintAmount(tick string) (int64, int64) {
 
 	tickinfo, ok := p.tickerMap[strings.ToLower(tick)]
 	if !ok {

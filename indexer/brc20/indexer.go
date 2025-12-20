@@ -42,10 +42,10 @@ type TransferNftInfo struct {
 
 func (p *TransferNftInfo) Clone() *TransferNftInfo {
 	return &TransferNftInfo{
-		TxInIndex: p.TxInIndex,
-		AddressId: p.AddressId,
-		UtxoId: p.UtxoId,
-		Ticker: p.Ticker,
+		TxInIndex:   p.TxInIndex,
+		AddressId:   p.AddressId,
+		UtxoId:      p.UtxoId,
+		Ticker:      p.Ticker,
 		TransferNft: p.TransferNft.Clone(),
 	}
 }
@@ -71,7 +71,7 @@ type BRC20Indexer struct {
 	actionBufferMap map[uint64]*ActionInfo // key: input的utxoId，保存一个区块
 
 	// checkpoint 临时使用
-	holdermap map[uint64]*common.Decimal
+	holderMapInPrevBlock map[uint64]*common.Decimal
 }
 
 func NewIndexer(db common.KVDB) *BRC20Indexer {
@@ -134,9 +134,9 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 		}
 		for name, info := range holder.Tickers {
 			newInfo := &common.BRC20TickAbbrInfo{
-				AvailableBalance: info.AvailableBalance.Clone(),
+				AvailableBalance:    info.AvailableBalance.Clone(),
 				TransferableBalance: info.TransferableBalance.Clone(),
-				TransferableData: make(map[uint64]*common.TransferNFT),
+				TransferableData:    make(map[uint64]*common.TransferNFT),
 			}
 			for k, v := range info.TransferableData {
 				newInfo.TransferableData[k] = v.Clone()
@@ -163,7 +163,6 @@ func (s *BRC20Indexer) Clone() *BRC20Indexer {
 	for key, value := range s.tickerUpdated {
 		newInst.tickerUpdated[key] = value
 	}
-
 
 	newInst.status = s.status.Clone()
 
@@ -221,11 +220,10 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	startTime := time.Now()
 	version := s.GetDBVersion()
-	
+
 	s.status = initStatusFromDB(s.db)
 	common.Log.Infof("brc20 db version: %s", version)
 	common.Log.Info("InitIndexer ...")
-
 
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("InitIndexer %d ms", elapsed)
@@ -253,13 +251,13 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
 			total = total.Add(&item.Amount)
 			available = available.Add(&item.Amount)
 			method = "insribe-mint"
-		
+
 		case common.BRC20_Action_InScribe_Transfer:
 			flag = ""
 			transferrable = transferrable.Add(&item.Amount)
 			available = available.Sub(&item.Amount)
 			method = "inscribe-transfer"
-		
+
 		case common.BRC20_Action_Transfer:
 			if addressId == item.FromAddr {
 				flag = "-"
@@ -388,7 +386,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 	sort.Slice(mid, func(i, j int) bool {
 		return mid[i].amt.Cmp(mid[j].amt) > 0
 	})
-	limit := 20//len(mid) // 40
+	limit := 20 //len(mid) // 40
 	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
 	for i, item := range mid {
 		if i > limit {
@@ -479,7 +477,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 			"ordi",
 			"usdt",
 			"test",
-			"husk", 
+			"husk",
 			"gc  ",
 			"ttt3",
 			"doge",
@@ -504,7 +502,6 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		//s.printHistoryWithAddress(name, 0x1569f9)
 		//s.printHistoryWithAddress(name, 0x3b0cee)
 	}
-	
 
 	startTime := time.Now()
 	allTickers := s.GetAllTickers()
@@ -979,7 +976,6 @@ func (s *BRC20Indexer) loadTransferNft(utxoId uint64) *TransferNftInfo {
 
 	return transfer
 }
-
 
 func (s *BRC20Indexer) loadTickerHistory(name string) []*common.BRC20ActionHistory {
 	history := s.loadTransferHistoryFromDB(name)

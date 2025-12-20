@@ -17,8 +17,8 @@ type HolderAction = exotic.HolderAction
 
 // TODO 加载所有数据，太耗时间和内存，需要优化，参考nft和brc20模块 (目前数据量少，问题不大)
 type FTIndexer struct {
-	db         common.KVDB
-	nftIndexer *nft.NftIndexer
+	db           common.KVDB
+	nftIndexer   *nft.NftIndexer
 	enableHeight int
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
@@ -32,6 +32,9 @@ type FTIndexer struct {
 	// 其他辅助信息
 	holderActionList []*HolderAction           // 在同一个block中，状态变迁需要按顺序执行，因为一个utxo会很快被消费掉，变成新的utxo
 	tickerAdded      map[string]*common.Ticker // key: ticker
+
+	// 校验数据，不需要保存
+	holderMapInPrevBlock map[uint64]int64
 }
 
 func NewOrdxIndexer(db common.KVDB) *FTIndexer {
@@ -40,7 +43,7 @@ func NewOrdxIndexer(db common.KVDB) *FTIndexer {
 		enableHeight = 28883
 	}
 	return &FTIndexer{
-		db: db,
+		db:           db,
 		enableHeight: enableHeight,
 	}
 }
@@ -98,8 +101,8 @@ func (s *FTIndexer) Clone() *FTIndexer {
 					for i, v := range assets {
 						newAssetInfo := &common.AssetAbbrInfo{
 							MintingNftId: v.MintingNftId,
-							BindingSat: v.BindingSat,
-							Offsets: v.Offsets.Clone(),
+							BindingSat:   v.BindingSat,
+							Offsets:      v.Offsets.Clone(),
 						}
 						assetVector[i] = newAssetInfo
 					}
@@ -228,7 +231,6 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 		}
 
 		common.Log.Infof("FTIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
-
 
 		utxos, ok := s.utxoMap[name]
 		if !ok {

@@ -1558,3 +1558,29 @@ func (p *BaseIndexer) getAddressById(addressId uint64) string {
 	}
 	return value
 }
+
+
+// only for api access
+func (b *BaseIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValueV2 {
+	value, ok := b.addressValueMap[address]
+	if !ok {
+		data, err := db.GetAddressDataFromDBV2(ldb, address)
+		if err == nil {
+			value = common.ToAddressValueV2(data)
+			b.addressValueMap[address] = value
+			ok = true
+		}
+	}
+
+	return value
+}
+
+// key: utxoId, value: btc value
+func (b *BaseIndexer) GetUTXOs(addressId uint64) (map[uint64]int64) {
+	address := b.getAddressById(addressId)
+	addrValue := b.getAddressValue2(address, b.db)
+	if addrValue == nil {
+		return nil
+	}
+	return addrValue.Utxos
+}
