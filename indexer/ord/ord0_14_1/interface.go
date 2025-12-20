@@ -17,7 +17,7 @@ type InscriptionResult struct {
 }
 
 func InscriptionToResult(envelope *ParsedEnvelope, blockHeight int) *InscriptionResult {
-	jubileeHeight := 824544
+	jubileeHeight := common.Jubilee_Height
 	var curse ordCommon.Curse
 	if blockHeight >= jubileeHeight {
 		curse = ordCommon.NoCurse

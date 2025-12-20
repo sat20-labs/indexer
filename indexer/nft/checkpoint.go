@@ -21,7 +21,8 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 	30000: {
 		NftCount: 194,
 		InscriptionMap: map[string]int64{
-			"ordi": 0,
+			"0ab6fc4e95b0bfcf31a242d6cde21421586372c6bbf5bc3e23432df606363f3fi0": 142,
+			"103a16e73c97bca1df6ec280af4cf6b7e9540b45791e6634f362cc42f4d4ac76i0": 193,
 		},
 	},
 }

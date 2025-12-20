@@ -15,6 +15,7 @@ type CheckPoint struct {
 
 type TickerStatus struct {
 	Name        string
+	DeployHeight int
 	Max         int64
 	Minted      int64
 	MintCount   int64
@@ -25,7 +26,8 @@ type TickerStatus struct {
 var testnet4_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
-			"dogecoin": {}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"RarePizza": {DeployHeight: 31894},
+			"dogecoin": {DeployHeight: 60886}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
 		},
 	},
 
@@ -50,7 +52,7 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 var mainnet_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
-			"pearl": {}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"pearl": {DeployHeight: 827307}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
 		},
 	},
 
@@ -136,6 +138,11 @@ func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
 	//rpc := base.NewRpcIndexer(p.nftIndexer.GetBaseIndexer())
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
 	for name, tickerStatus := range checkpoint.Tickers {
+		if tickerStatus.DeployHeight != 0 {
+			if height < tickerStatus.DeployHeight {
+				continue
+			}
+		}
 		name = strings.ToLower(name)
 		ticker := p.getTicker(name)
 		if ticker == nil {

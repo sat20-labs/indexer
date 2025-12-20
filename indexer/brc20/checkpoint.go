@@ -19,6 +19,7 @@ type CheckPoint struct {
 
 type TickerStatus struct {
 	Name        string
+	DeployHeight int
 	Max         string
 	Minted      string
 	MintCount   int
@@ -39,7 +40,7 @@ var _heightToHolderRecords map[int]map[string]*validate.BRC20HolderCSVRecord
 var testnet4_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
-			"ordi": {}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"ordi": {DeployHeight: 28865}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
 		},
 	},
 
@@ -414,7 +415,7 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 var mainnet_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
-			"ordi": {}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"ordi": {DeployHeight: 779832}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
 		},
 	},
 
@@ -557,6 +558,11 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 	//rpc := base.NewRpcIndexer(p.nftIndexer.GetBaseIndexer())
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
 	for name, tickerStatus := range checkpoint.Tickers {
+		if tickerStatus.DeployHeight != 0 {
+			if height < tickerStatus.DeployHeight {
+				continue
+			}
+		}
 		name = strings.ToLower(name)
 		tickerInfo := p.loadTickInfo(name)
 		if tickerInfo == nil {
@@ -635,13 +641,25 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	if !_enable_validate {
 		return
 	}
-	if height < 779832 {
-		return
-	}
+	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
+
 	name := "ordi"
+	var path string
+	if isMainnet {
+		if height < 779832 {
+			return
+		}
+		path = "./indexer/brc20/validate/ordi.csv"
+	} else {
+		if height < 28865 {
+			return
+		}
+		path = "./indexer/brc20/validate/ordi-testnet4.csv"
+	}
+	
 	if _validateData == nil {
 		var err error
-		_validateData, err = validate.ReadBRC20CSV("./indexer/brc20/validate/ordi.csv")
+		_validateData, err = validate.ReadBRC20CSV(path)
 		if err != nil {
 			common.Log.Panicf("ReadBRC20CSV failed, %v", err)
 		}

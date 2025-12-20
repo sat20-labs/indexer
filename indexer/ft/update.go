@@ -267,7 +267,9 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 	common.Log.Infof("FTIndexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 
 	p.mutex.Unlock()
-	p.CheckPointWithBlockHeight(block.Height)
+	if !common.IsMainnet() {
+		p.CheckPointWithBlockHeight(block.Height)
+	}
 	// if !p.CheckSelf(block.Height) {
 	// 	common.Log.Panicf("FTIndexer UpdateTransfer CheckSelf %d failed", block.Height)
 	// }

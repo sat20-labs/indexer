@@ -993,7 +993,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
 
-	// if tx.TxId == "d725216e18e5b75cfaf5f0c7043ea8450c36d74fa6c2bdb229532700594e921b" {
+	// if tx.TxId == "8c6acaebeb146c8abae21ef441cf9dde94cfc7bc68d51f7bef22dd1797c31a0d" {
 	// 	common.Log.Infof("")
 	// }
 
@@ -1077,8 +1077,8 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		// 	return
 		// }
 		if nft.Base.CurseType != 0 {
-			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
-			if block.Height < 824544 { // Jubilee
+			common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
+			if block.Height < common.Jubilee_Height { // Jubilee
 				return
 			}
 			// vindicated

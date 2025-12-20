@@ -95,12 +95,10 @@ func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BR
 
 	name := strings.ToLower(mint.Name)
 	tickerInfo := s.tickerMap[name]
-	ticker := tickerInfo.Ticker
-
-	// ticker 还没有部署
-	if mint.NftId < ticker.Nft.Base.Id {
+	if tickerInfo == nil {
 		return
 	}
+	ticker := tickerInfo.Ticker
 	if ticker.EndInscriptionId != "" {
 		// 已经足够了
 		return
@@ -464,9 +462,9 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
 		if txIndex == 0 {
 			continue
 		}
-		if tx.TxId == "2c898453ced8a8aef58ee7d18413ade93c9c3d722cae39b24d793e25d56b0a41" {
-			common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
-		}
+		// if tx.TxId == "8c6acaebeb146c8abae21ef441cf9dde94cfc7bc68d51f7bef22dd1797c31a0d" {
+		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+		// }
 
 		inputTransferNfts := make(map[int64]*TransferNftInfo)
 		hasTransfer := false

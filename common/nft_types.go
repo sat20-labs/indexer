@@ -4,7 +4,7 @@ import (
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
-const Jubilee_Height int = 824544
+var Jubilee_Height int = 824544
 
 type InscribeBaseContent = pb.InscribeBaseContent
 type Nft struct {
