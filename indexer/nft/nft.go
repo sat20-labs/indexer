@@ -389,7 +389,10 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 	// 对所有铸造信息排序
 	type pair struct {
-		seq    uint64
+		idx1 int
+		idx2 int
+		idx3 int
+		offset int64
 		info   *InscribeInfo
 	}
 
@@ -398,6 +401,10 @@ func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 	for txIndex, txIndexMap := range p.actionBufferMap {
 		for txInIndex, infoVector := range txIndexMap {
 			for idx3, info := range infoVector {
+				// if info.Input.TxId == "4341ee078033631b1c17b5312ac279e899d456880b3628c7fb332044a7a42f47" {
+				// 	common.Log.Infof("")
+				// }
+
 				idx := txIndex
 				if info.Nft.Base.Sat < 0 { 
 					// unbound
@@ -408,26 +415,11 @@ func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 					// fee spent
 					idx += totalTxs
 				}
-				if idx > 0x7fff {
-					common.Log.Panicf("%s has too big index %x", info.Input.TxId, idx)
-				}
-
-				idx2 := txInIndex
-				if idx2 > 0x1fff {
-					common.Log.Panicf("%s has too many input %x", info.Input.TxId, idx2)
-				}
-				
-				// txIn内部铭文顺序
-				if idx3 > 0xfff {
-					common.Log.Panicf("%s has too many inscription %x", info.Input.TxId, idx3)
-				}
-
-				if info.InOffset > 0xffffff { 
-					common.Log.Panicf("%s has too big offset %x", info.Input.TxId, info.InOffset)
-				}
-				seq := (uint64(idx)<<49 | uint64(idx2)<<36 | uint64(idx3)<<24 | uint64(info.InOffset)) 
 				item := &pair{
-					seq:    seq,
+					idx1: idx,
+					idx2: txInIndex,
+					idx3: idx3, // txIn内部铭文顺序
+					offset: info.InOffset,
 					info:   info,
 				}
 				mid = append(mid, item)
@@ -435,18 +427,26 @@ func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 		}
 	}
 	sort.Slice(mid, func(i, j int) bool {
-		return mid[i].seq < mid[j].seq
+		if mid[i].idx1 == mid[j].idx1 {
+			if mid[i].idx2 == mid[j].idx2 {
+				if mid[i].idx3 == mid[j].idx3 {
+					return mid[i].offset < mid[j].offset
+				}
+				return mid[i].idx3 < mid[j].idx3
+			}
+			return mid[i].idx2 < mid[j].idx2
+		}
+		return mid[i].idx1 < mid[j].idx1
 	})
 
 	traceTaget := int64(0)
 	for _, item := range mid {
-		nft := item.info.Nft
-
 		p.nftMint(item.info)
 
-		if nft.Base.InscriptionId == "d725216e18e5b75cfaf5f0c7043ea8450c36d74fa6c2bdb229532700594e921bi0" {
-			traceTaget = nft.Base.Id
-		}
+		// nft := item.info.Nft
+		// if nft.Base.InscriptionId == "1654500098640d6cedeff295eceeb4b61e63d554ddc5ebade6f2fbd879f640bbi0" {
+		// 	traceTaget = nft.Base.Id
+		// }
 	}
 
 	if traceTaget != 0 {
