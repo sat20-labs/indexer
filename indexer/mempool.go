@@ -226,10 +226,10 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     netParam := instance.GetChainParam()
     txId := tx.TxID()
-    p.mutex.RLock()
+    p.mutex.Lock()
     _, ok := p.txMap[txId]
     if ok {
-        p.mutex.RUnlock()
+        p.mutex.Unlock()
         common.Log.Debugf("tx %s already in mempool", txId)
         return 
     }
@@ -241,7 +241,7 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
     for k, v := range p.unConfirmedUtxoMap {
         preFectcher[k] = v
     }
-    p.mutex.RUnlock()
+    p.mutex.Unlock()
 
     // Heavy work OUTSIDE LOCK:
     inputs, outpus, err := p.rebuildTxOutput(tx, preFectcher)
