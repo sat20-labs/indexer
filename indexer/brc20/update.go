@@ -176,6 +176,15 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	// 	common.Log.Infof("")
 	// }
 
+	// transfer铭文，实质是将一定数量的token绑定到一个utxo中，所以一个utxo中如果有多个transfer铭文，只有第一个transfer铭文有效
+	// 比如：mainnet：e298f7bbea84879bc69a711e27302fc05e34c41fe5d054f22ce0aa1fc8e20add，批量生成多个transfer铭文，只有第一个有效
+	_, ok := s.transferNftMap[transfer.Nft.UtxoId]
+	if ok {
+		common.Log.Debugf("%s inscription is ignored", transfer.Nft.Base.InscriptionId)
+		return 
+	}
+
+
 	tickerName := strings.ToLower(transfer.Name)
 	addressId := transfer.Nft.OwnerAddressId
 	holder := s.loadHolderInfo(addressId, tickerName)
