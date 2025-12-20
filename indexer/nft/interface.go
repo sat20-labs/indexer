@@ -193,6 +193,13 @@ func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 	return p.getNftsWithSat(sat)
 }
 
+func (p *NftIndexer) GetNftsWithSatNoDisable(sat int64) *common.NftsInSat {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	return p.getNftsWithSat(sat)
+}
+
 func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 	info, ok := p.satMap[sat]
 	if ok {

@@ -26,7 +26,7 @@ type SatInfo struct {
 	AddressId uint64
 	UtxoId    uint64
 	Offset    int64
-	CurseCount int
+	CurseCount int // CurseCount+2 <= len(Nfts)，至少有两个非诅咒的铭文，意味着该sat是reinscription
 	Nfts      map[*common.Nft]bool
 }
 
@@ -632,7 +632,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 							if sat != nft.Base.Sat {
 								nft.Base.Sat = sat // 同一个聪，需要命名一致
 								// 根据ordinals规则，判断是否是reinscription
-								if nft.Base.CurseType == 0 {
+								if nft.Base.CurseType == 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
 									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
 										// 已经存在非cursed的铭文，后面的铭文都是reinscription

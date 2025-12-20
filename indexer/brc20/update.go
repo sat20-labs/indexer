@@ -10,6 +10,25 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+func (s *BRC20Indexer) validInscribe(nft *common.Nft) bool {
+	if nft.Base.CurseType != 0 {
+		common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
+		if nft.Base.BlockHeight < int32(common.Jubilee_Height) { // Jubilee
+			return false
+		}
+	}
+	satInfo := s.nftIndexer.GetNftsWithSatNoDisable(nft.Base.Sat)
+	if satInfo == nil {
+		common.Log.Panicf("can't find sat %d info in inscription %s", nft.Base.Sat, nft.Base.InscriptionId)
+	}
+
+	if len(satInfo.Nfts) >= int(satInfo.CurseCount + 2) {
+		return false // reinscription: 有两个非诅咒的铭文
+	}
+
+	return true
+}
+
 // deploy
 func (s *BRC20Indexer) UpdateInscribeDeploy(input *common.TxInput, ticker *common.BRC20Ticker) {
 	s.mutex.Lock()
@@ -23,12 +42,9 @@ func (s *BRC20Indexer) UpdateInscribeDeploy(input *common.TxInput, ticker *commo
 func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *common.BRC20Ticker) {
 	// 再次检查，因为nft可能会修改reinsription状态
 	nft := ticker.Nft
-	if nft.Base.CurseType != 0 {
-		common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
-		if nft.Base.BlockHeight < 824544 { // Jubilee
-			return
-		}
-		// vindicated
+	if !s.validInscribe(nft) {
+		common.Log.Debugf("%s inscription is invalid", nft.Base.InscriptionId)
+		return
 	}
 
 	name := strings.ToLower(ticker.Name)
@@ -72,12 +88,9 @@ func (s *BRC20Indexer) UpdateInscribeMint(input *common.TxInput, mint *common.BR
 }
 
 func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BRC20Mint) {
-	if mint.Nft.Base.CurseType != 0 {
-		common.Log.Debugf("%s inscription is cursed, %d", mint.Nft.Base.InscriptionId, mint.Nft.Base.CurseType)
-		if mint.Nft.Base.BlockHeight < 824544 { // Jubilee
-			return
-		}
-		// vindicated
+	if !s.validInscribe(mint.Nft) {
+		common.Log.Debugf("%s inscription is invalid", mint.Nft.Base.InscriptionId)
+		return
 	}
 
 	name := strings.ToLower(mint.Name)
@@ -155,12 +168,9 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *c
 }
 
 func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *common.BRC20Transfer) {
-	if transfer.Nft.Base.CurseType != 0 {
-		common.Log.Debugf("%s inscription is cursed, %d", transfer.Nft.Base.InscriptionId, transfer.Nft.Base.CurseType)
-		if transfer.Nft.Base.BlockHeight < 824544 { // Jubilee
-			return
-		}
-		// vindicated
+	if !s.validInscribe(transfer.Nft) {
+		common.Log.Debugf("%s inscription is invalid", transfer.Nft.Base.InscriptionId)
+		return
 	}
 	// if transfer.Nft.Base.InscriptionId == "b73abee8f9cf28bf58bc45476b32ff1f4bcb01f58d0101ea83a094acdeb73cff" {
 	// 	common.Log.Infof("")
