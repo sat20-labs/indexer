@@ -12,6 +12,12 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
+const (
+	maxBatchSize = 1280 << 20 // 1280MB，安全
+	maxItemSize  = 64 << 20  // 单条数据兜底
+)
+
+
 type pebbleDB struct {
 	path string
 	db   *pebble.DB
@@ -394,12 +400,32 @@ func (p *pebbleWriteBatch) Put(key, value []byte) error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
+
+	itemSize := len(key) + len(value)
+
+	// 单条记录过大，单独提交
+	if itemSize >= maxItemSize {
+		b := p.db.NewBatch()
+		defer b.Close()
+		if err := b.Set(key, value, nil); err != nil {
+			return err
+		}
+		return b.Commit(pebble.Sync)
+	}
+
+	if err := p.ensureCapacity(itemSize); err != nil {
+		return err
+	}
 	return p.batch.Set(key, value, nil)
 }
 
 func (p *pebbleWriteBatch) Delete(key []byte) error {
 	if p.closed {
 		return errors.New("writebatch closed")
+	}
+
+	if err := p.ensureCapacity(len(key)); err != nil {
+		return err
 	}
 	return p.batch.Delete(key, nil)
 }
@@ -408,13 +434,34 @@ func (p *pebbleWriteBatch) Flush() error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
-	return p.batch.Commit(pebble.Sync)
+	err := p.batch.Commit(pebble.Sync)
+	p.closed = true
+	return err
 }
 
 func (p *pebbleWriteBatch) Close() {
+	if p.closed {
+		return
+	}
 	p.closed = true
 	_ = p.batch.Close()
 }
+
+func (p *pebbleWriteBatch) ensureCapacity(extra int) error {
+	if p.closed {
+		return errors.New("writebatch closed")
+	}
+
+	// 如果再写入 extra 后会超过阈值，先提交
+	if p.batch.Len()+extra >= maxBatchSize {
+		if err := p.batch.Commit(pebble.Sync); err != nil {
+			return err
+		}
+		p.batch.Reset()
+	}
+	return nil
+}
+
 
 func (p *pebbleDB) NewWriteBatch() common.WriteBatch {
 	return &pebbleWriteBatch{db: p.db, batch: p.db.NewBatch()}
