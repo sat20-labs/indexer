@@ -10,11 +10,10 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/assert"
-	"github.com/btcsuite/btcd/txscript"
 )
-
 
 func GetTxRawData(txID string, network string) (string, error) {
 	url := ""
@@ -79,7 +78,7 @@ func GetRawData(txID string, network string) ([][]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", txID, err)
 	}
-	
+
 	var txWitness []interface{}
 	for _, vin := range data["vin"].([]interface{}) {
 		txWitness = vin.(map[string]interface{})["witness"].([]interface{})
@@ -165,7 +164,7 @@ func TestParser_Satpoint(t *testing.T) {
 		spBytes := field[FIELD_POINT]
 		satpoint := 0
 		if len(spBytes) > 0 {
-			satpoint = GetSatpoint(spBytes)
+			satpoint = GetSatPointer(spBytes)
 		}
 
 		Log.Infof("sat point %s %d", hex.EncodeToString(field[FIELD_POINT]), satpoint)
@@ -457,7 +456,7 @@ func TestParser_ord5(t *testing.T) {
 		assert.True(t, false)
 	}
 
-	satpoint := GetSatpoint(fields[0][FIELD_POINT])
+	satpoint := GetSatPointer(fields[0][FIELD_POINT])
 
 	if satpoint != 0x18d {
 		Log.Info(err)
@@ -818,7 +817,6 @@ func TestParser_addr(t *testing.T) {
 		t.Fatalf("error deserializing transaction: %v", err)
 	}
 
-
 	for i, v := range tx.TxOut {
 		scyptClass, addrs, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, &chaincfg.TestNet4Params)
 		if err != nil {
@@ -836,8 +834,7 @@ func TestParser_addr(t *testing.T) {
 		if len(addrsString) != 0 {
 			fmt.Printf("%d address %v\n", i, addrsString)
 		}
-		
-		
+
 		if len(addrs) == 0 {
 			address := "UNKNOWN"
 			if scyptClass == txscript.NullDataTy {

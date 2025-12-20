@@ -8,11 +8,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	"github.com/stretchr/testify/assert"
 )
-
 
 func GetTxRawData(txID string, network string) (string, error) {
 	url := ""
@@ -145,7 +144,7 @@ func TestParser_Satpoint(t *testing.T) {
 		spBytes := field.Inscription.Pointer
 		satpoint := 0
 		if len(spBytes) > 0 {
-			satpoint = common.GetSatpoint(spBytes)
+			satpoint = common.GetSatPointer(spBytes)
 		}
 
 		fmt.Printf("sat point %s %d\n", hex.EncodeToString(field.Inscription.Pointer), satpoint)
@@ -279,9 +278,9 @@ func TestParser_ord1(t *testing.T) {
 	}
 
 	for i, field := range fields {
-		
-			fmt.Printf("%d: %v", i, field)
-		
+
+		fmt.Printf("%d: %v", i, field)
+
 	}
 }
 
@@ -351,7 +350,7 @@ func TestParser_ord5(t *testing.T) {
 		assert.True(t, false)
 	}
 
-	satpoint := common.GetSatpoint(fields[0].Inscription.Pointer)
+	satpoint := common.GetSatPointer(fields[0].Inscription.Pointer)
 
 	if satpoint != 0x18d {
 		fmt.Printf("%v\n", err)
@@ -640,7 +639,6 @@ func TestParser_ord19(t *testing.T) {
 		assert.True(t, false)
 	}
 
-	
 	assert.True(t, !fields[0].IsCursed)
 	assert.True(t, fields[1].IsCursed)
 }
@@ -680,7 +678,6 @@ func TestParser_ord21(t *testing.T) {
 		assert.True(t, false)
 	}
 }
-
 
 func TestParser_ord22(t *testing.T) {
 	// input 0, output 0

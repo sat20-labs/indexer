@@ -334,7 +334,6 @@ func UnmarshalBRC20BaseContentStrict(data []byte, content *BRC20BaseContent) err
 	return nil
 }
 
-
 func ParseBrc20BaseContent(content string) *BRC20BaseContent {
 	var ret BRC20BaseContent
 	err := UnmarshalBRC20BaseContentStrict([]byte(content), &ret)
@@ -348,7 +347,7 @@ func ParseBrc20BaseContent(content string) *BRC20BaseContent {
 	return &ret
 }
 
-func UnmarshalBRC2DeployContentStrict(data string, content *BRC20DeployContent) (error) {
+func UnmarshalBRC2DeployContentStrict(data string, content *BRC20DeployContent) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(data), &raw); err != nil {
 		return err
@@ -358,7 +357,6 @@ func UnmarshalBRC2DeployContentStrict(data string, content *BRC20DeployContent) 
 	if err != nil {
 		return err
 	}
-
 
 	// 只接受小写
 	if v, ok := raw["lim"]; ok {
@@ -400,8 +398,7 @@ func ParseBrc20DeployContent(content string) *BRC20DeployContent {
 	return &ret
 }
 
-
-func UnmarshalBRC2AmtContentStrict(data string, content *BRC20AmtContent) (error) {
+func UnmarshalBRC2AmtContentStrict(data string, content *BRC20AmtContent) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(data), &raw); err != nil {
 		return err
@@ -411,7 +408,6 @@ func UnmarshalBRC2AmtContentStrict(data string, content *BRC20AmtContent) (error
 	if err != nil {
 		return err
 	}
-
 
 	// 只接受小写
 	if v, ok := raw["amt"]; ok {
@@ -435,7 +431,7 @@ func ParseBBRC20AmtContent(content string) *BRC20AmtContent {
 	return &ret
 }
 
-func UnmarshalBRC2MintContentStrict(data string, content *BRC20MintContent) (error) {
+func UnmarshalBRC2MintContentStrict(data string, content *BRC20MintContent) error {
 	return UnmarshalBRC2AmtContentStrict(data, &content.BRC20AmtContent)
 }
 
@@ -451,8 +447,7 @@ func ParseBrc20MintContent(content string) *BRC20MintContent {
 	return &ret
 }
 
-
-func UnmarshalBRC2TransferContentStrict(data string, content *BRC20TransferContent) (error) {
+func UnmarshalBRC2TransferContentStrict(data string, content *BRC20TransferContent) error {
 	return UnmarshalBRC2AmtContentStrict(data, &content.BRC20AmtContent)
 }
 
@@ -501,7 +496,7 @@ func Json2cbor(jsonData []byte) ([]byte, error) {
 	return (cborData), nil
 }
 
-func GetSatpoint(spBytes []byte) int {
+func GetSatPointer(spBytes []byte) int {
 	// ab28fc85219361cd62d1302048e160d7632903b1bde4c6158c005f05ea46bd02
 	l := len(spBytes)
 	if l == 2 {

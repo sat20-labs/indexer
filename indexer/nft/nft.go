@@ -78,7 +78,7 @@ type NftIndexer struct {
 	utxoDeled       []uint64
 
 	// 不需要备份的数据
-	actionBufferMap map[int][]*InscribeInfo   // txIndex
+	actionBufferMap map[int]map[int][]*InscribeInfo   // txIndex-txInIndex
 	nftAddedUtxoMap map[uint64][]*InscribeInfo // 一个区块中，增量的nft在哪个输入中 utxoId->nft
 }
 
@@ -119,7 +119,7 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
 	}
 	p.lastContentTypeId = p.status.ContentTypeCount
 
-	p.actionBufferMap = make(map[int][]*InscribeInfo)
+	p.actionBufferMap = make(map[int]map[int][]*InscribeInfo)
 	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
 }
 
@@ -354,7 +354,7 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 }
 
 // 每个NFT Mint都调用
-func (p *NftIndexer) NftMint(input *common.TxInput, satpoint int64, nft *common.Nft) {
+func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.Nft) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -369,12 +369,18 @@ func (p *NftIndexer) NftMint(input *common.TxInput, satpoint int64, nft *common.
 
 	info := &InscribeInfo{
 		Input: input,
-		InOffset: satpoint,
+		InOffset: inOffset,
 		UtxoId: nft.UtxoId,
 		Nft:   nft,
 	}
 
-	p.actionBufferMap[input.InTxIndex] = append(p.actionBufferMap[input.InTxIndex], info)
+	txMap, ok := p.actionBufferMap[input.InTxIndex]
+	if !ok {
+		txMap = make(map[int][]*InscribeInfo)
+		p.actionBufferMap[input.InTxIndex] = txMap
+	}
+	txMap[input.TxInIndex] = append(txMap[input.TxInIndex], info)
+
 	p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
 	p.nftAdded = append(p.nftAdded, nft)
 }
@@ -389,35 +395,43 @@ func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 
 	totalTxs := len(block.Transactions)
 	mid := make([]*pair, 0)
-	for txIndex, txIndexVector := range p.actionBufferMap {
-		for idx2, info := range txIndexVector {
-			idx := txIndex
-			if info.Nft.Base.Sat < 0 { 
-				// unbound
-				idx += totalTxs + 1
-			}
-			_, outTxIndex, _ := common.FromUtxoId(info.UtxoId)
-			if outTxIndex == 0 {
-				// fee spent
-				idx += totalTxs
-			}
-			if info.InOffset > 0xffffffff {
-				common.Log.Panicf("%s has too big offset %x", info.Input.TxId, info.InOffset)
-			}
-			if idx > 0xffff {
-				common.Log.Panicf("%s has too big index %x", info.Input.TxId, idx)
-			}
+	for txIndex, txIndexMap := range p.actionBufferMap {
+		for txInIndex, infoVector := range txIndexMap {
+			for idx3, info := range infoVector {
+				idx := txIndex
+				if info.Nft.Base.Sat < 0 { 
+					// unbound
+					idx += totalTxs + 1
+				}
+				_, outTxIndex, _ := common.FromUtxoId(info.UtxoId)
+				if outTxIndex == 0 {
+					// fee spent
+					idx += totalTxs
+				}
+				if idx > 0x7fff {
+					common.Log.Panicf("%s has too big index %x", info.Input.TxId, idx)
+				}
 
-			// txIn内部铭文顺序
-			if idx2 > 0xffff {
-				common.Log.Panicf("%s has too big TxIn index %x", info.Input.TxId, idx2)
+				idx2 := txInIndex
+				if idx2 > 0x1fff {
+					common.Log.Panicf("%s has too many input %x", info.Input.TxId, idx2)
+				}
+				
+				// txIn内部铭文顺序
+				if idx3 > 0xfff {
+					common.Log.Panicf("%s has too many inscription %x", info.Input.TxId, idx3)
+				}
+
+				if info.InOffset > 0xffffff { 
+					common.Log.Panicf("%s has too big offset %x", info.Input.TxId, info.InOffset)
+				}
+				seq := (uint64(idx)<<49 | uint64(idx2)<<36 | uint64(idx3)<<24 | uint64(info.InOffset)) 
+				item := &pair{
+					seq:    seq,
+					info:   info,
+				}
+				mid = append(mid, item)
 			}
-			seq := (uint64(idx)<<48 | uint64(idx2)<<32 | uint64(info.InOffset)) 
-			item := &pair{
-				seq:    seq,
-				info:   info,
-			}
-			mid = append(mid, item)
 		}
 	}
 	sort.Slice(mid, func(i, j int) bool {
@@ -430,13 +444,13 @@ func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 
 		p.nftMint(item.info)
 
-		if nft.Base.InscriptionId == "6c0f375ddfd2f24e4cf96e21a817a84ddc133ce0ad6b382ac90e8e6de3a11712i0" {
+		if nft.Base.InscriptionId == "d725216e18e5b75cfaf5f0c7043ea8450c36d74fa6c2bdb229532700594e921bi0" {
 			traceTaget = nft.Base.Id
 		}
 	}
 
 	if traceTaget != 0 {
-		for i := traceTaget - 100; i <= traceTaget; i++ {
+		for i := traceTaget - 100; i <= traceTaget+10; i++ {
 			nft := p.getNftWithId(i)
 			common.Log.Infof("%d %s", i, nft.Base.InscriptionId)
 		}
@@ -686,7 +700,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	p.processInscribeInBlock(block)
 
 	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
-	p.actionBufferMap = make(map[int][]*InscribeInfo)
+	p.actionBufferMap = make(map[int]map[int][]*InscribeInfo)
 
 	p.CheckPointWithBlockHeight(block.Height)
 

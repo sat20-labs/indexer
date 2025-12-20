@@ -30,7 +30,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 		id := 0
 		for i, input := range tx.Inputs {
 
-			// if tx.TxId == "fbfa79f18e1132adf767a03f64776e412c13229693a5e6af55f8835f101b7615" {
+			// if tx.TxId == "d725216e18e5b75cfaf5f0c7043ea8450c36d74fa6c2bdb229532700594e921b" {
 			// 	common.Log.Info("")
 			// }
 
@@ -68,10 +68,102 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	common.Log.Infof("processOrdProtocol %d is done, cost: %v", block.Height, time.Since(measureStartTime))
 }
 
-// satpoint 是聪在输入端TxIn中的位置，offset是聪在输出端TxOut的位置
+// satpointer 是聪在输入端所有TxIn中的位置
+// 返回聪在输入TxIn和offset，输出TxOut和offset
 func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
-	inputIndex, txIndex int, tx *common.Transaction, satpoint int64) (*common.TxOutputV2, int64, int64) {
+	txIndex int, tx *common.Transaction, satpointer int64) (
+	*common.TxInput, int64, *common.TxOutputV2, int64) {
 
+	// 看看聪在哪一个输入中
+	var inOffset int64
+	var input *common.TxInput
+	
+	// 带pointer的铭文，需要从reveal tx的所有输入开始定位聪
+	var outValue int64
+	for _, txOut := range tx.Outputs {
+		if txOut.OutValue.Value == 0 {
+			continue
+		}
+		if outValue+txOut.OutValue.Value > int64(satpointer) {
+			var inValue int64
+			for _, txIn := range tx.Inputs {
+				if txIn.OutValue.Value == 0 {
+					continue
+				}
+				if inValue+txIn.OutValue.Value > int64(satpointer) {
+					input = txIn
+					inOffset = satpointer - inValue
+					break
+				}
+				inValue += txIn.OutValue.Value
+			}
+
+			return input, inOffset, txOut, satpointer - outValue
+		}
+		outValue += txOut.OutValue.Value
+	}
+	
+	if satpointer > 0 {
+		// 可能pointer太大，超出output的范畴，默认使用第一个非零输出
+		// testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017bi0
+		// e9099189d9755bc537ff4cdf2c6ea0b5f200005eeac8d85f8490d1cbd45f9c59i0
+		satpointer = 0
+		outValue = 0
+		
+		for _, txOut := range tx.Outputs {
+			if txOut.OutValue.Value != 0 {
+				for _, txIn := range tx.Inputs {
+					if txIn.OutValue.Value != 0 {
+						input = txIn
+						break
+					}
+				}
+				return input, 0, txOut, 0
+			}
+		}
+		// 如果satpoint大于0，但是不在输出中，修改satpoint的值为0
+		// 到奖励聪继续找
+	}
+
+	// 如果satpoint == 0，聪输出在奖励区块中
+	// testnet4: 408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74 输出为0
+	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 多个输出
+
+	for _, txIn := range tx.Inputs {
+		if txIn.OutValue.Value != 0 {
+			input = txIn
+			break
+		}
+	}
+
+	// 作为网络费用给到了矿工，位置在手续费的0位置
+	var baseOffset int64
+	for i := 0; i < txIndex; i++ { // 0 是奖励聪，跳过前面index-1个交易的手续费，
+		baseOffset += coinbase[i].Size
+	}
+
+	coinbaseTx := block.Transactions[0]
+	outValue = 0
+	for _, txOut := range coinbaseTx.Outputs {
+		if txOut.OutValue.Value == 0 {
+			continue
+		}
+		if outValue+txOut.OutValue.Value > baseOffset {
+			return input, 0, txOut, baseOffset - outValue
+		}
+		outValue += txOut.OutValue.Value
+	}
+	// 没有绑定聪的铭文
+	return nil, 0, nil, 0
+}
+
+// 聪在输出端TxOut和位置offset
+func findOutput(block *common.Block, coinbase []*common.Range,
+	inputIndex, txIndex int, tx *common.Transaction) (
+	*common.TxOutputV2, int64) {
+	// 不带pointer的铭文，聪在该输入的第一个聪
+
+	var inOffset int64
 	// non first input in tx
 	var baseOffset int64
 	if inputIndex != 0 {
@@ -84,36 +176,18 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	}
 
 	var outValue int64
-	satpoint += baseOffset
+	inOffset += baseOffset
 	for _, txOut := range tx.Outputs {
 		if txOut.OutValue.Value == 0 {
 			continue
 		}
-		if outValue+txOut.OutValue.Value > int64(satpoint) {
-			return txOut, satpoint, satpoint - outValue
+		if outValue+txOut.OutValue.Value > int64(inOffset) {
+			return txOut, inOffset - outValue
 		}
 		outValue += txOut.OutValue.Value
 	}
-	if satpoint > 0 {
-		// 找不到输出，默认使用第一个非零输出（注意需要跳过inputIndex）
-		// testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017bi0
-		// e9099189d9755bc537ff4cdf2c6ea0b5f200005eeac8d85f8490d1cbd45f9c59i0
-		satpoint = baseOffset
-		outValue = 0
-		for _, txOut := range tx.Outputs {
-			if txOut.OutValue.Value == 0 {
-				continue
-			}
-			if outValue+txOut.OutValue.Value > int64(satpoint) {
-				return txOut, satpoint, satpoint - outValue
-			}
-			outValue += txOut.OutValue.Value
-		}
-		// 如果satpoint大于0，但是不在输出中，修改satpoint的值为0
-		// 到奖励聪继续找
-	}
 
-	// 如果satpoint == 0，聪输出在奖励区块中
+	// 聪输出在奖励区块中
 	// testnet4: 408d74bb4c068c4a43282af3d3b403c285ea0863f63c7bddbd6a064006e3ea74 输出为0
 	// testnet4: 4bee6242e4ef88e632b7061686ee60f9a0000c85071263ccb44a8aeb83c5072f 多个输出
 
@@ -130,15 +204,15 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 			continue
 		}
 		if outValue+txOut.OutValue.Value > baseOffset {
-			return txOut, 0, baseOffset - outValue
+			return txOut, baseOffset - outValue
 		}
 		outValue += txOut.OutValue.Value
 	}
 	// 没有绑定聪的铭文
-	return nil, 0, 0
+	return nil, 0
 }
 
-func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
+func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutputV2, outOffset int64,
 	content *common.OrdxDeployContent, nft *common.Nft) *common.Ticker {
 	height := nft.Base.BlockHeight
 	// 去掉这个限制
@@ -330,7 +404,7 @@ func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out 
 	}
 
 	// 确保输出在output中
-	if out.OutValue.Value < satpoint {
+	if out.OutValue.Value < outOffset {
 		common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, ranges not in output",
 			nft.Base.InscriptionId, content.Ticker)
 		return nil
@@ -366,7 +440,7 @@ func (s *IndexerMgr) handleDeployTicker(satpoint int64, in *common.TxInput, out 
 	return ticker
 }
 
-func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
+func (s *IndexerMgr) handleMintTicker(in *common.TxInput, inOffset int64, out *common.TxOutputV2,
 	content *common.OrdxMintContent, nft *common.Nft) *common.Mint {
 	inscriptionId := nft.Base.InscriptionId
 	height := nft.Base.BlockHeight
@@ -426,8 +500,8 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	satsNum := int64(amt) / int64(deployTicker.N)
 	newRngs := common.AssetOffsets{
 		{
-			Start: satpoint,
-			End:   satpoint + satsNum,
+			Start: inOffset,
+			End:   inOffset + satsNum,
 		},
 	}
 
@@ -441,7 +515,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 				Ticker:   deployTicker.Attr.Rarity,
 			}
 			exoticranges := in.Offsets[exoticName]
-			newRngs = exoticranges.Pickup(satpoint, satsNum)
+			newRngs = exoticranges.Pickup(inOffset, satsNum)
 			if len(newRngs) == 0 {
 				common.Log.Infof("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, but no enough exotic satoshi", inscriptionId, content.Ticker)
 				return nil
@@ -482,7 +556,7 @@ func (s *IndexerMgr) handleMintTicker(satpoint int64, in *common.TxInput, out *c
 	return mint
 }
 
-func (s *IndexerMgr) handleBrc20DeployTicker(satpoint int64, out *common.TxOutputV2,
+func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	content *common.BRC20DeployContent, nft *common.Nft) *common.BRC20Ticker {
 
 	ticker := &common.BRC20Ticker{
@@ -572,7 +646,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(satpoint int64, out *common.TxOutpu
 	return ticker
 }
 
-func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV2,
+func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 	content *common.BRC20MintContent, nft *common.Nft) *common.BRC20Mint {
 	ticker := s.brc20Indexer.GetTicker(content.Ticker)
 	if ticker == nil {
@@ -622,7 +696,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(satpoint int64, out *common.TxOutputV
 	return mint
 }
 
-func (s *IndexerMgr) handleBrc20TransferTicker(satpoint int64, out *common.TxOutputV2,
+func (s *IndexerMgr) handleBrc20TransferTicker(out *common.TxOutputV2,
 	content *common.BRC20TransferContent, nft *common.Nft) *common.BRC20Transfer {
 	inscriptionId := nft.Base.InscriptionId
 	ticker := s.brc20Indexer.GetTicker(content.Ticker)
@@ -776,7 +850,8 @@ func (s *IndexerMgr) handleNameRouting(content *common.OrdxUpdateContentV2, nft 
 	s.ns.NameUpdate(update)
 }
 
-func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.TxOutputV2,
+func (s *IndexerMgr) handleOrdX(in *common.TxInput, out *common.TxOutputV2,
+	inOffset, outOffset int64,
 	insc *ord.InscriptionResult, nft *common.Nft) {
 	ordxInfo, bOrdx := ord.IsOrdXProtocol(insc)
 	if !bOrdx {
@@ -797,7 +872,7 @@ func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.
 			return
 		}
 
-		ticker := s.handleDeployTicker(satpoint, in, out, deployInfo, nft)
+		ticker := s.handleDeployTicker(in, out, outOffset, deployInfo, nft)
 		if ticker == nil {
 			return
 		}
@@ -816,7 +891,7 @@ func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.
 			return
 		}
 
-		mint := s.handleMintTicker(satpoint, in, out, mintInfo, nft)
+		mint := s.handleMintTicker(in, inOffset, out, mintInfo, nft)
 		if mint == nil {
 			return
 		}
@@ -828,7 +903,7 @@ func (s *IndexerMgr) handleOrdX(satpoint int64, in *common.TxInput, out *common.
 	}
 }
 
-func (s *IndexerMgr) handleBrc20(input *common.TxInput, satpoint int64, out *common.TxOutputV2,
+func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 	insc *ord.InscriptionResult, nft *common.Nft) {
 
 	content := string(insc.Inscription.Body)
@@ -866,7 +941,7 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, satpoint int64, out *com
 			return
 		}
 
-		ticker := s.handleBrc20DeployTicker(satpoint, out, deployInfo, nft)
+		ticker := s.handleBrc20DeployTicker(out, deployInfo, nft)
 		if ticker == nil {
 			return
 		}
@@ -884,7 +959,7 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, satpoint int64, out *com
 		// 	common.Log.Info("mint brc20 ticker is box1")
 		// }
 
-		mint := s.handleBrc20MintTicker(satpoint, out, mintInfo, nft)
+		mint := s.handleBrc20MintTicker(out, mintInfo, nft)
 		if mint == nil {
 			return
 		}
@@ -902,7 +977,7 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, satpoint int64, out *com
 		// 	common.Log.Info("transfer brc20 ticker is box1")
 		// }
 
-		transfer := s.handleBrc20TransferTicker(satpoint, out, transferInfo, nft)
+		transfer := s.handleBrc20TransferTicker(out, transferInfo, nft)
 		if transfer == nil {
 			return
 		}
@@ -918,25 +993,37 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
 
-	// if tx.TxId == "c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151" {
+	// if tx.TxId == "d725216e18e5b75cfaf5f0c7043ea8450c36d74fa6c2bdb229532700594e921b" {
 	// 	common.Log.Infof("")
 	// }
 
-	satpoint := int64(0)
-	if insc.Inscription.Pointer != nil {
-		satpoint = int64(common.GetSatpoint(insc.Inscription.Pointer))
-	}
+	// 1. 无 pointer：铭刻 sat = inscription 所在 txIn 的第 0 个 sat
+	// 2. 有 pointer：铭刻 sat = reveal tx 所有 txIn 拼接后的第 pointer 个 sat
 	index := int(insc.TxInIndex) // index of input in tx
-
+	var inOffset, outOffset int64
 	var output *common.TxOutputV2
-	// 遵循ordinals的规则
-	var offset int64
-	if input.OutValue.Value != 0 {
-		output, satpoint, offset = findOutputWithSatPoint(block, coinbase, index, txIndex, tx, satpoint)
+	if insc.Inscription.Pointer != nil {
+		satpointer := int64(common.GetSatPointer(insc.Inscription.Pointer))
+		var hasValue bool
+		for _, txIn := range tx.Inputs {
+			if txIn.OutValue.Value != 0 {
+				hasValue = true
+				break
+			}
+		}
+		if hasValue {
+			input, inOffset, output, outOffset = findOutputWithSatPoint(block, coinbase, txIndex, tx, satpointer)
+		}
+		// else unbound
+	} else {
+		if input.OutValue.Value != 0 {
+			output, outOffset = findOutput(block, coinbase, index, txIndex, tx)
+		} 
+		// else unbound
 	}
 
 	// 1. 先保存nft数据
-	nft := s.handleNft(input, output, satpoint, offset, insc, inscriptionId, tx, block)
+	nft := s.handleNft(input, output, inOffset, outOffset, insc, inscriptionId, txIndex, tx, block)
 	if nft == nil {
 		return
 	}
@@ -953,7 +1040,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	protocol, content := ord.GetProtocol(insc)
 	switch protocol {
 	case "ordx":
-		s.handleOrdX(satpoint, input, output, insc, nft)
+		s.handleOrdX(input, output, inOffset, outOffset, insc, nft)
 	case "sns":
 		domain := common.ParseDomainContent(string(insc.Inscription.Body))
 		if domain == nil {
@@ -989,7 +1076,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
 		// 	return
 		// }
-		if nft.Base.CurseType != 0 { 
+		if nft.Base.CurseType != 0 {
 			common.Log.Infof("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
 			if block.Height < 824544 { // Jubilee
 				return
@@ -997,7 +1084,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 			// vindicated
 		}
 
-		s.handleBrc20(input, satpoint, output, insc, nft)
+		s.handleBrc20(input, output, insc, nft)
 
 	case "primary-name":
 		primaryNameContent := common.ParseCommonContent(string(insc.Inscription.Body))
@@ -1070,8 +1157,8 @@ func (s *IndexerMgr) handleSnsName(name string, nft *common.Nft) {
 	}
 }
 
-func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2, satpoint, offset int64,
-	insc *ord.InscriptionResult, inscriptionId int, tx *common.Transaction, block *common.Block) *common.Nft {
+func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2, inOffset, outOffset int64,
+	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction, block *common.Block) *common.Nft {
 
 	var addressId, utxoId uint64
 	var sat, outpoint int64
@@ -1079,7 +1166,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		sat = int64(common.ToUtxoId(output.OutHeight, output.OutTxIndex, inscriptionId))
 		addressId = output.AddressId
 		utxoId = output.UtxoId
-		outpoint = offset
+		outpoint = outOffset
 	} else {
 		sat = -1
 		addressId = common.INVALID_ID
@@ -1108,26 +1195,14 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		},
 		OwnerAddressId: addressId,
 		UtxoId:         utxoId,
-		Offset:         offset,
+		Offset:         outOffset,
 	}
-	s.nft.NftMint(input, satpoint, &nft)
+	s.nft.NftMint(input, inOffset, &nft)
 	if !insc.IsCursed && nft.Base.CurseType != 0 {
 		insc.IsCursed = true
 		insc.CurseReason = ordCommon.Curse(nft.Base.CurseType)
 	}
 	return &nft
-}
-
-func getSatInRange(common []*common.Range, satpoint int64) int64 {
-	for _, rng := range common {
-		if satpoint >= (rng.Size) {
-			satpoint -= (rng.Size)
-		} else {
-			return rng.Start + int64(satpoint)
-		}
-	}
-
-	return -1
 }
 
 // func (s *IndexerMgr) hasSameTickerInRange(ticker string, rngs []*common.Range) bool {
