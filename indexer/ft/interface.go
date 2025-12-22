@@ -207,10 +207,8 @@ func (p *FTIndexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]
 			continue
 		}
 
-		for k, assetVector := range info.Tickers {
-			for _, v := range assetVector {
-				result[k] += v.AssetAmt()
-			}
+		for k, v := range info.Tickers {
+			result[k] += v.AssetAmt()
 		}
 	}
 
@@ -228,14 +226,12 @@ func (p *FTIndexer) getAssetAmtByAddress(address uint64, tickerName string) int6
 			continue
 		}
 
-		tickers, ok := info.Tickers[tickerName]
+		assetInfo, ok := info.Tickers[tickerName]
 		if !ok {
 			continue
 		}
 
-		for _, v := range tickers {
-			result += v.AssetAmt()
-		}
+		result += assetInfo.AssetAmt()
 	}
 	return result
 }
@@ -285,13 +281,9 @@ func (p *FTIndexer) GetAssetsWithUtxo(utxo uint64) map[string]common.AssetOffset
 
 	holders := p.holderInfo[utxo]
 	if holders != nil {
-		for ticker, assetVector := range holders.Tickers {
+		for ticker, assetInfo := range holders.Tickers {
 			// deep copy
-			var offsets common.AssetOffsets
-			for _, info := range assetVector {
-				offsets.Merge(info.Offsets)
-			}
-			result[ticker] = offsets
+			result[ticker] = assetInfo.Offsets.Clone()
 		}
 		return result
 	}
@@ -308,13 +300,9 @@ func (p *FTIndexer) GetAssetsWithUtxoV2(utxo uint64) map[string]int64 {
 
 	holders := p.holderInfo[utxo]
 	if holders != nil {
-		for ticker, assetVector := range holders.Tickers {
+		for ticker, assetInfo := range holders.Tickers {
 			// deep copy
-			var amt int64
-			for _, info := range assetVector {
-				amt += info.AssetAmt()
-			}
-			result[ticker] = amt
+			result[ticker] = assetInfo.AssetAmt()
 		}
 		return result
 	}
@@ -348,17 +336,12 @@ func (p *FTIndexer) GetAssetsWithUtxoV3(utxo uint64, tickerName string) int64 {
 		return 0
 	}
 
-	tickInfoVector := holder.Tickers[tickerName]
-	if tickInfoVector == nil {
+	tickAssetInfo := holder.Tickers[tickerName]
+	if tickAssetInfo == nil {
 		return 0
 	}
 
-	var amt int64
-	for _, info := range tickInfoVector {
-		amt += info.AssetAmt()
-	}
-
-	return amt
+	return tickAssetInfo.AssetAmt()
 }
 
 // return: mint的ticker名字

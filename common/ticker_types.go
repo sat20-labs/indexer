@@ -59,7 +59,6 @@ type MintAbbrInfo struct {
 
 // 某个utxo中的某种资产数据
 type AssetAbbrInfo struct {
-	MintingNftId  int64 // 还在铸造中，不确定是否有效
 	BindingSat int
 	Offsets    AssetOffsets
 }
@@ -70,7 +69,6 @@ func (p *AssetAbbrInfo) AssetAmt() int64 {
 
 func (p *AssetAbbrInfo) Clone() *AssetAbbrInfo {
 	return &AssetAbbrInfo{
-		MintingNftId: p.MintingNftId,
 		BindingSat: p.BindingSat,
 		Offsets: p.Offsets.Clone(),
 	}

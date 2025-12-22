@@ -15,6 +15,12 @@ type HolderInfo = exotic.HolderInfo
 
 type HolderAction = exotic.HolderAction
 
+type ActionInfo struct {
+	Action int
+	Input *common.TxInput
+	Info   any
+}
+
 // TODO 加载所有数据，太耗时间和内存，需要优化，参考nft和brc20模块 (目前数据量少，问题不大)
 type FTIndexer struct {
 	db           common.KVDB
@@ -32,6 +38,9 @@ type FTIndexer struct {
 	// 其他辅助信息
 	holderActionList []*HolderAction           // 在同一个block中，状态变迁需要按顺序执行，因为一个utxo会很快被消费掉，变成新的utxo
 	tickerAdded      map[string]*common.Ticker // key: ticker
+
+	// 一个区块的缓存数据，不需要备份
+	actionBufferMap map[uint64][]*ActionInfo // 一个区块中，增量的mint在哪个输入中 utxoId->mint
 
 	// 校验数据，不需要保存
 	holderMapInPrevBlock map[uint64]int64
@@ -95,18 +104,9 @@ func (s *FTIndexer) Clone() *FTIndexer {
 		if action.Action > 0 {
 			value, ok := s.holderInfo[action.UtxoId]
 			if ok {
-				newTickerInfo := make(map[string]map[int64]*common.AssetAbbrInfo)
+				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
 				for k, assets := range value.Tickers {
-					assetVector := make(map[int64]*common.AssetAbbrInfo, len(assets))
-					for i, v := range assets {
-						newAssetInfo := &common.AssetAbbrInfo{
-							MintingNftId: v.MintingNftId,
-							BindingSat:   v.BindingSat,
-							Offsets:      v.Offsets.Clone(),
-						}
-						assetVector[i] = newAssetInfo
-					}
-					newTickerInfo[k] = assetVector
+					newTickerInfo[k] = assets.Clone()
 				}
 				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
 				newInst.holderInfo[action.UtxoId] = &info
@@ -188,13 +188,9 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 		s.holderInfo = s.loadHolderInfoFromDB()
 		// 更新ticker数据的utxo数据
 		for utxoId, holder := range s.holderInfo {
-			for name, assetInfoMap := range holder.Tickers {
+			for name, assetInfo := range holder.Tickers {
 				ticker := s.tickerMap[name]
-				var offsets common.AssetOffsets
-				for _, asset := range assetInfoMap {
-					offsets.Merge(asset.Offsets)
-				}
-				ticker.UtxoMap[utxoId] = offsets
+				ticker.UtxoMap[utxoId] = assetInfo.Offsets.Clone()
 			}
 		}
 		s.utxoMap = s.loadUtxoMapFromDB()
@@ -248,16 +244,13 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holdermap", name, utxo)
 					return false
 				}
-				tickInfoVector, ok := holderInfo.Tickers[name]
+				tickAssetInfo, ok := holderInfo.Tickers[name]
 				if !ok {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holders", name, utxo)
 					return false
 				}
 
-				var amountInHolder int64
-				for _, info := range tickInfoVector {
-					amountInHolder += info.AssetAmt()
-				}
+				amountInHolder := tickAssetInfo.AssetAmt()
 				if amountInHolder != amoutInUtxo {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
 					return false

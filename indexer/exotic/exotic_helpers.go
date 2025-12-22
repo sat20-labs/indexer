@@ -102,7 +102,6 @@ func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinba
 
 					p.addTickerAsset(name, txOut.UtxoId, offsets)
 					assetInfo := &common.AssetAbbrInfo{
-						MintingNftId: p.status.Count,
 						BindingSat: int(asset.BindingSat), 
 						Offsets: offsets}
 					p.addHolder(txOut, asset.Name.Ticker, assetInfo)

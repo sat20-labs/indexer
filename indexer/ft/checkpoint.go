@@ -28,6 +28,8 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 		Tickers: map[string]*TickerStatus{
 			"RarePizza": {DeployHeight: 31894},
 			"dogecoin": {DeployHeight: 60886}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"fail02": {DeployHeight: 29008},
+			"fair01": {DeployHeight: 28883},
 		},
 	},
 

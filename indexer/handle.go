@@ -755,7 +755,7 @@ func (s *IndexerMgr) handleNameRegister(content *common.OrdxRegContent, nft *com
 	}
 }
 
-func (s *IndexerMgr) handleNameUpdate(content *common.OrdxUpdateContentV2, nft *common.Nft) {
+func (s *IndexerMgr) handleNameUpdate(input *common.TxInput, content *common.OrdxUpdateContentV2, nft *common.Nft) {
 
 	content.Name = strings.ToLower(content.Name)
 
@@ -789,7 +789,7 @@ func (s *IndexerMgr) handleNameUpdate(content *common.OrdxUpdateContentV2, nft *
 		}
 		if delegate != "" {
 			ticker.Base.Delegate = delegate
-			s.ftIndexer.UpdateTick(ticker)
+			s.ftIndexer.UpdateTick(input, ticker)
 		}
 	}
 
@@ -877,7 +877,7 @@ func (s *IndexerMgr) handleOrdX(in *common.TxInput, out *common.TxOutputV2,
 			return
 		}
 
-		s.ftIndexer.UpdateTick(ticker)
+		s.ftIndexer.UpdateTick(in, ticker)
 
 	case "mint":
 		mintInfo := common.ParseMintContent(ordxInfo)
@@ -1069,7 +1069,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 				if updateInfo == nil {
 					return
 				}
-				s.handleNameUpdate(updateInfo, nft)
+				s.handleNameUpdate(input, updateInfo, nft)
 			}
 		}
 	case "brc-20":
@@ -1091,7 +1091,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		if primaryNameContent != nil {
 			switch primaryNameContent.Op {
 			case "update":
-				s.handleNameUpdate(primaryNameContent, nft)
+				s.handleNameUpdate(input, primaryNameContent, nft)
 			}
 		}
 		// {
