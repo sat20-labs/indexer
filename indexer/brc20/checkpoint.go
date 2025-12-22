@@ -777,7 +777,9 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			if len(diff2) > 0 {
 				common.Log.Infof("not in validate data but occur in our process")
 				for _, v := range diff2 {
-					common.Log.Infof("%v", tobeMap[v])
+					common.Log.Infof("history item: %v", v)
+					nft := p.nftIndexer.GetNftWithId(tobeMap[v].NftId)
+					common.Log.Infof("nft: %v", nft)
 				}
 			}
 

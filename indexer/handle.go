@@ -412,7 +412,7 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 
 	nft.Base.UserData = []byte(content.Ticker)
 	ticker := &common.Ticker{
-		Base:       common.CloneBaseContent(nft.Base),
+		Base:       nft.Base,
 		Name:       content.Ticker,
 		Desc:       content.Des,
 		Type:       common.ASSET_TYPE_FT,
@@ -545,7 +545,7 @@ func (s *IndexerMgr) handleMintTicker(in *common.TxInput, inOffset int64, out *c
 
 	nft.Base.TypeName = common.ASSET_TYPE_FT
 	mint := &common.Mint{
-		Base:    common.CloneBaseContent(nft.Base),
+		Base:    nft.Base,
 		Name:    content.Ticker,
 		UtxoId:  in.UtxoId, // ordx资产需要从input的聪中分配
 		Offsets: newRngs,

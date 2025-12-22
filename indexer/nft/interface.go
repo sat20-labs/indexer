@@ -12,7 +12,6 @@ func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
 	return len(sats) != 0
 }
 
-
 func (p *NftIndexer) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -24,7 +23,7 @@ func (p *NftIndexer) getNftWithInscriptionId(inscriptionId string) *common.Nft {
 		return nil
 	}
 
-	nft := p.getNftInBuffer2(inscriptionId)
+	nft := p.getNftInBufferWithInscriptionId(inscriptionId)
 	if nft != nil {
 		return nft
 	}
@@ -35,25 +34,24 @@ func (p *NftIndexer) getNftWithInscriptionId(inscriptionId string) *common.Nft {
 	if err != nil {
 		//common.Log.Errorf("GetValueFromDB with inscription %s failed. %v", inscriptionId, err)
 		return nil
-	} 
-	
+	}
+
 	nfts := p.getNftsWithSat(value.Sat)
 	if nfts != nil {
 		for _, nftId := range nfts.Nfts {
 			if nftId == value.Id {
-				var nft common.InscribeBaseContent
-				err := p.loadNftFromDB(nftId, &nft)
+				nft, err := p.loadNftFromDB(nftId)
 				if err != nil {
 					return nil
 				}
+				nft.OwnerAddressId = nfts.OwnerAddressId
+				nft.UtxoId = nfts.UtxoId
+				nft.Offset = nfts.Offset
 
-				return &common.Nft{
-					Base:           &nft,
-					OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId, Offset: nfts.Offset}
+				return nft
 			}
 		}
 	}
-	
 
 	return nil
 }
@@ -96,7 +94,7 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) map[int64]int64 {
 		result[sat] = offset
 	}
 
-	return result	
+	return result
 }
 
 func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
@@ -126,7 +124,6 @@ func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 	return result
 }
 
-
 func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
@@ -134,7 +131,7 @@ func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 }
 
 func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
-	
+
 	nft := p.getNftInBuffer(id)
 	if nft != nil {
 		return nft
@@ -154,20 +151,20 @@ func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
 
 	for _, nftId := range nfts.Nfts {
 		if nftId == id {
-			var nft common.InscribeBaseContent
-			err := p.loadNftFromDB(nftId, &nft)
+			nft, err := p.loadNftFromDB(nftId)
 			if err != nil {
 				return nil
 			}
-			return &common.Nft{
-				Base:           &nft,
-				OwnerAddressId: nfts.OwnerAddressId, UtxoId: nfts.UtxoId, Offset: nfts.Offset}
+			nft.OwnerAddressId = nfts.OwnerAddressId
+			nft.UtxoId = nfts.UtxoId
+			nft.Offset = nfts.Offset
+
+			return nft
 		}
 	}
 
 	return nil
 }
-
 
 func (p *NftIndexer) getNftBaseWithId(id int64) *common.InscribeBaseContent {
 	nft := p.getNftInBuffer(id)
@@ -175,12 +172,12 @@ func (p *NftIndexer) getNftBaseWithId(id int64) *common.InscribeBaseContent {
 		return nft.Base
 	}
 
-	var base common.InscribeBaseContent
-	err := p.loadNftFromDB(id, &base)
+	nft, err := p.loadNftFromDB(id)
 	if err != nil {
 		return nil
 	}
-	return &base
+
+	return nft.Base
 }
 
 func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
@@ -211,7 +208,7 @@ func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 	if err != nil {
 		return nil
 	}
-	
+
 	return nfts
 }
 
@@ -287,7 +284,24 @@ func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, proof []byte) error {
 	return nil
 }
 
-func (p *NftIndexer) loadNftFromDB(nftId int64, value *common.InscribeBaseContent) error {
+// 当前状态还没有设置
+func (p *NftIndexer) loadNftFromDB(nftId int64) (*common.Nft, error) {
+	var baseContent common.InscribeBaseContent
+	err := p.loadNftBaseConentFromDB(nftId, &baseContent)
+	if err != nil {
+		return nil, err
+	}
+
+	nft := &common.Nft{
+		Base: &baseContent,
+	}
+
+	p.inscriptionToNftIdMap[baseContent.InscriptionId] = nft
+	p.nftIdToinscriptionMap[baseContent.Id] = nft
+	return nft, nil
+}
+
+func (p *NftIndexer) loadNftBaseConentFromDB(nftId int64, value *common.InscribeBaseContent) error {
 	err := loadNftFromDB(nftId, value, p.db)
 	if err != nil {
 		return err
@@ -305,18 +319,18 @@ func (p *NftIndexer) loadNftFromDB(nftId int64, value *common.InscribeBaseConten
 		}
 	}
 	if len(value.Delegate) != 0 && len(value.Delegate) < 16 {
-		nftId, err := strconv.ParseInt(value.Delegate, 16, 64)
+		id, err := strconv.ParseInt(value.Delegate, 16, 64)
 		if err == nil {
-			inscriptionId, err := p.getInscriptionIdByNftId(nftId)
+			inscriptionId, err := p.getInscriptionIdByNftId(id)
 			if err == nil {
 				value.Delegate = inscriptionId
 			}
 		}
 	}
 	if len(value.Parent) != 0 && len(value.Parent) < 16 {
-		nftId, err := strconv.ParseInt(value.Parent, 16, 64)
+		id, err := strconv.ParseInt(value.Parent, 16, 64)
 		if err == nil {
-			inscriptionId, err := p.getInscriptionIdByNftId(nftId)
+			inscriptionId, err := p.getInscriptionIdByNftId(id)
 			if err == nil {
 				value.Parent = inscriptionId
 			}

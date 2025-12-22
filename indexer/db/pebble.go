@@ -23,52 +23,132 @@ type pebbleDB struct {
 	db   *pebble.DB
 }
 
+/*
+用 小 SST + 单线程 compaction 编译，
+再用 大 cache + 大 block 服务，
+这是 工业级索引器（包括 CockroachDB 内部）常用的策略。
+*/
+
+// 数据编译期的参数
+// 编译期性能提升的正确路径是：
+// 更多 cache（不是更大 SST）
+// 更大的 memtable
+// 更精准的 bloom
+// 8KB block size
+func buildOptions() *pebble.Options {
+    cache := pebble.NewCache(32 << 30) // 32GB：显著提升随机读
+
+    return &pebble.Options{
+        Cache:        cache,
+        MaxOpenFiles: 50000,
+
+        // —— MemTable：极其关键 ——
+        MemTableSize:                64 << 20, // 64MB（提高热 key 命中）
+        MemTableStopWritesThreshold: 3,        // 最多 ~192MB memtable
+
+        // —— L0 控制 ——
+        L0CompactionThreshold:  6,
+        L0StopWritesThreshold:  12,
+
+        // —— 防止层级过大 ——
+        LBaseMaxBytes: 1 << 30, // 1GB
+
+        // —— compaction 仍然单线程，防 OOM ——
+        MaxConcurrentCompactions: func() int { return 1 },
+
+        Levels: func() []pebble.LevelOptions {
+            lvls := make([]pebble.LevelOptions, 7)
+            for i := range lvls {
+                lvls[i] = pebble.LevelOptions{
+                    TargetFileSize: 128 << 20, // 128MB：安全上限
+                    BlockSize:      8 << 10,   // 8KB：point lookup 最优区间
+                    FilterPolicy:   bloom.FilterPolicy(12), // ↑ Bloom 精度
+                    FilterType:     pebble.TableFilter,
+                }
+            }
+            return lvls
+        }(),
+    }
+}
+
+
+// 索引完成后，重启进程，用下面的参数打开同一个 DB：
+// 索引完成后，重启进程，用下面的参数打开同一个 DB：
+func serveOptions() *pebble.Options {
+    cache := pebble.NewCache(32 << 30) // 32GB
+
+    return &pebble.Options{
+        Cache:        cache,
+        MaxOpenFiles: 50000,
+
+        MemTableSize:                64 << 20,
+        MemTableStopWritesThreshold: 4,
+
+        // compaction 几乎不会发生
+        MaxConcurrentCompactions: func() int { return 2 },
+
+        Levels: func() []pebble.LevelOptions {
+            lvls := make([]pebble.LevelOptions, 7)
+            for i := range lvls {
+                lvls[i].TargetFileSize = 256 << 20 // 256MB
+                lvls[i].BlockSize = 16 << 10       // 提高点查效率
+                lvls[i].FilterPolicy = bloom.FilterPolicy(10)
+                lvls[i].FilterType = pebble.TableFilter
+            }
+            return lvls
+        }(),
+    }
+}
+
+
 func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 	if o == nil {
-		// 建议：Cache 设为机器内存的 20%~40%
-		cache := pebble.NewCache(8 << 30) // 4 GiB，可按需调整
-		// 可选：TableCache 默认够用；需要更高并发可单独配置
+		o = buildOptions()
+		
+		// // 建议：Cache 设为机器内存的 20%~40%
+		// cache := pebble.NewCache(16 << 30) // 16 GiB，可按需调整
+		// // 可选：TableCache 默认够用；需要更高并发可单独配置
 
 
-		o = &pebble.Options{
-			Cache:         cache,
-			MaxOpenFiles:  50000,      // 多SST场景减少频繁打开
-			MemTableSize:  256 << 20,  // 256MB：增大写缓冲，减少 flush 频率
-			// 当 memtable 压力大时阻断写入，防止 L0 过度堆积
-			MemTableStopWritesThreshold: 4,
+		// o = &pebble.Options{
+		// 	Cache:         cache,
+		// 	MaxOpenFiles:  50000,      // 多SST场景减少频繁打开
+		// 	MemTableSize:  64 << 20,  // 64MB：增大写缓冲，减少 flush 频率
+		// 	// 当 memtable 压力大时阻断写入，防止 L0 过度堆积
+		// 	MemTableStopWritesThreshold: 4,
 
-			// L0 门限：控制写入背压。NVMe 下可更激进些（更大阈值）
-			L0CompactionThreshold:  8,
-			L0StopWritesThreshold:  24, // 达到后暂停写入，给 compaction 让路
-			LBaseMaxBytes:          2 << 30, // L1 基准容量，放大后减少 L0→L1 频繁抖动
+		// 	// L0 门限：控制写入背压。NVMe 下可更激进些（更大阈值）
+		// 	L0CompactionThreshold:  8,
+		// 	L0StopWritesThreshold:  24, // 达到后暂停写入，给 compaction 让路
+		// 	LBaseMaxBytes:          2 << 30, // L1 基准容量，放大后减少 L0→L1 频繁抖动
 
-			// 并行压缩（非常关键，避免 compaction 成为瓶颈）
-			MaxConcurrentCompactions: func() int { return 4 },
+		// 	// 并行压缩（非常关键，避免 compaction 成为瓶颈）
+		// 	MaxConcurrentCompactions: func() int { return 1 },
 
-			Levels: func() []pebble.LevelOptions {
-				lvls := make([]pebble.LevelOptions, 7)
-				for i := range lvls {
-					lvls[i].TargetFileSize = 64 << 20  // 64 MiB；可逐层×2
-					lvls[i].BlockSize = 8 << 10       // 8 KiB（小 value， 适合点查）
-					lvls[i].FilterPolicy = bloom.FilterPolicy(10) // 10 bits/entry
-					lvls[i].FilterType = pebble.TableFilter
+		// 	Levels: func() []pebble.LevelOptions {
+		// 		lvls := make([]pebble.LevelOptions, 7)
+		// 		for i := range lvls {
+		// 			lvls[i].TargetFileSize = 64 << 20  // 64 MiB；可逐层×2
+		// 			lvls[i].BlockSize = 8 << 10       // 8 KiB（小 value， 适合点查）
+		// 			lvls[i].FilterPolicy = bloom.FilterPolicy(10) // 10 bits/entry
+		// 			lvls[i].FilterType = pebble.TableFilter
 
-					// if i > 0 {
-					// 	lvls[i].Compression = pebble.ZstdCompression // 压缩更大 TODO 后面测试后开启
-					// }
-				}
-				// 逐层放大 TargetFileSize（非必须，但对大数据集更友好）
-				for i := 1; i < len(lvls); i++ { 
-					lvls[i].TargetFileSize = lvls[i-1].TargetFileSize << 1 
-				}
-				return lvls
-			}(),
+		// 			// if i > 0 {
+		// 			// 	lvls[i].Compression = pebble.ZstdCompression // 压缩更大 TODO 后面测试后开启
+		// 			// }
+		// 		}
+		// 		// 逐层放大 TargetFileSize（非必须，但对大数据集更友好）
+		// 		for i := 1; i < len(lvls); i++ { 
+		// 			lvls[i].TargetFileSize = lvls[i-1].TargetFileSize << 1 
+		// 		}
+		// 		return lvls
+		// 	}(),
 
-			// WAL 同步策略：强一致用 Sync；追求吞吐可结合时间门限
-			// 注：WALMinSyncInterval 在新版本里可用（按你的 Pebble 版本）
-			// WALMinSyncInterval: func() time.Duration {return 5 * time.Millisecond},
-		}
-		//o.Levels[0].EnsureDefaults()
+		// 	// WAL 同步策略：强一致用 Sync；追求吞吐可结合时间门限
+		// 	// 注：WALMinSyncInterval 在新版本里可用（按你的 Pebble 版本）
+		// 	// WALMinSyncInterval: func() time.Duration {return 5 * time.Millisecond},
+		// }
+		// //o.Levels[0].EnsureDefaults()
 
 	
 		// o.TableCache = pebble.NewTableCache()
@@ -396,12 +476,16 @@ type pebbleWriteBatch struct {
 	closed bool
 }
 
+var PrintLog = false
 func (p *pebbleWriteBatch) Put(key, value []byte) error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
 
 	itemSize := len(key) + len(value)
+	if PrintLog {
+		common.Log.Infof("%s size %d", string(key), itemSize)
+	}
 
 	// 单条记录过大，单独提交
 	if itemSize >= maxItemSize {
@@ -435,7 +519,6 @@ func (p *pebbleWriteBatch) Flush() error {
 		return errors.New("writebatch closed")
 	}
 	err := p.batch.Commit(pebble.Sync)
-	p.closed = true
 	return err
 }
 
@@ -453,11 +536,14 @@ func (p *pebbleWriteBatch) ensureCapacity(extra int) error {
 	}
 
 	// 如果再写入 extra 后会超过阈值，先提交
-	if p.batch.Len()+extra >= maxBatchSize {
+	batchSize := p.batch.Len()
+	if batchSize+extra >= maxBatchSize {
+		common.Log.Infof("ensureCapacity commit data...")
 		if err := p.batch.Commit(pebble.Sync); err != nil {
 			return err
 		}
-		p.batch.Reset()
+		p.batch.Close()
+		p.batch = p.db.NewBatch()
 	}
 	return nil
 }
