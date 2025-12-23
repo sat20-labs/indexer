@@ -8,7 +8,7 @@ import (
 )
 
 func (p *NftIndexer) HasNftInUtxo(utxoId uint64) bool {
-	sats := p.GetBoundSatsWithUtxo(utxoId)
+	sats := p.GetSatsWithUtxo(utxoId)
 	return len(sats) != 0
 }
 
@@ -65,23 +65,11 @@ func (p *NftIndexer) GetNftHolderWithInscriptionId(inscriptionId string) uint64 
 }
 
 // key: sat
-func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) map[int64]int64 {
+func (p *NftIndexer) GetSatsWithUtxo(utxoId uint64) map[int64]int64 {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	sats, ok := p.utxoMap[utxoId]
-	if !ok {
-		var value NftsInUtxo
-		err := loadUtxoValueFromDB(utxoId, &value, p.db)
-		if err != nil {
-			return nil
-		}
-		sats = make(map[int64]int64)
-		for _, item := range value.Sats {
-			sats[item.Sat] = item.Offset
-		}
-		// p.utxoMap[utxoId] = sats, 如果设置，就要同步更新satMap，否则会在transfer中导致异常
-	}
+	sats := p.getSatsWithUtxo(utxoId)
 	if len(sats) == 0 {
 		return nil
 	}
@@ -97,11 +85,34 @@ func (p *NftIndexer) GetBoundSatsWithUtxo(utxoId uint64) map[int64]int64 {
 	return result
 }
 
-func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
-	sats := p.GetBoundSatsWithUtxo(utxoId)
+// key: sat
+func (p *NftIndexer) getSatsWithUtxo(utxoId uint64) map[int64]int64 {
+	sats, ok := p.utxoMap[utxoId]
+	if !ok {
+		var value NftsInUtxo
+		err := loadUtxoValueFromDB(utxoId, &value, p.db)
+		if err != nil {
+			return nil
+		}
+		sats = make(map[int64]int64)
+		for _, item := range value.Sats {
+			sats[item.Sat] = item.Offset
+		}
+		// p.utxoMap[utxoId] = sats, 如果设置，就要同步更新satMap，否则会在transfer中导致异常
+	}
 
+	return sats
+}
+
+func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+
+	return p.getNftsWithUtxo(utxoId)
+}
+
+func (p *NftIndexer) getNftsWithUtxo(utxoId uint64) []*common.Nft {
+	sats := p.getSatsWithUtxo(utxoId)
 
 	result := make([]*common.Nft, 0)
 	for sat := range sats {
@@ -190,13 +201,6 @@ func (p *NftIndexer) GetNftsWithSat(sat int64) *common.NftsInSat {
 	return p.getNftsWithSat(sat)
 }
 
-func (p *NftIndexer) GetNftsWithSatNoDisable(sat int64) *common.NftsInSat {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	return p.getNftsWithSat(sat)
-}
-
 func (p *NftIndexer) getNftsWithSat(sat int64) *common.NftsInSat {
 	info, ok := p.satMap[sat]
 	if ok {
@@ -271,7 +275,7 @@ func (p *NftIndexer) GetAllNftsWithInscriptionAddress(addressId uint64) []int64 
 }
 
 func (p *NftIndexer) DisableNftsInUtxo(utxoId uint64, proof []byte) error {
-	sats := p.GetBoundSatsWithUtxo(utxoId)
+	sats := p.GetSatsWithUtxo(utxoId)
 	// 实际上是将上面这所有的聪disable了
 
 	p.mutex.Lock()

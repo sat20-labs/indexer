@@ -39,13 +39,13 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 		p.actionBufferMap[input.InTxIndex] = txMap
 	}
 	txMap[input.TxInIndex] = append(txMap[input.TxInIndex], info)
-
 	p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
+
 	p.nftAdded = append(p.nftAdded, nft)
 }
 
 // 必须先加载satmap和utxomap
-func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
+func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) {
 	// 对所有铸造信息排序
 	type pair struct {
 		idx1   int
@@ -101,6 +101,7 @@ func (p *NftIndexer) processInscribeInBlock(block *common.Block) {
 	traceTaget := int64(0)
 	for _, item := range mid {
 		p.nftMint(item.info)
+		//common.Log.Infof("%d %s", item.info.Nft.Base.Id, item.info.Nft.Base.InscriptionId)
 
 		// nft := item.info.Nft
 		// if nft.Base.InscriptionId == "1654500098640d6cedeff295eceeb4b61e63d554ddc5ebade6f2fbd879f640bbi0" {
@@ -195,7 +196,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	// 	common.Log.Infof("")
 	// }
 
-	// 预加载
+	// prepare 1: 预加载
 	startTime := time.Now()
 	p.db.View(func(txn common.ReadBatch) error {
 		type pair struct {
@@ -284,19 +285,23 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	})
 	//common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 
-	// 计算新位置，资产直接加入block的交易数据中，方便后面模块直接处理资产数据
-	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	// prepare 2: calc inscription number
 	for _, tx := range block.Transactions[1:] {
-		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
-			// if tx.TxId == "5f3beb0d677f8fbd167d933f63cd9992a747c2bc5dc009d6f8cba55750819163" {
-			// 	common.Log.Infof("%d", i)
+			// if tx.TxId == "b2648c6021e5ca1d71a93728762cf42b5919f6919f57539f676d0051c8f838ae" {
+			// 	common.Log.Infof("%d %d %d", block.Height, input.InTxIndex, input.TxInIndex)
 			// }
+
+			// 合并资产
 			sats := p.utxoMap[input.UtxoId]                 // 已经铭刻的聪
 			addedNft, ok := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
+			// 将铸造资产加入utxomap，并计算可能的reinscription
 			if ok {
-				// 合并铸造结果
-				for _, info := range addedNft {
+				if sats == nil {
+					sats = make(map[int64]int64)
+					p.utxoMap[input.UtxoId] = sats
+				}
+				for _, info := range addedNft { // 新增加的nft，有可能已经是重复铭刻
 					nft := info.Nft
 					newSat := true
 					for sat, offset := range sats {
@@ -304,11 +309,13 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 							if sat != nft.Base.Sat {
 								nft.Base.Sat = sat // 同一个聪，需要命名一致
 								// 根据ordinals规则，判断是否是reinscription
-								if nft.Base.CurseType == 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
+								if nft.Base.CurseType == 0 {
 									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
 										// 已经存在非cursed的铭文，后面的铭文都是reinscription
+										// Jubilee后，也是需要记录reinscription
 										nft.Base.CurseType = int32(ordCommon.Reinscription)
+										nft.Base.Reinscription = 1
 										common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 									}
 								}
@@ -318,16 +325,31 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 						}
 					}
 					if newSat {
-						if sats == nil {
-							sats = make(map[int64]int64)
-						}
+						// 加入utxomap
 						sats[nft.Base.Sat] = info.InOffset
 					}
 					p.addNftToSatMap(nft)
 				}
 			}
+		}
+	}
 
-			if len(sats) > 0 {
+	// 更新铭文的编号，更新satmap
+	p.sortInscriptionInBlock(block)
+	// hook: prepare for transfer
+	p.processCallback.PrepareUpdateTransfer(block, coinbase)
+
+	// 执行真正的transfer
+	// 计算新位置，资产直接加入block的交易数据中，方便后面模块直接处理资产数据
+	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	for i, tx := range block.Transactions[1:] {
+		var allInput *common.TxOutput
+		for _, input := range tx.Inputs {
+			// if tx.TxId == "5f3beb0d677f8fbd167d933f63cd9992a747c2bc5dc009d6f8cba55750819163" {
+			// 	common.Log.Infof("%d", i)
+			// }
+			sats, ok := p.utxoMap[input.UtxoId]
+			if ok {
 				for sat, offset := range sats {
 					addSatInfoToOutput(&input.TxOutput, sat, offset)
 				}
@@ -344,6 +366,10 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		}
 
 		change := p.innerUpdateTransfer(tx, allInput)
+		// hook: process tx
+		change2 := p.processCallback.TxInputProcess(i+1, tx, block, coinbase)
+		change.Merge(change2)
+
 		coinbaseInput.Append(change)
 	}
 
@@ -353,14 +379,14 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	if !change.Zero() {
 		common.Log.Panicf("UpdateTransfer should consume all input assets")
 	}
-
-	// 更新铭文的编号，更新satmap
-	p.processInscribeInBlock(block)
+	// hook: process coin base
+	p.processCallback.TxInputProcess(0, tx, block, coinbase)
 
 	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
 	p.actionBufferMap = make(map[int]map[int][]*InscribeInfo)
-
 	p.CheckPointWithBlockHeight(block.Height)
+	// hook: process checkpoint
+	p.processCallback.UpdateTransferFinished(block)
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }
@@ -457,7 +483,6 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 	}
 	return change
 }
-
 
 // 跟base数据库同步
 func (p *NftIndexer) UpdateDB() {

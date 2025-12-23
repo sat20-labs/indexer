@@ -167,7 +167,7 @@ func (b *IndexerMgr) Init() {
 	b.exotic = exotic.NewExoticIndexer(b.exoticDB)
 	b.exotic.Init(b.compiling)
 	b.nft = nft.NewNftIndexer(b.nftDB)
-	b.nft.Init(b.compiling)
+	b.nft.Init(b.compiling, b)
 	b.ftIndexer = ft.NewOrdxIndexer(b.ftDB)
 	b.ftIndexer.Init(b.nft)
 	b.ns = ns.NewNameService(b.nsDB)

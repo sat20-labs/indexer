@@ -7,9 +7,8 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
+	indexerCommon "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
-
-	
 )
 
 type InscribeInfo struct {
@@ -50,10 +49,11 @@ type NftIndexer struct {
 	db           common.KVDB
 	status       *common.NftStatus
 	enableHeight int
-	disabledSats map[int64]bool // 所有disabled的satoshi
+	disabledSats map[int64]bool // 所有disabled的satoshi TODO 跑数据时需要禁止该功能，不要影响聪的属性
 
-	baseIndexer *base.BaseIndexer
-	mutex       sync.RWMutex
+	baseIndexer     *base.BaseIndexer
+	processCallback indexerCommon.BlockProcCallback
+	mutex           sync.RWMutex
 
 	// realtime buffer, utxoMap和satMap必须保持一致，utxo包含的聪，必须在satMap
 	utxoMap               map[uint64]map[int64]int64 // utxo->sat->offset  确保utxo中包含的所有nft都列在这里
@@ -93,10 +93,12 @@ func NewNftIndexer(db common.KVDB) *NftIndexer {
 }
 
 // 只能被调用一次
-func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer) {
+func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer,
+	cb indexerCommon.BlockProcCallback) {
 	p.baseIndexer = baseIndexer
 	p.status = initStatusFromDB(p.db)
 	p.disabledSats = loadAllDisalbedSatsFromDB(p.db)
+	p.processCallback = cb
 
 	p.utxoMap = make(map[uint64]map[int64]int64)
 	p.satMap = make(map[int64]*SatInfo)

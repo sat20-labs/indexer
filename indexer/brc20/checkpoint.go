@@ -98,7 +98,7 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 
 	60000: {
 		Height:      60000,
-		TickerCount: 18,
+		TickerCount: 20, // 多了两个 chmc, chwi
 		Tickers: map[string]*TickerStatus{
 			"ordi": {
 				Name:        "ordi",
@@ -727,7 +727,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	if ok {
 		nftIndexer := p.nftIndexer
 		for id, num := range inscriptionMap {
-			nft := nftIndexer.GetNftWithInscriptionId(id)
+			nft := nftIndexer.GetNftWithInscriptionIdWithNoLock(id)
 			if nft == nil {
 				common.Log.Panicf("height %d can't find inscription %s", height, id)
 			}
@@ -777,8 +777,8 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			if len(diff2) > 0 {
 				common.Log.Infof("not in validate data but occur in our process")
 				for _, v := range diff2 {
-					common.Log.Infof("history item: %v", v)
-					nft := p.nftIndexer.GetNftWithId(tobeMap[v].NftId)
+					common.Log.Infof("history item: %v", tobeMap[v])
+					nft := p.nftIndexer.GetNftWithIdWithNoLock(tobeMap[v].NftId)
 					common.Log.Infof("nft: %v", nft)
 				}
 			}
@@ -809,7 +809,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			} else {
 				common.Log.Errorf("%d #%d %s different nftId %d %d in tx %s, %d", height,
 					valid.InscriptionNumber, valid.InscriptionID, valid.InscriptionNumber, item.NftId, valid.TxID, valid.TxIdx)
-				nft := p.nftIndexer.GetNftWithId(item.NftId)
+				nft := p.nftIndexer.GetNftWithIdWithNoLock(item.NftId)
 				if nft != nil {
 					common.Log.Infof("local: %d -> %s", nft.Base.Id, nft.Base.InscriptionId)
 				}

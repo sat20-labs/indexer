@@ -10,20 +10,16 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func (s *BRC20Indexer) validInscribe(nft *common.Nft) bool {
+func (s *BRC20Indexer) CheckInscription(nft *common.Nft) bool {
 	if nft.Base.CurseType != 0 {
 		common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
 		if nft.Base.BlockHeight < int32(common.Jubilee_Height) { // Jubilee
 			return false
 		}
 	}
-	satInfo := s.nftIndexer.GetNftsWithSatNoDisable(nft.Base.Sat)
-	if satInfo == nil {
-		common.Log.Panicf("can't find sat %d info in inscription %s", nft.Base.Sat, nft.Base.InscriptionId)
-	}
 
-	if len(satInfo.Nfts) >= int(satInfo.CurseCount + 2) {
-		return false // reinscription: 有两个非诅咒的铭文
+	if nft.Base.Reinscription != 0 {
+		return false
 	}
 
 	return true
@@ -42,7 +38,7 @@ func (s *BRC20Indexer) UpdateInscribeDeploy(input *common.TxInput, ticker *commo
 func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *common.BRC20Ticker) {
 	// 再次检查，因为nft可能会修改reinsription状态
 	nft := ticker.Nft
-	if !s.validInscribe(nft) {
+	if !s.CheckInscription(nft) {
 		common.Log.Debugf("%s inscription is invalid", nft.Base.InscriptionId)
 		return
 	}
@@ -81,6 +77,19 @@ func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *commo
 func (s *BRC20Indexer) UpdateInscribeMint(input *common.TxInput, mint *common.BRC20Mint) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
+		// 忽略某些不知道什么原因，unisat认为是无效的brc20铸造铭文，仅仅为了让校验数据可以正确匹配
+		var excludingInscriptions = map[string]bool {
+			"06ccbac09747a62b2b6c000786b0c5c34ded98d50e8e84986f1c4884bc60e461i0": true, // vindicated
+			//"23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1i0": true,
+			//"8642d3bc8e84ca265c87689241398aaff4d323ab411028deaeae371d1555b276i0": true,
+		}
+		if _, ok := excludingInscriptions[mint.Nft.Base.InscriptionId]; ok {
+			return
+		}
+	}
+
 	s.actionBufferMap[input.UtxoId] = &ActionInfo{
 		Action: common.BRC20_Action_InScribe_Mint,
 		Info:   mint,
@@ -88,7 +97,7 @@ func (s *BRC20Indexer) UpdateInscribeMint(input *common.TxInput, mint *common.BR
 }
 
 func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BRC20Mint) {
-	if !s.validInscribe(mint.Nft) {
+	if !s.CheckInscription(mint.Nft) {
 		common.Log.Debugf("%s inscription is invalid", mint.Nft.Base.InscriptionId)
 		return
 	}
@@ -159,6 +168,23 @@ func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BR
 func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *common.BRC20Transfer) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
+		// 忽略某些不知道什么原因，unisat认为是无效的brc20铭文，仅仅为了让校验数据可以正确匹配
+		var excludingInscriptions = map[string]bool {
+			// "ea7e189806151db47817a8ab8a114a3b600be927705ad4b243af72701ee0ede4i0": true,
+			// "309f44dbafb6392b2010524353387318ae1cc4a3da9c570615026b14e9268785i0": true,
+			// "6d785b25de51b9668df10d5bd110469da3139578f246ec8280af7059ba6ebdd3i0": true,
+			// "1e0ae459eb8a5209cf64969d47f28f4ca7da453adc017ecab5c5647ef209d746i0": true,
+			// "4950bd176c2cec6eb9079e18db97755dcfdaf8ef747803c3f1ebef0a278c763ai0": true,
+			// "710d4f2621e147968c7d276cdd7d11dae94360daa0c3c5202b8309cbe85bf9b2i0": true,
+			// "7765f2e3435f8d732162687d70d6dc754eb3643eae39f68f13b80c29d208232ei0": true,
+		}
+		if _, ok := excludingInscriptions[transfer.Nft.Base.InscriptionId]; ok {
+			return
+		}
+	}
+
 	s.actionBufferMap[input.UtxoId] = &ActionInfo{
 		Action: common.BRC20_Action_InScribe_Transfer,
 		Info:   transfer,
@@ -166,7 +192,7 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *c
 }
 
 func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *common.BRC20Transfer) {
-	if !s.validInscribe(transfer.Nft) {
+	if !s.CheckInscription(transfer.Nft) {
 		common.Log.Debugf("%s inscription is invalid", transfer.Nft.Base.InscriptionId)
 		return
 	}
@@ -242,289 +268,21 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 		transfer.Amt.String(), tickAbbrInfo.TransferableBalance.String())
 }
 
-func (s *BRC20Indexer) UpdateTransfer(block *common.Block) {
-	if block.Height < s.enableHeight {
-		return
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (s *BRC20Indexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
+	
 	startTime := time.Now()
-
-	// if block.Height == 65934 {
-	// 	common.Log.Infof("")
-	// }
-
-	// pebble 随机读取性能差，调整读的顺序
-	// 预加载相关地址的数据: ticker, holder, utxo
-	s.db.View(func(txn common.ReadBatch) error {
-		// 处理区块涉及到的铸造
-		// 先加载所有ticker
-		addressToLoad := make(map[uint64]map[string]bool) // 该地址哪些ticker被影响
-		tickerToLoad := make(map[string]bool)
-		addingTransfer := make(map[uint64]string)
-		for _, item := range s.actionBufferMap {
-			var name string
-			var addressId uint64
-			switch item.Action {
-			case common.BRC20_Action_InScribe_Deploy:
-				deploy := item.Info.(*common.BRC20Ticker)
-				name = strings.ToLower(deploy.Name)
-				addressId = deploy.Nft.OwnerAddressId
-			case common.BRC20_Action_InScribe_Mint:
-				mint := item.Info.(*common.BRC20Mint)
-				name = strings.ToLower(mint.Name)
-				addressId = mint.Nft.OwnerAddressId
-			case common.BRC20_Action_InScribe_Transfer:
-				transfer := item.Info.(*common.BRC20Transfer)
-				name = strings.ToLower(transfer.Name)
-				addressId = transfer.Nft.OwnerAddressId
-
-				addingTransfer[transfer.Nft.UtxoId] = transfer.Name
-			}
-
-			tickers, ok := addressToLoad[addressId]
-			if !ok {
-				tickers = make(map[string]bool)
-				addressToLoad[addressId] = tickers
-			}
-			tickers[name] = true
-
-			_, ok = s.tickerMap[name]
-			if ok {
-				continue
-			}
-			tickerToLoad[name] = true
-		}
-
-		// 加载mint涉及到地址
-		type pair struct {
-			utxoId    uint64
-			addressId uint64
-			tx        *common.Transaction
-			ticker    string
-		}
-
-		// 预处理区块本身的交易
-		utxoToLoad := make([]*pair, 0)
-		transferTxMap := make(map[*common.Transaction]map[string]bool) // 该交易影响哪些ticker
-		for _, tx := range block.Transactions[1:] {
-			for _, input := range tx.Inputs {
-				nft, ok := s.transferNftMap[input.UtxoId] // 本区块生成的transfer没有在这里面
-				if ok {
-					if !nft.TransferNft.IsInvalid {
-						tickers, ok := transferTxMap[tx]
-						if !ok {
-							tickers = make(map[string]bool)
-							transferTxMap[tx] = tickers
-						}
-						tickers[nft.Ticker] = true // 影响输出的结果
-
-						tickers, ok = addressToLoad[nft.AddressId]
-						if !ok {
-							tickers = make(map[string]bool)
-							addressToLoad[nft.AddressId] = tickers
-						}
-						tickers[nft.Ticker] = true
-					}
-					continue
-				}
-				ticker, ok := addingTransfer[input.UtxoId]
-				if ok {
-					tickers, ok := transferTxMap[tx]
-					if !ok {
-						tickers = make(map[string]bool)
-						transferTxMap[tx] = tickers
-					}
-					tickers[ticker] = true // 影响输出的结果
-					continue
-				}
-				utxoToLoad = append(utxoToLoad, &pair{
-					utxoId:    input.UtxoId,
-					addressId: input.AddressId,
-					tx:        tx,
-					ticker:    "",
-				})
-			}
-		}
-		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
-		sort.Slice(utxoToLoad, func(i, j int) bool {
-			return utxoToLoad[i].utxoId < utxoToLoad[j].utxoId
-		})
-
-		for _, v := range utxoToLoad {
-			if v.ticker == "" {
-				var value TransferNftInfo
-				key := GetUtxoToTransferKey(v.utxoId)
-				err := db.GetValueFromTxn([]byte(key), &value, txn)
-				if err != nil {
-					continue // 没有transfer铭文，忽略
-				}
-				v.ticker = value.Ticker
-				s.transferNftMap[v.utxoId] = &value
-
-				if !value.TransferNft.IsInvalid {
-					tickers, ok := transferTxMap[v.tx]
-					if !ok {
-						tickers = make(map[string]bool)
-						transferTxMap[v.tx] = tickers
-					}
-					tickers[value.Ticker] = true // 影响输出的结果
-				}
-			}
-			_, ok := s.tickerMap[v.ticker]
-			if !ok {
-				tickerToLoad[v.ticker] = true
-			}
-
-			tickers, ok := addressToLoad[v.addressId]
-			if !ok {
-				tickers = make(map[string]bool)
-				addressToLoad[v.addressId] = tickers
-			}
-			tickers[v.ticker] = true
-		}
-
-		// 对存在资产转移的tx，加载其输出的地址
-		for tx, names := range transferTxMap {
-			for _, output := range tx.Outputs {
-				if output.OutValue.Value == 0 {
-					continue
-				}
-				tickers, ok := addressToLoad[output.AddressId]
-				if !ok {
-					tickers = make(map[string]bool)
-					addressToLoad[output.AddressId] = tickers
-				}
-				for name := range names {
-					tickers[name] = true
-				}
-			}
-		}
-		addressToLoadVector := make([]*pair, 0)
-		for addressId, tickers := range addressToLoad {
-			for name := range tickers {
-				addressToLoadVector = append(addressToLoadVector, &pair{
-					addressId: addressId,
-					ticker:    name,
-				})
-			}
-		}
-		sort.Slice(addressToLoadVector, func(i, j int) bool {
-			return addressToLoadVector[i].addressId < addressToLoadVector[j].addressId
-		})
-		for _, v := range addressToLoadVector {
-			holder, ok := s.holderMap[v.addressId]
-			if !ok {
-				holder = &HolderInfo{
-					Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-				}
-				s.holderMap[v.addressId] = holder
-			}
-			_, ok = holder.Tickers[v.ticker]
-			if ok {
-				continue
-			}
-			var value common.BRC20TickAbbrInfo
-			key := GetHolderInfoKey(v.addressId, v.ticker)
-			err := db.GetValueFromTxn([]byte(key), &value, txn)
-			if err != nil {
-				continue
-			}
-			holder.Tickers[v.ticker] = &value
-		}
-
-		tickerKeys := make([]string, len(tickerToLoad))
-		for k := range tickerToLoad {
-			tickerKeys = append(tickerKeys, GetTickerKey(k))
-		}
-		sort.Slice(tickerKeys, func(i, j int) bool {
-			return tickerKeys[i] < tickerKeys[j]
-		})
-		for _, key := range tickerKeys {
-			var ticker common.BRC20Ticker
-			err := db.GetValueFromDB([]byte(key), &ticker, s.db)
-			if err != nil {
-				continue
-			}
-
-			s.tickerMap[strings.ToLower(ticker.Name)] = &BRC20TickInfo{
-				Name:   strings.ToLower(ticker.Name),
-				Ticker: &ticker,
-			}
-		}
-
-		return nil
-	})
+	s.PrepareUpdateTransfer(block, coinbase)
 
 	// 检查transferNft转入到哪个输出
 	for txIndex, tx := range block.Transactions {
 		if txIndex == 0 {
 			continue
 		}
-		// if tx.TxId == "8c6acaebeb146c8abae21ef441cf9dde94cfc7bc68d51f7bef22dd1797c31a0d" {
-		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
-		// }
-
-		inputTransferNfts := make(map[int64]*TransferNftInfo)
-		hasTransfer := false
-		for index, input := range tx.Inputs {
-			// if input.UtxoId == 3804104075509760 || input.UtxoId == 3804104075771904 {
-			// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
-			// }
-
-			// 按顺序执行每一个动作。 每个input最多只有一个动作。
-			item, ok := s.actionBufferMap[input.UtxoId]
-			if ok {
-				switch item.Action {
-				case common.BRC20_Action_InScribe_Deploy:
-					deploy := item.Info.(*common.BRC20Ticker)
-					name := strings.ToLower(deploy.Name)
-					_, ok := s.tickerMap[name]
-					if ok {
-						continue
-					}
-					s.updateInscribeDeploy(input, deploy)
-				case common.BRC20_Action_InScribe_Mint:
-					mint := item.Info.(*common.BRC20Mint)
-					s.updateInscribeMint(input, mint)
-				case common.BRC20_Action_InScribe_Transfer:
-					transfer := item.Info.(*common.BRC20Transfer)
-					s.updateInscribeTransfer(input, transfer)
-				}
-			}
-
-			transfer, ok := s.transferNftMap[input.UtxoId] // transferNftMap 第一次转移时，先不删除，只设置标志位
-			if ok {
-				transfer.TxInIndex = index
-				inputTransferNfts[transfer.TransferNft.NftId] = transfer
-				hasTransfer = true
-			}
-		}
-
-		if hasTransfer {
-			for _, output := range tx.Outputs {
-				s.innerUpdateTransfer(txIndex, tx.TxId, output, inputTransferNfts)
-			}
-
-			// testnet4: 19206e5c580194fce3a513682998e918e40b9c2a2afaa64f63e55a217b7ec023
-			// 该交易有很多个transfer nft作为手续费给到了矿工，需要将这些transfer nft作废，
-			// 比如其中的一个：3f04ce47dc1ed5fc04243d3282dae6d472111fe584b2318d0715b6a1c9bb9664i0
-			if len(inputTransferNfts) != 0 {
-				for _, transfer := range inputTransferNfts {
-					if !transfer.TransferNft.IsInvalid {
-						transfer.TransferNft.IsInvalid = true
-						s.cancelTransferNft(transfer, block.Height, txIndex, tx)
-					}
-				}
-			}
-		}
+		s.TxInputProcess(txIndex, tx, block, coinbase)
 	}
 
-	s.actionBufferMap = make(map[uint64]*ActionInfo)
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
-
-	s.CheckPointWithBlockHeight(block.Height)
+	s.UpdateTransferFinished(block)
 }
 
 // 增加该address下的资产数据
@@ -635,7 +393,7 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height, inde
 	//s.addTransferNft(transfer)
 
 	// 检查该transfer nft最后输出到哪个utxoId
-	nft := s.nftIndexer.GetNftWithId(transfer.TransferNft.Id)
+	nft := s.nftIndexer.GetNftWithIdWithNoLock(transfer.TransferNft.Id)
 
 	action := HolderAction{
 		Height:     height,
@@ -735,7 +493,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 		if err != nil {
 			common.Log.Panicf("innerUpdateTransfer3 ParseInt %s failed, %v", asset.Name.Ticker, err)
 		}
-		ids := s.nftIndexer.GetNftsWithSat(sat)
+		ids := s.nftIndexer.GetNftsWithSatNoDisable(sat)
 		for _, nftId := range ids.Nfts {
 
 			transfer, ok := inputTransferNfts[nftId]
@@ -959,4 +717,294 @@ func (s *BRC20Indexer) UpdateDB() {
 	s.tickerUpdated = make(map[string]*common.BRC20Ticker)
 
 	common.Log.Infof("BRC20Indexer->UpdateDB takse: %v", time.Since(startTime))
+}
+
+// 实现新的区块处理接口
+func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*common.Range) {
+	if block.Height < s.enableHeight {
+		return
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if block.Height == 29601 {
+		common.Log.Infof("")
+	}
+
+	// pebble 随机读取性能差，调整读的顺序
+	// 预加载相关地址的数据: ticker, holder, utxo
+	s.db.View(func(txn common.ReadBatch) error {
+		// 处理区块涉及到的铸造，将铸造的结果直接放在交易的输出上，跟其他索引器放在输入上有所不同，因为涉及有效性判断
+		// 先加载所有ticker
+		addressToLoad := make(map[uint64]map[string]bool) // 该地址哪些ticker被影响
+		tickerToLoad := make(map[string]bool)
+		addingTransfer := make(map[uint64]string)
+		for _, item := range s.actionBufferMap {
+			var name string
+			var addressId uint64
+			switch item.Action {
+			case common.BRC20_Action_InScribe_Deploy:
+				deploy := item.Info.(*common.BRC20Ticker)
+				name = strings.ToLower(deploy.Name)
+				addressId = deploy.Nft.OwnerAddressId
+			case common.BRC20_Action_InScribe_Mint:
+				mint := item.Info.(*common.BRC20Mint)
+				name = strings.ToLower(mint.Name)
+				addressId = mint.Nft.OwnerAddressId
+			case common.BRC20_Action_InScribe_Transfer:
+				transfer := item.Info.(*common.BRC20Transfer)
+				name = strings.ToLower(transfer.Name)
+				addressId = transfer.Nft.OwnerAddressId
+
+				addingTransfer[transfer.Nft.UtxoId] = transfer.Name
+			}
+
+			tickers, ok := addressToLoad[addressId]
+			if !ok {
+				tickers = make(map[string]bool)
+				addressToLoad[addressId] = tickers
+			}
+			tickers[name] = true
+
+			_, ok = s.tickerMap[name]
+			if ok {
+				continue
+			}
+			tickerToLoad[name] = true
+		}
+
+		// 加载mint涉及到地址
+		type pair struct {
+			utxoId    uint64
+			addressId uint64
+			tx        *common.Transaction
+			ticker    string
+		}
+
+		// 预处理区块本身的交易
+		utxoToLoad := make([]*pair, 0)
+		transferTxMap := make(map[*common.Transaction]map[string]bool) // 该交易影响哪些ticker
+		for _, tx := range block.Transactions[1:] {
+			for _, input := range tx.Inputs {
+				if tx.TxId == "e7115ee426b1a36f7aa9a0463798ec1aa173953a45daa7966bee8096a5254778" {
+					common.Log.Infof("utxoId = %d", input.UtxoId)
+				}
+				nft, ok := s.transferNftMap[input.UtxoId] // 本区块生成的transfer没有在这里面
+				if ok {
+					if !nft.TransferNft.IsInvalid {
+						tickers, ok := transferTxMap[tx]
+						if !ok {
+							tickers = make(map[string]bool)
+							transferTxMap[tx] = tickers
+						}
+						tickers[nft.Ticker] = true // 影响输出的结果
+
+						tickers, ok = addressToLoad[nft.AddressId]
+						if !ok {
+							tickers = make(map[string]bool)
+							addressToLoad[nft.AddressId] = tickers
+						}
+						tickers[nft.Ticker] = true
+					}
+					continue
+				}
+				ticker, ok := addingTransfer[input.UtxoId]
+				if ok {
+					tickers, ok := transferTxMap[tx]
+					if !ok {
+						tickers = make(map[string]bool)
+						transferTxMap[tx] = tickers
+					}
+					tickers[ticker] = true // 影响输出的结果
+					continue
+				}
+				utxoToLoad = append(utxoToLoad, &pair{
+					utxoId:    input.UtxoId,
+					addressId: input.AddressId,
+					tx:        tx,
+					ticker:    "",
+				})
+			}
+		}
+		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
+		sort.Slice(utxoToLoad, func(i, j int) bool {
+			return utxoToLoad[i].utxoId < utxoToLoad[j].utxoId
+		})
+
+		for _, v := range utxoToLoad {
+			if v.ticker == "" {
+				var value TransferNftInfo
+				if v.utxoId == 1015880032452608 {
+					common.Log.Infof("")
+				}
+				key := GetUtxoToTransferKey(v.utxoId)
+				err := db.GetValueFromTxn([]byte(key), &value, txn)
+				if err != nil {
+					continue // 没有transfer铭文，忽略
+				}
+				v.ticker = value.Ticker
+				s.transferNftMap[v.utxoId] = &value
+
+				if !value.TransferNft.IsInvalid {
+					tickers, ok := transferTxMap[v.tx]
+					if !ok {
+						tickers = make(map[string]bool)
+						transferTxMap[v.tx] = tickers
+					}
+					tickers[value.Ticker] = true // 影响输出的结果
+				}
+			}
+			_, ok := s.tickerMap[v.ticker]
+			if !ok {
+				tickerToLoad[v.ticker] = true
+			}
+
+			tickers, ok := addressToLoad[v.addressId]
+			if !ok {
+				tickers = make(map[string]bool)
+				addressToLoad[v.addressId] = tickers
+			}
+			tickers[v.ticker] = true
+		}
+
+		// 对存在资产转移的tx，加载其输出的地址
+		for tx, names := range transferTxMap {
+			for _, output := range tx.Outputs {
+				if output.OutValue.Value == 0 {
+					continue
+				}
+				tickers, ok := addressToLoad[output.AddressId]
+				if !ok {
+					tickers = make(map[string]bool)
+					addressToLoad[output.AddressId] = tickers
+				}
+				for name := range names {
+					tickers[name] = true
+				}
+			}
+		}
+		addressToLoadVector := make([]*pair, 0)
+		for addressId, tickers := range addressToLoad {
+			for name := range tickers {
+				addressToLoadVector = append(addressToLoadVector, &pair{
+					addressId: addressId,
+					ticker:    name,
+				})
+			}
+		}
+		sort.Slice(addressToLoadVector, func(i, j int) bool {
+			return addressToLoadVector[i].addressId < addressToLoadVector[j].addressId
+		})
+		for _, v := range addressToLoadVector {
+			holder, ok := s.holderMap[v.addressId]
+			if !ok {
+				holder = &HolderInfo{
+					Tickers: make(map[string]*common.BRC20TickAbbrInfo),
+				}
+				s.holderMap[v.addressId] = holder
+			}
+			_, ok = holder.Tickers[v.ticker]
+			if ok {
+				continue
+			}
+			var value common.BRC20TickAbbrInfo
+			key := GetHolderInfoKey(v.addressId, v.ticker)
+			err := db.GetValueFromTxn([]byte(key), &value, txn)
+			if err != nil {
+				continue
+			}
+			holder.Tickers[v.ticker] = &value
+		}
+
+		tickerKeys := make([]string, len(tickerToLoad))
+		for k := range tickerToLoad {
+			tickerKeys = append(tickerKeys, GetTickerKey(k))
+		}
+		sort.Slice(tickerKeys, func(i, j int) bool {
+			return tickerKeys[i] < tickerKeys[j]
+		})
+		for _, key := range tickerKeys {
+			var ticker common.BRC20Ticker
+			err := db.GetValueFromDB([]byte(key), &ticker, s.db)
+			if err != nil {
+				continue
+			}
+
+			s.tickerMap[strings.ToLower(ticker.Name)] = &BRC20TickInfo{
+				Name:   strings.ToLower(ticker.Name),
+				Ticker: &ticker,
+			}
+		}
+
+		return nil
+	})
+}
+func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction, 
+	block *common.Block, coinbase []*common.Range,
+) *common.TxOutput {
+	if tx.TxId == "309f44dbafb6392b2010524353387318ae1cc4a3da9c570615026b14e9268785" {
+		common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+	}
+
+	inputTransferNfts := make(map[int64]*TransferNftInfo)
+	hasTransfer := false
+	for index, input := range tx.Inputs {
+		// if input.UtxoId == 3804104075509760 || input.UtxoId == 3804104075771904 {
+		// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+		// }
+
+		// 将结果直接放在交易的输出上
+		// 按顺序执行每一个动作。 每个input最多只有一个动作。
+		item, ok := s.actionBufferMap[input.UtxoId]
+		if ok {
+			switch item.Action {
+			case common.BRC20_Action_InScribe_Deploy:
+				deploy := item.Info.(*common.BRC20Ticker)
+				name := strings.ToLower(deploy.Name)
+				_, ok := s.tickerMap[name]
+				if ok {
+					continue
+				}
+				s.updateInscribeDeploy(input, deploy)
+			case common.BRC20_Action_InScribe_Mint:
+				mint := item.Info.(*common.BRC20Mint)
+				s.updateInscribeMint(input, mint)
+			case common.BRC20_Action_InScribe_Transfer:
+				transfer := item.Info.(*common.BRC20Transfer)
+				s.updateInscribeTransfer(input, transfer)
+			}
+		}
+
+		transfer, ok := s.transferNftMap[input.UtxoId] // transferNftMap 第一次转移时，先不删除，只设置标志位
+		if ok {
+			transfer.TxInIndex = index
+			inputTransferNfts[transfer.TransferNft.NftId] = transfer
+			hasTransfer = true
+		}
+	}
+
+	if hasTransfer {
+		for _, output := range tx.Outputs {
+			s.innerUpdateTransfer(txIndex, tx.TxId, output, inputTransferNfts)
+		}
+
+		// testnet4: 19206e5c580194fce3a513682998e918e40b9c2a2afaa64f63e55a217b7ec023
+		// 该交易有很多个transfer nft作为手续费给到了矿工，需要将这些transfer nft作废，
+		// 比如其中的一个：3f04ce47dc1ed5fc04243d3282dae6d472111fe584b2318d0715b6a1c9bb9664i0
+		if len(inputTransferNfts) != 0 {
+			for _, transfer := range inputTransferNfts {
+				if !transfer.TransferNft.IsInvalid {
+					transfer.TransferNft.IsInvalid = true
+					s.cancelTransferNft(transfer, block.Height, txIndex, tx)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (s *BRC20Indexer) UpdateTransferFinished(block *common.Block) {
+	s.actionBufferMap = make(map[uint64]*ActionInfo)
+	s.CheckPointWithBlockHeight(block.Height)
 }

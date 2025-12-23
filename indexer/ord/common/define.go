@@ -22,7 +22,7 @@ const (
 	NotInFirstInput       Curse = 4 // 0.9.0+
 	Pointer               Curse = 5 // 0.14.1+
 	Pushnum               Curse = 6 // 0.14.1+
-	Reinscription         Curse = 7 // 0.9.0+
+	Reinscription         Curse = 7 // 0.9.0+ // 跟Jubilee无关
 	Stutter               Curse = 8 // 0.14.1+
 	UnrecognizedEvenField Curse = 9 // 0.9.0+
 )

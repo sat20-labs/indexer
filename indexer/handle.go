@@ -58,7 +58,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	//time2 := time.Now()
 	s.nft.UpdateTransfer(block, coinbase)
 	s.ns.UpdateTransfer(block)
-	s.brc20Indexer.UpdateTransfer(block)
+	//s.brc20Indexer.UpdateTransfer(block, coinbase) // 由nftindexer内部调用过去
 	s.RunesIndexer.UpdateTransfer(block)
 
 	s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
@@ -1073,17 +1073,10 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 			}
 		}
 	case "brc-20":
-		// if s.IsMainnet() && s.brc20Indexer.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
-		// 	return
-		// }
-		if nft.Base.CurseType != 0 {
-			common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
-			if block.Height < common.Jubilee_Height { // Jubilee
-				return
-			}
-			// vindicated
+		if !s.brc20Indexer.CheckInscription(nft) {
+			common.Log.Debugf("brc20: %s inscription is ignored", nft.Base.InscriptionId)
+			return
 		}
-
 		s.handleBrc20(input, output, insc, nft)
 
 	case "primary-name":
