@@ -1192,6 +1192,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 	}
 	s.nft.NftMint(input, inOffset, &nft)
 	if !insc.IsCursed && nft.Base.CurseType != 0 {
+		// reinscription
 		insc.IsCursed = true
 		insc.CurseReason = ordCommon.Curse(nft.Base.CurseType)
 	}

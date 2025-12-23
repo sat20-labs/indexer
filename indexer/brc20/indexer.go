@@ -437,6 +437,7 @@ func (s *BRC20Indexer) printTicker(name string) {
 	common.Log.Infof("MintCount: %d", ticker.MintCount)
 	common.Log.Infof("HolderCount: %d", ticker.HolderCount)
 	common.Log.Infof("TX Count: %d", ticker.TransactionCount)
+	common.Log.Infof("%d %s", ticker.Nft.Base.Id, ticker.Nft.Base.InscriptionId)
 }
 
 // 自检。如果错误，将停机

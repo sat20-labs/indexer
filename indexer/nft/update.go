@@ -121,11 +121,11 @@ func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) {
 func (p *NftIndexer) nftMint(info *InscribeInfo) {
 	nft := info.Nft
 
-	if nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
-		nft.Base.CurseType = 0
+	if nft.Base.CurseType < 0 && nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
+		nft.Base.CurseType = int32(ordCommon.Vindicated)
 	}
 
-	if nft.Base.CurseType != 0 {
+	if nft.Base.CurseType < 0 {
 		p.status.CurseCount++
 		nft.Base.Id = -int64(p.status.CurseCount) // 从-1开始
 	} else {
@@ -397,7 +397,7 @@ func (p *NftIndexer) addNftToSatMap(nft *common.Nft) {
 		p.satMap[nft.Base.Sat] = info
 	}
 	info.Nfts[nft] = true
-	if nft.Base.CurseType != 0 {
+	if nft.Base.CurseType < 0 {
 		info.CurseCount++
 	}
 }

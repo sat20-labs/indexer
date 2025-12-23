@@ -373,6 +373,7 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 	// var wg sync.WaitGroup
 	// wg.Add(3)
 
+	vindicated := 0
 	blessCount := 0
 	curseCount := 0
 	nftMap := make(map[int64]bool)
@@ -384,17 +385,20 @@ func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
 		if err != nil {
 			common.Log.Panicf("item.Value error: %v", err)
 		}
-		if value.CurseType != 0 {
+		if value.CurseType < 0 {
 			nftMap[value.Id] = true
 			curseCount++
 			//common.Log.Infof("%d %s is cursed %d", value.Id, value.InscriptionId, value.CurseType)
-		} else {
+		} else if value.CurseType == 0 {
 			blessCount++
+		} else {
+			vindicated++
 		}
 
 		return nil
 	})
-	common.Log.Infof("count %d, curse count %d", blessCount, curseCount)
+	common.Log.Infof("blessed %d, cursed %d, vindicated %d, total %d", 
+		blessCount, curseCount, vindicated, blessCount+curseCount+vindicated)
 	for i := int64(1); i < int64(p.status.CurseCount); i++ {
 		_, ok := nftMap[-i]
 		if !ok {

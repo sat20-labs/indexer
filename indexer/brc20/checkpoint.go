@@ -551,6 +551,10 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 	if matchHeight != 0 {
 		tickers := p.getAllTickers()
 		if checkpoint.TickerCount != 0 && len(tickers) != checkpoint.TickerCount {
+			for i := len(tickers) - 20; i < len(tickers) - 1; i++ {
+				p.printTicker(tickers[i])
+				common.Log.Info("")
+			}
 			common.Log.Panicf("ticker count different")
 		}
 	}
