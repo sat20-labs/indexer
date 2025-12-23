@@ -98,7 +98,7 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 
 	60000: {
 		Height:      60000,
-		TickerCount: 20, // 多了两个 chmc, chwi
+		TickerCount: 18,
 		Tickers: map[string]*TickerStatus{
 			"ordi": {
 				Name:        "ordi",
@@ -222,10 +222,10 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 			"Test": {
 				Name:        "Test",
 				Max:         "21000000",
-				Minted:      "14917000",
-				MintCount:   14917,
-				HolderCount: 32,
-				TxCount:     14957,
+				Minted:      "14918000",
+				MintCount:   14918,
+				HolderCount: 33,
+				TxCount:     14958,
 				Holders: map[string]string{
 					"tb1p5cymzvgf87fgeuzfexwxgvlmuuq309gegfh4q6np8g4qq6lnlk3qpzf2rs": "3000000",
 					"tb1q0juamrh0s56hwzh9w5af2r9qfn986tym4h6yz5":                     "2450000",
@@ -573,6 +573,9 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 			common.Log.Panicf("%s Max different, %s %s", name, ticker.Max.String(), tickerStatus.Max)
 		}
 		if tickerStatus.Minted != "" && ticker.Minted.String() != tickerStatus.Minted {
+			// p.printHolders(name)
+			// p.printHistory(name)
+			// p.printTicker(name)
 			common.Log.Panicf("%s Minted different, %s %s", name, ticker.Minted.String(), tickerStatus.Minted)
 		}
 		if tickerStatus.MintCount != 0 && ticker.MintCount != uint64(tickerStatus.MintCount) {

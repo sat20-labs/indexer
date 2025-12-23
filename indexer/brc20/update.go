@@ -82,8 +82,8 @@ func (s *BRC20Indexer) UpdateInscribeMint(input *common.TxInput, mint *common.BR
 		// 忽略某些不知道什么原因，unisat认为是无效的brc20铸造铭文，仅仅为了让校验数据可以正确匹配
 		var excludingInscriptions = map[string]bool {
 			"06ccbac09747a62b2b6c000786b0c5c34ded98d50e8e84986f1c4884bc60e461i0": true, // vindicated
-			//"23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1i0": true,
-			//"8642d3bc8e84ca265c87689241398aaff4d323ab411028deaeae371d1555b276i0": true,
+			// "23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1i0": true, // reinscription
+			// "8642d3bc8e84ca265c87689241398aaff4d323ab411028deaeae371d1555b276i0": true, // reinscription
 		}
 		if _, ok := excludingInscriptions[mint.Nft.Base.InscriptionId]; ok {
 			return
@@ -172,13 +172,7 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *c
 	if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
 		// 忽略某些不知道什么原因，unisat认为是无效的brc20铭文，仅仅为了让校验数据可以正确匹配
 		var excludingInscriptions = map[string]bool {
-			// "ea7e189806151db47817a8ab8a114a3b600be927705ad4b243af72701ee0ede4i0": true,
-			// "309f44dbafb6392b2010524353387318ae1cc4a3da9c570615026b14e9268785i0": true,
-			// "6d785b25de51b9668df10d5bd110469da3139578f246ec8280af7059ba6ebdd3i0": true,
-			// "1e0ae459eb8a5209cf64969d47f28f4ca7da453adc017ecab5c5647ef209d746i0": true,
-			// "4950bd176c2cec6eb9079e18db97755dcfdaf8ef747803c3f1ebef0a278c763ai0": true,
-			// "710d4f2621e147968c7d276cdd7d11dae94360daa0c3c5202b8309cbe85bf9b2i0": true,
-			// "7765f2e3435f8d732162687d70d6dc754eb3643eae39f68f13b80c29d208232ei0": true,
+			// "ea7e189806151db47817a8ab8a114a3b600be927705ad4b243af72701ee0ede4i0": true, // reinscription
 		}
 		if _, ok := excludingInscriptions[transfer.Nft.Base.InscriptionId]; ok {
 			return
