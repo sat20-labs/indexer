@@ -286,9 +286,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	//common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 
 	// prepare 2: calc inscription number
+	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
+		var allInput *common.TxOutput
 		for _, input := range tx.Inputs {
-			// if tx.TxId == "b2648c6021e5ca1d71a93728762cf42b5919f6919f57539f676d0051c8f838ae" {
+			// if tx.TxId == "23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1" {
 			// 	common.Log.Infof("%d %d %d", block.Height, input.InTxIndex, input.TxInIndex)
 			// }
 
@@ -298,6 +300,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				sats = make(map[int64]int64)
 			}
 
+			/*
+			寻找重复的铭文，需要考虑几个特殊的case：
+			1. 本区块新增加的nft，有可能已经是重复铭刻同一个聪
+			2. 输入的utxo是本区块生成的，所以这个时候utxoMap没有任何sats。这里需要想办法解决聪在本区块内能唯一表示，仅靠utxo内的偏移，会导致结果
+			*/
 			addedNft := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
 			// 将铸造资产加入utxomap，并计算可能的reinscription
 			for _, info := range addedNft { // 新增加的nft，有可能已经是重复铭刻
@@ -331,32 +338,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			}
 
 			if len(sats) > 0 {
-				p.utxoMap[input.UtxoId] = sats
-			}
-			
-		}
-	}
-
-	// 更新铭文的编号，更新satmap
-	p.sortInscriptionInBlock(block)
-	// hook: prepare for transfer
-	p.processCallback.PrepareUpdateTransfer(block, coinbase)
-
-	// 执行真正的transfer
-	// 计算新位置，资产直接加入block的交易数据中，方便后面模块直接处理资产数据
-	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
-	for i, tx := range block.Transactions[1:] {
-		var allInput *common.TxOutput
-		for _, input := range tx.Inputs {
-			// if tx.TxId == "5f3beb0d677f8fbd167d933f63cd9992a747c2bc5dc009d6f8cba55750819163" {
-			// 	common.Log.Infof("%d", i)
-			// }
-			sats, ok := p.utxoMap[input.UtxoId]
-			if ok {
 				for sat, offset := range sats {
 					addSatInfoToOutput(&input.TxOutput, sat, offset)
 				}
 
+				p.utxoMap[input.UtxoId] = sats
 				delete(p.utxoMap, input.UtxoId)
 				p.utxoDeled = append(p.utxoDeled, input.UtxoId)
 			}
@@ -367,29 +353,32 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				allInput.Append(&input.TxOutput)
 			}
 		}
-
 		change := p.innerUpdateTransfer(tx, allInput)
-		// hook: process tx
-		change2 := p.processCallback.TxInputProcess(i+1, tx, block, coinbase)
-		change.Merge(change2)
-
 		coinbaseInput.Append(change)
 	}
-
 	// 处理哪些直接输出到奖励聪的铸造结果
 	tx := block.Transactions[0]
 	change := p.innerUpdateTransfer(tx, coinbaseInput)
 	if !change.Zero() {
 		common.Log.Panicf("UpdateTransfer should consume all input assets")
 	}
-	// hook: process coin base
-	p.processCallback.TxInputProcess(0, tx, block, coinbase)
+	// 更新铭文的编号，更新satmap
+	p.sortInscriptionInBlock(block)
+
+	// // hook: prepare for transfer
+	// p.processCallback.PrepareUpdateTransfer(block, coinbase)
+
+	// // 计算新位置，资产直接加入block的交易数据中，方便后面模块直接处理资产数据
+	// //coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	// for i, tx := range block.Transactions {
+	// 	p.processCallback.TxInputProcess(i, tx, block, coinbase)
+	// }
 
 	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
 	p.actionBufferMap = make(map[int]map[int][]*InscribeInfo)
 	p.CheckPointWithBlockHeight(block.Height)
 	// hook: process checkpoint
-	p.processCallback.UpdateTransferFinished(block)
+	//p.processCallback.UpdateTransferFinished(block)
 
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 }

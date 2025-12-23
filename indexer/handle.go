@@ -58,7 +58,7 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	//time2 := time.Now()
 	s.nft.UpdateTransfer(block, coinbase)
 	s.ns.UpdateTransfer(block)
-	//s.brc20Indexer.UpdateTransfer(block, coinbase) // 由nftindexer内部调用过去
+	s.brc20Indexer.UpdateTransfer(block, coinbase) // 由nftindexer内部调用过去
 	s.RunesIndexer.UpdateTransfer(block)
 
 	s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
