@@ -294,43 +294,46 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 
 			// 合并资产
 			sats := p.utxoMap[input.UtxoId]                 // 已经铭刻的聪
-			addedNft, ok := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
+			if sats == nil {
+				sats = make(map[int64]int64)
+			}
+
+			addedNft := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
 			// 将铸造资产加入utxomap，并计算可能的reinscription
-			if ok {
-				if sats == nil {
-					sats = make(map[int64]int64)
-					p.utxoMap[input.UtxoId] = sats
-				}
-				for _, info := range addedNft { // 新增加的nft，有可能已经是重复铭刻
-					nft := info.Nft
-					newSat := true
-					for sat, offset := range sats {
-						if offset == info.InOffset {
-							if sat != nft.Base.Sat {
-								nft.Base.Sat = sat // 同一个聪，需要命名一致
-								// 根据ordinals规则，判断是否是reinscription
-								if nft.Base.CurseType == 0 {
-									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
-									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
-										// 已经存在非cursed的铭文，后面的铭文都是reinscription
-										// Jubilee后，也是需要记录reinscription
-										nft.Base.CurseType = int32(ordCommon.Reinscription)
-										nft.Base.Reinscription = 1
-										common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
-									}
+			for _, info := range addedNft { // 新增加的nft，有可能已经是重复铭刻
+				nft := info.Nft
+				newSat := true
+				for sat, offset := range sats {
+					if offset == info.InOffset {
+						if sat != nft.Base.Sat {
+							nft.Base.Sat = sat // 同一个聪，需要命名一致
+							// 根据ordinals规则，判断是否是reinscription
+							if nft.Base.CurseType == 0 {
+								nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
+								if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+									// 已经存在非cursed的铭文，后面的铭文都是reinscription
+									// Jubilee后，也是需要记录reinscription
+									nft.Base.CurseType = int32(ordCommon.Reinscription)
+									nft.Base.Reinscription = 1
+									common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 								}
 							}
-							newSat = false
-							break
 						}
+						newSat = false
+						break
 					}
-					if newSat {
-						// 加入utxomap
-						sats[nft.Base.Sat] = info.InOffset
-					}
-					p.addNftToSatMap(nft)
 				}
+				if newSat {
+					// 加入utxomap
+					sats[nft.Base.Sat] = info.InOffset
+				}
+				p.addNftToSatMap(nft)
 			}
+
+			if len(sats) > 0 {
+				p.utxoMap[input.UtxoId] = sats
+			}
+			
 		}
 	}
 
