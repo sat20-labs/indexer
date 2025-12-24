@@ -63,11 +63,11 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 
 func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 
-	if in.TxId == "20baac681d8f456876b65ef17a0a613136eea528fe0c881f5c2e60c26a0d9a1b" {
-		common.Log.Infof("")
-	}
+	// if in.TxId == "20baac681d8f456876b65ef17a0a613136eea528fe0c881f5c2e60c26a0d9a1b" {
+	// 	common.Log.Infof("")
+	// }
 
-	name := strings.ToLower(mint.Name)
+	name := mint.Name
 
 	ticker, ok := p.tickerMap[name]
 	if !ok {
@@ -80,19 +80,13 @@ func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 		BindingSat: ticker.Ticker.N, 
 		Offsets: mint.Offsets.Clone(),
 	}
-
-	// ordx协议因为一次铸造多个聪的资产，需要先在输入的聪上做分配
-	if !p.addHolder(&in.TxOutputV2, name, assetInfo) {
-		// 同一个聪上重复铸造导致的失败
-		common.Log.Warnf("FTIndexer UpdateMint %s invalid mint %s", name, in.TxId)
-		return
-	}
+	p.addHolder(&in.TxOutputV2, name, assetInfo)
 
 	old, ok := ticker.UtxoMap[mint.UtxoId]
 	if ok {
 		old.Merge(mint.Offsets)
 	} else {
-		ticker.UtxoMap[mint.UtxoId] = mint.Offsets
+		ticker.UtxoMap[mint.UtxoId] = mint.Offsets.Clone()
 	}
 	ticker.Ticker.TotalMinted += mint.Offsets.Size() * int64(ticker.Ticker.N)
 	p.tickerAdded[name] = ticker.Ticker // 更新
@@ -103,7 +97,7 @@ func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
-func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) bool {
+func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
 	info, ok := p.holderInfo[utxo.UtxoId]
 	if !ok {
 		info = &HolderInfo{
@@ -120,8 +114,6 @@ func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo 
 		p.utxoMap[ticker] = utxovalue
 	}
 	utxovalue[utxo.UtxoId] = amt
-
-	return true
 }
 
 func (p *FTIndexer) deleteUtxoMap(ticker string, utxo uint64) {
@@ -137,9 +129,9 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 		return
 	}
 
-	if block.Height == 30823 {
-		common.Log.Infof("")
-	}
+	// if block.Height == 31905 {
+	// 	common.Log.Infof("")
+	// }
 
 	p.mutex.Lock()
 
@@ -157,7 +149,6 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 			input := in.Clone()
 
 			utxo := input.UtxoId
-		//loopback:
 
 			holder := p.holderInfo[utxo]
 			actions, ok := p.actionBufferMap[utxo]
@@ -177,7 +168,8 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 								mintingAssetOffsets := mint.Offsets
 								inter := common.IntersectAssetOffsets(mintingAssetOffsets, existingAsset.Offsets)
 								if len(inter) != 0 {
-									common.Log.Infof("utxo %s mint asset %s on some satoshi with the same asset", input.OutPointStr, mint.Name)
+									common.Log.Infof("%s mint asset %s on some satoshi with the same asset", 
+										mint.Base.InscriptionId, mint.Name)
 									// 这次铸造无效
 									continue
 								}
@@ -191,7 +183,7 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 			}
 
 			if holder != nil {
-				// 如果是批量铸造，需要能区分各个铸造
+
 				tickers := make(map[string]bool)
 				for ticker, assetInfo := range holder.Tickers {
 
@@ -289,9 +281,6 @@ func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction,
 			}
 		}
 
-		// 处理完成，稀有聪资产数据清空，避免下一轮影响稀有聪资产数据的处理
-		txOut.Assets = nil
-		txOut.Offsets = make(map[common.AssetName]common.AssetOffsets)
 	}
 	return change
 }

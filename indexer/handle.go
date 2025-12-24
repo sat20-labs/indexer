@@ -553,7 +553,7 @@ func (s *IndexerMgr) handleMintTicker(in *common.TxInput, inOffset int64, out *c
 	nft.Base.TypeName = common.ASSET_TYPE_FT
 	mint := &common.Mint{
 		Base:    nft.Base,
-		Name:    content.Ticker,
+		Name:    strings.ToLower(content.Ticker),
 		UtxoId:  in.UtxoId, // ordx资产需要从input的聪中分配
 		Offsets: newRngs,
 		Amt:     int64(amt),
