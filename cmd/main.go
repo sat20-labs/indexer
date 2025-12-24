@@ -7,6 +7,7 @@ func main() {
 
 	//OrdDiff_Test()
 
-	OrdNumDiff_Test()
+	//OrdNumDiff_Test()
 
+	TestCompareMintHistory()
 }

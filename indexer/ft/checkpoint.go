@@ -27,7 +27,7 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
 			"RarePizza": {DeployHeight: 31894},
-			"dogecoin": {DeployHeight: 60886}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"dogcoin": {DeployHeight: 60886}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
 			"fail02": {DeployHeight: 29008},
 			"fair01": {DeployHeight: 28883},
 		},
@@ -35,16 +35,17 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 
 	114380: {
 		Tickers: map[string]*TickerStatus{
-			"dogecoin": {
-				Minted:      156271012,
-				MintCount:   15638,
-				HolderCount: 2083,
+			"dogcoin": {
+				Minted:      1800100, 
+				MintCount:   1810,
+				HolderCount: 78,
 				Holders: map[string]int64{
-					"bc1qmgactfmdfympq5tqld7rc53y4dphvdyqnmtuuv9jwgpn7hqwr2kss26dls": 18436116,
-					"bc1pae8vkxlfa6aeefswxjnaxupm90zjc56y924jr4uhwkzv7aldhdysrc45cr": 3004146,
-					"bc1qfsvzq8wysyzxdmt982sq4pkpc9xpd4nlku7tjr":                     2667024,
-					"bc1pgn2jfve3n7hhmua4966aa57ggckpp67qm34hj6hmtjm82qdmukyq29rau7": 36,
-					"bc1qtz5ymtyycg0dyrz2y6zlm7rc46wl9nmy49jen3":                     1,
+					"tb1p7pnu75ln3evuyw26sdnl5kq6xxmlpqs5x7l6c6dqy5nqy5nz46cqvc7g8n": 886000,
+					"tb1qw86hsm7etf4jcqqg556x94s6ska9z0239ahl0tslsuvr5t5kd0nq7vh40m": 454262,
+					"tb1p8dklwgn9zsm3cezmtl6rdtygcllf649pm75ua33hacnfpd7t4dqqxmcvfr": 100000,
+					"tb1p6jcfgfwyfw2nhd948c3sq8cyuevcfjm9u5p8zjrh80kldxsruw2su0432a": 63500,
+					"tb1pfgrteggdxrejy5xafgsc0l00uset0wxvgq29ug8s0enkmhyt9zcqetp23z": 330,
+					"tb1phv466d2pzf2fat7rc06hlecvuvk4wwa8v6mudw93fwdeauctujlqrxkcm0": 100,
 				},
 			},
 		},
@@ -136,8 +137,7 @@ func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
 			common.Log.Panicf("ticker count different")
 		}
 	}
-	// 太花时间
-	//rpc := base.NewRpcIndexer(p.nftIndexer.GetBaseIndexer())
+	
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
 	for name, tickerStatus := range checkpoint.Tickers {
 		if tickerStatus.DeployHeight != 0 {

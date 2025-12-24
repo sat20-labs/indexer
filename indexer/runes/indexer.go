@@ -38,6 +38,8 @@ type Indexer struct {
 
 	//addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable // addressId+utxoId -> runeId+balance  TODO 这个没用
 
+	// checkpoint 临时使用
+	holderMapInPrevBlock map[uint64]*common.Decimal
 }
 
 func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIndexer) *Indexer {

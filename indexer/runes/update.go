@@ -81,6 +81,8 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	format := "RuneIndexer.UpdateTransfer-> handle block succ, tx count:%d, update holder count:%d, remove holder count:%d, block took time:%v"
 	common.Log.Infof(format, txCount, s.HolderUpdateCount, s.HolderRemoveCount, sinceTime)
 	s.update()
+
+	s.CheckPointWithBlockHeight(block.Height)
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {

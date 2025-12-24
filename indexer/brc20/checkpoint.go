@@ -222,10 +222,10 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 			"Test": {
 				Name:        "Test",
 				Max:         "21000000",
-				Minted:      "14918000",
-				MintCount:   14918,
-				HolderCount: 33,
-				TxCount:     14958,
+				Minted:      "14917000",
+				MintCount:   14917,
+				HolderCount: 32,
+				TxCount:     14957,
 				Holders: map[string]string{
 					"tb1p5cymzvgf87fgeuzfexwxgvlmuuq309gegfh4q6np8g4qq6lnlk3qpzf2rs": "3000000",
 					"tb1q0juamrh0s56hwzh9w5af2r9qfn986tym4h6yz5":                     "2450000",
@@ -663,6 +663,9 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		}
 		path = "./indexer/brc20/validate/ordi-testnet4.csv"
 	}
+
+	var startHeight, endHeight int
+	startHeight = 0xffffffff
 	
 	if _validateData == nil {
 		var err error
@@ -694,9 +697,19 @@ func (p *BRC20Indexer) validateHistory(height int) {
 				}
 				inscs[record.InscriptionID] = record.InscriptionNumber
 			}
+
+			if record.Height > endHeight {
+				endHeight = record.Height
+			}
+			if record.Height < startHeight {
+				startHeight = record.Height
+			}
 		}
 	}
 	if len(_validateData) == 0 {
+		return
+	}
+	if height < startHeight || height > endHeight {
 		return
 	}
 
@@ -898,11 +911,14 @@ func findDiffInMap[T1 any, T2 any](t1 map[string]T1, t2 map[string]T2) []string 
 	return result
 }
 
-func readHolderDataToMap(dir string) {
+func readHolderDataToMap(dir string) (int, int) {
 	validateHolderData, err := validate.ReadBRC20HolderCSVDir(dir)
 	if err != nil {
 		common.Log.Panicf("ReadBRC20HolderCSVDir %s failed, %v", dir, err)
 	}
+
+	var startHeight, endHeight int
+	startHeight = 0xffffffff
 
 	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
 	for _, record := range validateHolderData {
@@ -912,7 +928,15 @@ func readHolderDataToMap(dir string) {
 			_heightToHolderRecords[record.LastHeight] = holders
 		}
 		holders[record.Address] = record
+
+		if record.LastHeight > endHeight {
+			endHeight = record.LastHeight
+		}
+		if record.LastHeight < startHeight {
+			startHeight = record.LastHeight
+		}
 	}
+	return startHeight, endHeight
 }
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
@@ -924,10 +948,14 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 		return
 	}
 
+	var startHeight, endHeight int
 	if _heightToHolderRecords == nil {
-		readHolderDataToMap("./indexer/brc20/validate/holders")
+		startHeight, endHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
 	}
 	if len(_heightToHolderRecords) == 0 {
+		return
+	}
+	if height < startHeight || height > endHeight {
 		return
 	}
 

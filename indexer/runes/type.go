@@ -3,6 +3,7 @@ package runes
 import (
 	"encoding/json"
 
+	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"lukechampine.com/uint128"
 )
@@ -83,6 +84,19 @@ type RuneInfo struct {
 	Turbo             bool
 	Etching           string
 	Parent            string
+}
+
+func (s RuneInfo) TotalMinted() *common.Decimal {
+	return common.NewDecimalFromUint128(s.Supply, int(s.Divisibility))
+}
+
+func (s RuneInfo) TotalHolderAmt() *common.Decimal {
+	amt := s.Supply.Sub(s.Burned)
+	return common.NewDecimalFromUint128(amt, int(s.Divisibility))
+}
+
+func (s RuneInfo) Max() *common.Decimal {
+	return common.NewDecimalFromUint128(s.MaxSupply, int(s.Divisibility))
 }
 
 func (s RuneInfo) MarshalJSON() ([]byte, error) {
