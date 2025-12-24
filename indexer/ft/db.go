@@ -17,10 +17,6 @@ func (s *FTIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
 func (s *FTIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 	mintList := s.loadMintDataFromDB(tickinfo.Name)
 	for _, mint := range mintList {
-		for _, rng := range mint.Ordinals {
-			tickinfo.MintInfo.AddMintInfo(rng, mint.Base.InscriptionId)
-		}
-
 		tickinfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
 	}
 }
@@ -28,7 +24,7 @@ func (s *FTIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
 func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	count := 0
 	startTime := time.Now()
-	common.Log.Debug("loadHolderInfoFromDB ...")
+	common.Log.Debug("FTIndexer loadHolderInfoFromDB ...")
 	result := make(map[uint64]*HolderInfo, 0)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_HOLDER), false, func(k, v []byte) error {
 
@@ -61,11 +57,11 @@ func (s *FTIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	return result
 }
 
-func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
+func (s *FTIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	count := 0
 	startTime := time.Now()
-	common.Log.Debug("loadUtxoMapFromDB ...")
-	result := make(map[string]*map[uint64]int64, 0)
+	common.Log.Info("loadUtxoMapFromDB ...")
+	result := make(map[string]map[uint64]int64, 0)
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -80,11 +76,11 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]*map[uint64]int64 {
 			if err == nil {
 				oldmap, ok := result[ticker]
 				if ok {
-					(*oldmap)[utxo] = amount
+					oldmap[utxo] = amount
 				} else {
 					utxomap := make(map[uint64]int64, 0)
 					utxomap[utxo] = amount
-					result[ticker] = &utxomap
+					result[ticker] = utxomap
 				}
 			} else {
 				common.Log.Errorln("DecodeBytes " + err.Error())
@@ -160,7 +156,7 @@ func (s *FTIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Min
 	result := make(map[string]*common.Mint, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Debugf("loadMintDataFromDB ...")
+	common.Log.Debug("loadMintDataFromDB ...")
 	err := s.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"), false, func(k, v []byte) error {
 
 		key := string(k)

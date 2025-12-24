@@ -8,11 +8,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	"github.com/stretchr/testify/assert"
 )
-
 
 func GetTxRawData(txID string, network string) (string, error) {
 	url := ""
@@ -77,8 +76,14 @@ func GetRawData(txID string, network string) ([][]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", txID, err)
 	}
-	txWitness := data["vin"].([]interface{})[0].(map[string]interface{})["witness"].([]interface{})
 
+	var txWitness []interface{}
+	for _, vin := range data["vin"].([]interface{}) {
+		txWitness = vin.(map[string]interface{})["witness"].([]interface{})
+		if len(txWitness) < 2 {
+			continue
+		}
+	}
 	if len(txWitness) < 2 {
 		return nil, fmt.Errorf("failed to retrieve witness for %s", txID)
 	}
@@ -139,7 +144,7 @@ func TestParser_Satpoint(t *testing.T) {
 		spBytes := field.Inscription.Pointer
 		satpoint := 0
 		if len(spBytes) > 0 {
-			satpoint = common.GetSatpoint(spBytes)
+			satpoint = common.GetSatPointer(spBytes)
 		}
 
 		fmt.Printf("sat point %s %d\n", hex.EncodeToString(field.Inscription.Pointer), satpoint)
@@ -273,9 +278,9 @@ func TestParser_ord1(t *testing.T) {
 	}
 
 	for i, field := range fields {
-		
-			fmt.Printf("%d: %v", i, field)
-		
+
+		fmt.Printf("%d: %v", i, field)
+
 	}
 }
 
@@ -345,7 +350,7 @@ func TestParser_ord5(t *testing.T) {
 		assert.True(t, false)
 	}
 
-	satpoint := common.GetSatpoint(fields[0].Inscription.Pointer)
+	satpoint := common.GetSatPointer(fields[0].Inscription.Pointer)
 
 	if satpoint != 0x18d {
 		fmt.Printf("%v\n", err)
@@ -634,7 +639,6 @@ func TestParser_ord19(t *testing.T) {
 		assert.True(t, false)
 	}
 
-	
 	assert.True(t, !fields[0].IsCursed)
 	assert.True(t, fields[1].IsCursed)
 }
@@ -660,6 +664,24 @@ func TestParser_ord20(t *testing.T) {
 func TestParser_ord21(t *testing.T) {
 	// input 0, output 0
 	rawData, err := GetRawData("4e73e226998b37ea6eee0d904a17321e3c0f75abfd9c3b534845ea5ff345a9e3", "testnet4")
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		assert.True(t, false)
+	}
+	fields, _, err := ParseInscription(rawData)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		assert.True(t, false)
+	}
+
+	if len(fields) != 1 {
+		assert.True(t, false)
+	}
+}
+
+func TestParser_ord22(t *testing.T) {
+	// input 0, output 0
+	rawData, err := GetRawData("93d051c5a0ae3b6c34cad59878622993ff6c992fc8b84ca11e435f6496220e64", "testnet4")
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		assert.True(t, false)

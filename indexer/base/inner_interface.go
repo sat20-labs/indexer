@@ -1,7 +1,7 @@
 package base
 
 import (
-	"github.com/sat20-labs/indexer/common"
+	
 )
 
 /*
@@ -16,24 +16,4 @@ func (p *BaseIndexer) GetAddressId(address string) uint64 {
 
 func (b *BaseIndexer) IsMainnet() bool {
 	return b.chaincfgParam.Name == "mainnet"
-}
-
-func (b *BaseIndexer) GetAddressWithUtxo(utxo string) string {
-	output, ok := b.utxoIndex.Index[utxo]
-	if ok {
-		return output.Address.Addresses[0]
-	}
-
-	err := b.loadUtxoFromDB(utxo)
-	if err != nil {
-		common.Log.Errorf("failed to get value of utxo: %s, %v", utxo, err)
-		return ""
-	}
-
-	output, ok = b.utxoIndex.Index[utxo]
-	if ok {
-		return output.Address.Addresses[0]
-	}
-	
-	return ""
 }

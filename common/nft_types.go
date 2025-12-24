@@ -4,14 +4,23 @@ import (
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
-const Jubilee_Height int = 824544
+var Jubilee_Height int = 824544
 
 type InscribeBaseContent = pb.InscribeBaseContent
 type Nft struct {
 	Base           *InscribeBaseContent
 	OwnerAddressId uint64
 	UtxoId         uint64
-	Offset         int64 // 在对外接口时重新获取，内部不要用也不要重新
+	Offset         int64
+}
+
+func (p *Nft) Clone() *Nft {
+	return &Nft{
+		Base:           p.Base, // 固定数据
+		OwnerAddressId: p.OwnerAddressId,
+		UtxoId:         p.UtxoId,
+		Offset:         p.Offset,
+	}
 }
 
 type NftStatus struct {

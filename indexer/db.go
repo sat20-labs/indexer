@@ -36,6 +36,11 @@ func (p *IndexerMgr) initDB() (err error) {
 		return err
 	}
 
+	p.exoticDB, err = openDB(p.dbDir + "exotic")
+	if err != nil {
+		return err
+	}
+
 	p.ftDB, err = openDB(p.dbDir + "ft")
 	if err != nil {
 		return err

@@ -19,18 +19,13 @@ type Indexer interface {
 	GetAddressId(address string) uint64
 	GetUtxoById(utxoId uint64) string
 	GetUtxoId(utxo string) uint64
+	GetUtxoValue(utxo string) int64
 	// return: utxoId->value
 	GetUTXOsWithAddress(address string) (map[uint64]int64, error)
-	// return: utxo, sat ranges
-	GetOrdinalsWithUtxoId(id uint64) (string, []*common.Range, error)
-	// return: utxoId, sat ranges
-	GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, error)
-	// return: address, utxo
-	FindSat(sat int64) (string, string, error)
 	// return: address
 	GetHolderAddress(inscriptionId string) string
 
-	// Asset
+	// ordx Asset
 	// return: tick->amount
 	GetAssetSummaryInAddress(address string) map[common.TickerName]int64
 	// return: tick->UTXOs
@@ -39,17 +34,14 @@ type Indexer interface {
 	GetAssetUTXOsInAddressWithTick(address string, tickerName *common.TickerName) (map[uint64]int64, error)
 	// return: mint info sorted by inscribed time
 	GetMintHistoryWithAddress(address string, tickerName *common.TickerName, start, limit int) ([]*common.MintAbbrInfo, int)
-	HasAssetInUtxo(utxo string, excludingExotic bool) bool
-	// return: ticker -> asset info (inscriptinId -> asset ranges)
-	GetAssetsWithUtxo(utxo uint64) map[common.TickerName]map[string][]*common.Range
-	// return: all asset pieces in the utxo in original sequence, including blank sats
-	GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRange
-	// return: ticker -> asset info (inscriptinId -> asset ranges)
-	GetAssetsWithRanges([]*common.Range) map[string]map[string][]*common.Range
-	// return: exotic range and types
-	GetExoticsWithRanges(ranges []*common.Range) []*common.ExoticRange
-	HasExoticInRanges(ranges []*common.Range) bool
-	GetExoticsWithType(ranges []*common.Range, typ string) []*common.ExoticRange
+	HasAssetInUtxo(utxo uint64, excludingExotic bool) bool
+	// return: ticker -> asset info (asset ranges)
+	GetAssetsWithUtxo(utxo uint64) map[common.TickerName]common.AssetOffsets
+	
+
+	GetExotics(utxoId uint64) map[string]common.AssetOffsets
+	GetExoticsWithType(utxoId uint64, typ string) common.AssetOffsets
+
 	AddCollection(ntype, ticker string, ids []string) error
 
 	// FT

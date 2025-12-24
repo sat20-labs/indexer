@@ -45,7 +45,7 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 	if b.nft.HasNftInUtxo(utxoId) {
 		return true
 	}
-	
+
 	if b.HasNameInUtxo(utxoId) {
 		return true
 	}
@@ -61,28 +61,20 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 	}
 
 	if !excludingExotic {
-		_, rngs, err := b.GetOrdinalsWithUtxoId(utxoId)
-		if err == nil {
-			if b.exotic.HasExoticInRanges(rngs) {
-				return true
-			}
+		if b.exotic.HasExoticInUtxo(utxoId) {
+			return true
 		}
-	} 
-	
+	}
+
 	return false
 }
 
-func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
-	utxoId, rngs, err := b.rpcService.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
-		return false
-	}
-
+func (b *IndexerMgr) HasAssetInUtxo(utxoId uint64, excludingExotic bool) bool {
 	result := b.nft.HasNftInUtxo(utxoId)
 	if result {
 		return true
 	}
-	
+
 	if b.HasNameInUtxo(utxoId) {
 		return true
 	}
@@ -97,7 +89,7 @@ func (b *IndexerMgr) HasAssetInUtxo(utxo string, excludingExotic bool) bool {
 		return true
 	}
 
-	if !excludingExotic && b.exotic.HasExoticInRanges(rngs) {
+	if !excludingExotic && b.exotic.HasExoticInUtxo(utxoId) {
 		return true
 	}
 
@@ -173,21 +165,15 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 			bSpecialTicker = true
 		}
 		for utxoId := range utxos {
-			_, rng, err := b.GetOrdinalsWithUtxoId(utxoId)
-			if err != nil {
-				common.Log.Errorf("GetOrdinalsWithUtxoId failed, %d", utxoId)
-				continue
-			}
-
-			sr := b.exotic.GetExoticsWithRanges2(rng)
+			sr := b.exotic.GetAssetsWithUtxo(utxoId)
 			amount := int64(0)
 			for name, rngs := range sr {
 				if bSpecialTicker {
 					if name == ticker.Ticker {
-						amount += (common.GetOrdinalsSize(rngs))
+						amount += rngs.Size()
 					}
 				} else {
-					amount += (common.GetOrdinalsSize(rngs))
+					amount += rngs.Size()
 				}
 			}
 			if amount > 0 {
@@ -233,7 +219,7 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 		if b.HasAssetInUtxoId(utxoId, false) {
 			continue
 		}
-		
+
 		plainUtxoMap[utxoId] = v
 	}
 	exAssets, plainUtxos := b.getExoticSummaryByAddress(plainUtxoMap)
@@ -298,9 +284,10 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 // 返回跟聪不绑定的资产，资产数据有可能仅用于显示
 // return: ticker -> assets(amt)
 type AssetInfoInUtxo struct {
-	Amt *common.Decimal
+	Amt     *common.Decimal
 	Invalid bool
 }
+
 func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*AssetInfoInUtxo {
 	result := make(map[common.TickerName]*AssetInfoInUtxo)
 
@@ -319,8 +306,8 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.Tick
 	brc20Asset := b.brc20Indexer.GetUtxoAssets(utxoId)
 	if brc20Asset != nil {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: brc20Asset.Name}
-		result[tickName] =  &AssetInfoInUtxo{
-			Amt: brc20Asset.Amt,
+		result[tickName] = &AssetInfoInUtxo{
+			Amt:     brc20Asset.Amt,
 			Invalid: brc20Asset.Invalid,
 		}
 	}
@@ -329,8 +316,8 @@ func (b *IndexerMgr) GetUnbindingAssetsWithUtxoV2(utxoId uint64) map[common.Tick
 }
 
 // return: ticker -> assets(inscriptionId->Ranges)
-func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[string][]*common.Range {
-	result := make(map[common.TickerName]map[string][]*common.Range)
+func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]common.AssetOffsets {
+	result := make(map[common.TickerName]common.AssetOffsets)
 	ftAssets := b.ftIndexer.GetAssetsWithUtxo(utxoId)
 	if len(ftAssets) > 0 {
 		for k, v := range ftAssets {
@@ -340,8 +327,10 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[
 	}
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
-		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: ""}
-		result[tickName] = nfts
+		for k, v := range nfts {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORD, Type: common.ASSET_TYPE_NFT, Ticker: k}
+			result[tickName] = v
+		}
 	}
 	names := b.getNamesWithUtxo(utxoId)
 	if len(names) > 0 {
@@ -353,9 +342,6 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[
 	exo := b.getExoticsWithUtxo(utxoId)
 	if len(exo) > 0 {
 		for k, v := range exo {
-			if b.HasAssetInUtxoId(utxoId, true) {
-				continue
-			}
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
 			result[tickName] = v
 		}
@@ -364,111 +350,6 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]map[
 	return result
 }
 
-func (b *IndexerMgr) GetAssetOffsetWithUtxo(utxo string) []*common.AssetOffsetRange {
-	result := make([]*common.AssetOffsetRange, 0)
-
-	utxoId, rngs, err := b.rpcService.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
-		return nil
-	}
-
-	assetmap := b.GetAssetsWithUtxo(utxoId)
-
-	// 白聪打底
-	offset := int64(0)
-	for _, rng := range rngs {
-		result = append(result, &common.AssetOffsetRange{Range: rng, Offset: offset})
-		offset += rng.Size
-	}
-
-	// 插入资产数据
-	for ticker, assets := range assetmap {
-		for _, assetRngs := range assets {
-			for _, assetRng := range assetRngs {
-
-				for i := 0; i < len(result); {
-					rng := result[i]
-					intersection := common.InterRange(rng.Range, assetRng)
-					if intersection.Start < 0 {
-						i++
-						continue
-					}
-
-					// 分割rng，不处理超出rng的部分
-					offset1 := int64(0) // 或者需要加上基数 rng.Offset
-					offset2 := intersection.Start - rng.Range.Start
-					offset3 := offset2 + intersection.Size
-					offset4 := rng.Range.Size
-
-					// 前不相交部分
-					rng1 := rng.Clone()
-					rng1.Range.Size = offset2 - offset1
-
-					// 相交部分
-					rng2 := rng.Clone()
-					rng2.Range.Start = rng1.Range.Start + offset2
-					rng2.Range.Size = offset3 - offset2
-					rng2.Offset = offset2 + rng.Offset
-					if rng2.Assets == nil {
-						rng2.Assets = make([]*common.TickerName, 0)
-					}
-					rng2.Assets = append(rng2.Assets, &ticker)
-
-					// 后不相交部分
-					rng3 := rng.Clone()
-					rng3.Range.Start = rng1.Range.Start + offset3
-					rng3.Range.Size = offset4 - offset3
-					rng3.Offset = offset3 + rng.Offset
-
-					newResult := make([]*common.AssetOffsetRange, i)
-					copy(newResult, result[0:i])
-					j := i
-					if rng1.Range.Size > 0 {
-						newResult = append(newResult, rng1)
-						j++
-					}
-					if rng2.Range.Size > 0 {
-						newResult = append(newResult, rng2)
-						j++
-					}
-					if rng3.Range.Size > 0 {
-						newResult = append(newResult, rng3)
-						j++
-					}
-					if i+1 < len(result) {
-						newResult = append(newResult, result[i+1:]...)
-					}
-					i = j + 1
-					result = newResult
-				}
-			}
-		}
-	}
-
-	return result
-}
-
-// return: ticker -> assets(inscriptionId->Ranges)
-func (b *IndexerMgr) GetAssetsWithRanges(ranges []*common.Range) map[string]map[string][]*common.Range {
-	result := b.ftIndexer.GetAssetsWithRanges(ranges)
-	if result == nil {
-		result = make(map[string]map[string][]*common.Range)
-	}
-	ret := b.getNftsWithRanges(ranges)
-	if len(ret) > 0 {
-		result[common.ASSET_TYPE_NFT] = ret
-	}
-	ret = b.getNamesWithRanges(ranges)
-	if len(ret) > 0 {
-		result[common.ASSET_TYPE_NS] = ret
-	}
-	ret = b.exotic.GetExoticsWithRanges2(ranges)
-	if len(ret) > 0 {
-		result[common.ASSET_TYPE_EXOTIC] = ret
-	}
-
-	return result
-}
 
 func (b *IndexerMgr) GetMintHistory(tick string, start, limit int) []*common.MintAbbrInfo {
 	switch tick {
@@ -522,15 +403,17 @@ func (b *IndexerMgr) GetMintInfo(inscriptionId string) *common.Mint {
 	switch nft.Base.TypeName {
 	case common.ASSET_TYPE_NFT:
 		return &common.Mint{
-			Base:     nft.Base,
-			Amt:      1,
-			Ordinals: []*common.Range{{Start: nft.Base.Sat, Size: 1}},
+			Base:    nft.Base,
+			Amt:     1,
+			UtxoId:  nft.UtxoId,
+			Offsets: common.AssetOffsets{{Start: nft.Offset, End: nft.Offset+1}},
 		}
 	case common.ASSET_TYPE_NS:
 		return &common.Mint{
-			Base:     nft.Base,
-			Amt:      1,
-			Ordinals: []*common.Range{{Start: nft.Base.Sat, Size: 1}},
+			Base:    nft.Base,
+			Amt:     1,
+			UtxoId:  nft.UtxoId,
+			Offsets: common.AssetOffsets{{Start: nft.Offset, End: nft.Offset+1}},
 		}
 	}
 
@@ -567,7 +450,7 @@ func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string
 	value := make([]string, 0)
 	switch ntype {
 	case common.ASSET_TYPE_NFT:
-	
+
 		err := db.GetValueFromDB(key, value, b.localDB)
 		if err != nil {
 			common.Log.Errorf("GetCollection %s %s failed: %v", ntype, ticker, err)

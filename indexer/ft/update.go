@@ -8,10 +8,25 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-// 每个deploy都调用
-func (p *FTIndexer) UpdateTick(ticker *common.Ticker) {
+// 每个deploy都调用，也可以用于更新
+func (p *FTIndexer) UpdateTick(in *common.TxInput, ticker *common.Ticker) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
+
+	if p.actionBufferMap == nil {
+		p.actionBufferMap = make(map[uint64][]*ActionInfo)
+	}
+
+	action := &ActionInfo{
+		Action: common.BRC20_Action_InScribe_Deploy,
+		Input: in,
+		Info: ticker,
+	}
+
+	p.actionBufferMap[in.UtxoId] = append(p.actionBufferMap[in.UtxoId], action)
+}
+
+func (p *FTIndexer) updateTick(in *common.TxInput, ticker *common.Ticker) {
 
 	name := strings.ToLower(ticker.Name)
 	org, ok := p.tickerMap[name]
@@ -28,166 +43,256 @@ func (p *FTIndexer) UpdateTick(ticker *common.Ticker) {
 }
 
 // 每个mint都调用这个函数。
-func (p *FTIndexer) UpdateMint(inUtxo uint64, mint *common.Mint) {
+func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	name := strings.ToLower(mint.Name)
+	if p.actionBufferMap == nil {
+		p.actionBufferMap = make(map[uint64][]*ActionInfo)
+	}
+
+	action := &ActionInfo{
+		Action: common.BRC20_Action_InScribe_Mint,
+		Input: in,
+		Info: mint,
+	}
+
+	p.actionBufferMap[in.UtxoId] = append(p.actionBufferMap[in.UtxoId], action)
+
+}
+
+func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
+
+	// if in.TxId == "20baac681d8f456876b65ef17a0a613136eea528fe0c881f5c2e60c26a0d9a1b" {
+	// 	common.Log.Infof("")
+	// }
+
+	name := mint.Name
+
 	ticker, ok := p.tickerMap[name]
 	if !ok {
 		// 正常不会走到这里，除非是数据从中间跑
 		return
 	}
 	mint.Id = int64(len(ticker.InscriptionMap))
-	for _, rng := range mint.Ordinals {
-		ticker.MintInfo.AddMintInfo(rng, mint.Base.InscriptionId)
+
+	assetInfo := &common.AssetAbbrInfo{
+		BindingSat: ticker.Ticker.N, 
+		Offsets: mint.Offsets.Clone(),
 	}
+	p.addHolder(&in.TxOutputV2, name, assetInfo)
+
+	old, ok := ticker.UtxoMap[mint.UtxoId]
+	if ok {
+		old.Merge(mint.Offsets)
+	} else {
+		ticker.UtxoMap[mint.UtxoId] = mint.Offsets.Clone()
+	}
+	ticker.Ticker.TotalMinted += mint.Offsets.Size() * int64(ticker.Ticker.N)
+	p.tickerAdded[name] = ticker.Ticker // 更新
+
 	ticker.MintAdded = append(ticker.MintAdded, mint)
 	ticker.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
-
-	// action := HolderAction{Utxo: mint.Utxo, Action: 1}
-	// p.holderActionList = append(p.holderActionList, &action)
-	// p.addHolder(mint.Ticker, mint.OwnerAddress, mint.Utxo, mint.Utxo, mint.Ordinals)
-	// 这里加holder，容易跟UpdateTransfer形成双重加holder
-
-	// 应该在这里将input的utxo加入就行，在UpdateTransfer中做真正的处理
-	mintInfo := make(map[string][]*common.Range, 0)
-	mintInfo[mint.Base.InscriptionId] = mint.Ordinals
-	tickers := make(map[string]*common.TickAbbrInfo, 0)
-	tickers[name] = &common.TickAbbrInfo{N: ticker.Ticker.N, MintInfo: mintInfo}
-	action := HolderAction{UtxoId: inUtxo, AddressId: mint.Base.InscriptionAddress, Tickers: tickers, Action: 1}
-	p.holderActionList = append(p.holderActionList, &action)
-	// 仅仅为了让UpdateTransfer能检查到输入的input中有资产，所以该tx的output才会进行资产检查工作
-	p.addHolder(inUtxo, name, ticker.Ticker.N, mint.Base.InscriptionAddress, 0, mint.Base.InscriptionId, mint.Ordinals)
 }
 
-// 增加该utxo下的资产数据，该资产为ticker，持有人，在mintutxo铸造，资产的聪范围。聪范围可以累加，因为资产都来自不同的utxo。
-func (p *FTIndexer) addHolder(utxo uint64, ticker string, n int, address uint64, index int, inscriptionId string, rngs []*common.Range) {
 
-	mintinfo := make(map[string][]*common.Range, 0)
-	mintinfo[inscriptionId] = rngs
-
-	info, ok := p.holderInfo[utxo]
+// 增加该utxo下的资产数据，该资产为ticker，持有人，
+func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
+	info, ok := p.holderInfo[utxo.UtxoId]
 	if !ok {
-		tickinfo := common.TickAbbrInfo{N: n, MintInfo: mintinfo}
-		tickers := make(map[string]*common.TickAbbrInfo, 0)
-		tickers[ticker] = &tickinfo
-		info = &HolderInfo{AddressId: address, Index: index, Tickers: tickers}
-		p.holderInfo[utxo] = info
-	} else {
-		info.AddressId = address
-		info.Index = index
-		tickinfo, ok := info.Tickers[ticker]
-		if !ok {
-			tickinfo := common.TickAbbrInfo{N: n, MintInfo: mintinfo}
-			info.Tickers[ticker] = &tickinfo
-		} else {
-			tickinfo.MintInfo[inscriptionId] = append(tickinfo.MintInfo[inscriptionId], rngs...)
+		info = &HolderInfo{
+			AddressId: utxo.AddressId,
+			Tickers:   make(map[string]*common.AssetAbbrInfo, 0),
 		}
+		p.holderInfo[utxo.UtxoId] = info
 	}
 
+	amt := info.AddTickerAsset(ticker, assetInfo)
 	utxovalue, ok := p.utxoMap[ticker]
 	if !ok {
-		newutxovalue := make(map[uint64]int64, 0)
-		newutxovalue[utxo] = common.GetOrdinalsSize(rngs) * int64(n)
-		p.utxoMap[ticker] = &newutxovalue
-	} else {
-		(*utxovalue)[utxo] += common.GetOrdinalsSize(rngs) * int64(n)
+		utxovalue = make(map[uint64]int64, 0)
+		p.utxoMap[ticker] = utxovalue
 	}
+	utxovalue[utxo.UtxoId] = amt
 }
 
 func (p *FTIndexer) deleteUtxoMap(ticker string, utxo uint64) {
 	utxos, ok := p.utxoMap[ticker]
 	if ok {
-		delete(*utxos, utxo)
+		delete(utxos, utxo)
 	}
 }
 
-func (p *FTIndexer) UpdateTransfer(block *common.Block) {
+func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
+
+	if block.Height < p.enableHeight {
+		return
+	}
+
+	// if block.Height == 31905 {
+	// 	common.Log.Infof("")
+	// }
+
 	p.mutex.Lock()
 
 	startTime := time.Now()
 
+	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
-		hasAsset := false
-		for _, input := range tx.Inputs {
+
+		if tx.TxId == "20baac681d8f456876b65ef17a0a613136eea528fe0c881f5c2e60c26a0d9a1b" {
+			common.Log.Infof("")
+		}
+
+		var allInput *common.TxOutput
+		for _, in := range tx.Inputs {
+			input := in.Clone()
+
 			utxo := input.UtxoId
-			holder, ok := p.holderInfo[utxo]
+
+			holder := p.holderInfo[utxo]
+			actions, ok := p.actionBufferMap[utxo]
 			if ok {
-				hasAsset = true
-				action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: holder.Tickers, Action: -1}
+				// 需要对将铸造结果先合并到input中，同时处理可能的资产铸造有效性问题
+				for _, action := range actions {
+					switch action.Action {
+					case common.BRC20_Action_InScribe_Deploy:
+						p.updateTick(action.Input, action.Info.(*common.Ticker))
+					case common.BRC20_Action_InScribe_Mint:
+						mint := action.Info.(*common.Mint)
+						if holder != nil {
+							existingAsset, ok := holder.Tickers[mint.Name]
+							if ok {
+								// 检查同名字的铸造，不能在已经铸造有该资产的聪上
+								// testnet4: 54bec54ac5c68646753398403bea863c6f015f109b283444b8c8460ee64940ac
+								mintingAssetOffsets := mint.Offsets
+								inter := common.IntersectAssetOffsets(mintingAssetOffsets, existingAsset.Offsets)
+								if len(inter) != 0 {
+									common.Log.Infof("%s mint asset %s on some satoshi with the same asset", 
+										mint.Base.InscriptionId, mint.Name)
+									// 这次铸造无效
+									continue
+								}
+							}
+						}
+						// 没有冲突，加入holder中
+						p.updateMint(action.Input, mint)
+						holder = p.holderInfo[utxo]
+					}
+				}
+			}
+
+			if holder != nil {
+
+				tickers := make(map[string]bool)
+				for ticker, assetInfo := range holder.Tickers {
+
+					tickerInfo := p.tickerMap[ticker]
+
+					assetName := common.AssetName{
+						Protocol: common.PROTOCOL_NAME_ORDX,
+						Type:     common.ASSET_TYPE_FT,
+						Ticker:   ticker,
+					}
+					asset := common.AssetInfo{
+						Name:       assetName,
+						Amount:     *common.NewDecimal(assetInfo.AssetAmt(), 0),
+						BindingSat: uint32(tickerInfo.Ticker.N),
+					}
+					input.Assets.Add(&asset)
+					input.Offsets[asset.Name] = assetInfo.Offsets.Clone()
+					tickers[ticker] = true
+				}
+
+				action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: tickers, Action: -1}
 				p.holderActionList = append(p.holderActionList, &action)
 				delete(p.holderInfo, utxo)
 				for name := range holder.Tickers {
 					p.deleteUtxoMap(name, utxo)
 				}
 			}
-		}
 
-		if hasAsset {
-			for _, output := range tx.Outputs {
-				p.innerUpdateTransfer(output)
+			if allInput == nil {
+				allInput = input.Clone()
+			} else {
+				allInput.Append(input)
 			}
 		}
+
+		change := p.innerUpdateTransfer(tx, allInput)
+		coinbaseInput.Append(change)
 	}
-	// 保持顺序
-	tx := block.Transactions[0]
-	for _, output := range tx.Outputs {
-		p.innerUpdateTransfer(output)
+
+	if len(coinbaseInput.Assets) != 0 {
+		tx := block.Transactions[0]
+		change := p.innerUpdateTransfer(tx, coinbaseInput)
+		if !change.Zero() {
+			common.Log.Panicf("UpdateTransfer should consume all input assets")
+		}
 	}
-	common.Log.Infof("OrdxIndexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
+
+	p.actionBufferMap = make(map[uint64][]*ActionInfo)
+
+	common.Log.Infof("FTIndexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 
 	p.mutex.Unlock()
-	// if !p.CheckSelf(block.Height) {
-	// 	common.Log.Panicf("FTIndexer UpdateTransfer CheckSelf %d failed", block.Height)
-	// }
+	p.CheckPointWithBlockHeight(block.Height)
 }
 
-func (p *FTIndexer) innerUpdateTransfer(output *common.Output) {
+func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction,
+	input *common.TxOutput) *common.TxOutput {
 
-	utxo := common.GetUtxoId(output)
+	change := input
+	for _, txOut := range tx.Outputs {
 
-	// 检查是否存在ticker。如果存在，就更新对应的holder数据
-	bUpdated := false
-	tickers := make(map[string]*common.TickAbbrInfo, 0)
+		if txOut.OutPointStr == "9aeb2adcaa104ee63a02247717a8a6a3d14f82cac4fa77863a9cea848ebdd653:0" {
+			common.Log.Infof("")
+		}
 
-	for _, t := range p.tickerMap {
-		mintinfo := make(map[string][]*common.Range, 0)
-		for _, r := range output.Ordinals {
-			// 求相交区间，只记录相交区间
-			interRanges := t.MintInfo.FindIntersections(r)
-			for _, rng := range interRanges {
-				key := rng.Rng
-				value := rng.Value.(*common.RBTreeValue_Mint)
-				for _, mintutxo := range value.InscriptionIds {
-					mintinfo[mintutxo] = append(mintinfo[mintutxo], key)
+		if txOut.OutValue.Value == 0 {
+			continue
+		}
+		newOut, newChange, err := change.Cut(txOut.OutValue.Value)
+		if err != nil {
+			common.Log.Panicf("innerUpdateTransfer Cut failed, %v", err)
+		}
+		change = newChange
+
+		if len(newOut.Assets) != 0 {
+			tickers := make(map[string]bool)
+			// 只处理ordx资产
+			for _, asset := range newOut.Assets {
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORDX &&
+					asset.Name.Type == common.ASSET_TYPE_FT {
+					offsets := newOut.Offsets[asset.Name]
+					assetInfo := &common.AssetAbbrInfo{
+						BindingSat: int(asset.BindingSat), 
+						Offsets: offsets.Clone()}
+					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+
+					tickers[asset.Name.Ticker] = true
 				}
 			}
-		}
-		for mintutxo, ranges := range mintinfo {
-			for i, address := range output.Address.Addresses {
-				addressId := p.nftIndexer.GetBaseIndexer().GetAddressId(address)
-				p.addHolder(utxo, t.Name, t.Ticker.N, addressId, i, mintutxo, ranges)
-			}
-			bUpdated = true
-		}
-		if len(mintinfo) > 0 {
-			tickers[t.Name] = &common.TickAbbrInfo{N: t.Ticker.N, MintInfo: mintinfo}
-		}
-	}
 
-	if bUpdated {
-		for i, address := range output.Address.Addresses {
-			addressId := p.nftIndexer.GetBaseIndexer().GetAddressId(address)
-			action := HolderAction{UtxoId: utxo, AddressId: addressId, Index: i, Tickers: tickers, Action: 1}
-			p.holderActionList = append(p.holderActionList, &action)
+			if len(tickers) > 0 {
+				addressId := txOut.AddressId
+				action := HolderAction{UtxoId: txOut.UtxoId, AddressId: addressId, Tickers: tickers, Action: 1}
+				p.holderActionList = append(p.holderActionList, &action)
+			}
 		}
+
 	}
+	return change
 }
 
 // 跟basic数据库同步
 func (p *FTIndexer) UpdateDB() {
 	//common.Log.Infof("OrdxIndexer->UpdateDB start...")
+
+	if p.nftIndexer.GetBaseIndexer().GetHeight() < p.enableHeight {
+		return
+	}
+
 	startTime := time.Now()
 
 	wb := p.db.NewWriteBatch()
@@ -246,7 +351,7 @@ func (p *FTIndexer) UpdateDB() {
 				amount := int64(0)
 				value, ok := p.utxoMap[tickerName]
 				if ok {
-					amount, ok = (*value)[action.UtxoId]
+					amount, ok = value[action.UtxoId]
 					if ok {
 						err := db.SetDB([]byte(key), &amount, wb)
 						if err != nil {

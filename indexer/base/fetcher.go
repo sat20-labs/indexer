@@ -10,7 +10,7 @@ import (
 )
 
 // 不要panic，可能会影响写数据库
-func FetchBlock(height int, chainParams *chaincfg.Params) *common.Block {
+func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 	hash, err := getBlockHash(uint64(height))
 	if err != nil {
 		common.Log.Errorf("getBlockHash %d failed. %v", height, err)
@@ -41,68 +41,72 @@ func FetchBlock(height int, chainParams *chaincfg.Params) *common.Block {
 
 	transactions := block.Transactions()
 	txs := make([]*common.Transaction, len(transactions))
-	for i, tx := range transactions {
-		inputs := []*common.Input{}
-		outputs := []*common.Output{}
+	for txIndex, tx := range transactions {
+		inputs := []*common.TxInput{}
+		outputs := []*common.TxOutputV2{}
 
-		for txInIndex, v := range tx.MsgTx().TxIn {
-			txid := v.PreviousOutPoint.Hash.String()
-			vout := v.PreviousOutPoint.Index
-			input := &common.Input{Txid: txid, TxIndex: i, TxInIndex: txInIndex, Vout: int64(vout), Witness: v.Witness}
+		msgTx := tx.MsgTx()
+		for index, txIn := range msgTx.TxIn {
+			input := &common.TxInput{
+				TxOutputV2: common.TxOutputV2{
+					TxOutput: common.TxOutput{
+						UtxoId:        0,
+						OutPointStr:   txIn.PreviousOutPoint.String(),
+						Offsets:       make(map[common.AssetName]common.AssetOffsets),
+						SatBindingMap: make(map[int64]*common.AssetInfo),
+						Invalids:      make(map[common.AssetName]bool),
+					},
+					TxOutIndex: int(txIn.PreviousOutPoint.Index),
+				},
+				Witness:   txIn.Witness,
+				TxId:      txIn.PreviousOutPoint.Hash.String(),
+				InHeight:  height,
+				InTxIndex: txIndex,
+				TxInIndex: index,
+			}
 			inputs = append(inputs, input)
 		}
 
 		// parse the raw tx values
-		for j, v := range tx.MsgTx().TxOut {
-			// Determine the type of the script and extract the address
-			scyptClass, addrs, reqSig, err := txscript.ExtractPkScriptAddrs(v.PkScript, chainParams)
+		for j, v := range msgTx.TxOut {
+			//Determine the type of the script and extract the address
+			scyptClass, _, _, err := txscript.ExtractPkScriptAddrs(v.PkScript, chaincfgParam)
 			if err != nil {
 				common.Log.Errorf("ExtractPkScriptAddrs %d failed. %v", height, err)
 				return nil
 				//common.Log.Panicf("BaseIndexer.fetchBlock-> Failed to extract address: %v", err)
 			}
-
-			addrsString := make([]string, len(addrs))
-			for i, x := range addrs {
-				if scyptClass == txscript.MultiSigTy {
-					addrsString[i] = hex.EncodeToString(x.ScriptAddress()) // pubkey
+			// MultiSigTy, 例如testnet4: 21f4713326dbe56bdd553613fdf6f112086425f55c83fd54e8a2f36045e1d965 2/3签名
+			// if len(addresses) > 1 {
+			// 	common.Log.Infof("tx: %s has multi addresses %v", msgTx.TxID(), addresses)
+			// }
+			if scyptClass == txscript.NonStandardTy {
+				// 很多opreturn被识别为NonStandarTy，比如testnet4 2826ead858ddb5b58d331849481189bd7b705ab0582a1d39b3b1c0bd42c864f9
+				//common.Log.Infof("tx: %s has nonStandard address %v", msgTx.TxID(), addresses)
+				if common.IsOpReturn(v.PkScript) {
+					scyptClass = txscript.NullDataTy
 				} else {
-					addrsString[i] = x.EncodeAddress()
-				}
-			}
-
-			var receiver common.ScriptPubKey
-
-			if len(addrs) == 0 {
-				address := "UNKNOWN"
-				if scyptClass == txscript.NullDataTy {
-					address = "OP_RETURN"
+					//common.Log.Infof("tx: %s has not std address, pkscript %s", msgTx.TxID(), hex.EncodeToString(v.PkScript))
 				}
 				if len(v.PkScript) == 0 {
 					// testnet4: 47cfff6998e67852eb8c2fe7fbef2a39c8443c9fa480c7b33a87d8dde1d8e3bd
 					v.PkScript = []byte{0x51}
 				}
-				receiver = common.ScriptPubKey{
-					Addresses: []string{address},
-					Type:      int(scyptClass),
-					PkScript: v.PkScript,
-					ReqSig:   reqSig,
-				}
-			} else {
-				receiver = common.ScriptPubKey{
-					Addresses: addrsString,
-					Type:      int(scyptClass),
-					PkScript: v.PkScript,
-					ReqSig:   reqSig,
-				}
 			}
 
-			output := &common.Output{Height: height, TxId: i, Value: v.Value, Address: &receiver, N: int64(j)}
-			outputs = append(outputs, output)
+			output := common.GenerateTxOutput(msgTx, j)
+			output.UtxoId = common.ToUtxoId(height, txIndex, j)
+			outputs = append(outputs, &common.TxOutputV2{
+				TxOutput:    *output,
+				OutTxIndex:  txIndex,
+				TxOutIndex:  j,
+				OutHeight:   height,
+				AddressType: int(scyptClass),
+			})
 		}
 
-		txs[i] = &common.Transaction{
-			Txid:    tx.Hash().String(),
+		txs[txIndex] = &common.Transaction{
+			TxId:    tx.Hash().String(),
 			Inputs:  inputs,
 			Outputs: outputs,
 		}

@@ -110,6 +110,11 @@ func (p *NameService) getNameInBuffer(name string) *NameRegister {
 // 跟base数据库同步
 func (p *NameService) UpdateDB() {
 	//common.Log.Infof("NameService->UpdateDB start...")
+
+	if !p.nftIndexer.IsEnabled() {
+		return
+	}
+
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -132,6 +137,12 @@ func (p *NameService) UpdateDB() {
 		}
 		err := db.SetDBWithProto3([]byte(key), &value, wb)
 		//err := db.SetDB([]byte(key), &value, wb)
+		if err != nil {
+			common.Log.Panicf("NameService->UpdateDB Error setting %s in db %v", key, err)
+		}
+
+		key = GetSatKey(name.Nft.Base.Sat)
+		err = db.SetDB([]byte(key), name.Name, wb)
 		if err != nil {
 			common.Log.Panicf("NameService->UpdateDB Error setting %s in db %v", key, err)
 		}

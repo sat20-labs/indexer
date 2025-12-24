@@ -1,6 +1,7 @@
 package nft
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -49,14 +50,46 @@ func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	return result
 }
 
-func loadNftFromDB(sat int64, value *common.NftsInSat, ldb common.KVDB) error {
+func getContentTypesFromDB(db common.KVDB) map[int]string {
+	result := make(map[int]string, 0)
+	err := db.BatchRead([]byte(DB_PREFIX_IT), false, func(k, v []byte) error {
+
+		key := string(k)
+		id, err := ParseContTypeKey(key)
+		if err == nil {
+			result[id] = string(v)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		common.Log.Panicf("getContentTypesFromDB Error: %v", err)
+	}
+
+	return result
+}
+
+func loadNftsInSatFromDB(sat int64, value *common.NftsInSat, ldb common.KVDB) error {
 	key := GetSatKey(sat)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
-func loadNftFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBatch) error {
+func loadNftsInSatFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBatch) error {
 	key := GetSatKey(sat)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
+}
+
+func loadNftFromDB(nftId int64, value *common.InscribeBaseContent, ldb common.KVDB) error {
+	return ldb.View(func(rb common.ReadBatch) error {
+		return loadNftFromTxn(nftId, value, rb)
+	})
+}
+
+func loadNftFromTxn(nftId int64, value *common.InscribeBaseContent, txn common.ReadBatch) error {
+	key := GetNftKey(nftId)
 	// return db.GetValueFromDB([]byte(key), txn, value)
 	return db.GetValueFromTxnWithProto3([]byte(key), txn, value)
 }
@@ -79,14 +112,23 @@ func hasNftInUtxo(utxoId uint64, ldb common.KVDB) bool {
 	return err == nil
 }
 
-// 聪的十进制数字不超过16位，为了排序，这里填足够的0
+// 大端序下，高位字节先比较 → 字节序比较行为与整数比较行为一致。
 func GetSatKey(sat int64) string {
-	return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat)
+	return fmt.Sprintf("%s%s", DB_PREFIX_SAT, hex.EncodeToString(common.Uint64ToBytes(uint64(sat)))) // 1.7.0
+	//return fmt.Sprintf("%s%016d", DB_PREFIX_NFT, sat) // 1.6.0
 	//return fmt.Sprintf("%s%d", DB_PREFIX_NFT, sat) // 1.5.0
 }
 
+func GetNftKey(nftId int64) string {
+	return fmt.Sprintf("%s%s", DB_PREFIX_NFT, hex.EncodeToString(common.Uint64ToBytes(uint64(nftId))))
+}
+
 func GetUtxoKey(UtxoId uint64) string {
-	return fmt.Sprintf("%s%d", DB_PREFIX_UTXO, UtxoId)
+	return fmt.Sprintf("%s%s", DB_PREFIX_UTXO, hex.EncodeToString(common.Uint64ToBytes(UtxoId)))
+}
+
+func GetCTKey(id int) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_IT, id)
 }
 
 func GetInscriptionIdKey(id string) string {
@@ -94,7 +136,7 @@ func GetInscriptionIdKey(id string) string {
 }
 
 func GetInscriptionAddressKey(addrId uint64, nftId int64) string {
-	return fmt.Sprintf("%s%d_%d", DB_PREFIX_INSCADDR, addrId, nftId)
+	return fmt.Sprintf("%s%d_%d", DB_PREFIX_INSCADDR, addrId, nftId) // nftId 有负数，需要更改分界符
 }
 
 func GetDisabledSatKey(sat int64) string {
@@ -102,15 +144,21 @@ func GetDisabledSatKey(sat int64) string {
 }
 
 func ParseSatKey(input string) (int64, error) {
-	if !strings.HasPrefix(input, DB_PREFIX_NFT) {
+	if !strings.HasPrefix(input, DB_PREFIX_SAT) {
 		return -1, fmt.Errorf("invalid string format, %s", input)
 	}
-	str := strings.TrimPrefix(input, DB_PREFIX_NFT) // 注意有负数聪
-	sat, err := strconv.ParseInt(str, 10, 64)
+	str := strings.TrimPrefix(input, DB_PREFIX_SAT)
+
+	bytes, err := hex.DecodeString(str)
 	if err != nil {
-		return -1, fmt.Errorf("invalid string format, %s", input)
+		return 0, err
 	}
-	return sat, nil
+	if len(bytes) != 8 {
+		return 0, fmt.Errorf("invalid sat: %s", str)
+	}
+	sat := common.BytesToUint64(bytes)
+
+	return int64(sat), nil
 }
 
 func ParseUtxoKey(input string) (uint64, error) {
@@ -118,7 +166,28 @@ func ParseUtxoKey(input string) (uint64, error) {
 		return common.INVALID_ID, fmt.Errorf("invalid string format, %s", input)
 	}
 	str := strings.TrimPrefix(input, DB_PREFIX_UTXO)
-	return strconv.ParseUint(str, 10, 64)
+	bytes, err := hex.DecodeString(str)
+	if err != nil {
+		return 0, err
+	}
+	if len(bytes) != 8 {
+		return 0, fmt.Errorf("invalid sat: %s", str)
+	}
+	utxoId := common.BytesToUint64(bytes)
+	return utxoId, nil
+}
+
+func ParseContTypeKey(input string) (int, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_IT) {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	str := strings.TrimPrefix(input, DB_PREFIX_IT)
+	id, err := strconv.Atoi(str)
+	if err != nil {
+		return -1, err
+	}
+
+	return id, nil
 }
 
 func ParseAddressKey(input string) (uint64, int64, error) {
@@ -178,4 +247,57 @@ func loadAllDisalbedSatsFromDB(ldb common.KVDB) map[int64]bool {
 func saveDisabledSatToDB(sat int64, value []byte, ldb common.KVDB) error {
 	key := GetDisabledSatKey(sat)
 	return db.GobSetDB([]byte(key), value, ldb)
+}
+
+func GetContentIdKey(id uint64) []byte {
+	return []byte(fmt.Sprintf(DB_PREFIX_IC+"%x", id))
+}
+
+func GetContentDBKey(content string) []byte {
+	return []byte(DB_PREFIX_CI + content)
+}
+
+func BindContentDBKeyToId(content string, id uint64, wb common.WriteBatch) error {
+	if err := wb.Put(GetContentIdKey(id), []byte(content)); err != nil {
+		return err
+	}
+	return wb.Put(GetContentDBKey(content), common.Uint64ToBytes(id))
+}
+
+func UnBindContentId(content string, id uint64, wb common.WriteBatch) error {
+	wb.Delete(GetContentIdKey(id))
+	wb.Delete(GetContentDBKey(content))
+	return nil
+}
+
+func GetContentByIdFromDB(ldb common.KVDB, id uint64) (string, error) {
+	key, err := ldb.Read(GetContentIdKey(id))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(key), DB_PREFIX_CI), nil
+}
+
+func GetContentByIdFromTxn(txn common.ReadBatch, id uint64) (string, error) {
+	key, err := txn.Get(GetContentIdKey(id))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(key), DB_PREFIX_CI), nil
+}
+
+func GetContentIdFromDB(db common.KVDB, content string) (uint64, error) {
+	key, err := db.Read(GetContentDBKey(content))
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	return common.BytesToUint64(key), nil
+}
+
+func GetContentIdFromTxn(db common.ReadBatch, content string) (uint64, error) {
+	key, err := db.Get(GetContentDBKey(content))
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	return common.BytesToUint64(key), nil
 }

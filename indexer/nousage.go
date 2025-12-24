@@ -66,11 +66,7 @@ func (p *IndexerMgr) FilterRarepizza() bool {
 			continue
 		}
 
-		assetsmap := p.ftIndexer.GetAssetRangesWithUtxo(nft.UtxoId, "rarepizza")
-		amount := int64(0)
-		for _, v := range assetsmap {
-			amount += common.GetOrdinalsSize(v)
-		}
+		amount := p.ftIndexer.GetAssetsWithUtxoV3(nft.UtxoId, "rarepizza")
 		if amount != 1000 {
 			continue
 		}
@@ -646,14 +642,11 @@ func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 				common.Log.Panicf("item.Value error: %v", err)
 			}
 
-			er := p.exotic.GetExoticsWithType(value.Ordinals, exotic.Pizza)
+			er := p.exotic.GetExoticsWithType(value.UtxoId, exotic.Pizza)
 			if len(er) > 0 {
-				num := int64(0)
-				for _, r := range er {
-					num += r.Range.Size
-				}
+				num := er.Size()
 				total += num
-				pizzaAddrMap[(value.AddressIds[0])] += num
+				pizzaAddrMap[(value.AddressId)] += num
 			}
 
 			return nil

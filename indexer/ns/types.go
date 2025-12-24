@@ -11,6 +11,7 @@ const NS_STATUS_KEY = "nsstatus"
 
 const (
 	DB_PREFIX_NAME = "r-" // name  NameRegister
+	DB_PREFIX_SAT  = "s-" // sat -> name
 	DB_PREFIX_KV   = "k-" // key-value  KeyValueInDB
 	DB_PREFIX_BUCK = "bk-"
 )

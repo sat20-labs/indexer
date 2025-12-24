@@ -64,32 +64,22 @@ func ParseUtxo(utxo string) (txid string, vout int, err error) {
 	return txid, vout, err
 }
 
-func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, typ, index int64, err error) {
+func ParseAddressIdKey(addresskey string) (addressId uint64, utxoId uint64, err error) {
 	parts := strings.Split(addresskey, "-")
-	if len(parts) < 4 {
-		return INVALID_ID, INVALID_ID, 0, 0, fmt.Errorf("invalid address key %s", addresskey)
+	if len(parts) < 2 {
+		return INVALID_ID, INVALID_ID, fmt.Errorf("invalid address key %s", addresskey)
 	}
 	addressId, err = strconv.ParseUint(parts[1], 16, 64)
 	if err != nil {
-		return INVALID_ID, INVALID_ID, 0, 0, err
+		return INVALID_ID, INVALID_ID, err
 	}
 	utxoId, err = strconv.ParseUint(parts[2], 16, 64)
 	if err != nil {
-		return INVALID_ID, INVALID_ID, 0, 0, err
+		return INVALID_ID, INVALID_ID, err
 	}
-	typ, err = strconv.ParseInt(parts[3], 16, 32)
-	if err != nil {
-		return INVALID_ID, INVALID_ID, 0, 0, err
-	}
-	index = 0
-	if len(parts) > 4 {
-		index, err = strconv.ParseInt(parts[4], 16, 32)
-		if err != nil {
-			return INVALID_ID, INVALID_ID, 0, 0, err
-		}
-	}
-	return addressId, utxoId, typ, index, err
+	return addressId, utxoId, err
 }
+
 
 func ToUtxo(txid string, vout int) string {
 	return txid+":"+strconv.Itoa(vout)
@@ -299,7 +289,7 @@ func StringToUint32(str string) (uint32, error) {
 		return 0, err
 	}
 	return BytesToUint32(b), nil
-} 
+}
 
 func CheckUtxoFormat(utxo string) error {
 	parts := strings.Split(utxo, ":")

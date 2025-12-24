@@ -3,7 +3,6 @@ package ordx
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
@@ -172,7 +171,13 @@ func (s *Model) GetMintDetailInfo(inscriptionId string) (*rpcwire.MintDetailInfo
 		Delegate:       mintInfo.Base.Delegate,
 		Content:        mintInfo.Base.Content,
 		ContentType:    string(mintInfo.Base.ContentType),
-		Ranges:         mintInfo.Ordinals,
+	}
+
+	for _, offset := range mintInfo.Offsets {
+		ret.Ranges = append(ret.Ranges, &common.Range{
+			Start: offset.Start,
+			Size: offset.End-offset.Start,
+		})
 	}
 
 	return ret, nil
@@ -262,41 +267,6 @@ func (s *Model) GetBalanceSummaryList(address string, start int, limit int) ([]*
 	return result, nil
 }
 
-func (s *Model) GetAssetsWithUtxos_deprecated(req *rpcwire.UtxosReq) ([]*rpcwire.UtxoAbbrAssets, error) {
-	result := make([]*rpcwire.UtxoAbbrAssets, 0)
-	for _, utxo := range req.Utxos {
-		utxoId := s.indexer.GetUtxoId(utxo)
-		assets := s.indexer.GetAssetsWithUtxo(utxoId)
-
-		utxoAssets := rpcwire.UtxoAbbrAssets{Utxo: utxo}
-		for tickerName, mintinfo := range assets {
-
-			ticker := s.indexer.GetTickerInfo(&tickerName)
-			if ticker == nil {
-				return nil, fmt.Errorf("can't find ticker %s", tickerName.String())
-			}
-
-			amount := int64(0)
-			for _, rng := range mintinfo {
-				amount += common.GetOrdinalsSize(rng) * int64(ticker.N)
-			}
-
-			utxoAssets.Assets = append(utxoAssets.Assets, &rpcwire.AssetAbbrInfo{
-				TypeName: ticker.Type,
-				Ticker:   ticker.Ticker,
-				Amount:   amount,
-			})
-		}
-		sort.Slice(utxoAssets.Assets, func(i, j int) bool {
-			return utxoAssets.Assets[i].Amount > utxoAssets.Assets[j].Amount
-		})
-
-		result = append(result, &utxoAssets)
-	}
-
-	return result, nil
-}
-
 func (s *Model) GetExistingUtxos(req *rpcwire.UtxosReq) ([]string, error) {
 	result := make([]string, 0)
 	for _, utxo := range req.Utxos {
@@ -365,12 +335,6 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 
 	result := make([]*rpcwire.TickerAsset, 0)
 	for _, utxoAsset := range utxoresult {
-		_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoAsset.Utxo)
-		if err != nil {
-			common.Log.Warningf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
-			continue
-		}
-
 		assets := s.indexer.GetAssetsWithUtxo(utxoAsset.Utxo)
 		for k, mintinfo := range assets {
 			if k.Type != ticker.Type || (ticker.Ticker != "" && k.Ticker != ticker.Ticker) {
@@ -384,18 +348,18 @@ func (s *Model) GetUtxoList(address string, tickerName string, start, limit int)
 				Ticker:   ticker.Ticker,
 				Utxo:     s.indexer.GetUtxoById(utxoAsset.Utxo),
 			}
-			resp.Amount = common.GetOrdinalsSize(rngs)
+			resp.Amount = s.indexer.GetUtxoValue(resp.Utxo)
 
-			for inscriptionId, ranges := range mintinfo {
-				asset := rpcwire.InscriptionAsset{}
-				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(n)
-				asset.Ranges = ranges
-				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
-				asset.InscriptionID = inscriptionId
+			
+			asset := rpcwire.InscriptionAsset{}
+			asset.AssetAmount = mintinfo.Size() * int64(n)
+			asset.Ranges = mintinfo.ToRanges()
+			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
+			asset.InscriptionID = ""
 
-				resp.Assets = append(resp.Assets, &asset)
-				resp.AssetAmount += asset.AssetAmount
-			}
+			resp.Assets = append(resp.Assets, &asset)
+			resp.AssetAmount += asset.AssetAmount
+			
 
 			sort.Slice(resp.Assets, func(i, j int) bool {
 				return resp.Assets[i].InscriptionID < resp.Assets[j].InscriptionID
@@ -458,34 +422,28 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 
 	result := make([]*rpcwire.TickerAsset, 0)
 	for _, utxoAsset := range utxoresult {
-		_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoAsset.Utxo)
-		if err != nil {
-			common.Log.Warningf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
-			continue
-		}
-
 		tickAbbrInfoMap := s.indexer.GetAssetsWithUtxo(utxoAsset.Utxo)
 
 		resp := &rpcwire.TickerAsset{
 			Ticker: tickerName,
 			Utxo:   s.indexer.GetUtxoById(utxoAsset.Utxo),
 		}
-		resp.Amount = common.GetOrdinalsSize(rngs)
+		resp.Amount = s.indexer.GetUtxoValue(resp.Utxo)
 		resp.AssetAmount += 0
 
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
 			n := s.getBindingSatFromOrdxTicker(&ticker)
-			for inscId, ranges := range tickAbbrInfo {
-				asset := rpcwire.InscriptionAsset{}
-				asset.TypeName = ticker.Type
-				asset.Ticker = ticker.Ticker
-				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(n)
-				asset.Ranges = ranges
-				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
-				asset.InscriptionID = inscId
+			
+			asset := rpcwire.InscriptionAsset{}
+			asset.TypeName = ticker.Type
+			asset.Ticker = ticker.Ticker
+			asset.AssetAmount = tickAbbrInfo.Size() * int64(n)
+			asset.Ranges = tickAbbrInfo.ToRanges()
+			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
+			asset.InscriptionID = ""
 
-				resp.Assets = append(resp.Assets, &asset)
-			}
+			resp.Assets = append(resp.Assets, &asset)
+			
 		}
 
 		result = append(result, resp)
@@ -530,33 +488,27 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 
 	result := make([]*rpcwire.TickerAsset, 0)
 	for _, utxoAsset := range utxoresult {
-		_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoAsset.Utxo)
-		if err != nil {
-			common.Log.Warningf("GetOrdinalsForUTXO %d failed, %v", utxoAsset.Utxo, err)
-			continue
-		}
-
 		tickAbbrInfoMap := s.indexer.GetAssetsWithUtxo(utxoAsset.Utxo)
 
 		resp := &rpcwire.TickerAsset{
 			Ticker: "",
 			Utxo:   s.indexer.GetUtxoById(utxoAsset.Utxo),
 		}
-		resp.Amount = common.GetOrdinalsSize(rngs)
+		resp.Amount = s.indexer.GetUtxoValue(resp.Utxo)
 		resp.AssetAmount = 0
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
 			n := s.getBindingSatFromOrdxTicker(&ticker)
-			for inscId, ranges := range tickAbbrInfo {
-				asset := rpcwire.InscriptionAsset{}
-				asset.TypeName = ticker.Type
-				asset.Ticker = ticker.Ticker
-				asset.AssetAmount = common.GetOrdinalsSize(ranges) * int64(n)
-				asset.Ranges = ranges
-				asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
-				asset.InscriptionID = inscId
+			
+			asset := rpcwire.InscriptionAsset{}
+			asset.TypeName = ticker.Type
+			asset.Ticker = ticker.Ticker
+			asset.AssetAmount = tickAbbrInfo.Size() * int64(n)
+			asset.Ranges = tickAbbrInfo.ToRanges()
+			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
+			asset.InscriptionID = ""
 
-				resp.Assets = append(resp.Assets, &asset)
-			}
+			resp.Assets = append(resp.Assets, &asset)
+			
 		}
 		result = append(result, resp)
 	}
@@ -565,16 +517,16 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 }
 
 func (s *Model) GetDetailAssetWithUtxo(utxo string) (*rpcwire.AssetDetailInfo, error) {
-	utxoId, rngs, err := s.indexer.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
+	utxoId := s.indexer.GetUtxoId(utxo)
+	if utxoId == common.INVALID_ID {
 		common.Log.Errorf("GetUtxoAsset failed, %s", utxo)
-		return nil, err
+		return nil, fmt.Errorf("GetUtxoAsset failed, %s", utxo)
 	}
 
 	var result rpcwire.AssetDetailInfo
 	result.Utxo = utxo
-	result.Value = int64(common.GetOrdinalsSize(rngs))
-	result.Ranges = rngs
+	result.Value = s.indexer.GetUtxoValue(utxo)
+	result.Ranges = nil
 
 	// TODO 是否需要做这个过滤？如果需要，所有获取资产的地方都要修改
 	// 1.同一个inscriptionId，只出现一次
@@ -590,76 +542,21 @@ func (s *Model) GetDetailAssetWithUtxo(utxo string) (*rpcwire.AssetDetailInfo, e
 		tickinfo.Utxo = ""
 		tickinfo.Amount = 0
 
-		for inscriptionId, mintranges := range mintinfo {
-			// _, ok := inscriptionMap[inscriptionId]
-			// if ok {
-			// 	continue
-			// } else {
-			// 	inscriptionMap[inscriptionId] = true
-			// }
+		
 
-			asset := rpcwire.InscriptionAsset{}
-			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(n)
-			asset.Ranges = mintranges
-			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
-			asset.InscriptionID = inscriptionId
+		asset := rpcwire.InscriptionAsset{}
+		asset.AssetAmount = mintinfo.Size() * int64(n)
+		asset.Ranges = mintinfo.ToRanges()
+		asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
+		asset.InscriptionID = ""
 
-			tickinfo.Assets = append(tickinfo.Assets, &asset)
-			tickinfo.AssetAmount += asset.AssetAmount
-		}
-
-		sort.Slice(tickinfo.Assets, func(i, j int) bool {
-			return tickinfo.Assets[i].InscriptionID < tickinfo.Assets[j].InscriptionID
-		})
+		tickinfo.Assets = append(tickinfo.Assets, &asset)
+		tickinfo.AssetAmount += asset.AssetAmount
+		
 
 		if tickinfo.AssetAmount > 0 {
 			result.Assets = append(result.Assets, &tickinfo)
 		}
-	}
-
-	sort.Slice(result.Assets, func(i, j int) bool {
-		return result.Assets[i].AssetAmount > result.Assets[j].AssetAmount
-	})
-
-	return &result, nil
-}
-
-func (s *Model) GetAssetOffsetWithUtxo(utxo string) ([]*common.AssetOffsetRange, error) {
-	ret := s.indexer.GetAssetOffsetWithUtxo(utxo)
-	if len(ret) == 0 {
-		return nil, fmt.Errorf("can't find this utxo %s", utxo)
-	}
-	return ret, nil
-}
-
-func (s *Model) GetDetailAssetWithRanges(req *rpcwire.RangesReq) (*rpcwire.AssetDetailInfo, error) {
-
-	var result rpcwire.AssetDetailInfo
-	result.Ranges = req.Ranges
-	result.Utxo = ""
-	result.Value = common.GetOrdinalsSize(req.Ranges)
-
-	assets := s.indexer.GetAssetsWithRanges(req.Ranges)
-	for tickerName, info := range assets {
-		n := s.getBindingSatFromOrdxTicker(common.NewAssetNameFromString(tickerName))
-
-		var tickinfo rpcwire.TickerAsset
-		tickinfo.Ticker = tickerName
-		tickinfo.Utxo = ""
-		tickinfo.Amount = 0
-
-		for mintutxo, mintranges := range info {
-			asset := rpcwire.InscriptionAsset{}
-			asset.AssetAmount = common.GetOrdinalsSize(mintranges) * int64(n)
-			asset.Ranges = mintranges
-			asset.InscriptionNum = common.INVALID_INSCRIPTION_NUM
-			asset.InscriptionID = mintutxo
-
-			tickinfo.Assets = append(tickinfo.Assets, &asset)
-			tickinfo.AssetAmount += asset.AssetAmount
-		}
-
-		result.Assets = append(result.Assets, &tickinfo)
 	}
 
 	sort.Slice(result.Assets, func(i, j int) bool {
@@ -675,10 +572,8 @@ func (s *Model) GetAbbrAssetsWithUtxo(utxo string) ([]*rpcwire.AssetAbbrInfo, er
 	assets := s.indexer.GetAssetsWithUtxo(utxoId)
 	for ticker, mintinfo := range assets {
 
-		amount := int64(0)
-		for _, rng := range mintinfo {
-			amount += common.GetOrdinalsSize(rng)
-		}
+		n := s.getBindingSatFromOrdxTicker(&ticker)
+		amount := mintinfo.Size() * int64(n)
 
 		result = append(result, &rpcwire.AssetAbbrInfo{
 			TypeName: ticker.Type,
@@ -698,41 +593,11 @@ func (s *Model) GetSeedsWithUtxo(utxo string) ([]*rpcwire.Seed, error) {
 	result := make([]*rpcwire.Seed, 0)
 	assets := s.indexer.GetAssetsWithUtxo(s.indexer.GetUtxoId(utxo))
 	for ticker, info := range assets {
-		assetRanges := make([]*common.Range, 0)
-		for _, rngs := range info {
-			assetRanges = append(assetRanges, rngs...)
-		}
-		seed := rpcwire.Seed{TypeName: ticker.Type, Ticker: ticker.Ticker, Seed: common.GenerateSeed2(assetRanges)}
+		seed := rpcwire.Seed{TypeName: ticker.Type, Ticker: ticker.Ticker, Seed: common.GenerateSeed2(info.ToRanges())}
 		result = append(result, &seed)
 	}
 
 	return result, nil
-}
-
-func (s *Model) GetSatRangeWithUtxo(utxo string) (*rpcwire.UtxoInfo, error) {
-	utxoId := uint64(common.INVALID_ID)
-	var err error
-	if len(utxo) < 64 {
-		utxoId, err = strconv.ParseUint(utxo, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	result := rpcwire.UtxoInfo{}
-	if utxoId == common.INVALID_ID {
-		result.Id, result.Ranges, err = s.indexer.GetOrdinalsWithUtxo(utxo)
-		result.Utxo = utxo
-	} else {
-		result.Utxo, result.Ranges, err = s.indexer.GetOrdinalsWithUtxoId(utxoId)
-		result.Id = utxoId
-	}
-	if err != nil {
-		common.Log.Warnf("GetSatRangeWithUtxo %s failed, %v", utxo, err)
-		return nil, err
-	}
-
-	return &result, nil
 }
 
 func (s *Model) GetNSStatusList(start, limit int) (*rpcwire.NSStatusData, error) {
@@ -859,9 +724,9 @@ func (s *Model) GetNamesWithKey(address, key string, start, limit int) (*rpcwire
 	ret := rpcwire.NamesWithAddressData{Address: address}
 	var names []*common.NameInfo
 	var total int
-	
+
 	names, total = s.indexer.GetNamesWithKey(address, key, start, limit)
-	
+
 	for _, info := range names {
 		data := rpcwire.OrdinalsName{NftItem: *s.nameToItem(info)}
 		kv, ok := info.KVs[key]
@@ -1024,8 +889,9 @@ func (s *Model) GetNftsWithSat(sat int64) (*rpcwire.NftsWithAddressData, error) 
 	address := s.indexer.GetAddressById(nfts.OwnerAddressId)
 	utxo := s.indexer.GetUtxoById(nfts.UtxoId)
 	value := s.getUtxoValue2(utxo)
-	for _, info := range nfts.Nfts {
-		item := s.baseContentToNftItem(info)
+	for _, nftId := range nfts.Nfts {
+		nft := s.indexer.GetNftInfo(nftId)
+		item := s.baseContentToNftItem(nft.Base)
 		item.Address = address
 		item.Utxo = utxo
 		item.Value = value
@@ -1098,17 +964,13 @@ func (s *Model) nameToItem(info *common.NameInfo) *rpcwire.NftItem {
 }
 
 func (s *Model) getUtxoValue(utxoId uint64) int64 {
-	_, rngs, err := s.indexer.GetOrdinalsWithUtxoId(utxoId)
-	if err != nil {
+	utxo := s.indexer.GetUtxoById(utxoId)
+	if utxo == "" {
 		return 0
 	}
-	return common.GetOrdinalsSize(rngs)
+	return s.indexer.GetUtxoValue(utxo)
 }
 
 func (s *Model) getUtxoValue2(utxo string) int64 {
-	_, rngs, err := s.indexer.GetOrdinalsWithUtxo(utxo)
-	if err != nil {
-		return 0
-	}
-	return common.GetOrdinalsSize(rngs)
+	return s.indexer.GetUtxoValue(utxo)
 }

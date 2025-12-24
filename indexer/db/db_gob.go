@@ -112,11 +112,8 @@ func GetAddressDBKeyV2(address string) []byte {
 	return []byte(common.DB_KEY_ADDRESSV2 + address)
 }
 
-func GetAddressValueDBKey(addressid uint64, utxoid uint64, typ, i int) []byte {
-	if i == 0 {
-		return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x", addressid, utxoid, typ))
-	}
-	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x-%x-%x", addressid, utxoid, typ, i))
+func GetAddressValueDBKey(addressid uint64, utxoid uint64) []byte {
+	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x", addressid, utxoid))
 }
 
 func GetUtxoIdKey(id uint64) []byte {
@@ -204,33 +201,6 @@ func GetAddressIdFromTxn(db common.ReadBatch, address string) (uint64, error) {
 		return common.INVALID_ID, err
 	}
 	return common.BytesToUint64(key), nil
-}
-
-
-func GetAddressDataFromDBV2(db common.KVDB, address string) (*common.AddressValueInDBV2, error) {
-	var result common.AddressValueInDBV2
-
-	v, err := db.Read(GetAddressDBKeyV2(address))
-	if err != nil {
-		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
-		return nil, err
-	}
-	
-	err = DecodeBytes(v, &result)
-	return &result, err
-}
-
-func GetAddressDataFromDBTxnV2(txn common.ReadBatch, address string) (*common.AddressValueInDBV2, error) {
-	var result common.AddressValueInDBV2
-
-	v, err := txn.Get(GetAddressDBKeyV2(address))
-	if err != nil {
-		//common.Log.Errorf("GetAddressIdFromDBTxn %s error: %v", address, err)
-		return nil, err
-	}
-	
-	err = DecodeBytes(v, &result)
-	return &result, err
 }
 
 func CheckKeyExists(db common.KVDB, key []byte) bool {

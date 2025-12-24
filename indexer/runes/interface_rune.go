@@ -169,7 +169,7 @@ func (s *Indexer) GetRuneInfos(start, limit uint64) (ret []*RuneInfo, total uint
 
 func (s *Indexer) GetRuneInfo(tickerName string) *RuneInfo {
 	var ticker *RuneInfo
-	if strings.Contains(tickerName, ":") || strings.Contains(tickerName, "_") {
+	if strings.Contains(tickerName, ":") {
 		ticker = s.GetRuneInfoWithId(tickerName)
 	} else {
 		ticker = s.GetRuneInfoWithName(tickerName)

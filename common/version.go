@@ -13,5 +13,5 @@ const ORDX_INDEXER_VERSION = "1.0.4"
 // 1.4.0  2024.12.24    support STP
 // 1.5.0  2025.02.03    support n parameter
 // 1.6.0  2025.08.10    change db from badger to levelDB
-// 1.6.1  2025.12.10    update nft.proto, support brc20
-const BASE_DB_VERSION = "1.6.1"
+// 1.7.0  2025.12.01    use local Range
+const BASE_DB_VERSION = "1.7.0"

@@ -25,6 +25,7 @@ type IndexerMgr struct {
 	dbDir string
 	// data from blockchain
 	baseDB  common.KVDB
+	exoticDB common.KVDB
 	ftDB    common.KVDB
 	nsDB    common.KVDB
 	nftDB   common.KVDB
@@ -35,9 +36,8 @@ type IndexerMgr struct {
 	kvDB    common.KVDB
 
 	// 保护这两个数据
-	reloading 	 int32
+	reloading     int32
 	rpcProcessing int32
-
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -55,9 +55,7 @@ type IndexerMgr struct {
 	ftIndexer    *ft.FTIndexer
 	ns           *ns.NameService
 	nft          *nft.NftIndexer
-	
 
-	
 	// 跑数据
 	lastCheckHeight int
 	compiling       *base_indexer.BaseIndexer
@@ -71,8 +69,8 @@ type IndexerMgr struct {
 	nftBackupDB       *nft.NftIndexer
 
 	/////////////////////////////////
-	mutex sync.RWMutex // 保护下面的数据
-	clmap        map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
+	mutex sync.RWMutex                           // 保护下面的数据
+	clmap map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
 	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
@@ -131,9 +129,11 @@ func NewIndexerMgr(
 	case "testnet3":
 		instance.ordFirstHeight = 2413343
 		instance.ordxFirstHeight = 2570589
+		common.Jubilee_Height = 0
 	default: // testnet4
 		instance.ordFirstHeight = 0
 		instance.ordxFirstHeight = 0
+		common.Jubilee_Height = 0
 	}
 
 	return instance
@@ -164,12 +164,12 @@ func (b *IndexerMgr) Init() {
 		exotic.SatributeList = append(exotic.SatributeList, exotic.Customized)
 	}
 
-	b.exotic = exotic.NewExoticIndexer(b.compiling)
-	b.exotic.Init()
+	b.exotic = exotic.NewExoticIndexer(b.exoticDB)
+	b.exotic.Init(b.compiling)
 	b.nft = nft.NewNftIndexer(b.nftDB)
-	b.nft.Init(b.compiling)
+	b.nft.Init(b.compiling, b)
 	b.ftIndexer = ft.NewOrdxIndexer(b.ftDB)
-	b.ftIndexer.InitOrdxIndexer(b.nft)
+	b.ftIndexer.Init(b.nft)
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
@@ -221,52 +221,52 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		if !isRunning {
 			isRunning = true
 			go func() {
-					ret := b.compiling.SyncToChainTip(stopIndexerChan)
-					if ret == 0 {
+				ret := b.compiling.SyncToChainTip(stopIndexerChan)
+				if ret == 0 {
 					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
-							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
-							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
-							b.compiling.SetUpdateDBCallback(nil)
-							b.updateDB()
-							if b.maxIndexHeight <= 0 {
+						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
+						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
+						b.compiling.SetUpdateDBCallback(nil)
+						b.updateDB()
+						if b.maxIndexHeight <= 0 {
 							b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
-							}
 						}
+					}
 
-						if b.maxIndexHeight > 0 {
-							if b.maxIndexHeight <= b.compiling.GetHeight() {
-								b.updateDB()
-								b.checkSelf()
-								common.Log.Infof("reach expected height, set exit flag")
-								bWantExit = true
-							}
-						}
-
-						b.dbgc()
-						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
-						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
-						// 	period := 1000
-						// 	if b.compiling.GetSyncHeight()%period == 0 {
-						// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
-						// 		b.checkSelf()
-						// 	}
-						// }
-						if b.dbStatistic() {
-							bWantExit = true
-						}
-
-					} else if ret > 0 {
-						// handle reorg
-						b.handleReorg(ret)
-						b.compiling.SyncToChainTip(stopIndexerChan)
-					} else {
-						if ret == -1 {
-							common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+					if b.maxIndexHeight > 0 {
+						if b.maxIndexHeight <= b.compiling.GetHeight() {
+							b.updateDB()
+							b.checkSelf()
+							common.Log.Infof("reach expected height, set exit flag")
 							bWantExit = true
 						}
 					}
 
-					isRunning = false
+					b.dbgc()
+					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
+					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
+					// 	period := 1000
+					// 	if b.compiling.GetSyncHeight()%period == 0 {
+					// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
+					// 		b.checkSelf()
+					// 	}
+					// }
+					if b.dbStatistic() {
+						bWantExit = true
+					}
+
+				} else if ret > 0 {
+					// handle reorg
+					b.handleReorg(ret)
+					b.compiling.SyncToChainTip(stopIndexerChan)
+				} else {
+					if ret == -1 {
+						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
+						bWantExit = true
+					}
+				}
+
+				isRunning = false
 			}()
 		}
 	}
@@ -316,6 +316,7 @@ func (b *IndexerMgr) dbgc() {
 	db.RunDBGC(b.baseDB)
 	db.RunDBGC(b.nftDB)
 	db.RunDBGC(b.nsDB)
+	db.RunDBGC(b.exoticDB)
 	db.RunDBGC(b.ftDB)
 	db.RunDBGC(b.brc20DB)
 	db.RunDBGC(b.runesDB)
@@ -329,6 +330,7 @@ func (b *IndexerMgr) closeDB() {
 	b.runesDB.Close()
 	b.brc20DB.Close()
 	b.ftDB.Close()
+	b.exoticDB.Close()
 	b.nsDB.Close()
 	b.nftDB.Close()
 	b.baseDB.Close()
@@ -457,26 +459,26 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
-	b.brc20BackupDB = b.brc20Indexer.Clone()
-	b.runesBackupDB = b.RunesIndexer.Clone()
+	b.compilingBackupDB = b.compiling.Clone(true)
+
+	b.exoticBackupDB = b.exotic.Clone()
 	b.ftBackupDB = b.ftIndexer.Clone()
 	b.nsBackupDB = b.ns.Clone()
 	b.nftBackupDB = b.nft.Clone()
-	b.exoticBackupDB = b.exotic.Clone()
-	b.compilingBackupDB = b.compiling.Clone()
-	
+	b.brc20BackupDB = b.brc20Indexer.Clone()
+	b.runesBackupDB = b.RunesIndexer.Clone()
 	common.Log.Infof("prepareDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
+	b.compiling.Subtract(b.compilingBackupDB)
+	b.exotic.Subtract(b.exoticBackupDB)
+	b.nft.Subtract(b.nftBackupDB)
+	b.ns.Subtract(b.nsBackupDB)
+	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
 	b.RunesIndexer.Subtract(b.runesBackupDB)
-	b.ftIndexer.Subtract(b.ftBackupDB)
-	b.ns.Subtract(b.nsBackupDB)
-	b.nft.Subtract(b.nftBackupDB)
-	b.exotic.Subtract(b.exoticBackupDB)
-	b.compiling.Subtract(b.compilingBackupDB)
-	
+
 	common.Log.Infof("cleanDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
 }
 

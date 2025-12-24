@@ -5,7 +5,7 @@ const (
 	Block9           string = "block9"
 	Block78          string = "block78"
 	Nakamoto         string = "nakamoto"
-	FirstTransaction string = "1stTX"
+	FirstTransaction string = "1sttx"
 	Vintage          string = "vintage"
 	Common           string = "common"
 	Uncommon         string = "uncommon"

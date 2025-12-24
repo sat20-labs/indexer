@@ -282,6 +282,13 @@ func TestAssetOffsets_Insert(t *testing.T) {
 				{Start: 0, End: 15},
 			},
 		},
+
+		{
+			name:     "insert with overlap (caller responsibility)",
+			initial:  AssetOffsets{{Start: 0, End: 5}},
+			input:   &OffsetRange{Start: 4, End: 10},
+			expected: AssetOffsets{{Start: 4, End: 10}}, // <- this is how your code behaves
+		},
 	}
 
 	for _, tt := range tests {
@@ -477,3 +484,47 @@ func TestAssetOffsets_Split(t *testing.T) {
 	}
 }
 
+
+func TestAssetOffsets_Merge(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  AssetOffsets
+		append   AssetOffsets
+		expected AssetOffsets
+	}{
+		{
+			name:     "merge non-adjacent ranges",
+			initial:  AssetOffsets{{Start: 0, End: 5}, {Start: 20, End: 30}},
+			append:   AssetOffsets{{Start: 6, End: 10}, {Start: 40, End: 50}},
+			expected: AssetOffsets{{Start: 0, End: 5}, {Start: 6, End: 10}, {Start: 20, End: 30}, {Start: 40, End: 50}},
+		},
+		{
+			name:     "merge adjacent - should merge",
+			initial:  AssetOffsets{{Start: 0, End: 5}, {Start: 20, End: 30}},
+			append:   AssetOffsets{{Start: 5, End: 10}, {Start: 15, End: 20}},
+			expected: AssetOffsets{{Start: 0, End: 10}, {Start: 15, End: 30}},
+		},
+		{
+			name:     "merge empty second",
+			initial:  AssetOffsets{{Start: 0, End: 5}},
+			append:   AssetOffsets{},
+			expected: AssetOffsets{{Start: 0, End: 5}},
+		},
+		{
+			name:     "merge to empty",
+			initial:  AssetOffsets{},
+			append:   AssetOffsets{{Start: 2, End: 6}},
+			expected: AssetOffsets{{Start: 2, End: 6}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			initial := append(AssetOffsets{}, tt.initial...) // copy
+			initial.Merge(tt.append)
+			if !reflect.DeepEqual(initial, tt.expected) {
+				t.Errorf("expected %v, got %v", tt.expected, initial)
+			}
+		})
+	}
+}

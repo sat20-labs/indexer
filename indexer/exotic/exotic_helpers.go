@@ -7,6 +7,226 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+func initDefaultExoticAsset() {
+	// 没啥用
+	// blocks := make(map[int]bool)
+	// for i := 0; i < 1000; i++ {
+	// 	blocks[i] = true
+	// }
+	// defaultAssetInBlockSubSidy[Vintage] = blocks
+
+	blocks2 := make(map[int]bool)
+	for _, block := range NakamotoBlocks {
+		blocks2[block] = true
+	}
+	_defaultAssetInBlockSubSidy[Nakamoto] = blocks2
+
+	_defaultAssetInBlockSubSidy[Block9] = map[int]bool{9: true}
+	_defaultAssetInBlockSubSidy[Block78] = map[int]bool{78: true}
+
+	if !common.IsMainnet() {
+		_defaultAssetInUtxo = make(map[string]map[string]common.AssetOffsets)
+		_defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:0"] = map[string]common.AssetOffsets{
+			FirstTransaction: {
+				{
+					Start: 0,
+					End:   100 * 100000000,
+				},
+			},
+		}
+		_defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:1"] = map[string]common.AssetOffsets{
+			FirstTransaction: {
+				{
+					Start: 0,
+					End:   2804999961782,
+				},
+			},
+		}
+
+		blocks3 := make(map[int]bool)
+		for _, block := range PIZZA_ORG_BLOCK {
+			blocks3[block] = true
+		}
+		_defaultAssetInBlockSubSidy[Pizza] = blocks3
+
+		// 暂时只在测试环境开启
+		vintage := make(map[int]bool)
+		for i := 0; i <= 1000; i++ {
+			vintage[i] = true
+		}
+		_defaultAssetInBlockSubSidy[Vintage] = vintage
+	}
+}
+
+// 所有事先定义的稀有聪
+// utxo->ticker->offset
+var _defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
+
+	PIZZA_UTXO: {
+		Pizza: common.AssetOffsets{
+			{
+				Start: 0,
+				End:   PIZZA_VALUE,
+			},
+		},
+	},
+
+	"f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16:0": {
+		FirstTransaction: common.AssetOffsets{
+			{
+				Start: 0,
+				End:   10 * 100000000,
+			},
+		},
+	},
+}
+
+var _defaultAssetInBlockSubSidy = map[string]map[int]bool{}
+
+
+// 在区块的coinbase输入中生成稀有聪资产
+func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinbaseInput *common.TxOutput) {
+
+	// 根据交易本身生成的稀有聪
+	for _, tx := range block.Transactions {
+		for _, txOut := range tx.Outputs {
+			utxo := txOut.OutPointStr
+			assetmap, ok := _defaultAssetInUtxo[utxo]
+			if ok {
+				for name, offsets := range assetmap {
+					asset := common.AssetInfo{
+						Name: common.AssetName{
+							Protocol: common.PROTOCOL_NAME_ORDX,
+							Type:     common.ASSET_TYPE_EXOTIC,
+							Ticker:   name,
+						},
+						Amount:     *common.NewDecimal(txOut.OutValue.Value, 0),
+						BindingSat: 1,
+					}
+					
+					txOut.Assets.Add(&asset)
+					txOut.Offsets[asset.Name] = offsets.Clone()
+
+					p.addTickerAsset(name, txOut.UtxoId, offsets)
+					assetInfo := &common.AssetAbbrInfo{
+						BindingSat: int(asset.BindingSat), 
+						Offsets: offsets}
+					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+					p.status.Count++
+
+					tickers := make(map[string]bool)
+					tickers[name] = true
+					action := HolderAction{UtxoId: txOut.UtxoId, AddressId: txOut.UtxoId, Tickers: tickers, Action: 1}
+					p.holderActionList = append(p.holderActionList, &action)
+				}
+			}
+		}
+	}
+
+	// 根据区块奖励聪生成的稀有聪（在区块的奖励聪中生成的稀有聪，不需要调用addHolder）
+	height := block.Height
+	if coinbaseInput.OutValue.Value == 0 {
+		// empty block
+		common.Log.Infof("empty block %d, not need to generate rarity asset", height)
+		return
+	}
+
+	for name, blocks := range _defaultAssetInBlockSubSidy {
+		_, ok := blocks[height]
+		if ok {
+
+			asset := common.AssetInfo{
+				Name: common.AssetName{
+					Protocol: common.PROTOCOL_NAME_ORDX,
+					Type:     common.ASSET_TYPE_EXOTIC,
+					Ticker:   name,
+				},
+				Amount:     *common.NewDecimal(coinbaseInput.OutValue.Value, 0),
+				BindingSat: 1,
+			}
+			offset := common.AssetOffsets{&common.OffsetRange{
+				Start: 0,
+				End:   coinbaseInput.OutValue.Value,
+			},
+			}
+			coinbaseInput.Assets.Add(&asset)
+			coinbaseInput.Offsets[asset.Name] = offset
+
+			p.addTickerAsset(name, coinbaseInput.UtxoId, offset)
+		}
+	}
+
+	p.generateRodarmorRarityAssetInBlock(height, coinbaseInput)
+}
+
+func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets common.AssetOffsets) {
+	tickInfo, ok := p.tickerMap[name]
+	if !ok {
+		tickInfo = newExoticTickerInfo(name)
+
+		tickInfo.Ticker = newExoticDefaultTicker(name)
+		tickInfo.Ticker.Id = int64(len(p.tickerMap))
+		p.tickerMap[name] = tickInfo
+		p.tickerAdded[name] = tickInfo.Ticker
+	}
+	tickInfo.UtxoMap[utxoId] = offsets.Clone()
+	tickInfo.Ticker.TotalMinted += offsets.Size()
+	// tickInfo.MintAdded = append(ticker.MintAdded, mint)
+	// tickInfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
+
+	p.tickerAdded[name] = tickInfo.Ticker // 更新
+}
+
+func (p *ExoticIndexer) generateRodarmorRarityAssetInBlock(height int, coinbaseInput *common.TxOutput) {
+
+	asset := common.AssetInfo{
+		Name: common.AssetName{
+			Protocol: common.PROTOCOL_NAME_ORDX,
+			Type:     common.ASSET_TYPE_EXOTIC,
+			Ticker:   "",
+		},
+		Amount:     *common.NewDecimal(1, 0),
+		BindingSat: 1,
+	}
+	offset0 := common.AssetOffsets{
+		{
+			Start: 0,
+			End:   1,
+		},
+	}
+
+	var name string
+	if height == 0 {
+		name = Mythic
+	} else if height%CycleInterval == 0 {
+		name = Legendary
+	} else if height%HalvingInterval == 0 {
+		name = Epic
+	} else if height%DificultyAdjustmentInterval == 0 {
+		name = Rare
+	} else {
+		name = Uncommon
+	}
+	asset.Name.Ticker = name
+	coinbaseInput.Assets.Add(asset.Clone())
+	coinbaseInput.Offsets[asset.Name] = offset0
+	p.addTickerAsset(name, coinbaseInput.UtxoId, offset0)
+
+	//if name == Uncommon {
+		asset.Name.Ticker = Black
+		offset1 := common.AssetOffsets{
+			{
+				Start: coinbaseInput.OutValue.Value - 1,
+				End:   coinbaseInput.OutValue.Value,
+			},
+		}
+
+		coinbaseInput.Assets.Add(asset.Clone())
+		coinbaseInput.Offsets[asset.Name] = offset1
+		p.addTickerAsset(asset.Name.Ticker, coinbaseInput.UtxoId, offset1)
+	//}
+}
+
 func (p *ExoticIndexer) getBlockInBuffer(height int) *common.BlockValueInDB {
 	return p.baseIndexer.GetBlockInBuffer(height)
 }
@@ -86,89 +306,102 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 	common.Log.Infof("InitRarityDB %d takes %v", height, time.Since(start))
 }
 
-func (p *ExoticIndexer) GetRangesForRodarmorRarity(height int, txn common.ReadBatch) map[string][]*common.Range {
-	start := time.Now()
-
-	result := make(map[string][]*common.Range, 0)
-
-	// uncommon
-	bs := NewBuckStore(p.db, string(Uncommon))
-	if bs.GetLastKey() < height {
-		p.InitRarityDB(height)
+func AddAsset(output *common.TxOutput, name string, offset int64, amt int64) {
+	asset := common.AssetInfo{
+		Name: common.AssetName{
+			Protocol: common.PROTOCOL_NAME_ORDX,
+			Type:     common.ASSET_TYPE_EXOTIC,
+			Ticker:   name,
+		},
+		Amount:     *common.NewDecimal(amt, 0),
+		BindingSat: 1,
 	}
-	rngsInBlock := bs.GetAll()
-	firstSatInBlock := make([]*common.Range, 0)
-	for height, rng := range rngsInBlock {
-		firstSatInBlock = append(firstSatInBlock, rng)
-		p.firstSatInBlock.Put(rng.Start, height)
+	output.Assets.Add(&asset)
+	output.Offsets[asset.Name] = common.AssetOffsets{
+		{
+			Start: offset,
+			End:   offset + amt,
+		},
 	}
-	result[Uncommon] = firstSatInBlock
+}
 
-	// black
-	lastSatInBlock := make([]*common.Range, 0)
-	for _, rng := range firstSatInBlock {
-		lastSatInBlock = append(lastSatInBlock, &common.Range{Start: rng.Start - 1, Size: 1})
-	}
-	result[Black] = lastSatInBlock
+func (p *ExoticIndexer) GenerateRodarmorRarityAssets(block *common.Block,
+	coinbase []*common.Range) {
 
-	// mythic
-	rng := p.getBlockRange(0, txn)
-	r := common.Range{Start: rng.Start, Size: 1}
-	result[Mythic] = append(result[Mythic], &r)
+	// // uncommon
+	// tx := block.Transactions[0]
 
-	for i := CycleInterval; i <= height; i += CycleInterval {
-		rng := p.getBlockRange(i, txn)
-		r := common.Range{Start: rng.Start, Size: 1}
-		result[Legendary] = append(result[Legendary], &r)
-	}
+	// for height, rng := range rngsInBlock {
+	// 	firstSatInBlock = append(firstSatInBlock, rng)
+	// 	p.firstSatInBlock.Put(rng.Start, height)
+	// }
+	// result[Uncommon] = firstSatInBlock
 
-	for i := HalvingInterval; i <= height; i += HalvingInterval {
-		if i == 0 {
-			continue
-		} else if i%CycleInterval == 0 {
-			continue
-		}
-		rng := p.getBlockRange(i, txn)
-		r := common.Range{Start: rng.Start, Size: 1}
-		result[Legendary] = append(result[Legendary], &r)
-	}
+	// // black
+	// lastSatInBlock := make([]*common.Range, 0)
+	// for _, rng := range firstSatInBlock {
+	// 	lastSatInBlock = append(lastSatInBlock, &common.Range{Start: rng.Start - 1, Size: 1})
+	// }
+	// result[Black] = lastSatInBlock
 
-	for i := DificultyAdjustmentInterval; i <= height; i += DificultyAdjustmentInterval {
-		if i == 0 {
-			continue
-		} else if i%CycleInterval == 0 {
-			continue
-		} else if i%HalvingInterval == 0 {
-			continue
-		}
-		rng := p.getBlockRange(i, txn)
-		r := common.Range{Start: rng.Start, Size: 1}
-		result[Legendary] = append(result[Legendary], &r)
-	}
+	// // mythic
+	// rng := p.getBlockRange(0, txn)
+	// r := common.Range{Start: rng.Start, Size: 1}
+	// result[Mythic] = append(result[Mythic], &r)
 
-	common.Log.Infof("GetRangesForRodarmorRarity %d takes %v", height, time.Since(start))
-
-	// for i := 0; i <= height; i++ {
+	// for i := CycleInterval; i <= height; i += CycleInterval {
 	// 	rng := p.getBlockRange(i, txn)
-	// 	r := define.Range{
-	// 		Start: rng.Start,
-	// 		Size:  1,
-	// 	}
-
-	// 	if i == 0 {
-	// 		result[Mythic] = append(result[Mythic], &r)
-	// 	} else if i%CycleInterval == 0 {
-	// 		result[Legendary] = append(result[Legendary], &r)
-	// 	} else if i%HalvingInterval == 0 {
-	// 		result[Epic] = append(result[Epic], &r)
-	// 	} else if i%DificultyAdjustmentInterval == 0 {
-	// 		result[Rare] = append(result[Rare], &r)
-	// 	} else {
-	// 		result[Uncommon] = append(result[Uncommon], &r)
-	// 	}
+	// 	r := common.Range{Start: rng.Start, Size: 1}
+	// 	result[Legendary] = append(result[Legendary], &r)
 	// }
 
-	return result
+	// for i := HalvingInterval; i <= height; i += HalvingInterval {
+	// 	if i == 0 {
+	// 		continue
+	// 	} else if i%CycleInterval == 0 {
+	// 		continue
+	// 	}
+	// 	rng := p.getBlockRange(i, txn)
+	// 	r := common.Range{Start: rng.Start, Size: 1}
+	// 	result[Legendary] = append(result[Legendary], &r)
+	// }
+
+	// for i := DificultyAdjustmentInterval; i <= height; i += DificultyAdjustmentInterval {
+	// 	if i == 0 {
+	// 		continue
+	// 	} else if i%CycleInterval == 0 {
+	// 		continue
+	// 	} else if i%HalvingInterval == 0 {
+	// 		continue
+	// 	}
+	// 	rng := p.getBlockRange(i, txn)
+	// 	r := common.Range{Start: rng.Start, Size: 1}
+	// 	result[Legendary] = append(result[Legendary], &r)
+	// }
+
+	// common.Log.Infof("GetRangesForRodarmorRarity %d takes %v", height, time.Since(start))
+
+	// // for i := 0; i <= height; i++ {
+	// // 	rng := p.getBlockRange(i, txn)
+	// // 	r := define.Range{
+	// // 		Start: rng.Start,
+	// // 		Size:  1,
+	// // 	}
+
+	// // 	if i == 0 {
+	// // 		result[Mythic] = append(result[Mythic], &r)
+	// // 	} else if i%CycleInterval == 0 {
+	// // 		result[Legendary] = append(result[Legendary], &r)
+	// // 	} else if i%HalvingInterval == 0 {
+	// // 		result[Epic] = append(result[Epic], &r)
+	// // 	} else if i%DificultyAdjustmentInterval == 0 {
+	// // 		result[Rare] = append(result[Rare], &r)
+	// // 	} else {
+	// // 		result[Uncommon] = append(result[Uncommon], &r)
+	// // 	}
+	// // }
+
+	// return result
 }
 
 func (p *ExoticIndexer) getMoreRodarmorRarityRangesToHeight(startHeight, endHeight int, txn common.ReadBatch) map[string][]*common.Range {
@@ -245,48 +478,27 @@ func (p *ExoticIndexer) getRangesForOmega(startHeight, endHeight int, txn common
 	return ranges
 }
 
-func (p *ExoticIndexer) loadExoticRanges(height int) map[string][]*common.Range {
-	if height < 0 || p.baseIndexer.GetHeight() < 0 {
-		return nil
-	}
+// validBlock := make([]int, 0)
+// for h := range NakamotoBlocks {
+// 	if h <= height {
+// 		validBlock = append(validBlock, h)
+// 	}
+// }
+// result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
 
-	var result map[string][]*common.Range
-	p.db.View(func(txn common.ReadBatch) error {
-		result = p.GetRangesForRodarmorRarity(height, txn)
+// if height >= 1000 {
+// 	result[Vintage] = p.getRangeToBlock(1000, txn)
+// }
 
-		result[Pizza] = PizzaRanges
-		if height >= 9 {
-			result[Block9] = p.getRangeForBlock(9, txn)
-		}
-		if height >= 78 {
-			result[Block78] = p.getRangeForBlock(78, txn)
-		}
-		validBlock := make([]int, 0)
-		for h := range NakamotoBlocks {
-			if h <= height {
-				validBlock = append(validBlock, h)
-			}
-		}
-		result[Nakamoto] = p.getRangesForBlocks(validBlock, txn)
+// // TODO
+// //result[Alpha] = GetRangesForAlpha(0, height)
+// //result[Omega] = GetRangesForOmega(0, height)
 
-		result[FirstTransaction] = FirstTransactionRanges
-		if height >= 1000 {
-			result[Vintage] = p.getRangeToBlock(1000, txn)
-		}
+// //result[Hitman] = HitmanRanges
+// //result[Jpeg] = JpegRanges
+// //result[Fibonacci] =
 
-		// TODO
-		//result[Alpha] = GetRangesForAlpha(0, height)
-		//result[Omega] = GetRangesForOmega(0, height)
-
-		//result[Hitman] = HitmanRanges
-		//result[Jpeg] = JpegRanges
-		//result[Fibonacci] =
-
-		if IsTestNet {
-			result[Customized] = CustomizedRange
-		}
-		return nil
-	})
-
-	return result
-}
+// if IsTestNet {
+// 	result[Customized] = CustomizedRange
+// }
+// return nil

@@ -82,6 +82,12 @@ func loadNameFromDB(name string, value *NameValueInDB, ldb common.KVDB) error {
 	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
+func loadNameWithSatIdFromDB(sat int64, name *string, ldb common.KVDB) error {
+	key := GetSatKey(sat)
+	return db.GetValueFromDB([]byte(key), name, ldb)
+}
+
+
 func loadNameProperties(name string, ldb common.KVDB) map[string]*common.KeyValueInDB {
 	KVs := make(map[string]*common.KeyValueInDB)
 
@@ -124,6 +130,10 @@ func loadValueWithKey(name, key string, ldb common.KVDB) *common.KeyValueInDB {
 
 func GetNameKey(name string) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_NAME, strings.ToLower(name))
+}
+
+func GetSatKey(sat int64) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_SAT, sat)
 }
 
 func GetKVKey(name, key string) string {

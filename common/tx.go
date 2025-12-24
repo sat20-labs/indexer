@@ -1,18 +1,22 @@
 package common
 
 import (
+	"encoding/base64"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
-type Range = pb.MyRange
+const RANGE_IN_GLOBAL = false // true: Range 表示一个satoshi的全局编码，一个 [0, 2099999997690000) 的数字
+// false: Range表示特殊聪在当前utxo中的范围。使用false，可以极大降低数据存储需求
+
+type Range = pb.PbRange
 
 type Input struct {
 	Txid     string         `json:"txid"`
-	TxIndex  int
-	TxInIndex int
 	UtxoId   uint64         `json:"utxoid"`
 	Address  *ScriptPubKey  `json:"scriptPubKey"`
 	Vout     int64          `json:"vout"`
@@ -37,10 +41,94 @@ type Output struct {
 	Ordinals []*Range      `json:"ordinals"`
 }
 
+type TxInput struct {
+	TxOutputV2 // 作为输入的utxo的信息
+	Witness    wire.TxWitness
+	// 当前交易的输入信息
+	TxId      string // 作为输入时的交易
+	InHeight  int
+	InTxIndex int
+	TxInIndex int
+}
+
+type TxOutputV2 struct {
+	TxOutput
+	TxOutIndex  int
+	OutTxIndex  int
+	OutHeight   int
+	AddressId   uint64
+	AddressType int
+}
+
+func (p *TxOutputV2) GetAddress() string {
+	switch txscript.ScriptClass(p.AddressType) {
+	case txscript.NullDataTy:
+		return "OP_RETURN"
+	}
+
+	var chainParams *chaincfg.Params
+	if IsMainnet() {
+		chainParams = &chaincfg.MainNetParams
+	} else {
+		chainParams = &chaincfg.TestNet4Params
+	}
+	_, addresses, _, _ := txscript.ExtractPkScriptAddrs(p.OutValue.PkScript, chainParams)
+	if len(addresses) == 0 {
+		// txscript.MultiSigTy, NonStandardTy
+		return base64.StdEncoding.EncodeToString(p.OutValue.PkScript)
+	}
+
+	return addresses[0].EncodeAddress()
+}
+
+func GetPkScriptFromAddress(address string) ([]byte, error) {
+	if address == "OP_RETURN" {
+		return []byte{0x6a}, nil
+	}
+	// if address == "UNKNOWN" {
+	// 	return []byte{0x51}, nil
+	// }
+	var chainParams *chaincfg.Params
+	if IsMainnet() {
+		chainParams = &chaincfg.MainNetParams
+	} else {
+		chainParams = &chaincfg.TestNet4Params
+	}
+
+	pkScript, err := AddrToPkScript(address, chainParams)
+	if err != nil {
+		// base64
+		pkScript, err = base64.StdEncoding.DecodeString(address)
+	}
+	return pkScript, err
+}
+
+func GetAddressTypeFromAddress(address string) int {
+	pkScript, err := GetPkScriptFromAddress(address)
+	if err != nil {
+		return int(txscript.NonStandardTy)
+	}
+	return GetAddressTypeFromPkScript(pkScript)
+}
+
+func GetAddressTypeFromPkScript(pkScript []byte) int {
+	var chainParams *chaincfg.Params
+	if IsMainnet() {
+		chainParams = &chaincfg.MainNetParams
+	} else {
+		chainParams = &chaincfg.TestNet4Params
+	}
+	scriptClass, _, _, err := txscript.ExtractPkScriptAddrs(pkScript, chainParams)
+	if err != nil {
+		return int(txscript.NonStandardTy)
+	}
+	return int(scriptClass)
+}
+
 type Transaction struct {
-	Txid    string    `json:"txid"`
-	Inputs  []*Input  `json:"inputs"`
-	Outputs []*Output `json:"outputs"`
+	TxId    string        `json:"txid"`
+	Inputs  []*TxInput    `json:"inputs"`
+	Outputs []*TxOutputV2 `json:"outputs"`
 }
 
 type Block struct {
@@ -52,5 +140,5 @@ type Block struct {
 }
 
 type UTXOIndex struct {
-	Index map[string]*Output
+	Index map[string]*TxOutputV2
 }

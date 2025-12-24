@@ -15,16 +15,17 @@ func (e *ScriptError) Error() string {
 type Curse int
 
 const (
-	NoCurse               Curse = 0
-	DuplicateField        Curse = 1 // 0.14.1+ // mainnet: 74f11a182ec96f1f49c7870c5ddc535b46e6faa0879e6b6f94cc2b5a1bd7d358i0
-	IncompleteField       Curse = 2 // 0.14.1+
-	NotAtOffsetZero       Curse = 3 // 0.9.0+
-	NotInFirstInput       Curse = 4 // 0.9.0+
-	Pointer               Curse = 5 // 0.14.1+
-	Pushnum               Curse = 6 // 0.14.1+
-	Reinscription         Curse = 7 // 0.9.0+
-	Stutter               Curse = 8 // 0.14.1+
-	UnrecognizedEvenField Curse = 9 // 0.9.0+
+	Vindicated            Curse = 1
+	NoCurse               Curse = 0 // bless
+	DuplicateField        Curse = -1 // 0.14.1+
+	IncompleteField       Curse = -2 // 0.14.1+
+	NotAtOffsetZero       Curse = -3 // 0.9.0+
+	NotInFirstInput       Curse = -4 // 0.9.0+
+	Pointer               Curse = -5 // 0.14.1+
+	Pushnum               Curse = -6 // 0.14.1+
+	Reinscription         Curse = -7 // 0.9.0+ // 跟Jubilee无关
+	Stutter               Curse = -8 // 0.14.1+
+	UnrecognizedEvenField Curse = -9 // 0.9.0+
 )
 
 func (c Curse) Error() string {
@@ -48,7 +49,9 @@ func (c Curse) Error() string {
 	case UnrecognizedEvenField:
 		return "curse: contains an unrecognized field with an even tag"
 	case NoCurse:
-		return "curse: no curse detected"
+		return "no curse"
+	case Vindicated:
+		return "vindicated"
 	default:
 		return fmt.Sprintf("curse: unknown condition (%d)", c)
 	}

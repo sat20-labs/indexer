@@ -913,11 +913,13 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 			output.Assets = common.TxAssets{asset}
 		}
 
-		output = outputs[defaultRuneOutput]
-		err := output.Assets.Subtract(&asset)
-		if err != nil {
-			return nil, nil, err
-		}
+        if defaultRuneOutput >= 0 {
+            output = outputs[defaultRuneOutput]
+            err := output.Assets.Subtract(&asset)
+            if err != nil {
+                return nil, nil, err
+            }
+        }
 	}
 
 	return inputs, outputs, nil

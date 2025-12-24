@@ -140,11 +140,11 @@ func TestParseTxFromUtxoId(t *testing.T) {
 			continue
 		}
 
-		for j := range tx.Outputs {
+		for j, txOut := range tx.Outputs {
 			if j != vout {
 				continue
 			}
-			fmt.Printf("found %s:%d for utxoId %d\n", tx.Txid, j, utxoId)
+			fmt.Printf("found %s for utxoId %d\n", txOut.OutPointStr, utxoId)
 		}
 		break
 	}

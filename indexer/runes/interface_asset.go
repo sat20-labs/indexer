@@ -21,11 +21,6 @@ type AddressIdToAddressLotMap map[uint64]*AddressLot
 
 // key: addressId, value: amount
 func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Decimal) {
-	// if runeHolders, exist := runeHoldersCache.Get(runeId); exist {
-	// 	if time.Since(time.Unix(runeHolders.LastTimestamp, 0)) < tickHoldersInfoCacheDuration {
-	// 		return runeHolders.HoldersAddressAmount
-	// 	}
-	// }
 	runeInfo := s.GetRuneInfo(runeId)
 	if runeInfo == nil {
 		common.Log.Errorf("%s not found", runeId)
@@ -36,11 +31,11 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil
 	}
-	r := s.idToEntryTbl.Get(rid)
-	if r == nil {
-		common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
-		return nil
-	}
+	// r := s.idToEntryTbl.Get(rid)
+	// if r == nil {
+	// 	common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
+	// 	return nil
+	// }
 	balances, err := s.runeIdAddressToBalanceTbl.GetBalances(rid)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())
@@ -60,19 +55,12 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 
 	total := uint64(len(addressIdToAddressLotMap))
 	ret = make(map[uint64]*common.Decimal, total)
-	var i = 0
 
 	for addressId, addressLot := range addressIdToAddressLotMap {
 		decimal := common.NewDecimalFromUint128(*addressLot.Amount, int(runeInfo.Divisibility))
 		ret[addressId] = decimal
-		i++
 	}
 
-	// runeHolders := &RuneHolders{
-	// 	LastTimestamp:        time.Now().Unix(),
-	// 	HoldersAddressAmount: ret,
-	// }
-	// runeHoldersCache.Set(runeId, runeHolders)
 	return
 }
 
@@ -178,6 +166,9 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 	if len(balances) == 0 {
 		return nil, 0
 	}
+	if limit == 0 {
+		return nil, uint64(len(balances))
+	}
 
 	sort.Slice(balances, func(i, j int) bool {
 		return balances[i].OutPoint.UtxoId < balances[j].OutPoint.UtxoId
@@ -234,6 +225,27 @@ func (s *Indexer) GetAddressAssets(addressId uint64, utxos map[uint64]int64) map
 	}
 
 	return assetMap
+}
+
+func (s *Indexer) GetAddressAssetWithName(addressId uint64, name string) *common.Decimal {
+
+	runeInfo := s.GetRuneInfo(name)
+	if runeInfo == nil {
+		return nil
+	}
+
+	utxos := s.baseIndexer.GetUTXOs(addressId)
+	var balance uint128.Uint128
+	for utxoId := range utxos {
+		assets := s.GetUtxoAssets(utxoId)
+		for _, asset := range assets {
+			if asset.Rune == name {
+				balance = balance.Add(asset.Balance)
+			}
+		}
+	}
+
+	return common.NewDecimalFromUint128(balance, int(runeInfo.Divisibility))
 }
 
 /*

@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/sat20-labs/indexer/common"
@@ -21,12 +22,12 @@ func (b *IndexerMgr) GetNftInfoWithInscriptionId(id string) *common.Nft {
 // result: nft ids
 func (b *IndexerMgr) GetNftsWithUtxo(utxoId uint64) []string {
 	result := make([]string, 0)
-	sats := b.nft.GetBoundSatsWithUtxo(utxoId)
-	for _, sat := range sats {
+	sats := b.nft.GetSatsWithUtxo(utxoId)
+	for sat := range sats {
 		info := b.GetNftsWithSat(sat)
 		if info != nil {
-			for _, base := range info.Nfts {
-				result = append(result, base.InscriptionId)
+			for _, nftId := range info.Nfts {
+				result = append(result, fmt.Sprintf("%d", nftId))
 			}
 		}
 	}
@@ -103,7 +104,6 @@ func (b *IndexerMgr) GetNftAmountWithAddress(address string) map[string]int64 {
 	return b.getNftAmountWithAddress(address, nil)
 }
 
-
 func (b *IndexerMgr) getNftAmountWithAddress(address string, unconfirmedSpents map[uint64]*common.TxOutput) map[string]int64 {
 	nfts := b.getNftWithAddressInBuffer(address)
 
@@ -127,28 +127,20 @@ func (b *IndexerMgr) getNftAmountWithAddress(address string, unconfirmedSpents m
 	return result
 }
 
-func (b *IndexerMgr) getNftsWithUtxo(utxoId uint64) map[string][]*common.Range {
-	result := make(map[string][]*common.Range)
-	sats := b.nft.GetBoundSatsWithUtxo(utxoId)
-	for _, sat := range sats {
+func (b *IndexerMgr) getNftsWithUtxo(utxoId uint64) map[string]common.AssetOffsets {
+	result := make(map[string]common.AssetOffsets)
+	sats := b.nft.GetSatsWithUtxo(utxoId)
+	for sat := range sats {
 		nfts := b.nft.GetNftsWithSat(sat)
 		if nfts != nil {
-			for _, nft := range nfts.Nfts {
-				result[nft.InscriptionId] = []*common.Range{{Start: nft.Sat, Size: 1}}
+			offsets := common.AssetOffsets{
+				{
+					Start: nfts.Offset,
+					End:   nfts.Offset + 1,
+				},
 			}
-		}
-	}
-	return result
-}
-
-func (b *IndexerMgr) getNftsWithRanges(ranges []*common.Range) map[string][]*common.Range {
-	result := make(map[string][]*common.Range)
-	sats := b.nft.GetNftsWithRanges(ranges)
-	for _, sat := range sats {
-		nfts := b.nft.GetNftsWithSat(sat)
-		if nfts != nil {
-			for _, nft := range nfts.Nfts {
-				result[nft.InscriptionId] = []*common.Range{{Start: nfts.Sat, Size: 1}}
+			for _, nftId := range nfts.Nfts {
+				result[fmt.Sprintf("%d", nftId)] = offsets
 			}
 		}
 	}

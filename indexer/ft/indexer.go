@@ -5,53 +5,55 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/nft"
 )
 
-type TickInfo struct {
-	Name           string
-	MintInfo       *indexer.RangeRBTree            // mint history: 用于查找某个SatRange是否存在该ticker， Value是RBTreeValue_Mint
-	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId
-	MintAdded      []*common.Mint
-	Ticker         *common.Ticker
+type TickInfo = exotic.TickInfo
+type HolderInfo = exotic.HolderInfo
+
+type HolderAction = exotic.HolderAction
+
+type ActionInfo struct {
+	Action int
+	Input *common.TxInput
+	Info   any
 }
 
-type HolderAction struct {
-	UtxoId    uint64
-	AddressId uint64
-	Index     int
-	Tickers   map[string]*common.TickAbbrInfo
-	Action    int // -1 删除; 1 增加
-}
-
-type HolderInfo struct {
-	AddressId uint64
-	Index     int
-	Tickers   map[string]*common.TickAbbrInfo // key: ticker, 小写
-}
-
+// TODO 加载所有数据，太耗时间和内存，需要优化，参考nft和brc20模块 (目前数据量少，问题不大)
 type FTIndexer struct {
-	db         common.KVDB
-	nftIndexer *nft.NftIndexer
+	db           common.KVDB
+	nftIndexer   *nft.NftIndexer
+	enableHeight int
 
 	// 所有必要数据都保存在这几个数据结构中，任何查找数据的行为，必须先通过这几个数据结构查找，再去数据库中读其他数据
 	// 禁止直接对外暴露这几个结构的数据，防止被不小心修改
 	// 禁止直接遍历holderInfo和utxoMap，因为数据量太大（ord有亿级数据）
-	mutex      sync.RWMutex                 // 只保护这几个结构
-	tickerMap  map[string]*TickInfo         // ticker -> TickerInfo.  name 小写。 数据由mint数据构造。
-	holderInfo map[uint64]*HolderInfo       // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
-	utxoMap    map[string]*map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
+	mutex      sync.RWMutex                // 只保护这几个结构
+	tickerMap  map[string]*TickInfo        // ticker -> TickerInfo.  name 小写。
+	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
+	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
 
 	// 其他辅助信息
 	holderActionList []*HolderAction           // 在同一个block中，状态变迁需要按顺序执行，因为一个utxo会很快被消费掉，变成新的utxo
 	tickerAdded      map[string]*common.Ticker // key: ticker
+
+	// 一个区块的缓存数据，不需要备份
+	actionBufferMap map[uint64][]*ActionInfo // 一个区块中，增量的mint在哪个输入中 utxoId->mint
+
+	// 校验数据，不需要保存
+	holderMapInPrevBlock map[uint64]int64
 }
 
 func NewOrdxIndexer(db common.KVDB) *FTIndexer {
+	enableHeight := 827307
+	if !common.IsMainnet() {
+		enableHeight = 28883
+	}
 	return &FTIndexer{
-		db: db,
+		db:           db,
+		enableHeight: enableHeight,
 	}
 }
 
@@ -97,12 +99,16 @@ func (s *FTIndexer) Clone() *FTIndexer {
 
 	// 保存holderActionList对应的数据
 	newInst.holderInfo = make(map[uint64]*HolderInfo, 0)
-	newInst.utxoMap = make(map[string]*map[uint64]int64, 0)
+	newInst.utxoMap = make(map[string]map[uint64]int64, 0)
 	for _, action := range s.holderActionList {
 		if action.Action > 0 {
 			value, ok := s.holderInfo[action.UtxoId]
 			if ok {
-				info := HolderInfo{AddressId: value.AddressId, Tickers: value.Tickers}
+				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
+				for k, assets := range value.Tickers {
+					newTickerInfo[k] = assets.Clone()
+				}
+				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
 				newInst.holderInfo[action.UtxoId] = &info
 			} //else {
 			// 已经被删除，不存在了
@@ -114,15 +120,15 @@ func (s *FTIndexer) Clone() *FTIndexer {
 			if action.Action > 0 {
 				value, ok := s.utxoMap[tickerName]
 				if ok {
-					amount, ok := (*value)[action.UtxoId]
+					amount, ok := value[action.UtxoId]
 					if ok {
 						newmap, ok := newInst.utxoMap[tickerName]
 						if ok {
-							(*newmap)[action.UtxoId] = amount
+							newmap[action.UtxoId] = amount
 						} else {
 							m := make(map[uint64]int64, 0)
 							m[action.UtxoId] = amount
-							newInst.utxoMap[tickerName] = &m
+							newInst.utxoMap[tickerName] = m
 						}
 					} //else {
 					// 已经被删除，不存在了
@@ -161,7 +167,7 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 }
 
 // 在系统初始化时调用一次，如果有历史数据的话。一般在NewSatIndex之后调用。
-func (s *FTIndexer) InitOrdxIndexer(nftIndexer *nft.NftIndexer) {
+func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
 	height := nftIndexer.GetBaseIndexer().GetSyncHeight()
@@ -180,6 +186,13 @@ func (s *FTIndexer) InitOrdxIndexer(nftIndexer *nft.NftIndexer) {
 		}
 
 		s.holderInfo = s.loadHolderInfoFromDB()
+		// 更新ticker数据的utxo数据
+		for utxoId, holder := range s.holderInfo {
+			for name, assetInfo := range holder.Tickers {
+				ticker := s.tickerMap[name]
+				ticker.UtxoMap[utxoId] = assetInfo.Offsets.Clone()
+			}
+		}
 		s.utxoMap = s.loadUtxoMapFromDB()
 
 		s.holderActionList = make([]*HolderAction, 0)
@@ -223,7 +236,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 			}
 		} else {
 			amontInUtxos := int64(0)
-			for utxo, amoutInUtxo := range *utxos {
+			for utxo, amoutInUtxo := range utxos {
 				amontInUtxos += amoutInUtxo
 
 				holderInfo, ok := s.holderInfo[utxo]
@@ -231,15 +244,13 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holdermap", name, utxo)
 					return false
 				}
-				tickinfo, ok := holderInfo.Tickers[name]
+				tickAssetInfo, ok := holderInfo.Tickers[name]
 				if !ok {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d not in holders", name, utxo)
 					return false
 				}
-				amountInHolder := int64(0)
-				for _, rngs := range tickinfo.MintInfo {
-					amountInHolder += common.GetOrdinalsSize(rngs) * int64(tickinfo.N)
-				}
+
+				amountInHolder := tickAssetInfo.AssetAmt()
 				if amountInHolder != amoutInUtxo {
 					common.Log.Errorf("FTIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
 					return false
@@ -279,7 +290,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 				return false
 			}
 		} else {
-			common.Log.Errorf("FTIndexer incorrect %s", name)
+			common.Log.Errorf("FTIndexer Incorrect %s", name)
 			return false
 		}
 	}

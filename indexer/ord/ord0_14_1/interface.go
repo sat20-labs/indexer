@@ -17,11 +17,8 @@ type InscriptionResult struct {
 }
 
 func InscriptionToResult(envelope *ParsedEnvelope, blockHeight int) *InscriptionResult {
-	jubileeHeight := 824544
 	var curse ordCommon.Curse
-	if blockHeight >= jubileeHeight {
-		curse = ordCommon.NoCurse
-	} else if envelope.Payload.UnrecognizedEvenField {
+	if envelope.Payload.UnrecognizedEvenField {
 		curse = ordCommon.UnrecognizedEvenField
 	} else if envelope.Payload.DuplicateField {
 		curse = ordCommon.DuplicateField

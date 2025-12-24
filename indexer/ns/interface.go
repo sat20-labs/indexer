@@ -6,17 +6,6 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-func (p *NameService) HasNameInSat(sat int64) bool {
-
-	nftInSat := p.nftIndexer.GetNftsWithSat(sat)
-	for _, nft := range nftInSat.Nfts {
-		if nft.TypeName == common.ASSET_TYPE_NS {
-			return true
-		}
-	}
-	return false
-}
-
 
 // fast
 func (p *NameService) HasNamesInUtxo(utxoId uint64) bool {
@@ -60,19 +49,6 @@ func (p *NameService) GetNamesWithUtxo2(utxoId uint64) []string {
 	return result
 }
 
-func (p *NameService) GetNamesWithRanges(rngs []*common.Range) []int64 {
-
-	sats := p.nftIndexer.GetNftsWithRanges(rngs)
-	result := make([]int64, 0)
-	for _, sat := range sats {
-		if p.HasNameInSat(sat) {
-			result = append(result, sat)
-		}
-	}
-
-	return result
-}
-
 func (p *NameService) GetNameRegisterInfoWithInscriptionId(inscId string) *NameRegister {
 	nft := p.nftIndexer.GetNftWithInscriptionId(inscId)
 	if nft == nil || nft.Base.TypeName != common.ASSET_TYPE_NS {
@@ -85,22 +61,16 @@ func (p *NameService) GetNameRegisterInfoWithInscriptionId(inscId string) *NameR
 
 func (p *NameService) GetNameRegisterInfoWithSat(sat int64) []*NameRegister {
 	name := ""
-	nftInSat := p.nftIndexer.GetNftsWithSat(sat)
-	if nftInSat == nil {
+
+	err := loadNameWithSatIdFromDB(sat, &name, p.db)
+	if err != nil {
 		return nil
 	}
-	result := make([]*NameRegister, 0)
-	for _, nft := range nftInSat.Nfts {
-		if nft.TypeName == common.ASSET_TYPE_NS {
-			name = string(nft.UserData)
-			reg := p.GetNameRegisterInfo(name)
-			if reg != nil {
-				result = append(result, reg)
-			}
-		}
+	reg := p.GetNameRegisterInfo(name)
+	if reg == nil {
+		return nil
 	}
-
-	return result
+	return []*NameRegister{reg}
 }
 
 func (p *NameService) IsNameExist(name string) bool {

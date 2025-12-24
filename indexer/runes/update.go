@@ -17,6 +17,10 @@ import (
 )
 
 func (s *Indexer) UpdateDB() {
+	if s.baseIndexer.GetHeight() < s.enableHeight {
+		return
+	}
+
 	if s.height == 0 {
 		common.Log.Warnf("RuneIndexer.UpdateDB-> err: height(%d) == 0", s.height)
 		return
@@ -41,7 +45,7 @@ func (s *Indexer) UpdateDB() {
 }
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
-	if s.chaincfgParam.Net == wire.MainNet && block.Height < 840000 {
+	if block.Height < s.enableHeight {
 		return
 	}
 
@@ -69,7 +73,7 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		isParseOk, _ := s.index_runes(uint32(txIndex), transaction)
 		if isParseOk {
 			common.Log.Tracef("RuneIndexer.UpdateTransfer-> height:%d, txIndex:%d, txid:%s",
-				block.Height, txIndex, transaction.Txid)
+				block.Height, txIndex, transaction.TxId)
 		}
 	}
 	sinceTime := time.Since(startTime)
@@ -77,6 +81,8 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	format := "RuneIndexer.UpdateTransfer-> handle block succ, tx count:%d, update holder count:%d, remove holder count:%d, block took time:%v"
 	common.Log.Infof(format, txCount, s.HolderUpdateCount, s.HolderRemoveCount, sinceTime)
 	s.update()
+
+	s.CheckPointWithBlockHeight(block.Height)
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
@@ -87,10 +93,10 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 	artifact, err = parseArtifact(tx)
 	if err != nil {
 		if err != runestone.ErrNoOpReturn {
-			common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.Txid, err.Error())
+			common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) err:%s", tx.TxId, err.Error())
 		}
 	} else {
-		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.Txid, tx_index, artifact)
+		common.Log.Tracef("RuneIndexer.index_runes-> parseArtifact(%s) ok, tx_index:%d, artifact:%+v", tx.TxId, tx_index, artifact)
 	}
 	// if artifact != nil && artifact.Runestone != nil && artifact.Runestone.Edicts != nil {
 	// 	common.Log.Infof("%v", artifact.Runestone.Etching)
@@ -184,7 +190,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 					// find non-OP_RETURN outputs
 					var destinations []uint32
 					for outputIndex, output := range tx.Outputs {
-						if output.Address.PkScript[0] != txscript.OP_RETURN {
+						if output.OutValue.PkScript[0] != txscript.OP_RETURN {
 							destinations = append(destinations, uint32(outputIndex))
 						}
 					}
@@ -258,7 +264,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 
 		if pointer == nil {
 			for index, v := range tx.Outputs {
-				if v.Address.PkScript[0] != txscript.OP_RETURN {
+				if v.OutValue.PkScript[0] != txscript.OP_RETURN {
 					u32Index := uint32(index)
 					outIndex = &u32Index
 					find = true
@@ -308,20 +314,20 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			}
 		}
 		// increment burned balances
-		if tx.Outputs[vout].Address.PkScript[0] == txscript.OP_RETURN {
+		if tx.Outputs[vout].OutValue.PkScript[0] == txscript.OP_RETURN {
 			for id, balance := range balances {
 				burned.GetOrDefault(&id).AddAssign(balance)
 			}
 			continue
 		}
 		// Sort balanceArray by id so tests can assert balanceArray in a fixed order
-		outpoint := &table.OutPoint{UtxoId: common.GetUtxoId(tx.Outputs[vout])}
+		outpoint := &table.OutPoint{UtxoId: tx.Outputs[vout].UtxoId}
 		address, err := parseTxVoutScriptAddress(tx, int(vout), *s.chaincfgParam)
 		if err != nil {
 			common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
-				tx.Txid, vout, s.chaincfgParam.Net, err)
+				tx.TxId, vout, s.chaincfgParam.Net, err)
 		}
-		addressId := s.BaseIndexer.GetAddressId(string(address))
+		addressId := s.baseIndexer.GetAddressId(string(address))
 		outpointToBalancesValue := &table.OutpointToBalancesValue{
 			UtxoId:     outpoint.UtxoId,
 			AddressId:  addressId,
@@ -426,13 +432,13 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 		if outIndex != nil {
 			// 有效的输出
 			output := tx.Outputs[*outIndex]
-			utxoId := common.GetUtxoId(output)
+			utxoId := output.UtxoId
 			address, err := parseTxVoutScriptAddress(tx, int(*outIndex), *s.chaincfgParam)
 			if err != nil {
 				common.Log.Panicf("RuneIndexer.index_runes-> parseTxVoutScriptAddress(%v,%v,%v) err:%v",
-					tx.Txid, outIndex, s.chaincfgParam.Net, err)
+					tx.TxId, outIndex, s.chaincfgParam.Net, err)
 			} else {
-				addressId := s.BaseIndexer.GetAddressId(string(address))
+				addressId := s.baseIndexer.GetAddressId(string(address))
 				v := &table.RuneIdToMintHistory{
 					RuneId:    mintRuneId,
 					UtxoId:    utxoId,
@@ -466,7 +472,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 			RuneId:       *id,
 			Burned:       uint128.Uint128{},
 			Divisibility: 0,
-			Etching:      tx.Txid,
+			Etching:      tx.TxId,
 			Parent:       nil,
 			Terms:        nil,
 			Mints:        uint128.Uint128{},
@@ -481,7 +487,7 @@ func (s *Indexer) create_rune_entry(tx *common.Transaction, artifact *runestone.
 		entry = &runestone.RuneEntry{
 			RuneId:     *id,
 			Burned:     uint128.Uint128{},
-			Etching:    tx.Txid,
+			Etching:    tx.TxId,
 			Parent:     parent,
 			Terms:      artifact.Runestone.Etching.Terms,
 			Mints:      uint128.Uint128{},
@@ -521,7 +527,7 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 		if oldValue != nil {
 			for _, val := range oldValue.RuneIdLots {
 				if val.Lot.Value.IsZero() {
-					common.Log.Panicf("unallocated input rune is zero. tx %s", tx.Txid)
+					common.Log.Panicf("unallocated input rune is zero. tx %s", tx.TxId)
 				}
 				if ret1[val.RuneId] == nil {
 					ret1[val.RuneId] = runestone.NewLot(&uint128.Uint128{Lo: 0, Hi: 0})
@@ -565,12 +571,12 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 				key := &table.RuneIdAddressToBalance{RuneId: &val.RuneId, AddressId: oldValue.AddressId}
 				oldruneIdAddressToBalanceValue := s.runeIdAddressToBalanceTbl.Get(key)
 				if oldruneIdAddressToBalanceValue == nil {
-					common.Log.Panicf("address %s has missing rune %s in tx %s", input.Address.Addresses[0], val.RuneId.String(), tx.Txid)
+					common.Log.Panicf("address %s has missing rune %s in tx %s", hex.EncodeToString(input.OutValue.PkScript), val.RuneId.String(), tx.TxId)
 				}
 				var amount uint128.Uint128 = uint128.Uint128{Lo: 0, Hi: 0}
 				if oldruneIdAddressToBalanceValue.Balance.Value.Cmp(val.Lot.Value) < 0 {
 					//amount = uint128.Zero
-					common.Log.Panicf("address %s has incorrect rune value in tx %s", input.Address.Addresses[0], tx.Txid)
+					common.Log.Panicf("address %s has incorrect rune value in tx %s", hex.EncodeToString(input.OutValue.PkScript), tx.TxId)
 				} else {
 					amount = oldruneIdAddressToBalanceValue.Balance.Value.Sub(val.Lot.Value)
 				}
@@ -661,7 +667,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			var err error
 			var resp any
 			for {
-				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.Txid)
+				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.TxId)
 				if err == nil {
 					break
 				} else {
@@ -672,7 +678,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			}
 
 			txInfo, _ := resp.(*bitcoind.RawTransaction)
-			hexStr := txInfo.Vout[input.Vout].ScriptPubKey.Hex
+			hexStr := txInfo.Vout[input.TxOutIndex].ScriptPubKey.Hex
 			// is_p2tr
 			taproot := false
 			hexBytes, err := hex.DecodeString(hexStr)

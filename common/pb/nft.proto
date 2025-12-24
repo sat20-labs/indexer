@@ -22,8 +22,9 @@ message InscribeBaseContent {
     uint64 output = 15;     // inscribing output
     int64 outpoint = 16;    // offset in output when inscribing
     int32 curse_type = 17;
-    string typeName = 18;
-    bytes user_data = 19;
+    int32 reinscription = 18;
+    string typeName = 19;
+    bytes user_data = 20;
 }
 
 message NftsInSat {
@@ -32,5 +33,5 @@ message NftsInSat {
     uint64 utxo_id = 3;
     int64  offset = 4;
     int32 curseCount = 5;
-    repeated InscribeBaseContent nfts = 6;
+    repeated int64 nfts = 6; // nftId
 }

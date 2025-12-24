@@ -17,7 +17,7 @@ func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.I
 	for _, input := range transaction.Inputs {
 		_, _, err := common.ParseInscription(input.Witness)
 		if err == nil {
-			inscriptionId := runestone.InscriptionId(transaction.Txid + "i0")
+			inscriptionId := runestone.InscriptionId(transaction.TxId + "i0")
 			ret = &inscriptionId
 			return
 		}
@@ -28,8 +28,8 @@ func tryGetFirstInscriptionId(transaction *common.Transaction) (ret *runestone.I
 func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, err error) {
 	var msgTx wire.MsgTx
 	for _, output := range transaction.Outputs {
-		pkScript := output.Address.PkScript
-		msgTx.AddTxOut(wire.NewTxOut(output.Value, pkScript))
+		pkScript := output.OutValue.PkScript
+		msgTx.AddTxOut(wire.NewTxOut(output.OutValue.Value, pkScript))
 	}
 	runestone := &runestone.Runestone{}
 	ret, err = runestone.DecipherFromTx(&msgTx)
@@ -38,7 +38,7 @@ func parseArtifact(transaction *common.Transaction) (ret *runestone.Artifact, er
 
 func parseTxVoutScriptAddress(transaction *common.Transaction, voutIndex int, param chaincfg.Params) (address runestone.Address, err error) {
 	output := transaction.Outputs[voutIndex]
-	pkScript := output.Address.PkScript
+	pkScript := output.OutValue.PkScript
 	var addresses []btcutil.Address
 	var scyptClass txscript.ScriptClass
 	scyptClass, addresses, _, err = txscript.ExtractPkScriptAddrs(pkScript, &param)
