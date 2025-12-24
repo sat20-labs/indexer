@@ -66,9 +66,10 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 				},
 			},
 
+			// 114964
 			"RarePizza": {
 				Minted:      997000, 
-				MintCount:   1007,
+				MintCount:   997,
 				HolderCount: 23,
 				Holders: map[string]int64{
 					"tb1prcc8rp5wn0y9vp434kchl3aag8r8hz699006ufvczwnneuqx0wdsfmvq4y": 495000,
@@ -101,8 +102,27 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
 			"pearl": {DeployHeight: 827307}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
+			"jades": {DeployHeight: 830973},
+			"rarepizza": {DeployHeight: 850282},
 		},
 	},
+
+	828800: {
+		Tickers: map[string]*TickerStatus{
+			"pearl": {
+				Minted:      156271012, 
+			},
+		},
+	},
+
+	853358: {
+		Tickers: map[string]*TickerStatus{
+			"rarepizza": {
+				Minted:      99106856, 
+			},
+		},
+	},
+
 
 	928648: {
 		Tickers: map[string]*TickerStatus{
