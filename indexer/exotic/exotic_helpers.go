@@ -19,14 +19,14 @@ func initDefaultExoticAsset() {
 	for _, block := range NakamotoBlocks {
 		blocks2[block] = true
 	}
-	defaultAssetInBlockSubSidy[Nakamoto] = blocks2
+	_defaultAssetInBlockSubSidy[Nakamoto] = blocks2
 
-	defaultAssetInBlockSubSidy[Block9] = map[int]bool{9: true}
-	defaultAssetInBlockSubSidy[Block78] = map[int]bool{78: true}
+	_defaultAssetInBlockSubSidy[Block9] = map[int]bool{9: true}
+	_defaultAssetInBlockSubSidy[Block78] = map[int]bool{78: true}
 
 	if !common.IsMainnet() {
-		defaultAssetInUtxo = make(map[string]map[string]common.AssetOffsets)
-		defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:0"] = map[string]common.AssetOffsets{
+		_defaultAssetInUtxo = make(map[string]map[string]common.AssetOffsets)
+		_defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:0"] = map[string]common.AssetOffsets{
 			FirstTransaction: {
 				{
 					Start: 0,
@@ -34,7 +34,7 @@ func initDefaultExoticAsset() {
 				},
 			},
 		}
-		defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:1"] = map[string]common.AssetOffsets{
+		_defaultAssetInUtxo["475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756:1"] = map[string]common.AssetOffsets{
 			FirstTransaction: {
 				{
 					Start: 0,
@@ -47,13 +47,20 @@ func initDefaultExoticAsset() {
 		for _, block := range PIZZA_ORG_BLOCK {
 			blocks3[block] = true
 		}
-		defaultAssetInBlockSubSidy[Pizza] = blocks3
+		_defaultAssetInBlockSubSidy[Pizza] = blocks3
+
+		// 暂时只在测试环境开启
+		vintage := make(map[int]bool)
+		for i := 0; i <= 1000; i++ {
+			vintage[i] = true
+		}
+		_defaultAssetInBlockSubSidy[Vintage] = vintage
 	}
 }
 
 // 所有事先定义的稀有聪
 // utxo->ticker->offset
-var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
+var _defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
 
 	PIZZA_UTXO: {
 		Pizza: common.AssetOffsets{
@@ -74,7 +81,7 @@ var defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
 	},
 }
 
-var defaultAssetInBlockSubSidy = map[string]map[int]bool{}
+var _defaultAssetInBlockSubSidy = map[string]map[int]bool{}
 
 
 // 在区块的coinbase输入中生成稀有聪资产
@@ -84,7 +91,7 @@ func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinba
 	for _, tx := range block.Transactions {
 		for _, txOut := range tx.Outputs {
 			utxo := txOut.OutPointStr
-			assetmap, ok := defaultAssetInUtxo[utxo]
+			assetmap, ok := _defaultAssetInUtxo[utxo]
 			if ok {
 				for name, offsets := range assetmap {
 					asset := common.AssetInfo{
@@ -124,7 +131,7 @@ func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinba
 		return
 	}
 
-	for name, blocks := range defaultAssetInBlockSubSidy {
+	for name, blocks := range _defaultAssetInBlockSubSidy {
 		_, ok := blocks[height]
 		if ok {
 

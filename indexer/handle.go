@@ -498,6 +498,13 @@ func (s *IndexerMgr) handleMintTicker(in *common.TxInput, inOffset int64, out *c
 	}
 
 	satsNum := int64(amt) / int64(deployTicker.N)
+	// 确保在输入的聪内部
+	if in.OutValue.Value < inOffset + satsNum {
+		common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, %d not in input range: %d",
+			inscriptionId, content.Ticker, inOffset + satsNum, in.OutValue.Value)
+		return nil
+	}
+
 	newRngs := common.AssetOffsets{
 		{
 			Start: inOffset,
@@ -993,7 +1000,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	insc *ord.InscriptionResult, inscriptionId, txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range) {
 
-	// if tx.TxId == "8c6acaebeb146c8abae21ef441cf9dde94cfc7bc68d51f7bef22dd1797c31a0d" {
+	// if tx.TxId == "cbdcd47464e6041047590ec3029b3eb78ee98756662cfa96b59c8f4bc73148b4" {
 	// 	common.Log.Infof("")
 	// }
 

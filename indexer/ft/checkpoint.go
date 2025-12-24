@@ -30,6 +30,23 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 			"dogcoin": {DeployHeight: 60886}, // 每个区块，如果没有其他检查，就默认检查该资产的holder和minted是否匹配
 			"fail02": {DeployHeight: 29008},
 			"fair01": {DeployHeight: 28883},
+			"pizzaTest": {DeployHeight: 32026},
+		},
+	},
+
+	36344: {
+		Tickers: map[string]*TickerStatus{
+			"pizzaTest": {
+				Minted:      1237986, 
+			},
+		},
+	},
+
+	36213: {
+		Tickers: map[string]*TickerStatus{
+			"RarePizza": {
+				Minted:      997000, 
+			},
 		},
 	},
 
@@ -46,6 +63,34 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 					"tb1p6jcfgfwyfw2nhd948c3sq8cyuevcfjm9u5p8zjrh80kldxsruw2su0432a": 63500,
 					"tb1pfgrteggdxrejy5xafgsc0l00uset0wxvgq29ug8s0enkmhyt9zcqetp23z": 330,
 					"tb1phv466d2pzf2fat7rc06hlecvuvk4wwa8v6mudw93fwdeauctujlqrxkcm0": 100,
+				},
+			},
+
+			"RarePizza": {
+				Minted:      997000, 
+				MintCount:   1007,
+				HolderCount: 23,
+				Holders: map[string]int64{
+					"tb1prcc8rp5wn0y9vp434kchl3aag8r8hz699006ufvczwnneuqx0wdsfmvq4y": 495000,
+					"tb1p6jcfgfwyfw2nhd948c3sq8cyuevcfjm9u5p8zjrh80kldxsruw2su0432a": 457300,
+					"tb1pt9c60e43sxcvksr7arx9qvczj0w9sqjellk6xg9chw2d5pv7ax4sdy5r7n": 7000,
+					"tb1qw86hsm7etf4jcqqg556x94s6ska9z0239ahl0tslsuvr5t5kd0nq7vh40m": 6482,
+					"tb1qsp335pjzpzmddh6txa30t8gjlv8kurephdtnwz42f7yxd7afrrfs3gs0x7": 5990,
+					"tb1prnftyn4t8wz0rcxhw0emqa0r7lwh228nexmwwadnndxyz2dd3eksuqqlps": 7,
+				},
+			},
+
+			"pizzaTest": {
+				Minted:      1237986, 
+				MintCount:   1241,
+				HolderCount: 34,
+				Holders: map[string]int64{
+					"tb1p6jcfgfwyfw2nhd948c3sq8cyuevcfjm9u5p8zjrh80kldxsruw2su0432a": 543886,
+					"tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua": 454328,
+					"tb1pmzc7yvc7jt9t7vwv8xaqqchqlskg7g4e2ylfu9z4wrk37czjmweqpgq4zd": 100000,
+					"tb1q6l2zctpxqvwvkf73fnxqewezk3txflzw3se9h82ux9arksekcrss5cpzj2": 81,
+					"tb1p7q2t454hg6r0scdaphud3rdhtc7ghav9gne09hj203ck2q2hjphqcs8vuz": 15,
+					"tb1p30x9tc93c3rlfwxv5h5mcpxpwnxx0rvjt5x2f9ef9uukd9l98y4slp2ukr": 8,
 				},
 			},
 		},
