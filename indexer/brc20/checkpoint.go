@@ -29,11 +29,15 @@ type TickerStatus struct {
 }
 
 var _enable_validate bool = true
-var _validateData map[string]*validate.BRC20CSVRecord
-var _heightToRecords map[int][]*validate.BRC20CSVRecord // 按顺序
+var _validateHistoryData map[string]*validate.BRC20CSVRecord
+var _heightToHistoryRecords map[int][]*validate.BRC20CSVRecord // 按顺序
+var _historyStartHeight int = 0xffffffff
+var _historyEndHeight int
+
 var _validateInscriptionIdToNum map[string]int64
 var _validateInscriptionNumToId map[int64]string
 var _heightToInscriptionMap map[int]map[string]int64
+var _holderStartHeight, _holderEndHeight int
 
 var _heightToHolderRecords map[int]map[string]*validate.BRC20HolderCSVRecord
 
@@ -651,39 +655,41 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
 
 	name := "ordi"
-	var path string
-	if isMainnet {
-		if height < 779832 {
-			return
+	if _validateHistoryData == nil {
+		if isMainnet {
+			if height < 779832 {
+				return
+			}
+			var err error
+			path := "./indexer/brc20/validate/ordi"
+			_validateHistoryData, err = validate.ReadBRC20CSVDir(path)
+			if err != nil {
+				common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+			}
+		} else {
+			if height < 28865 {
+				return
+			}
+			var err error
+			path := "./indexer/brc20/validate/ordi-testnet4.csv"
+			_validateHistoryData, err = validate.ReadBRC20CSV(path)
+			if err != nil {
+				common.Log.Panicf("ReadBRC20CSV failed, %v", err)
+			}
 		}
-		path = "./indexer/brc20/validate/ordi.csv"
-	} else {
-		if height < 28865 {
-			return
-		}
-		path = "./indexer/brc20/validate/ordi-testnet4.csv"
 	}
-
-	var startHeight, endHeight int
-	startHeight = 0xffffffff
 	
-	if _validateData == nil {
-		var err error
-		_validateData, err = validate.ReadBRC20CSV(path)
-		if err != nil {
-			common.Log.Panicf("ReadBRC20CSV failed, %v", err)
-		}
-
-		_heightToRecords = make(map[int][]*validate.BRC20CSVRecord)
+	if _heightToHistoryRecords == nil {
+		_heightToHistoryRecords = make(map[int][]*validate.BRC20CSVRecord)
 		_validateInscriptionIdToNum = make(map[string]int64)
 		_validateInscriptionNumToId = make(map[int64]string)
 		_heightToInscriptionMap = make(map[int]map[string]int64)
-		for _, record := range _validateData {
-			v := _heightToRecords[record.Height]
+		for _, record := range _validateHistoryData {
+			v := _heightToHistoryRecords[record.Height]
 			if len(v) == 0 {
-				_heightToRecords[record.Height] = append([]*validate.BRC20CSVRecord(nil), record)
+				_heightToHistoryRecords[record.Height] = append([]*validate.BRC20CSVRecord(nil), record)
 			} else {
-				_heightToRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
+				_heightToHistoryRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
 			}
 			_validateInscriptionIdToNum[record.InscriptionID] = record.InscriptionNumber
 			_validateInscriptionNumToId[record.InscriptionNumber] = record.InscriptionID
@@ -698,18 +704,18 @@ func (p *BRC20Indexer) validateHistory(height int) {
 				inscs[record.InscriptionID] = record.InscriptionNumber
 			}
 
-			if record.Height > endHeight {
-				endHeight = record.Height
+			if record.Height > _historyEndHeight {
+				_historyEndHeight = record.Height
 			}
-			if record.Height < startHeight {
-				startHeight = record.Height
+			if record.Height < _historyStartHeight {
+				_historyStartHeight = record.Height
 			}
 		}
 	}
-	if len(_validateData) == 0 {
+	if len(_validateHistoryData) == 0 {
 		return
 	}
-	if height < startHeight || height > endHeight {
+	if height < _historyStartHeight || height > _historyEndHeight {
 		return
 	}
 
@@ -758,7 +764,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		}
 	}
 
-	validateRecords := _heightToRecords[height]
+	validateRecords := _heightToHistoryRecords[height]
 	validateMap := make(map[string]*validate.BRC20CSVRecord)
 	for _, item := range validateRecords {
 		key := fmt.Sprintf("%d-%x", item.InscriptionNumber, item.TxIdx)
@@ -897,6 +903,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		// }
 	}
 
+	common.Log.Infof("validateHistory %d history records are checked.", len(validateRecords))
 }
 
 // 找出T1中key不在T2的元素
@@ -948,14 +955,13 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 		return
 	}
 
-	var startHeight, endHeight int
 	if _heightToHolderRecords == nil {
-		startHeight, endHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
+		_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
 	}
 	if len(_heightToHolderRecords) == 0 {
 		return
 	}
-	if height < startHeight || height > endHeight {
+	if height < _holderStartHeight || height > _holderEndHeight {
 		return
 	}
 
@@ -984,4 +990,6 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 				address, record.Token, record.TransferableBalance, info.TransferableBalance.String())
 		}
 	}
+
+	common.Log.Infof("validateHolderData %d addresses are checked.", len(holders))
 }
