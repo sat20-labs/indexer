@@ -171,10 +171,10 @@ func (p *AssetOffsets) Cat(r2 *OffsetRange) {
 		if r1.End == r2.Start {
 			r1.End = r2.End
 		} else {
-			*p = append(*p, r2)
+			*p = append(*p, r2.Clone())
 		}
 	} else {
-		*p = append(*p, r2)
+		*p = append(*p, r2.Clone())
 	}
 }
 
@@ -189,7 +189,7 @@ func (p *AssetOffsets) Insert(r2 *OffsetRange) {
 	// 将新范围插入到合适的位置
 	*p = append(*p, nil)       // 扩展切片
 	copy((*p)[i+1:], (*p)[i:]) // 将插入位置后的元素向后移动
-	(*p)[i] = r2               // 插入新元素
+	(*p)[i] = r2.Clone()       // 插入新元素
 
 	// 合并相邻的区间
 	if i > 0 && (*p)[i-1].End >= (*p)[i].Start { // 如果与前一个区间相邻，合并
@@ -275,24 +275,34 @@ func (p *AssetOffsets) Pickup(offset int64, value int64) AssetOffsets {
 
 // another 已经调整过偏移值，并且偏移值都大于p
 func (p *AssetOffsets) Append(another AssetOffsets) {
-	var r1, r2 *OffsetRange
 	len1 := len(*p)
 	len2 := len(another)
-	if len1 > 0 {
-		if len2 == 0 {
-			return
-		}
-		r1 = (*p)[len1-1]
-		r2 = another[0]
-		if r1.End == r2.Start {
-			r1.End = r2.End
-			*p = append(*p, another[1:]...)
-		} else {
-			*p = append(*p, another...)
-		}
-	} else {
-		*p = append(*p, another...)
+
+	if len2 == 0 {
+		return
 	}
+
+	another = another.Clone()
+
+	// p 为空：整体深拷贝 another
+	if len1 == 0 {
+		*p = append(*p, another...)
+		return
+	}
+
+	last := (*p)[len1-1]
+	first := another[0]
+
+	// 可以合并
+	if last.End == first.Start {
+		// 允许原地修改 last（p 拥有独立内存）
+		last.End = first.End
+		*p = append(*p, another[1:]...)
+		return
+	}
+
+	// 不可合并：整体深拷贝追加
+	*p = append(*p, another...)
 }
 
 // Remove 从 p 中移除 another 描述的区间集合（假定 p 与 another 都是按升序、区间不重叠的列表，且 another 已经是相对于 p 的全局坐标）。
