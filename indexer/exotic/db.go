@@ -18,6 +18,11 @@ type Status struct {
 	Count            int64
 }
 
+func (p *Status) Clone() *Status {
+	a := *p
+	return &a
+}
+
 func initStatusFromDB(ldb common.KVDB) *Status {
 	stats := &Status{}
 	err := db.GetValueFromDB([]byte(STATUS_KEY), stats, ldb)

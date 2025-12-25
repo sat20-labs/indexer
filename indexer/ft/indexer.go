@@ -77,6 +77,7 @@ func (s *FTIndexer) GetDBVersion() string {
 // 只保存UpdateDB需要用的数据
 func (s *FTIndexer) Clone() *FTIndexer {
 	newInst := NewOrdxIndexer(s.db)
+	newInst.nftIndexer = s.nftIndexer
 
 	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
 	copy(newInst.holderActionList, s.holderActionList)

@@ -50,6 +50,7 @@ func (p *NameService) Clone() *NameService {
 	defer p.mutex.RUnlock()
 
 	newInst := NewNameService(p.db)
+	newInst.nftIndexer = p.nftIndexer
 
 	newInst.nameAdded = make([]*NameRegister, len(p.nameAdded))
 	copy(newInst.nameAdded, p.nameAdded)
