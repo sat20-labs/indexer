@@ -173,7 +173,7 @@ func (p *DisplayAsset) ToAssetInfo() *AssetInfo {
 	amount, err := NewDecimalFromString(p.Amount, p.Precision)
 	if err != nil {
 		// should not happen
-		return nil
+		Log.Panicf("ToAssetInfo.NewDecimalFromString %s failed, %v", p.Amount, err)
 	}
 	return &AssetInfo{
 		Name:       p.AssetName,
