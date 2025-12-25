@@ -36,9 +36,11 @@ func (p *FTIndexer) updateTick(in *common.TxInput, ticker *common.Ticker) {
 		tickinfo.Ticker = ticker
 		p.tickerMap[name] = tickinfo
 		p.tickerAdded[name] = ticker
+		common.Log.Debugf("FTIndexer.updateTick %s deploy ticker %s", ticker.Base.InscriptionId, ticker.Name)
 	} else {
 		// 仅更新显示内容
 		p.tickerAdded[name] = org.Ticker
+		common.Log.Debugf("FTIndexer.updateTick %s update ticker %s", ticker.Base.InscriptionId, ticker.Name)
 	}
 }
 
@@ -63,7 +65,7 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 
 func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 
-	// if in.TxId == "20baac681d8f456876b65ef17a0a613136eea528fe0c881f5c2e60c26a0d9a1b" {
+	// if mint.Base.InscriptionId == "cbaabeb030644cd83462b5befb497d84015140acaf5eacf9f797684e0730beb9i89" {
 	// 	common.Log.Infof("")
 	// }
 
@@ -80,19 +82,20 @@ func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 		BindingSat: ticker.Ticker.N, 
 		Offsets: mint.Offsets.Clone(),
 	}
-	p.addHolder(&in.TxOutputV2, name, assetInfo)
+	p.addHolder(&in.TxOutputV2, name, assetInfo) // 加入input的utxoId中，后面在transfer中转移到output
 
 	old, ok := ticker.UtxoMap[mint.UtxoId]
 	if ok {
 		old.Merge(mint.Offsets)
 	} else {
-		ticker.UtxoMap[mint.UtxoId] = mint.Offsets.Clone()
+		ticker.UtxoMap[mint.UtxoId] = mint.Offsets.Clone() // 加入output的utxoId中
 	}
 	ticker.Ticker.TotalMinted += mint.Offsets.Size() * int64(ticker.Ticker.N)
 	p.tickerAdded[name] = ticker.Ticker // 更新
 
 	ticker.MintAdded = append(ticker.MintAdded, mint)
 	ticker.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
+	common.Log.Debugf("FTIndexer.updateMint %s mint ticker %s %d -> %d", mint.Base.InscriptionId, mint.Name, mint.Amt, ticker.Ticker.TotalMinted)
 }
 
 
@@ -140,9 +143,9 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
 
-		if tx.TxId == "20baac681d8f456876b65ef17a0a613136eea528fe0c881f5c2e60c26a0d9a1b" {
-			common.Log.Infof("")
-		}
+		// if tx.TxId == "cbaabeb030644cd83462b5befb497d84015140acaf5eacf9f797684e0730beb9" {
+		// 	common.Log.Infof("")
+		// }
 
 		var allInput *common.TxOutput
 		for _, in := range tx.Inputs {
