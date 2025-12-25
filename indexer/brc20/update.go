@@ -935,6 +935,9 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction, 
 	block *common.Block, coinbase []*common.Range,
 ) *common.TxOutput {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	
 	if tx.TxId == "309f44dbafb6392b2010524353387318ae1cc4a3da9c570615026b14e9268785" {
 		common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 	}

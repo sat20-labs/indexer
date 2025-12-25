@@ -38,19 +38,19 @@ func initStatusFromDB(ldb common.KVDB) *Status {
 
 func (p *ExoticIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
 	tickinfo := newTickerInfo(tickerName)
-	tickinfo.Ticker = p.getTickerFromDB(tickerName)
+	tickinfo.Ticker = p.loadTickerFromDB(tickerName)
 	p.loadMintInfoFromDB(tickinfo)
 	return tickinfo
 }
 
 func (p *ExoticIndexer) loadMintInfoFromDB(tickinfo *TickInfo) {
-	mintList := p.loadMintDataFromDB(tickinfo.Name)
+	mintList := p.loadAllMintDataFromDB(tickinfo.Name)
 	for _, mint := range mintList {
 		tickinfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
 	}
 }
 
-func (p *ExoticIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
+func (p *ExoticIndexer) loadAllUtxoInfoFromDB() map[uint64]*HolderInfo {
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("ExoticIndexer loadHolderInfoFromDB ...")
@@ -86,10 +86,24 @@ func (p *ExoticIndexer) loadHolderInfoFromDB() map[uint64]*HolderInfo {
 	return result
 }
 
-func (p *ExoticIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
+func (p *ExoticIndexer) loadUtxoInfoFromDB(utxoId uint64) (*HolderInfo, error) {
+	var result HolderInfo
+	key := GetHolderInfoKey(utxoId)
+	err := db.GetValueFromDB([]byte(key), &result, p.db)
+	if err == common.ErrKeyNotFound {
+		//common.Log.Debugf("loadUtxoInfoFromDB key: %s, error: ErrKeyNotFound ", key)
+		return nil, err
+	} else if err != nil {
+		common.Log.Errorf("loadUtxoInfoFromDB error: %v", err)
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (p *ExoticIndexer) loadAllTickerToUtxoMapFromDB() map[string]map[uint64]int64 {
 	count := 0
 	startTime := time.Now()
-	common.Log.Debug("loadUtxoMapFromDB ...")
+	common.Log.Debug("loadAllTickerToUtxoMapFromDB ...")
 	result := make(map[string]map[uint64]int64, 0)
 	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO), false, func(k, v []byte) error {
 
@@ -126,7 +140,45 @@ func (p *ExoticIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadUtxoMapFromDB loaded %d records in %d ms", count, elapsed)
+	common.Log.Infof("loadAllTickerToUtxoMapFromDB loaded %d records in %d ms", count, elapsed)
+
+	return result
+}
+
+
+func (p *ExoticIndexer) loadTickerToUtxoMapFromDB(tickerName string) map[uint64]int64 {
+	count := 0
+	startTime := time.Now()
+	common.Log.Debug("loadTickerToUtxoMapFromDB ...")
+	result := make(map[uint64]int64, 0)
+	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO+tickerName+"-"), 
+		false, func(k, v []byte) error {
+
+		key := string(k)
+		_, utxoId, err := parseTickUtxoKey(key)
+		if err != nil {
+			common.Log.Errorln(key + " " + err.Error())
+		} else {
+			var amount int64
+
+			err = db.DecodeBytes(v, &amount)
+			if err == nil {
+				result[utxoId] = amount
+			} else {
+				common.Log.Errorln("DecodeBytes " + err.Error())
+			}
+		}
+		count++
+
+		return nil
+	})
+
+	if err != nil {
+		common.Log.Panicf("Error prefetching HolderInfo from db: %v", err)
+	}
+
+	elapsed := time.Since(startTime).Milliseconds()
+	common.Log.Infof("loadTickerToUtxoMapFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
@@ -157,35 +209,26 @@ func (p *ExoticIndexer) loadTickListFromDB() []string {
 	return result
 }
 
-func (p *ExoticIndexer) getTickListFromDB() []string {
-	return p.loadTickListFromDB()
-}
-
-// key: utxo
-func (p *ExoticIndexer) getMintListFromDB(tickname string) map[string]*common.Mint {
-	return p.loadMintDataFromDB(tickname)
-}
-
-func (p *ExoticIndexer) getMintFromDB(ticker, inscriptionId string) *common.Mint {
+func (p *ExoticIndexer) loadMintDataFromDB(ticker, inscriptionId string) *common.Mint {
 	var result common.Mint
 	key := GetMintHistoryKey(ticker, inscriptionId)
 	err := db.GetValueFromDB([]byte(key), &result, p.db)
 	if err == common.ErrKeyNotFound {
-		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
+		common.Log.Debugf("loadMintDataFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Errorf("GetMintFromDB error: %v", err)
+		common.Log.Errorf("loadMintDataFromDB error: %v", err)
 		return nil
 	}
 
 	return &result
 }
 
-func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common.Mint {
+func (p *ExoticIndexer) loadAllMintDataFromDB(tickerName string) map[string]*common.Mint {
 	result := make(map[string]*common.Mint, 0)
 	count := 0
 	startTime := time.Now()
-	common.Log.Debug("loadMintDataFromDB ...")
+	common.Log.Debug("loadAllMintDataFromDB ...")
 	err := p.db.BatchRead([]byte(DB_PREFIX_MINTHISTORY+tickerName+"-"), false, func(k, v []byte) error {
 
 		key := string(k)
@@ -198,7 +241,7 @@ func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common
 			if err == nil {
 				result[utxo] = &mint
 			} else {
-				common.Log.Errorln("loadMintDataFromDB DecodeBytes " + err.Error())
+				common.Log.Errorln("loadAllMintDataFromDB DecodeBytes " + err.Error())
 			}
 
 		}
@@ -212,12 +255,12 @@ func (p *ExoticIndexer) loadMintDataFromDB(tickerName string) map[string]*common
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadMintDataFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
+	common.Log.Infof("loadAllMintDataFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
 
 	return result
 }
 
-func (p *ExoticIndexer) getTickerFromDB(tickerName string) *common.Ticker {
+func (p *ExoticIndexer) loadTickerFromDB(tickerName string) *common.Ticker {
 	var result common.Ticker
 
 	key := DB_PREFIX_TICKER + tickerName

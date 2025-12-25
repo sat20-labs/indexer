@@ -2,6 +2,7 @@ package base
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -1583,4 +1584,31 @@ func (b *BaseIndexer) GetUTXOs(addressId uint64) (map[uint64]int64) {
 		return nil
 	}
 	return addrValue.Utxos
+}
+
+
+func (b *BaseIndexer) GetUtxoAddress(utxoId uint64) (uint64, error) {
+	// 有可能还没有写入数据库，所以读缓存
+	utxo, err := db.GetUtxoByID(b.db, utxoId)
+	if err != nil {
+		for _, item := range b.utxoIndex.Index {
+			if item.UtxoId == utxoId {
+				utxo = item.OutPointStr
+				break
+			}
+		}
+		if utxo == "" {
+			return common.INVALID_ID, fmt.Errorf("not found")
+		}
+	}
+
+	value := &common.UtxoValueInDB{}
+	key := db.GetUTXODBKey(utxo)
+	//err := db.GetValueFromDB(key, txn, value)
+	err = db.GetValueFromDBWithProto3(key, b.db, value)
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+
+	return value.AddressId, nil
 }

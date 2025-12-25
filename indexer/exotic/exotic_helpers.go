@@ -8,7 +8,7 @@ import (
 )
 
 func initDefaultExoticAsset() {
-	// 没啥用
+	// 暂时不支持vintage，没啥用
 	// blocks := make(map[int]bool)
 	// for i := 0; i < 1000; i++ {
 	// 	blocks[i] = true
@@ -171,8 +171,6 @@ func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets commo
 	}
 	tickInfo.UtxoMap[utxoId] = offsets.Clone()
 	tickInfo.Ticker.TotalMinted += offsets.Size()
-	// tickInfo.MintAdded = append(ticker.MintAdded, mint)
-	// tickInfo.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
 
 	p.tickerAdded[name] = tickInfo.Ticker // 更新
 }
