@@ -11,7 +11,6 @@ import (
 
 type TickInfo struct {
 	Name           string
-	UtxoMap        map[uint64]common.AssetOffsets  // utxoId, 动态的utxo数据
 	InscriptionMap map[string]*common.MintAbbrInfo // key: inscriptionId TODO 修改为nftId
 	MintAdded      []*common.Mint
 	Ticker         *common.Ticker
@@ -73,7 +72,6 @@ type ExoticIndexer struct {
 func newExoticTickerInfo(name string) *TickInfo {
 	return &TickInfo{
 		Name:           name,
-		UtxoMap:        make(map[uint64]common.AssetOffsets),
 		InscriptionMap: make(map[string]*common.MintAbbrInfo, 0),
 		MintAdded:      make([]*common.Mint, 0),
 	}

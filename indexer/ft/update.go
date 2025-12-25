@@ -84,12 +84,6 @@ func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 	}
 	p.addHolder(&in.TxOutputV2, name, assetInfo) // 加入input的utxoId中，后面在transfer中转移到output
 
-	old, ok := ticker.UtxoMap[mint.UtxoId]
-	if ok {
-		old.Merge(mint.Offsets)
-	} else {
-		ticker.UtxoMap[mint.UtxoId] = mint.Offsets.Clone() // 加入output的utxoId中
-	}
 	ticker.Ticker.TotalMinted += mint.Offsets.Size() * int64(ticker.Ticker.N)
 	p.tickerAdded[name] = ticker.Ticker // 更新
 

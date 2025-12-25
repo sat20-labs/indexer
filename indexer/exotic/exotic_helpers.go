@@ -169,7 +169,6 @@ func (p *ExoticIndexer) addTickerAsset(name string, utxoId uint64, offsets commo
 		p.tickerMap[name] = tickInfo
 		p.tickerAdded[name] = tickInfo.Ticker
 	}
-	tickInfo.UtxoMap[utxoId] = offsets.Clone()
 	tickInfo.Ticker.TotalMinted += offsets.Size()
 
 	p.tickerAdded[name] = tickInfo.Ticker // 更新

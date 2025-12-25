@@ -187,14 +187,8 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 		}
 
 		s.holderInfo = s.loadHolderInfoFromDB()
-		// 更新ticker数据的utxo数据
-		for utxoId, holder := range s.holderInfo {
-			for name, assetInfo := range holder.Tickers {
-				ticker := s.tickerMap[name]
-				ticker.UtxoMap[utxoId] = assetInfo.Offsets.Clone()
-			}
-		}
 		s.utxoMap = s.loadUtxoMapFromDB()
+		// TODO utxoMap 可以从 holderInfo 中构建出来
 
 		s.holderActionList = make([]*HolderAction, 0)
 		s.tickerAdded = make(map[string]*common.Ticker, 0)
