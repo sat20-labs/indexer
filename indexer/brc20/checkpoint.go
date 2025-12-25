@@ -28,14 +28,11 @@ type TickerStatus struct {
 	Holders     map[string]string
 }
 
-var _enable_validate bool = true
 var _validateHistoryData map[string]*validate.BRC20CSVRecord
 var _heightToHistoryRecords map[int][]*validate.BRC20CSVRecord // 按顺序
 var _historyStartHeight int = 0xffffffff
 var _historyEndHeight int
 
-var _validateInscriptionIdToNum map[string]int64
-var _validateInscriptionNumToId map[int64]string
 var _heightToInscriptionMap map[int]map[string]int64
 var _holderStartHeight, _holderEndHeight int
 
@@ -527,11 +524,11 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 }
 
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
+	startTime := time.Now()
 
 	p.validateHistory(height)
 	p.validateHolderData(height)
 
-	startTime := time.Now()
 	var checkpoint *CheckPoint
 	matchHeight := height
 	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
@@ -649,15 +646,13 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *BRC20Indexer) validateHistory(height int) {
-	if !_enable_validate {
-		return
-	}
+
 	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
 
 	name := "ordi"
 	if _validateHistoryData == nil {
 		if isMainnet {
-			if height < 779832 {
+			if height < 779832 || height > 929000 { // TODO 修改校验数据需要修改这个值
 				return
 			}
 			var err error
@@ -667,7 +662,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 				common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
 			}
 		} else {
-			if height < 28865 {
+			if height < 28865 || height > 114000 { // TODO 修改校验数据需要修改这个值
 				return
 			}
 			var err error
@@ -681,8 +676,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	
 	if _heightToHistoryRecords == nil {
 		_heightToHistoryRecords = make(map[int][]*validate.BRC20CSVRecord)
-		_validateInscriptionIdToNum = make(map[string]int64)
-		_validateInscriptionNumToId = make(map[int64]string)
+		
 		_heightToInscriptionMap = make(map[int]map[string]int64)
 		for _, record := range _validateHistoryData {
 			v := _heightToHistoryRecords[record.Height]
@@ -691,8 +685,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 			} else {
 				_heightToHistoryRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
 			}
-			_validateInscriptionIdToNum[record.InscriptionID] = record.InscriptionNumber
-			_validateInscriptionNumToId[record.InscriptionNumber] = record.InscriptionID
+			
 			if record.Type == common.BRC20_Action_InScribe_Deploy ||
 				record.Type == common.BRC20_Action_InScribe_Mint ||
 				record.Type == common.BRC20_Action_InScribe_Transfer {
@@ -948,10 +941,7 @@ func readHolderDataToMap(dir string) (int, int) {
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *BRC20Indexer) validateHolderData(height int) {
-	if !_enable_validate {
-		return
-	}
-	if height < 779832 {
+	if height < 779832 || height > 929000 { // 修改验证数据，需要修改这个值
 		return
 	}
 

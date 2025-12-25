@@ -119,6 +119,17 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Tickers: map[string]*TickerStatus{
 			"rarepizza": {
 				Minted:      99099456, 
+				/*
+					ordinls的pointer规则，判定这些都属于重复铸造，导致无效，共7400聪
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei1
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei6
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei13
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei14
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei15
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei16
+					691da870ad398ffb77b27965810085a2d1e1e595eeed499d1eeffff7a37b791ei17
+					facec9416e64a6cbe38d114444a5611075b7f7af1e79725a48e44cad9ed54a1fi99
+				*/
 			},
 		},
 	},
