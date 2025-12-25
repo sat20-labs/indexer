@@ -118,7 +118,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	853358: {
 		Tickers: map[string]*TickerStatus{
 			"rarepizza": {
-				Minted:      99106856, 
+				Minted:      99099456, 
 			},
 		},
 	},
@@ -157,8 +157,8 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	928649: {
 		Tickers: map[string]*TickerStatus{
 			"rarepizza": {
-				Minted:      99106856,
-				MintCount:   99234,
+				Minted:      99099456,
+				MintCount:   99226,
 				HolderCount: 6078,
 				Holders: map[string]int64{
 					"bc1p7jmfgmlecgp8c3j8260rpm3g2dlvey45kvhjd0hh0wn9zlwfr32qus90r3": 6896927,

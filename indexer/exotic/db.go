@@ -126,7 +126,7 @@ func (p *ExoticIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	}
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
+	common.Log.Infof("loadUtxoMapFromDB loaded %d records in %d ms", count, elapsed)
 
 	return result
 }
