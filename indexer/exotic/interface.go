@@ -55,10 +55,25 @@ func (p *ExoticIndexer) GetExoticsWithType(utxoId uint64, typ string) common.Ass
 	return result[typ]
 }
 
+func (p *ExoticIndexer) getAllTickers() []string {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	result := make([]string, 0, len(p.tickerMap))
+	for k := range p.tickerMap {
+		result = append(result, k)
+	}
+	return result
+}
+
 func (p *ExoticIndexer) GetTicker(tickerName string) *common.Ticker {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	tickerName = strings.ToLower(tickerName)
+
+	return p.getTicker(tickerName)
+}
+
+func (p *ExoticIndexer) getTicker(tickerName string) *common.Ticker {
 
 	ret, ok := p.tickerMap[tickerName]
 	if ok {
@@ -84,6 +99,10 @@ func (p *ExoticIndexer) GetHolderAndAmountWithTick(tickerName string) map[uint64
 	defer p.mutex.Unlock()
 
 	tickerName = strings.ToLower(tickerName)
+	return p.getHolderAndAmountWithTick(tickerName)
+}
+
+func (p *ExoticIndexer) getHolderAndAmountWithTick(tickerName string) map[uint64]int64 {
 	mp := make(map[uint64]int64, 0)
 
 	utxos, ok := p.utxoMap[tickerName]
@@ -112,4 +131,24 @@ func (p *ExoticIndexer) GetHolderAndAmountWithTick(tickerName string) map[uint64
 	}
 
 	return mp
+}
+
+// 获取某个地址下的资产 return: ticker->amount
+func (p *ExoticIndexer) getAssetAmtByAddress(address uint64, tickerName string) int64 {
+	utxos := p.baseIndexer.GetUTXOs(address)
+	var result int64
+	for utxo := range utxos {
+		info, ok := p.holderInfo[utxo]
+		if !ok {
+			continue
+		}
+
+		assetInfo, ok := info.Tickers[tickerName]
+		if !ok {
+			continue
+		}
+
+		result += assetInfo.AssetAmt()
+	}
+	return result
 }

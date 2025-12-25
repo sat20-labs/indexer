@@ -12,7 +12,7 @@ import (
 
 func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
 	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	
 
 	// 生成所有当前区块的稀有聪
 	startTime := time.Now()
@@ -48,7 +48,15 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 		}
 	}
 
+	p.mutex.Unlock()
+
 	common.Log.Infof("ExoticIndexer.UpdateTransfer in %v", time.Since(startTime))
+
+	p.CheckPointWithBlockHeight(block.Height)
+
+	// if !p.CheckSelf() {
+	// 	common.Log.Panic("")
+	// }
 }
 
 func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxo uint64) {

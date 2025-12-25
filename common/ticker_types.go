@@ -42,6 +42,11 @@ type Ticker struct {
 	Status      int     `json:"status"` // -1: not ready; 0 minting; 1 finished.
 }
 
+func (p *Ticker) Clone() *Ticker {
+	n := *p
+	return &n
+}
+
 type RBTreeValue_Mint struct {
 	InscriptionIds []string // 同一段satrange可以被多次mint，但不会被同一个ticker多次mint，所以这里肯定只有一个，因为该结构仅存在TickInfo中
 }

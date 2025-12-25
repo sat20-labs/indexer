@@ -1,6 +1,7 @@
 package exotic
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -61,7 +62,7 @@ type ExoticIndexer struct {
 	mutex sync.RWMutex // 只保护这几个结构
 
 	// 只加载必要的数据
-	tickerMap  map[string]*TickInfo        // 用于检索稀有聪. key 稀有聪种类
+	tickerMap  map[string]*TickInfo        // 没几个，全部加载
 	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
 	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
 
@@ -128,18 +129,19 @@ func (p *ExoticIndexer) Clone() *ExoticIndexer {
 
 	newInst.tickerAdded = make(map[string]*common.Ticker, 0)
 	for key, value := range p.tickerAdded {
-		newInst.tickerAdded[key] = value
+		newInst.tickerAdded[key] = value.Clone()
 	}
 
 	newInst.tickerMap = make(map[string]*TickInfo, 0)
 	for key, value := range p.tickerMap {
-		if len(value.MintAdded) > 0 {
+		//if len(value.MintAdded) > 0 {
 			tick := TickInfo{}
 			tick.Name = value.Name
 			tick.MintAdded = make([]*common.Mint, len(value.MintAdded))
 			copy(tick.MintAdded, value.MintAdded)
+			tick.Ticker = value.Ticker.Clone()
 			newInst.tickerMap[key] = &tick
-		}
+		//}
 	}
 
 	// 保存holderActionList对应的数据
@@ -202,30 +204,23 @@ func (p *ExoticIndexer) Subtract(another *ExoticIndexer) {
 
 	p.holderActionList = append([]*HolderAction(nil), p.holderActionList[len(another.holderActionList):]...)
 
-	for key := range another.tickerAdded {
-		delete(p.tickerAdded, key)
-	}
-
 	for key, value := range another.tickerMap {
 		ticker, ok := p.tickerMap[key]
 		if ok {
-			if ticker.Ticker.TotalMinted == value.Ticker.TotalMinted {
-				delete(p.tickerMap, key)
-			} else {
-				ticker.MintAdded = append([]*common.Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
-			}
+			ticker.MintAdded = append([]*common.Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
 		}		
 	}
 
-	for name, value := range another.utxoMap {
-		n, ok := p.utxoMap[name]
-		if ok {
-			for utxoId := range value {
-				delete(n, utxoId)
-				delete(p.holderInfo, utxoId)
-			}
-		}
-	}
+	// utxoMap是某个ticker的全量utxo，不能删除。TODO 这里无法删除，会导致utxomap数据量太大
+	// for name, value := range another.utxoMap {
+	// 	n, ok := p.utxoMap[name]
+	// 	if ok {
+	// 		for utxoId := range value {
+	// 			delete(n, utxoId)
+	// 			delete(p.holderInfo, utxoId)
+	// 		}
+	// 	}
+	// }
 }
 
 func newExoticDefaultTicker(name string) *common.Ticker {
@@ -331,3 +326,49 @@ func (p *ExoticIndexer) CheckSelf() bool {
 
 	return true
 }
+
+
+
+func (s *ExoticIndexer) printHoldersWithMap(holders map[uint64]int64) {
+	var total int64
+	type pair struct {
+		addressId uint64
+		amt       int64
+	}
+	mid := make([]*pair, 0)
+	for addressId, amt := range holders {
+		//common.Log.Infof("%x: %s", addressId, amt.String())
+		total += amt
+		mid = append(mid, &pair{
+			addressId: addressId,
+			amt:       amt,
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].amt > mid[j].amt
+	})
+	limit := 10 //len(mid) // 40
+	rpc := s.baseIndexer
+	for i, item := range mid {
+		if i > limit {
+			break
+		}
+		if item.amt == 0 {
+			continue
+		}
+		address, err := rpc.GetAddressByID(item.addressId)
+		if err != nil {
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
+			address = "-\t"
+		}
+		common.Log.Printf("%d: %x %s: %d", i, item.addressId, address, item.amt)
+	}
+	common.Log.Infof("total in holders: %d", total)
+}
+
+func (p *ExoticIndexer) printHolders(name string) {
+	holdermap := p.GetHolderAndAmountWithTick(name)
+	common.Log.Infof("holders from holder DB")
+	p.printHoldersWithMap(holdermap)
+}
+

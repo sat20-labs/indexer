@@ -150,7 +150,7 @@ func (p *ExoticIndexer) loadAllTickerToUtxoMapFromDB() map[string]map[uint64]int
 	return result
 }
 
-
+// 某个ticker的全量utxo （TODO 加一个address作为前缀，只加载该地址相关的utxo）
 func (p *ExoticIndexer) loadTickerToUtxoMapFromDB(tickerName string) map[uint64]int64 {
 	count := 0
 	startTime := time.Now()
