@@ -360,7 +360,7 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			Balance:  runeBalance.Balance,
 		}
 		s.runeIdOutpointToBalanceTbl.Insert(runeIdToOutpointToBalance)
-		common.Log.Infof("%s add %s %s from %s with key %s", 
+		common.Log.Debugf("%s add %s %s from %s with key %s", 
 			tx.TxId, runeBalance.RuneId.String(), runeBalance.Balance.String(), 
 			runeBalance.OutPoint.Key(), runeIdToOutpointToBalance.Key())
 
@@ -530,8 +530,8 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 					OutPoint: outpoint,
 				}
 				old := s.runeIdOutpointToBalanceTbl.Remove(runeIdOutpointToBalance)
-				common.Log.Infof("%s remove %s %s from %s with key %s", tx.TxId, val.RuneId.String(), 
-				old.Balance.String(), outpoint.Key(), runeIdOutpointToBalance.Key())
+				common.Log.Debugf("%s remove %s %s from %s with key %s", tx.TxId, val.RuneId.String(), 
+					old.Balance.String(), outpoint.Key(), runeIdOutpointToBalance.Key())
 
 				runeIdAddressToCountKey := &table.RuneIdAddressToCount{
 					RuneId:    &val.RuneId,

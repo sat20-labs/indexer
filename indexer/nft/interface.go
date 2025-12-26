@@ -316,27 +316,30 @@ func (p *NftIndexer) loadNftBaseConentFromDB(nftId int64, value *common.Inscribe
 	if err == nil {
 		value.ContentType = []byte(p.contentTypeMap[id])
 	}
-	if value.ContentId != 0 {
-		content, err := p.getContentById(value.ContentId)
-		if err == nil {
-			value.Content = []byte(content)
-		}
-	}
-	if len(value.Delegate) != 0 && len(value.Delegate) < 16 {
-		id, err := strconv.ParseInt(value.Delegate, 16, 64)
-		if err == nil {
-			inscriptionId, err := p.getInscriptionIdByNftId(id)
+
+	if _enable_compress_nft {
+		if value.ContentId != 0 {
+			content, err := p.getContentById(value.ContentId)
 			if err == nil {
-				value.Delegate = inscriptionId
+				value.Content = []byte(content)
 			}
 		}
-	}
-	if len(value.Parent) != 0 && len(value.Parent) < 16 {
-		id, err := strconv.ParseInt(value.Parent, 16, 64)
-		if err == nil {
-			inscriptionId, err := p.getInscriptionIdByNftId(id)
+		if len(value.Delegate) != 0 && len(value.Delegate) < 16 {
+			id, err := strconv.ParseInt(value.Delegate, 16, 64)
 			if err == nil {
-				value.Parent = inscriptionId
+				inscriptionId, err := p.getInscriptionIdByNftId(id)
+				if err == nil {
+					value.Delegate = inscriptionId
+				}
+			}
+		}
+		if len(value.Parent) != 0 && len(value.Parent) < 16 {
+			id, err := strconv.ParseInt(value.Parent, 16, 64)
+			if err == nil {
+				inscriptionId, err := p.getInscriptionIdByNftId(id)
+				if err == nil {
+					value.Parent = inscriptionId
+				}
 			}
 		}
 	}

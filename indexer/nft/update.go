@@ -12,6 +12,8 @@ import (
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
 
+var _enable_compress_nft = false
+
 // 每个NFT Mint都调用
 func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.Nft) {
 	p.mutex.Lock()
@@ -149,35 +151,37 @@ func (p *NftIndexer) nftMint(info *InscribeInfo) {
 		p.contentTypeToIdMap[ct] = ctId
 	}
 
-	clen := len(nft.Base.Content)
-	if clen > 32 && clen < 512 {
-		// 转换为id
-		content := string(nft.Base.Content)
-		id, err := p.getContentId(content)
-		if err != nil {
-			p.status.ContentCount++
-			id = p.status.ContentCount // 0 无效，从1开始
+	if _enable_compress_nft {
+		clen := len(nft.Base.Content)
+		if clen > 32 && clen < 512 {
+			// 转换为id
+			content := string(nft.Base.Content)
+			id, err := p.getContentId(content)
+			if err != nil {
+				p.status.ContentCount++
+				id = p.status.ContentCount // 0 无效，从1开始
 
-			p.contentMap[id] = content
-			p.contentToIdMap[content] = id
-			p.addedContentIdMap[id] = true
+				p.contentMap[id] = content
+				p.contentToIdMap[content] = id
+				p.addedContentIdMap[id] = true
+			}
+			nft.Base.ContentId = id
 		}
-		nft.Base.ContentId = id
-	}
 
-	if nft.Base.Delegate != "" {
-		delegate := p.getNftWithInscriptionId(nft.Base.Delegate)
-		if delegate != nil {
-			p.inscriptionToNftIdMap[delegate.Base.InscriptionId] = delegate
-			p.nftIdToinscriptionMap[delegate.Base.Id] = delegate
+		if nft.Base.Delegate != "" {
+			delegate := p.getNftWithInscriptionId(nft.Base.Delegate)
+			if delegate != nil {
+				p.inscriptionToNftIdMap[delegate.Base.InscriptionId] = delegate
+				p.nftIdToinscriptionMap[delegate.Base.Id] = delegate
+			}
 		}
-	}
 
-	if nft.Base.Parent != "" {
-		parent := p.getNftWithInscriptionId(nft.Base.Parent)
-		if parent != nil {
-			p.inscriptionToNftIdMap[parent.Base.InscriptionId] = parent
-			p.nftIdToinscriptionMap[parent.Base.Id] = parent
+		if nft.Base.Parent != "" {
+			parent := p.getNftWithInscriptionId(nft.Base.Parent)
+			if parent != nil {
+				p.inscriptionToNftIdMap[parent.Base.InscriptionId] = parent
+				p.nftIdToinscriptionMap[parent.Base.Id] = parent
+			}
 		}
 	}
 
@@ -240,20 +244,24 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		}
 
 		// 预加载satmap
-		satLoadingVector := make([]int64, 0, len(satsToLoad))
+		satLoadingVector := make([]*pair, 0, len(satsToLoad))
 		for k := range satsToLoad {
-			satLoadingVector = append(satLoadingVector, k)
+			satLoadingVector = append(satLoadingVector, &pair{
+				key: GetSatKey(k),
+				utxoId: uint64(k),
+			})
 		}
 		sort.Slice(satLoadingVector, func(i, j int) bool {
-			return satLoadingVector[i] < satLoadingVector[j]
+			return satLoadingVector[i].key < satLoadingVector[j].key
 		})
 		for _, v := range satLoadingVector {
-			_, ok := p.satMap[v]
+			sat := int64(v.utxoId)
+			_, ok := p.satMap[sat]
 			if ok {
 				continue
 			}
 			value := common.NftsInSat{}
-			err := loadNftsInSatFromTxn(v, &value, txn)
+			err := loadNftsInSatFromTxn(sat, &value, txn)
 			if err != nil {
 				common.Log.Panicf("block %d loadNftsInSatFromTxn sat %d failed, %v", block.Height, v, err)
 			}
@@ -270,7 +278,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				nft := &common.Nft{
 					Base: &common.InscribeBaseContent{
 						Id:  nftId,
-						Sat: v,
+						Sat: sat,
 					},
 					Offset:         value.Offset,
 					OwnerAddressId: value.OwnerAddressId,
@@ -278,12 +286,12 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				}
 				info.Nfts[nft] = true
 			}
-			p.satMap[v] = info
+			p.satMap[sat] = info
 		}
 
 		return nil
 	})
-	//common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
+	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 
 	// prepare 2: calc inscription number
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
@@ -518,16 +526,19 @@ func (p *NftIndexer) UpdateDB() {
 		if nft.Base.ContentId != 0 {
 			nft.Base.Content = nil
 		}
-		if nft.Base.Delegate != "" {
-			d, ok := p.inscriptionToNftIdMap[nft.Base.Delegate]
-			if ok {
-				nft.Base.Delegate = fmt.Sprintf("%x", d.Base.Id)
+
+		if _enable_compress_nft {
+			if nft.Base.Delegate != "" {
+				d, ok := p.inscriptionToNftIdMap[nft.Base.Delegate]
+				if ok {
+					nft.Base.Delegate = fmt.Sprintf("%x", d.Base.Id)
+				}
 			}
-		}
-		if nft.Base.Parent != "" {
-			d, ok := p.inscriptionToNftIdMap[nft.Base.Parent]
-			if ok {
-				nft.Base.Parent = fmt.Sprintf("%x", d.Base.Id)
+			if nft.Base.Parent != "" {
+				d, ok := p.inscriptionToNftIdMap[nft.Base.Parent]
+				if ok {
+					nft.Base.Parent = fmt.Sprintf("%x", d.Base.Id)
+				}
 			}
 		}
 

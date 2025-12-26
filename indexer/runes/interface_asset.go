@@ -187,9 +187,9 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 		ret.Balances[i] = addressLot
 		i++
 
-		if runeId == "39241:1" {
-			common.Log.Infof("%x: %s\n", balance.OutPoint.UtxoId, balance.Balance.Value.String())
-		}
+		// if runeId == "39241:1" {
+		// 	common.Log.Infof("%x: %s\n", balance.OutPoint.UtxoId, balance.Balance.Value.String())
+		// }
 	}
 	ret.Total = totalAmount.Value
 
