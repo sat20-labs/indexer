@@ -68,9 +68,9 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 
 	s.CheckPointWithBlockHeight(block.Height)
 
-	if !s.CheckSelf() {
-		common.Log.Panic("")
-	}
+	// if !s.CheckSelf() {
+	// 	common.Log.Panic("")
+	// }
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
