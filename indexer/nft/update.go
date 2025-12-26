@@ -240,20 +240,24 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		}
 
 		// 预加载satmap
-		satLoadingVector := make([]int64, 0, len(satsToLoad))
+		satLoadingVector := make([]*pair, 0, len(satsToLoad))
 		for k := range satsToLoad {
-			satLoadingVector = append(satLoadingVector, k)
+			satLoadingVector = append(satLoadingVector, &pair{
+				key: GetSatKey(k),
+				utxoId: uint64(k),
+			})
 		}
 		sort.Slice(satLoadingVector, func(i, j int) bool {
-			return satLoadingVector[i] < satLoadingVector[j]
+			return satLoadingVector[i].key < satLoadingVector[j].key
 		})
 		for _, v := range satLoadingVector {
-			_, ok := p.satMap[v]
+			sat := int64(v.utxoId)
+			_, ok := p.satMap[sat]
 			if ok {
 				continue
 			}
 			value := common.NftsInSat{}
-			err := loadNftsInSatFromTxn(v, &value, txn)
+			err := loadNftsInSatFromTxn(sat, &value, txn)
 			if err != nil {
 				common.Log.Panicf("block %d loadNftsInSatFromTxn sat %d failed, %v", block.Height, v, err)
 			}
@@ -270,7 +274,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				nft := &common.Nft{
 					Base: &common.InscribeBaseContent{
 						Id:  nftId,
-						Sat: v,
+						Sat: sat,
 					},
 					Offset:         value.Offset,
 					OwnerAddressId: value.OwnerAddressId,
@@ -278,12 +282,12 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				}
 				info.Nfts[nft] = true
 			}
-			p.satMap[v] = info
+			p.satMap[sat] = info
 		}
 
 		return nil
 	})
-	//common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
+	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 
 	// prepare 2: calc inscription number
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)

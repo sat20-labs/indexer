@@ -3,10 +3,12 @@ package exotic
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/base"
 )
 
 func parseTickListKey(input string) (string, error) {
@@ -65,4 +67,46 @@ func newTickerInfo(name string) *TickInfo {
 		InscriptionMap: make(map[string]*common.MintAbbrInfo, 0),
 		MintAdded:      make([]*common.Mint, 0),
 	}
+}
+
+func  PrintHoldersWithMap(holders map[uint64]int64, baseIndexer *base.BaseIndexer) {
+	var total int64
+	type pair struct {
+		addressId uint64
+		amt       int64
+	}
+	mid := make([]*pair, 0)
+	for addressId, amt := range holders {
+		//common.Log.Infof("%x: %s", addressId, amt.String())
+		total += amt
+		mid = append(mid, &pair{
+			addressId: addressId,
+			amt:       amt,
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].amt > mid[j].amt
+	})
+	limit := 10 //len(mid) // 40
+	for i, item := range mid {
+		if i > limit {
+			break
+		}
+		if item.amt == 0 {
+			continue
+		}
+		address, err := baseIndexer.GetAddressByID(item.addressId)
+		if err != nil {
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
+			address = "-\t"
+		}
+		fmt.Printf("\"%s\": %d,\n", address, item.amt)
+	}
+	common.Log.Infof("total in holders: %d", total)
+}
+
+func (p *ExoticIndexer) printHolders(name string) {
+	holdermap := p.GetHolderAndAmountWithTick(name)
+	common.Log.Infof("holders from holder DB")
+	PrintHoldersWithMap(holdermap, p.baseIndexer)
 }

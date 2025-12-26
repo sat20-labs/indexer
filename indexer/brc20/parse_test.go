@@ -312,8 +312,8 @@ func TestParseValidateDir(t *testing.T) {
 }
 
 
-func TestParseCompressFile(t *testing.T) {
-	err := validate.SplitCSVFile("./validate/ordi.csv", "./validate/ordi", 40000, "ordi")
+func TestParseSplitFile(t *testing.T) {
+	err := validate.SplitCSVFile("./validate/ordi_records.csv", "./validate/ordi", 40000, "ordi")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,4 +338,36 @@ func TestParseValidateData_history(t *testing.T) {
 	}
 
 	fmt.Printf("len %d", len(validateHolderData))
+}
+
+
+func TestCompareValidateFile(t *testing.T) {
+
+	validateData1, err := validate.ReadBRC20CSVDir("./validate/ordi")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	}
+
+	validateData2, err := validate.ReadBRC20CSV("./validate/ordi_records.csv")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	}
+
+	// validateData2, err := validate.ReadBRC20CSV("./validate/ordi.csv")
+	// if err != nil {
+	// 	common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	// }
+
+	diff1 := findDiffInMap(validateData1, validateData2)
+	fmt.Printf("diff1 %d\n", len(diff1))
+	for _, d := range diff1 {
+		fmt.Printf("%v\n", validateData1[d])
+	}
+
+	diff2 := findDiffInMap(validateData2, validateData1)
+	fmt.Printf("diff2 %d\n", len(diff2))
+	for _, d := range diff2 {
+		fmt.Printf("%v\n", validateData2[d])
+	}
+
 }

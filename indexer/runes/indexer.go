@@ -1,6 +1,8 @@
 package runes
 
 import (
+	"fmt"
+	"sort"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -664,8 +666,60 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 			}
 		}
 	}
+
+	s.printHolders(firstRuneName)
+	if s.baseIndexer.IsMainnet() {
+		s.printHolders("DOG•GO•TO•THE•MOON")
+	}
+	
+
 	common.Log.Infof("rune check amount took %v.", time.Since(startTime))
 
 	common.Log.Infof("runes checked.")
 	return true
+}
+
+
+
+func PrintHoldersWithMap(holders map[uint64]*common.Decimal, baseIndexer *base.BaseIndexer) {
+	var total *common.Decimal
+	type pair struct {
+		addressId uint64
+		amt       *common.Decimal
+	}
+	mid := make([]*pair, 0)
+	for addressId, amt := range holders {
+		//common.Log.Infof("%x: %s", addressId, amt.String())
+		total = total.Add(amt)
+		mid = append(mid, &pair{
+			addressId: addressId,
+			amt:       amt.Clone(),
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].amt.Cmp(mid[j].amt) > 0
+	})
+	limit := 10 //len(mid) // 40
+	for i, item := range mid {
+		if i > limit {
+			break
+		}
+		if item.amt.Sign() == 0 {
+			continue
+		}
+		address, err := baseIndexer.GetAddressByID(item.addressId)
+		if err != nil {
+			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
+			address = "-\t"
+		}
+		fmt.Printf("\"%s\": \"%s\",\n", address, item.amt.String())
+	}
+	common.Log.Infof("total in holders: %s", total.String())
+}
+
+
+func (p *Indexer) printHolders(name string) {
+	holdermap := p.GetHoldersWithTick(name)
+	common.Log.Infof("rune %s holders from holder DB", name)
+	PrintHoldersWithMap(holdermap, p.baseIndexer)
 }

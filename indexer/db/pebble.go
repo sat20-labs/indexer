@@ -24,6 +24,23 @@ type pebbleDB struct {
 }
 
 /*
+Pebble / RocksDB / LevelDB 都不适合“大规模 prefix scan + 只取少量结果”的用法
+修改建议：
+1. 把 prefix scan 改成「带 limit 的 scan」
+2. 禁止在 scan 中 copy key/value
+3. prefix scan ≠ 随机读，请区分两种路径
+	如果你是“prefix 下取 1000 个不连续 key”，不要用 iterator
+	替代方案（快得多）
+	维护 prefix → key list / offset index
+	prefix scan → 先查 index（小数据）
+	再用 Get() 点查 value
+	这是 索引器 / 搜索系统 / mempool indexer 的标准架构
+4. 能点查的地方，永远用 DB.Get()
+结果期望：
+000 次 DB.Get()	10–50 ms（cache 命中）
+prefix scan + limit=1000	50–300 ms
+无 limit 的 prefix scan	秒级（优化前）
+
 用 小 SST + 单线程 compaction 编译，
 再用 大 cache + 大 block 服务，
 这是 工业级索引器（包括 CockroachDB 内部）常用的策略。
@@ -314,7 +331,7 @@ func (p *pebbleDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) 
 			if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
 				break
 			}
-			if err := r(append([]byte{}, k...), append([]byte{}, it.Value()...)); err != nil {
+			if err := r(k, it.Value()); err != nil {
 				return err
 			}
 		}
@@ -335,14 +352,15 @@ func (p *pebbleDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) 
 		if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
 			break
 		}
-		if err := r(append([]byte{}, k...), append([]byte{}, it.Value()...)); err != nil {
+		if err := r(k, it.Value()); err != nil {
 			return err
 		}
 	}
 	return it.Error()
 }
 
-func (p *pebbleDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error {
+// 很慢，用于dump数据
+func (p *pebbleDB) ScanPrefixAll(prefix []byte, reverse bool, r func(k, v []byte) error) error {
 	return p.iter(prefix, nil, reverse, r)
 }
 
@@ -350,6 +368,140 @@ func (p *pebbleDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v
 	// seekKey 可在 prefix 内/外；iter() 会自动 clamp 到边界范围
 	return p.iter(prefix, seekKey, reverse, r)
 }
+
+// 慢，尽可能不要用
+func (p *pebbleDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error {
+	var (
+		pageSize = 1000
+		cursor  []byte = nil
+	)
+
+	for {
+		next, err := p.BatchReadPage(
+			prefix,
+			cursor,
+			pageSize,
+			false, // 正向
+			func(k, v []byte) error {
+				// 处理数据（注意：k/v 是只读引用）
+				return r(k, v)
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		if next == nil {
+			// 已经没有更多数据
+			break
+		}
+
+		// 下一页从这里开始
+		cursor = next
+	}
+	return nil
+}
+
+// BatchReadPage
+// - prefix: 前缀
+// - startKey: 本页起点（nil 表示第一页）
+// - limit: 最多返回多少条
+// - reverse: 是否反向
+// 返回：
+// - nextKey: 下一页的起点（nil 表示已经到末尾）
+func (p *pebbleDB) BatchReadPage(
+    prefix []byte,
+    startKey []byte, // exclusive
+    limit int,
+    reverse bool,
+    fn func(k, v []byte) error,
+) (nextKey []byte, err error) {
+
+    if limit <= 0 {
+        return nil, nil
+    }
+
+    var lower, upper []byte
+    if len(prefix) > 0 {
+        lower = prefix
+        upper = nextPrefix(prefix)
+    }
+
+    it, err := p.db.NewIter(&pebble.IterOptions{
+        LowerBound: lower,
+        UpperBound: upper,
+    })
+    if err != nil {
+        return nil, err
+    }
+    defer it.Close()
+
+    count := 0
+    var ok bool
+
+    if reverse {
+        // -------- 反向扫描 --------
+        if len(startKey) > 0 {
+            // exclusive：从 < startKey 的最大 key 开始
+            ok = it.SeekLT(startKey)
+        } else {
+            // 第一页：直接跳到 prefix 范围内的最后一个
+            ok = it.Last()
+        }
+
+        for ; ok && count < limit; ok = it.Prev() {
+            k := it.Key()
+
+            if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
+                break
+            }
+
+            if err := fn(k, it.Value()); err != nil {
+                return nil, err
+            }
+
+            nextKey = append([]byte{}, k...) // 复制一份作为游标
+            count++
+        }
+    } else {
+        // -------- 正向扫描 --------
+        if len(startKey) > 0 {
+            // exclusive：跳到 > startKey
+            ok = it.SeekGE(startKey)
+            if ok && bytes.Equal(it.Key(), startKey) {
+                ok = it.Next()
+            }
+        } else if len(prefix) > 0 {
+            // 第一页
+            ok = it.SeekGE(prefix)
+        } else {
+            ok = it.First()
+        }
+
+        for ; ok && count < limit; ok = it.Next() {
+            k := it.Key()
+
+            if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
+                break
+            }
+
+            if err := fn(k, it.Value()); err != nil {
+                return nil, err
+            }
+
+            nextKey = append([]byte{}, k...)
+            count++
+        }
+    }
+
+    // 如果这一页没有读满，说明已经到头了
+    if count < limit {
+        nextKey = nil
+    }
+
+    return nextKey, it.Error()
+}
+
 
 type pebbleReadBatch struct {
 	snap *pebble.Snapshot

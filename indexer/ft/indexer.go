@@ -227,6 +227,7 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 		}
 
 		common.Log.Infof("FTIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
+		s.printHolders(name)
 
 		utxos, ok := s.utxoMap[name]
 		if !ok {
@@ -305,4 +306,10 @@ func (s *FTIndexer) CheckSelf(height int) bool {
 	common.Log.Infof("FTIndexer CheckSelf took %v.", time.Since(startTime))
 
 	return true
+}
+
+func (p *FTIndexer) printHolders(name string) {
+	holdermap := p.GetHolderAndAmountWithTick(name)
+	common.Log.Infof("holders from holder DB")
+	exotic.PrintHoldersWithMap(holdermap, p.nftIndexer.GetBaseIndexer())
 }
