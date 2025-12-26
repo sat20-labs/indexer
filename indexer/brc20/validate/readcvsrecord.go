@@ -3,6 +3,7 @@ package validate
 import (
 	"compress/gzip"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -528,12 +529,15 @@ func SplitCSVFile(
 
 	for {
 		record, err := reader.Read()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
+
+		if err != nil && !errors.Is(err, io.EOF) {
 			closeCurrent()
 			return err
+		}
+
+		if record == nil {
+			// 没有数据了（包括 EOF 且无 record）
+			break
 		}
 
 		if outWriter == nil || rowCount >= rowsPerFile {
@@ -548,8 +552,51 @@ func SplitCSVFile(
 		}
 
 		rowCount++
+
+		if errors.Is(err, io.EOF) {
+			// 已处理最后一条记录
+			break
+		}
 	}
+
 
 	closeCurrent()
 	return nil
+}
+
+type CSVFile struct {
+	W *csv.Writer
+	F *os.File
+	Header []string
+}
+
+func openCSVFileForWrite(path string, header []string) (*CSVFile, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
+	w := csv.NewWriter(f)
+
+	// 写 header（现在是稳定的）
+	if err := w.Write(header); err != nil {
+		f.Close()
+		return nil, err
+	}
+
+	
+	return &CSVFile{
+		W: w,
+		F: f,
+		Header: header,
+	}, nil
+}
+
+func CloseCSVFile(c *CSVFile) {
+	if c.W != nil {
+		c.W.Flush()
+	}
+	if c.F != nil {
+		c.F.Close()
+	}
 }
