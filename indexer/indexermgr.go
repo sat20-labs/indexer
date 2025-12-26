@@ -213,7 +213,8 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 
 	bWantExit := false
 	isRunning := false
-	disableSync := false
+	disableSync := false // 启动rpc，不再同步数据
+	stepByStep := true   // 模拟工作时，一个块一个块慢慢同步，检查分叉处理的可靠性
 	tick := func() {
 		if disableSync {
 			return
@@ -221,7 +222,6 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		if !isRunning {
 			isRunning = true
 			go func() {
-				stepByStep := false
 				for !bWantExit {
 					ret := b.base.SyncToChainTip(stopIndexerChan, stepByStep)
 					if ret == 0 {
@@ -352,7 +352,7 @@ func (b *IndexerMgr) checkSelf() {
 		b.nft.CheckSelf(b.baseDB) &&
 		b.ns.CheckSelf(b.baseDB) &&
 		b.ftIndexer.CheckSelf(b.base.GetSyncHeight()) &&
-		b.RunesIndexer.CheckSelf(b.rpcService) &&
+		b.RunesIndexer.CheckSelf() &&
 		b.brc20Indexer.CheckSelf(b.base.GetSyncHeight()) {
 		common.Log.Infof("IndexerMgr.checkSelf succeed. %v", time.Since(start))
 	} else {

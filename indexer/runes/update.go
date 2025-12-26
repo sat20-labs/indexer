@@ -7,7 +7,6 @@ import (
 
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
@@ -17,12 +16,7 @@ import (
 )
 
 func (s *Indexer) UpdateDB() {
-	if s.baseIndexer.GetHeight() < s.enableHeight {
-		return
-	}
-
-	if s.height == 0 {
-		common.Log.Warnf("RuneIndexer.UpdateDB-> err: height(%d) == 0", s.height)
+	if s.height < s.enableHeight {
 		return
 	}
 
@@ -36,11 +30,7 @@ func (s *Indexer) UpdateDB() {
 	s.Status.Height = s.height
 	s.Status.Update()
 	s.dbWrite.FlushToDB()
-	s.isUpdateing = false
 
-	if s.chaincfgParam.Net == wire.MainNet && s.height < 840000 {
-		return
-	}
 	common.Log.Infof("RuneIndexer.UpdateDB-> db commit success, height:%d", s.Status.Height)
 }
 
@@ -49,16 +39,10 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		return
 	}
 
-	if !s.isUpdateing && block.Height > 0 && s.Status.Height > 0 {
-		if s.Status.Height >= uint64(block.Height) {
-			common.Log.Infof("RuneIndexer.UpdateTransfer-> cointinue next block, because status.Height(%d) > block.Height(%d)", s.Status.Height, block.Height)
-			return
-		} else if s.Status.Height < uint64(block.Height-1) {
-			common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.Status.Height, block.Height-1)
-		}
+	if s.height != (block.Height-1) {
+		common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.Status.Height, block.Height-1)
 	}
-	s.height = uint64(block.Height)
-	s.isUpdateing = true
+	s.height = (block.Height)
 
 	s.HolderUpdateCount = 0
 	s.HolderRemoveCount = 0
@@ -83,6 +67,10 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	s.update()
 
 	s.CheckPointWithBlockHeight(block.Height)
+
+	if !s.CheckSelf() {
+		common.Log.Panic("")
+	}
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
@@ -372,6 +360,9 @@ func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseO
 			Balance:  runeBalance.Balance,
 		}
 		s.runeIdOutpointToBalanceTbl.Insert(runeIdToOutpointToBalance)
+		common.Log.Infof("%s add %s %s from %s with key %s", 
+			tx.TxId, runeBalance.RuneId.String(), runeBalance.Balance.String(), 
+			runeBalance.OutPoint.Key(), runeIdToOutpointToBalance.Key())
 
 		// update addressOutpointToBalance
 		// addressOutpointToBalance := &table.AddressOutpointToBalance{
@@ -538,7 +529,9 @@ func (s *Indexer) unallocated(tx *common.Transaction) (ret1 table.RuneIdLotMap) 
 					RuneId:   &val.RuneId,
 					OutPoint: outpoint,
 				}
-				s.runeIdOutpointToBalanceTbl.Remove(runeIdOutpointToBalance)
+				old := s.runeIdOutpointToBalanceTbl.Remove(runeIdOutpointToBalance)
+				common.Log.Infof("%s remove %s %s from %s with key %s", tx.TxId, val.RuneId.String(), 
+				old.Balance.String(), outpoint.Key(), runeIdOutpointToBalance.Key())
 
 				runeIdAddressToCountKey := &table.RuneIdAddressToCount{
 					RuneId:    &val.RuneId,
@@ -600,7 +593,7 @@ func (s *Indexer) mint(runeId *runestone.RuneId) (lot *runestone.Lot, err error)
 		return
 	}
 	var amount *uint128.Uint128
-	amount, err = runeEntry.Mintable(s.height)
+	amount, err = runeEntry.Mintable(uint64(s.height))
 	if err != nil {
 		return
 	}
@@ -629,7 +622,7 @@ func (s *Indexer) etched(txIndex uint32, tx *common.Transaction, artifact *runes
 	if r == nil {
 		reserved_runes := s.Status.ReservedRunes
 		s.Status.ReservedRunes = reserved_runes + 1
-		r = runestone.Reserved(s.height, txIndex)
+		r = runestone.Reserved(uint64(s.height), txIndex)
 	} else {
 		if r.Value.Cmp(s.minimumRune.Value) < 0 ||
 			r.IsReserved() ||
@@ -640,7 +633,7 @@ func (s *Indexer) etched(txIndex uint32, tx *common.Transaction, artifact *runes
 		}
 	}
 	runeId = &runestone.RuneId{
-		Block: s.height,
+		Block: uint64(s.height),
 		Tx:    txIndex,
 	}
 	return runeId, r
@@ -705,7 +698,7 @@ func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runeston
 			if err != nil {
 				return false
 			}
-			commitTxHeight := uint64(blockHeader.Height)
+			commitTxHeight := int(blockHeader.Height)
 			confirmations := s.height - commitTxHeight + 1
 			if confirmations >= 6 {
 				return true

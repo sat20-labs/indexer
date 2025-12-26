@@ -152,12 +152,6 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 		return nil, 0
 	}
 
-	r := s.idToEntryTbl.Get(rid)
-	if r == nil {
-		common.Log.Errorf("RuneIndexer.GetAllUtxoBalances-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
-		return nil, 0
-	}
-
 	balances, err := s.runeIdOutpointToBalanceTbl.GetBalances(rid)
 	if err != nil {
 		common.Log.Panicf("RuneIndexer.GetAllUtxoBalances-> runeIdOutpointToBalanceTbl.GetBalances(%s) err:%s", rid.Hex(), err.Error())
@@ -188,10 +182,14 @@ func (s *Indexer) GetAllUtxoBalances(runeId string, start, limit uint64) (*UtxoB
 		addressLot := &UtxoBalance{
 			UtxoId:       balance.OutPoint.UtxoId,
 			Balance:      balance.Balance.Value,
-			Divisibility: r.Divisibility,
+			Divisibility: runeInfo.Divisibility,
 		}
 		ret.Balances[i] = addressLot
 		i++
+
+		if runeId == "39241:1" {
+			common.Log.Infof("%x: %s\n", balance.OutPoint.UtxoId, balance.Balance.Value.String())
+		}
 	}
 	ret.Total = totalAmount.Value
 

@@ -113,6 +113,11 @@ func (s *DbWrite) Subtract(dbWrite *DbWrite) {
 		}
 		if newlog.TimeStamp == log.Val.TimeStamp {
 			dbWrite.logs.Remove(log.Key)
+		} else {
+			// 其他item，当作已经存在数据库中
+			//if newlog.Type == store.PUT {
+				newlog.ExistInDb = true
+			//}
 		}
 	}
 }

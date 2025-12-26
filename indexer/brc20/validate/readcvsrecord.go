@@ -185,7 +185,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 
 		result[key] = rec
 	}
-	common.Log.Infof("block %d: %d %d", height,count, invalidCount)
+	//common.Log.Infof("block %d: %d %d", height,count, invalidCount)
 	return result, nil
 }
 

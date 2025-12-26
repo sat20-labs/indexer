@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/sat20-labs/indexer/common"
@@ -14,12 +13,6 @@ import (
 	"lukechampine.com/uint128"
 )
 
-const allRuneInfoCacheDuration = 10 * time.Minute
-
-var (
-	runeInfosCache              []*RuneInfo
-	lastRuneInfosCacheTimeStamp int64
-)
 
 func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
 	if runeEntry == nil {
@@ -80,7 +73,7 @@ func (s *Indexer) genRuneInfo(runeEntry *runestone.RuneEntry) (ret *RuneInfo) {
 		}
 		ret.MintInfo.Remaining = ret.MintInfo.Cap.Sub(ret.MintInfo.Mints)
 
-		_, err := runeEntry.Mintable(s.Status.Height + 1)
+		_, err := runeEntry.Mintable(uint64(s.Status.Height + 1))
 		ret.MintInfo.Mintable = err == nil
 
 		if ret.MintInfo.Mintable {
@@ -131,21 +124,16 @@ func (s *Indexer) GetAllRuneIds() []string {
 }
 
 func (s *Indexer) GetAllRuneInfos() (ret []*RuneInfo) {
-	currentTime := time.Now().Unix()
-	if currentTime-lastRuneInfosCacheTimeStamp > int64(allRuneInfoCacheDuration.Seconds()) || runeInfosCache == nil {
-		runeEntrys := s.idToEntryTbl.GetList()
-		// var i = 0
-		for _, runeEntry := range runeEntrys {
-			// common.Log.Tracef("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
-			runeInfo := s.genRuneInfo(runeEntry)
-			ret = append(ret, runeInfo)
-			// i++
-		}
-		runeInfosCache = ret
-		lastRuneInfosCacheTimeStamp = currentTime
-	} else {
-		ret = runeInfosCache
+	runeEntrys := s.idToEntryTbl.GetList()
+	// var i = 0
+	for _, runeEntry := range runeEntrys {
+		// common.Log.Tracef("RuneIndexer.GetRuneInfos-> runeEntrys index: %d", i)
+		runeInfo := s.genRuneInfo(runeEntry)
+		ret = append(ret, runeInfo)
+		// i++
 	}
+
+	
 	return
 }
 

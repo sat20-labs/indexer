@@ -211,7 +211,7 @@ func TestRuneCheckAllRuneInfos(t *testing.T) {
 			t.Fatalf("getRuneData err:%s", err.Error())
 		}
 
-		if runeData.Entry.Block > runesIndexer.Status.Height {
+		if runeData.Entry.Block > uint64(runesIndexer.Status.Height) {
 			break
 		}
 		runeInfo := runesIndexer.GetRuneInfoWithName(runeData.Entry.SpacedRune)

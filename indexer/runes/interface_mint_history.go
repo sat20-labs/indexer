@@ -1,9 +1,7 @@
 package runes
 
 import (
-	"time"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 )
@@ -13,15 +11,6 @@ type MintHistoryInfo struct {
 	MintHistory   []*MintHistory
 }
 
-const mintHistoryCacheDuration = 10 * time.Minute
-
-var (
-	runeMintHistoryCache cmap.ConcurrentMap[string, *MintHistoryInfo]
-)
-
-func init() {
-	runeMintHistoryCache = cmap.New[*MintHistoryInfo]()
-}
 
 /*
 *
@@ -36,12 +25,6 @@ func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
 		return nil
 	}
 	runeId = runeInfo.Id
-
-	if mintHistoryInfo, exist := runeMintHistoryCache.Get(runeId); exist {
-		if time.Since(time.Unix(mintHistoryInfo.LastTimestamp, 0)) < mintHistoryCacheDuration {
-			return mintHistoryInfo.MintHistory
-		}
-	}
 
 	id, err := runestone.RuneIdFromString(runeId)
 	if err != nil {
@@ -72,12 +55,6 @@ func (s *Indexer) GetAllMintHistory(runeId string) []*MintHistory {
 			Number:    r.Number,
 		}
 	}
-
-	mintHistoryInfo := &MintHistoryInfo{
-		LastTimestamp: time.Now().Unix(),
-		MintHistory:   ret,
-	}
-	runeMintHistoryCache.Set(runeId, mintHistoryInfo)
 
 	return ret
 }

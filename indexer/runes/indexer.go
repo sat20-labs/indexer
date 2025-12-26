@@ -18,16 +18,13 @@ import (
 type Indexer struct {
 	dbWrite                    *store.DbWrite
 	baseIndexer                *base.BaseIndexer
-	isUpdateing                bool
 	chaincfgParam              *chaincfg.Params
 	enableHeight               int
-	height                     uint64
+	height                     int
 	blockTime                  uint64
 	Status                     *table.RunesStatus
 	minimumRune                *runestone.Rune
-	burnedMap                  table.RuneIdLotMap
-	HolderUpdateCount          int
-	HolderRemoveCount          int
+	
 	idToEntryTbl               *table.RuneIdToEntryTable           // RuneId->RuneEntry
 	runeToIdTbl                *table.RuneToIdTable                // Rune->RuneId
 	outpointToBalancesTbl      *table.OutpointToBalancesTable      // utxoId->该utxo包含的所有符文资产数据
@@ -37,6 +34,11 @@ type Indexer struct {
 	runeIdAddressToCountTbl    *table.RuneIdAddressToCountTable    // runeId+addressId -> utxo的数量
 
 	//addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable // addressId+utxoId -> runeId+balance  TODO 这个没用
+
+	// transferUpdate 临时使用
+	burnedMap                  table.RuneIdLotMap
+	HolderUpdateCount          int
+	HolderRemoveCount          int
 
 	// checkpoint 临时使用
 	holderMapInPrevBlock map[uint64]*common.Decimal
@@ -135,10 +137,12 @@ func (s *Indexer) Clone() *Indexer {
 	cloneIndex.Status.Height = s.Status.Height
 	cloneIndex.Status.Number = s.Status.Number
 	cloneIndex.Status.ReservedRunes = s.Status.ReservedRunes
+
+	cloneIndex.minimumRune = &runestone.Rune{
+		Value: s.minimumRune.Value,
+	}
+
 	s.dbWrite.Clone(cloneIndex.dbWrite)
-	lastRuneInfosCacheTimeStamp = 0
-	runeInfosCache = nil
-	runeMintHistoryCache = cmap.New[*MintHistoryInfo]()
 
 	return cloneIndex
 }
@@ -147,7 +151,7 @@ func (s *Indexer) Subtract(backupIndexer *Indexer) {
 	backupIndexer.dbWrite.Subtract(s.dbWrite)
 }
 
-func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
+func (s *Indexer) CheckSelf() bool {
 
 	var firstRuneName = ""
 	switch s.chaincfgParam.Net {
@@ -193,12 +197,8 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 	}
 
 	checkAmount := func(address string, expectedmap map[string]string) bool {
-		addressId := rpc.GetAddressId(address)
-		utxos, err := rpc.GetUTXOs(address)
-		if err != nil {
-			common.Log.Errorf("GetUTXOs failed, %v", err)
-			return false
-		}
+		addressId := s.baseIndexer.GetAddressId(address)
+		utxos := s.baseIndexer.GetUTXOs(addressId)
 		assets := s.GetAddressAssets(addressId, utxos)
 
 		if len(assets) != len(expectedmap) {
@@ -633,12 +633,14 @@ func (s *Indexer) CheckSelf(rpc *base.RpcIndexer) bool {
 			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, len(holdermap))
 			return false
 		}
-
-		if rune.Number < 10 {
-			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
-		} else {
-			break
+		if rune.TotalHolderAmt().Cmp(holderAmount) != 0 {
+			common.Log.Errorf("rune ticker %s holder amount different. %s %s", rune.Name, rune.TotalHolderAmt(), holderAmount)
+			return false
 		}
+
+		//if rune.Number < 10 {
+			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
+		//} 
 
 		startTime2 = time.Now()
 		_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
