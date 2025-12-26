@@ -40,7 +40,7 @@ func (p *IndexerMgr) GetSyncHeight() int {
 }
 
 func (p *IndexerMgr) GetChainTip() int {
-	return p.compiling.GetChainTip()
+	return p.base.GetChainTip()
 }
 
 func (p *IndexerMgr) GetBlockInfo(height int) (*common.BlockInfo, error) {

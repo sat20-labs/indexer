@@ -30,6 +30,16 @@ type HolderInfo struct {
 	Tickers   map[string]*common.AssetAbbrInfo // key: ticker
 }
 
+func (p *HolderInfo) Clone() *HolderInfo {
+	newTickerInfo := make(map[string]*common.AssetAbbrInfo)
+	for k, assets := range p.Tickers {
+		newTickerInfo[k] = assets.Clone()
+	}
+	return &HolderInfo{
+		AddressId: p.AddressId, 
+		Tickers: newTickerInfo}
+}
+
 func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) int64 {
 	tickerAsset, ok := p.Tickers[name]
 	if !ok {
@@ -64,6 +74,8 @@ type ExoticIndexer struct {
 	// 只加载必要的数据
 	tickerMap  map[string]*TickInfo        // 没几个，全部加载
 	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
+	
+	// 全量数据， TODO 优化
 	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
 
 	holderActionList []*HolderAction
@@ -108,9 +120,11 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 		// 		ticker.UtxoMap[utxoId] = assetInfoMap.Offsets.Clone()
 		// 	}
 		// }
-		// p.utxoMap = p.loadUtxoMapFromDB()
 		p.holderInfo = make(map[uint64]*HolderInfo)
-		p.utxoMap = make(map[string]map[uint64]int64)
+
+		// TODO 不要加载所有
+		p.utxoMap = p.loadAllTickerToUtxoMapFromDB()
+		
 
 		p.holderActionList = make([]*HolderAction, 0)
 		p.tickerAdded = make(map[string]*common.Ticker, 0)
@@ -151,12 +165,7 @@ func (p *ExoticIndexer) Clone() *ExoticIndexer {
 		if action.Action > 0 {
 			value, ok := p.holderInfo[action.UtxoId]
 			if ok {
-				newTickerInfo := make(map[string]*common.AssetAbbrInfo)
-				for k, assets := range value.Tickers {
-					newTickerInfo[k] = assets.Clone()
-				}
-				info := HolderInfo{AddressId: value.AddressId, Tickers: newTickerInfo}
-				newInst.holderInfo[action.UtxoId] = &info
+				newInst.holderInfo[action.UtxoId] = value.Clone()
 			} //else {
 			// 已经被删除，不存在了
 			// common.Log.Panicf("can find utxo %s in holderInfo", action.Utxo)

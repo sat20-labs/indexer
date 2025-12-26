@@ -879,7 +879,7 @@ func (b *BaseIndexer) getAddressIdFromTxn(address string, bGenerateNew bool, txn
 	return addressId, bExist
 }
 
-func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
+func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}, stepByStep bool) int {
 	count, err := getBlockCount()
 	if err != nil {
 		common.Log.Errorf("failed to get block count %v", err)
@@ -890,8 +890,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 		return 0
 	}
 	
-	runInStep := false
-	if runInStep {
+	if stepByStep {
 		count = uint64(b.lastHeight) + 1
 	}
 	b.stats.ChainTip = int(count)

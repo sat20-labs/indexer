@@ -15,7 +15,7 @@ func (b *IndexerMgr) IsMainnet() bool {
 }
 
 func (b *IndexerMgr) GetBaseDBVer() string {
-	return b.compiling.GetBaseDBVer()
+	return b.base.GetBaseDBVer()
 }
 
 func (b *IndexerMgr) GetChainParam() *chaincfg.Params {
@@ -350,7 +350,6 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]comm
 	return result
 }
 
-
 func (b *IndexerMgr) GetMintHistory(tick string, start, limit int) []*common.MintAbbrInfo {
 	switch tick {
 	case common.ASSET_TYPE_NFT:
@@ -406,14 +405,14 @@ func (b *IndexerMgr) GetMintInfo(inscriptionId string) *common.Mint {
 			Base:    nft.Base,
 			Amt:     1,
 			UtxoId:  nft.UtxoId,
-			Offsets: common.AssetOffsets{{Start: nft.Offset, End: nft.Offset+1}},
+			Offsets: common.AssetOffsets{{Start: nft.Offset, End: nft.Offset + 1}},
 		}
 	case common.ASSET_TYPE_NS:
 		return &common.Mint{
 			Base:    nft.Base,
 			Amt:     1,
 			UtxoId:  nft.UtxoId,
-			Offsets: common.AssetOffsets{{Start: nft.Offset, End: nft.Offset+1}},
+			Offsets: common.AssetOffsets{{Start: nft.Offset, End: nft.Offset + 1}},
 		}
 	}
 

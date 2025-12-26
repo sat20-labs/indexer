@@ -625,7 +625,7 @@ func (p *IndexerMgr) SearchPredefinedName() bool {
 func (p *IndexerMgr) pizzaStatistic(bRegenerat bool) bool {
 
 	pizzaAddrMap := make(map[uint64]int64)
-	ldb := p.compiling.GetBaseDB()
+	ldb := p.base.GetBaseDB()
 	key := []byte("pizza-holder")
 
 	err := db.GetValueFromDB(key, &pizzaAddrMap, ldb)
@@ -751,7 +751,7 @@ func (p *IndexerMgr) writeToFile(filepath string, contents []string) {
 		return
 	}
 
-	file.WriteString(fmt.Sprintf("the total records: %d (height %d)\n", len(contents), p.compiling.GetHeight()))
+	file.WriteString(fmt.Sprintf("the total records: %d (height %d)\n", len(contents), p.base.GetHeight()))
 	for _, v := range contents {
 		_, err = file.WriteString(v + "\n")
 		if err != nil {
@@ -1344,7 +1344,7 @@ func (p *IndexerMgr) subNameStatistic(sub string) bool {
 		return true
 	}
 
-	file.WriteString(fmt.Sprintf("statistic: address=%d name=%d (height %d)\n", len(addrVect), len(nameMap), p.compiling.GetHeight()))
+	file.WriteString(fmt.Sprintf("statistic: address=%d name=%d (height %d)\n", len(addrVect), len(nameMap), p.base.GetHeight()))
 	for _, v := range addrVect {
 		str := fmt.Sprintf("%s : %d\n", v.Address, v.Count)
 		_, err = file.WriteString(str)

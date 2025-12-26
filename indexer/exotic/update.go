@@ -223,7 +223,7 @@ func (p *ExoticIndexer) UpdateDB() {
 
 	// reset memory buffer
 	p.holderInfo = make(map[uint64]*HolderInfo)
-	p.utxoMap = make(map[string]map[uint64]int64)
+	//p.utxoMap = make(map[string]map[uint64]int64)
 	p.holderActionList = make([]*HolderAction, 0)
 	p.tickerAdded = make(map[string]*common.Ticker)
 	for _, info := range p.tickerMap {
@@ -295,6 +295,9 @@ func (p *ExoticIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*c
 		tickerKeys := make([]string, len(tickerToLoad))
 		for k := range tickerToLoad {
 			tickerKeys = append(tickerKeys, GetTickerKey(k))
+			if _, ok := p.utxoMap[k]; !ok {
+				p.utxoMap[k] = p.loadTickerToUtxoMapFromDB(k)
+			}
 		}
 		sort.Slice(tickerKeys, func(i, j int) bool {
 			return tickerKeys[i] < tickerKeys[j]

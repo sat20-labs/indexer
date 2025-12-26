@@ -24,13 +24,13 @@ type IndexerMgr struct {
 	cfg   *config.YamlConf
 	dbDir string
 	// data from blockchain
-	baseDB  common.KVDB
+	baseDB   common.KVDB
 	exoticDB common.KVDB
-	ftDB    common.KVDB
-	nsDB    common.KVDB
-	nftDB   common.KVDB
-	brc20DB common.KVDB
-	runesDB common.KVDB
+	ftDB     common.KVDB
+	nsDB     common.KVDB
+	nftDB    common.KVDB
+	brc20DB  common.KVDB
+	runesDB  common.KVDB
 	// data from market
 	localDB common.KVDB
 	kvDB    common.KVDB
@@ -58,15 +58,15 @@ type IndexerMgr struct {
 
 	// 跑数据
 	lastCheckHeight int
-	compiling       *base_indexer.BaseIndexer
+	base           *base_indexer.BaseIndexer
 	// 备份所有需要写入数据库的数据
-	compilingBackupDB *base_indexer.BaseIndexer
-	exoticBackupDB    *exotic.ExoticIndexer
-	brc20BackupDB     *brc20.BRC20Indexer
-	runesBackupDB     *runes.Indexer
-	ftBackupDB        *ft.FTIndexer
-	nsBackupDB        *ns.NameService
-	nftBackupDB       *nft.NftIndexer
+	baseBackupDB   *base_indexer.BaseIndexer
+	exoticBackupDB *exotic.ExoticIndexer
+	brc20BackupDB  *brc20.BRC20Indexer
+	runesBackupDB  *runes.Indexer
+	ftBackupDB     *ft.FTIndexer
+	nsBackupDB     *ns.NameService
+	nftBackupDB    *nft.NftIndexer
 
 	/////////////////////////////////
 	mutex sync.RWMutex                           // 保护下面的数据
@@ -144,11 +144,11 @@ func (b *IndexerMgr) Init() {
 	if err != nil {
 		common.Log.Panicf("initDB failed. %v", err)
 	}
-	b.compiling = base_indexer.NewBaseIndexer(b.baseDB, b.chaincfgParam, b.maxIndexHeight, b.periodFlushToDB)
-	b.compiling.Init()
-	b.compiling.SetUpdateDBCallback(b.forceUpdateDB)
-	b.compiling.SetBlockCallback(b.processOrdProtocol)
-	b.lastCheckHeight = b.compiling.GetSyncHeight()
+	b.base = base_indexer.NewBaseIndexer(b.baseDB, b.chaincfgParam, b.maxIndexHeight, b.periodFlushToDB)
+	b.base.Init()
+	b.base.SetUpdateDBCallback(b.forceUpdateDB)
+	b.base.SetBlockCallback(b.processOrdProtocol)
+	b.lastCheckHeight = b.base.GetSyncHeight()
 	b.initCollections()
 
 	dbver := b.GetBaseDBVer()
@@ -157,7 +157,7 @@ func (b *IndexerMgr) Init() {
 		common.Log.Panicf("DB version inconsistent. DB ver %s, but code base %s", dbver, common.BASE_DB_VERSION)
 	}
 
-	b.rpcService = base_indexer.NewRpcIndexer(b.compiling)
+	b.rpcService = base_indexer.NewRpcIndexer(b.base)
 
 	if !instance.IsMainnet() {
 		exotic.IsTestNet = true
@@ -165,20 +165,20 @@ func (b *IndexerMgr) Init() {
 	}
 
 	b.exotic = exotic.NewExoticIndexer(b.exoticDB)
-	b.exotic.Init(b.compiling)
+	b.exotic.Init(b.base)
 	b.nft = nft.NewNftIndexer(b.nftDB)
-	b.nft.Init(b.compiling, b)
+	b.nft.Init(b.base, b)
 	b.ftIndexer = ft.NewOrdxIndexer(b.ftDB)
 	b.ftIndexer.Init(b.nft)
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
 	b.brc20Indexer.InitIndexer(b.nft)
-	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.compiling)
+	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.base)
 	b.RunesIndexer.Init()
 	b.miniMempool.init()
 
-	b.compilingBackupDB = nil
+	b.baseBackupDB = nil
 	b.exoticBackupDB = nil
 	b.ftBackupDB = nil
 	b.brc20BackupDB = nil
@@ -221,48 +221,55 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 		if !isRunning {
 			isRunning = true
 			go func() {
-				ret := b.compiling.SyncToChainTip(stopIndexerChan)
-				if ret == 0 {
-					if !bWantExit && b.compiling.GetHeight() == b.compiling.GetChainTip() {
-						// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
-						// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
-						b.compiling.SetUpdateDBCallback(nil)
-						b.updateDB()
-						if b.maxIndexHeight <= 0 {
-							b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
-						}
-					}
-
-					if b.maxIndexHeight > 0 {
-						if b.maxIndexHeight <= b.compiling.GetHeight() {
+				stepByStep := false
+				for !bWantExit {
+					ret := b.base.SyncToChainTip(stopIndexerChan, stepByStep)
+					if ret == 0 {
+						if !bWantExit && b.base.GetHeight() == b.base.GetChainTip() {
+							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
+							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
+							b.base.SetUpdateDBCallback(nil)
 							b.updateDB()
-							b.checkSelf()
-							common.Log.Infof("reach expected height, set exit flag")
+							if b.maxIndexHeight <= 0 {
+								b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
+							}
+						}
+
+						if b.maxIndexHeight > 0 {
+							if b.maxIndexHeight <= b.base.GetHeight() {
+								b.updateDB()
+								b.checkSelf()
+								common.Log.Infof("reach expected height, set exit flag")
+								bWantExit = true
+							}
+						}
+
+						b.dbgc()
+						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
+						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
+						// 	period := 1000
+						// 	if b.compiling.GetSyncHeight()%period == 0 {
+						// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
+						// 		b.checkSelf()
+						// 	}
+						// }
+						if b.dbStatistic() {
+							bWantExit = true
+						}
+
+					} else if ret > 0 {
+						// handle reorg
+						b.handleReorg(ret)
+						b.base.SyncToChainTip(stopIndexerChan, stepByStep)
+					} else {
+						if ret == -1 {
+							common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
 							bWantExit = true
 						}
 					}
 
-					b.dbgc()
-					// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
-					// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
-					// 	period := 1000
-					// 	if b.compiling.GetSyncHeight()%period == 0 {
-					// 		b.lastCheckHeight = b.compiling.GetSyncHeight()
-					// 		b.checkSelf()
-					// 	}
-					// }
-					if b.dbStatistic() {
-						bWantExit = true
-					}
-
-				} else if ret > 0 {
-					// handle reorg
-					b.handleReorg(ret)
-					b.compiling.SyncToChainTip(stopIndexerChan)
-				} else {
-					if ret == -1 {
-						common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
-						bWantExit = true
+					if !stepByStep {
+						break
 					}
 				}
 
@@ -284,6 +291,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 			if bWantExit {
 				break
 			}
+			bWantExit = true
 			if isRunning {
 				select {
 				case stopIndexerChan <- struct{}{}:
@@ -296,7 +304,6 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 				}
 				common.Log.Info("IndexerMgr inner thread exited")
 			}
-			bWantExit = true
 		}
 	}
 
@@ -340,13 +347,13 @@ func (b *IndexerMgr) closeDB() {
 
 func (b *IndexerMgr) checkSelf() {
 	start := time.Now()
-	if b.compiling.CheckSelf() &&
+	if b.base.CheckSelf() &&
 		b.exotic.CheckSelf() &&
 		b.nft.CheckSelf(b.baseDB) &&
 		b.ns.CheckSelf(b.baseDB) &&
-		b.ftIndexer.CheckSelf(b.compiling.GetSyncHeight()) &&
+		b.ftIndexer.CheckSelf(b.base.GetSyncHeight()) &&
 		b.RunesIndexer.CheckSelf(b.rpcService) &&
-		b.brc20Indexer.CheckSelf(b.compiling.GetSyncHeight()) {
+		b.brc20Indexer.CheckSelf(b.base.GetSyncHeight()) {
 		common.Log.Infof("IndexerMgr.checkSelf succeed. %v", time.Since(start))
 	} else {
 		b.closeDB()
@@ -372,7 +379,7 @@ func (b *IndexerMgr) handleReorg(height int) {
 	// 需要等rpc都完成，再重新启动
 	atomic.AddInt32(&b.reloading, 1)
 	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
-		time.Sleep(10*time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	atomic.AddInt32(&b.reloading, 1)
 	defer func() {
@@ -384,7 +391,7 @@ func (b *IndexerMgr) handleReorg(height int) {
 	b.closeDB()
 	b.Init() // 数据库重新打开
 	b.miniMempool.ProcessReorg()
-	b.compiling.SetReorgHeight(height)
+	b.base.SetReorgHeight(height)
 
 	common.Log.Infof("IndexerMgr handleReorg completed.")
 }
@@ -397,7 +404,7 @@ func (b *IndexerMgr) rpcEnter() {
 	if atomic.LoadInt32(&b.reloading) > 0 {
 		atomic.AddInt32(&b.rpcProcessing, -1)
 		for atomic.LoadInt32(&b.reloading) > 0 {
-			time.Sleep(10*time.Microsecond)
+			time.Sleep(10 * time.Microsecond)
 		}
 		atomic.AddInt32(&b.rpcProcessing, 1)
 	}
@@ -413,15 +420,15 @@ func (b *IndexerMgr) rpcLeft() {
 func (b *IndexerMgr) updateDB() {
 	b.updateServiceInstance()
 
-	complingHeight := b.compiling.GetHeight()
-	syncHeight := b.compiling.GetSyncHeight()
-	blocksInHistory := b.compiling.GetBlockHistory()
+	complingHeight := b.base.GetHeight()
+	syncHeight := b.base.GetSyncHeight()
+	blocksInHistory := b.base.GetBlockHistory()
 
 	gap := complingHeight - syncHeight
 	if gap < blocksInHistory {
 		common.Log.Infof("performUpdateDBInBuffer nothing to do at height %d-%d", complingHeight, syncHeight)
 	} else {
-		if b.compilingBackupDB == nil {
+		if b.baseBackupDB == nil {
 			b.prepareDBBuffer()
 		}
 		// 这个区间不备份数据
@@ -441,7 +448,7 @@ func (b *IndexerMgr) updateDB() {
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.cleanDBBuffer() // must before UpdateDB
-	wantToDelete := b.compilingBackupDB.UpdateDB()
+	wantToDelete := b.baseBackupDB.UpdateDB()
 	org := make(map[string]uint64)
 	for k, v := range wantToDelete {
 		org[k] = v
@@ -453,13 +460,13 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.runesBackupDB.UpdateDB()
 	b.brc20BackupDB.UpdateDB()
 	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
-	b.compilingBackupDB.CleanEmptyAddress(org, wantToDelete)
+	b.baseBackupDB.CleanEmptyAddress(org, wantToDelete)
 
-	b.compiling.SetSyncStats(b.compilingBackupDB.GetSyncStats())
+	b.base.SetSyncStats(b.baseBackupDB.GetSyncStats())
 }
 
 func (b *IndexerMgr) prepareDBBuffer() {
-	b.compilingBackupDB = b.compiling.Clone(true)
+	b.baseBackupDB = b.base.Clone(true)
 
 	b.exoticBackupDB = b.exotic.Clone()
 	b.ftBackupDB = b.ftIndexer.Clone()
@@ -467,11 +474,11 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.nftBackupDB = b.nft.Clone()
 	b.brc20BackupDB = b.brc20Indexer.Clone()
 	b.runesBackupDB = b.RunesIndexer.Clone()
-	common.Log.Infof("prepareDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
+	common.Log.Infof("prepareDBBuffer backup instance with %d", b.baseBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) cleanDBBuffer() {
-	b.compiling.Subtract(b.compilingBackupDB)
+	b.base.Subtract(b.baseBackupDB)
 	b.exotic.Subtract(b.exoticBackupDB)
 	b.nft.Subtract(b.nftBackupDB)
 	b.ns.Subtract(b.nsBackupDB)
@@ -479,15 +486,15 @@ func (b *IndexerMgr) cleanDBBuffer() {
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
 	b.RunesIndexer.Subtract(b.runesBackupDB)
 
-	common.Log.Infof("cleanDBBuffer backup instance with %d", b.compilingBackupDB.GetHeight())
+	common.Log.Infof("cleanDBBuffer backup instance with %d", b.baseBackupDB.GetHeight())
 }
 
 func (b *IndexerMgr) updateServiceInstance() {
-	if b.rpcService.GetHeight() == b.compiling.GetHeight() {
+	if b.rpcService.GetHeight() == b.base.GetHeight() {
 		return
 	}
 
-	newService := base_indexer.NewRpcIndexer(b.compiling)
+	newService := base_indexer.NewRpcIndexer(b.base)
 	common.Log.Infof("service instance %d cloned", newService.GetHeight())
 
 	newService.UpdateServiceInstance()
