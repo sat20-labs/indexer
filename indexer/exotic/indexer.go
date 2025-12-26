@@ -327,9 +327,7 @@ func (p *ExoticIndexer) CheckSelf() bool {
 	return true
 }
 
-
-
-func (s *ExoticIndexer) printHoldersWithMap(holders map[uint64]int64) {
+func PrintHoldersWithMap(holders map[uint64]int64, baseIndexer *base.BaseIndexer) {
 	var total int64
 	type pair struct {
 		addressId uint64
@@ -348,7 +346,6 @@ func (s *ExoticIndexer) printHoldersWithMap(holders map[uint64]int64) {
 		return mid[i].amt > mid[j].amt
 	})
 	limit := 10 //len(mid) // 40
-	rpc := s.baseIndexer
 	for i, item := range mid {
 		if i > limit {
 			break
@@ -356,7 +353,7 @@ func (s *ExoticIndexer) printHoldersWithMap(holders map[uint64]int64) {
 		if item.amt == 0 {
 			continue
 		}
-		address, err := rpc.GetAddressByID(item.addressId)
+		address, err := baseIndexer.GetAddressByID(item.addressId)
 		if err != nil {
 			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
 			address = "-\t"
@@ -369,6 +366,6 @@ func (s *ExoticIndexer) printHoldersWithMap(holders map[uint64]int64) {
 func (p *ExoticIndexer) printHolders(name string) {
 	holdermap := p.GetHolderAndAmountWithTick(name)
 	common.Log.Infof("holders from holder DB")
-	p.printHoldersWithMap(holdermap)
+	PrintHoldersWithMap(holdermap, p.baseIndexer)
 }
 

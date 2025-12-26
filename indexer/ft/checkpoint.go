@@ -50,6 +50,39 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 		},
 	},
 
+	50000: {
+		Tickers: map[string]*TickerStatus{
+			"pizzatest": {
+				Minted:      1237986, 
+				HolderCount: 12,
+				Holders: map[string]int64{
+					"tb1p6jcfgfwyfw2nhd948c3sq8cyuevcfjm9u5p8zjrh80kldxsruw2su0432a": 565886,
+					"tb1p62gjhywssq42tp85erlnvnumkt267ypndrl0f3s4sje578cgr79sekhsua": 471870,
+					"tb1pmzc7yvc7jt9t7vwv8xaqqchqlskg7g4e2ylfu9z4wrk37czjmweqpgq4zd": 100000,
+					"tb1p6zdas027hmm3c2q6nhplnyemfu8u6kvyu249wltr3dndrgjuda6suyhsug": 51800,
+					"tb1pvl8cuc2qm3dtgga3juh566mn9y6dpvdlk484yp9z9crak5rd3hwqs2590r": 16000,
+					"tb1prcc8rp5wn0y9vp434kchl3aag8r8hz699006ufvczwnneuqx0wdsfmvq4y": 10330,
+					"tb1p9nhmnzjlhzlsw3d4ees6z5p0h872vt485dkueua8dn0pupte5musf634ja": 10000,
+					"tb1p09w632q6zjcahz3mhg2ywgz5zqn8m4x8fjq8q2neaz2vpkkxl50s8h6dyc": 4000,
+					"tb1pp3r22ce7swdxuuqk69t8tkcdpzev3felln65tqvdpmh3ahprvp6ssqsxu9": 3000,
+					"tb1pvsx4d9ps9ps8jrqmfsk0vpurayx7jcmulkl35wcl7jpygs2aljrs49qkdh": 3000,
+					"tb1ppnhp3ktpyxd8hr8n5lu8znj90566ec535x7y5daauu845chqpm2qdp6rlw": 2000,
+				},
+			},
+			"rarepizza": {
+				Minted:      997000, 
+				HolderCount: 5,
+				Holders: map[string]int64{
+					"tb1prcc8rp5wn0y9vp434kchl3aag8r8hz699006ufvczwnneuqx0wdsfmvq4y": 498000,
+					"tb1p6jcfgfwyfw2nhd948c3sq8cyuevcfjm9u5p8zjrh80kldxsruw2su0432a": 492000,
+					"tb1pt9c60e43sxcvksr7arx9qvczj0w9sqjellk6xg9chw2d5pv7ax4sdy5r7n": 5000,
+					"tb1prm9fflqhtezag25s06t740e7ca4rydm9x5mucrc3lt6dlkxquyqq02k2cf": 1000,
+					"tb1qe2c5dhh0qm0jwsjqug7ya7glk9ydm9lwqll288": 1000,
+				},
+			},
+		},
+	},
+
 	114380: {
 		Tickers: map[string]*TickerStatus{
 			"dogcoin": {
@@ -291,7 +324,7 @@ func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
 		p.holderMapInPrevBlock = holdermap
 
 	}
-	common.Log.Infof("CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
+	common.Log.Infof("FTIndexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
 
 func (s *FTIndexer) printHistoryWithAddress(name string, addressId uint64) {

@@ -29,6 +29,21 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 		},
 	},
 
+	50000: {
+		Tickers: map[string]*TickerStatus{
+			"BESTINSLOT•XYZ": {
+				Minted:      "16",
+				HolderCount: 4,
+				Holders: map[string]string{
+					"tb1pudsspvxgvclznfu5lkxezexvta48pgnu407gw4fce0t9yawaqm6s39ycrz": "10",
+					"tb1p9ts4eu2s4adgjwumdmcu9qfw0hcavrh8m54tyrd39lkk7h4940yq2dmvzx": "4",
+					"tb1pn9dzakm6egrv90c9gsgs63axvmn6ydwemrpuwljnmz9qdk38ueqsqae936": "1",
+					"tb1qvhl8k0xu0stk956tjqx6q5ujp6tdyh24xcz0qq": "1",
+				},
+			},
+		},
+	},
+
 	114881: {
 		Tickers: map[string]*TickerStatus{
 			"BESTINSLOT•XYZ": {
@@ -195,7 +210,7 @@ func (p *Indexer) CheckPointWithBlockHeight(height int) {
 		p.holderMapInPrevBlock = holdermap
 
 	}
-	common.Log.Infof("CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
+	common.Log.Infof("Indexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
 
 func (s *Indexer) printHistoryWithAddress(name string, addressId uint64) {

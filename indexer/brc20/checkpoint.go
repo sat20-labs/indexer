@@ -641,7 +641,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		p.holderMapInPrevBlock = holdermap
 
 	}
-	common.Log.Infof("CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
+	common.Log.Infof("BRC20Indexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
@@ -896,7 +896,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		// }
 	}
 
-	common.Log.Infof("validateHistory %d history records are checked.", len(validateRecords))
+	common.Log.Infof("BRC20Indexer.validateHistory %d history records are checked.", len(validateRecords))
 }
 
 // 找出T1中key不在T2的元素
@@ -981,5 +981,5 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 		}
 	}
 
-	common.Log.Infof("validateHolderData %d addresses are checked.", len(holders))
+	common.Log.Infof("BRC20Indexer.validateHolderData %d addresses are checked.", len(holders))
 }
