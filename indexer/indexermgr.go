@@ -214,7 +214,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	bWantExit := false
 	isRunning := false
 	disableSync := false // 启动rpc，不再同步数据
-	stepByStep := true   // 模拟工作时，一个块一个块慢慢同步，检查分叉处理的可靠性
+	stepByStep := false   // 模拟工作时，一个块一个块慢慢同步，检查分叉处理的可靠性
 	tick := func() {
 		if disableSync {
 			return
