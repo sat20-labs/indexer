@@ -48,7 +48,7 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 }
 
 // 必须先加载satmap和utxomap
-func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) {
+func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) int {
 	// 对所有铸造信息排序
 	type pair struct {
 		idx1   int
@@ -119,6 +119,7 @@ func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) {
 		}
 	}
 
+	return len(mid)
 }
 
 func (p *NftIndexer) nftMint(info *InscribeInfo) {
@@ -293,11 +294,13 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		return nil
 	})
 	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
+	//startTime = time.Now()
 
 	// prepare 2: calc inscription number
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
+		//t2 := time.Now()
 		for _, input := range tx.Inputs {
 			// if tx.TxId == "23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1" {
 			// 	common.Log.Infof("%d %d %d", block.Height, input.InTxIndex, input.TxInIndex)
@@ -347,9 +350,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			}
 
 			if len(sats) > 0 {
+				builder := common.NewTxAssetsBuilder(len(sats))
 				for sat, offset := range sats {
-					addSatInfoToOutput(&input.TxOutput, sat, offset)
+					addSatInfoToOutput(&input.TxOutput, sat, offset, builder)
 				}
+				input.TxOutput.Assets = builder.Build()
 
 				p.utxoMap[input.UtxoId] = sats
 				delete(p.utxoMap, input.UtxoId)
@@ -362,17 +367,27 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				allInput.Append(&input.TxOutput)
 			}
 		}
+		//common.Log.Infof("process %s inputs takes %v", tx.TxId, time.Since(t2))
+		//t2 = time.Now()
 		change := p.innerUpdateTransfer(tx, allInput)
+		//common.Log.Infof("process %s outputs takes %v", tx.TxId, time.Since(t2))
 		coinbaseInput.Append(change)
 	}
 	// 处理哪些直接输出到奖励聪的铸造结果
+	//t2 := time.Now()
 	tx := block.Transactions[0]
 	change := p.innerUpdateTransfer(tx, coinbaseInput)
 	if !change.Zero() {
 		common.Log.Panicf("UpdateTransfer should consume all input assets")
 	}
+	//common.Log.Infof("process %s outputs takes %v", tx.TxId, time.Since(t2))
+	//common.Log.Infof("NftIndexer.UpdateTransfer process tx %d in %v", len(block.Transactions), time.Since(startTime))
+	//startTime = time.Now()
+
 	// 更新铭文的编号，更新satmap
 	p.sortInscriptionInBlock(block)
+	//common.Log.Infof("NftIndexer.UpdateTransfer adding %d inscription takes %v", n, time.Since(startTime))
+	//startTime = time.Now()
 
 	// // hook: prepare for transfer
 	// p.processCallback.PrepareUpdateTransfer(block, coinbase)
@@ -386,6 +401,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
 	p.actionBufferMap = make(map[int]map[int][]*InscribeInfo)
 	p.CheckPointWithBlockHeight(block.Height)
+	//common.Log.Infof("NftIndexer.UpdateTransfer checkpoint takes %v", time.Since(startTime))
 	// hook: process checkpoint
 	//p.processCallback.UpdateTransferFinished(block)
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
@@ -427,7 +443,7 @@ func (p *NftIndexer) addSatToUtxoMap(sat, offset int64, utxoId uint64) {
 	satoffsetMap[sat] = offset
 }
 
-func addSatInfoToOutput(output *common.TxOutput, sat, offset int64) {
+func addSatInfoToOutput(output *common.TxOutput, sat, offset int64, builder *common.TxAssetsBuilder) {
 	asset := common.AssetInfo{
 		Name: common.AssetName{
 			Protocol: common.PROTOCOL_NAME_ORD,
@@ -437,7 +453,8 @@ func addSatInfoToOutput(output *common.TxOutput, sat, offset int64) {
 		Amount:     *common.NewDecimal(1, 0),
 		BindingSat: 1,
 	}
-	output.Assets.Add(&asset)
+	builder.Add(&asset)
+	//output.Assets.Add(&asset)
 	output.Offsets[asset.Name] = common.AssetOffsets{&common.OffsetRange{Start: offset, End: offset + 1}}
 }
 
@@ -461,6 +478,8 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 
 		change = newChange
 		if len(newOut.Assets) != 0 {
+			//common.Log.Infof("%s assets %d", txOut.OutPointStr, len(newOut.Assets))
+			builder := common.NewTxAssetsBuilder(len(newOut.Assets))
 			for _, asset := range newOut.Assets {
 				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD &&
 					asset.Name.Type == common.ASSET_TYPE_NFT {
@@ -481,9 +500,10 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 					satInfo.Offset = offset
 
 					p.addSatToUtxoMap(sat, offset, txOut.UtxoId)
-					addSatInfoToOutput(&txOut.TxOutput, sat, offset) // 合并资产信息，供下一个模块处理
+					addSatInfoToOutput(&txOut.TxOutput, sat, offset, builder) // 合并资产信息，供下一个模块处理
 				}
 			}
+			txOut.TxOutput.Assets = builder.Build()
 		}
 	}
 	return change

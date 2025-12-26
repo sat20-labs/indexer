@@ -290,3 +290,73 @@ func (p *TxAssets) IsZero() bool {
 	}
 	return true
 }
+
+// 应对同时Add多个资产数据的方案
+type TxAssetsBuilder struct {
+    m map[AssetName]*AssetInfo
+}
+
+func NewTxAssetsBuilder(capHint int) *TxAssetsBuilder {
+    return &TxAssetsBuilder{
+        m: make(map[AssetName]*AssetInfo, capHint),
+    }
+}
+
+// 不分配内存，直接使用asset
+func (b *TxAssetsBuilder) Add(asset *AssetInfo) {
+    if asset == nil {
+        return
+    }
+
+    if exist, ok := b.m[asset.Name]; ok {
+        exist.Amount.AddInPlace(&asset.Amount)
+        return
+    }
+
+    // 关键点：
+    // 直接接管 asset，不 Clone，不复制 big.Int
+    b.m[asset.Name] = asset
+}
+
+// 分配内存版本
+func (b *TxAssetsBuilder) AddClone(asset *AssetInfo) {
+    if asset == nil {
+        return
+    }
+
+    if exist, ok := b.m[asset.Name]; ok {
+        exist.Amount.AddInPlace(&asset.Amount)
+        return
+    }
+
+    cloned := *asset
+    cloned.Amount = *asset.Amount.Clone()
+    b.m[asset.Name] = &cloned
+}
+
+func (b *TxAssetsBuilder) Build() TxAssets {
+    if len(b.m) == 0 {
+        return nil
+    }
+
+    res := make(TxAssets, 0, len(b.m))
+    for _, asset := range b.m {
+        res = append(res, *asset)
+    }
+
+    sort.Slice(res, func(i, j int) bool {
+        ai := res[i].Name
+        aj := res[j].Name
+
+        if ai.Protocol != aj.Protocol {
+            return ai.Protocol < aj.Protocol
+        }
+        if ai.Type != aj.Type {
+            return ai.Type < aj.Type
+        }
+        return ai.Ticker < aj.Ticker
+    })
+
+    return res
+}
+

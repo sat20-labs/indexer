@@ -386,6 +386,29 @@ func (d *Decimal) Add(other *Decimal) *Decimal {
 	return &Decimal{Precision: d.Precision, Value: value}
 }
 
+// 提高效率
+func (d *Decimal) AddInPlace(other *Decimal) {
+    if other == nil || other.Value == nil {
+        return
+    }
+
+    if d.Value == nil {
+        // 不共享 other.Value，显式拷贝
+        d.Value = new(big.Int).Set(other.Value)
+        d.Precision = other.Precision
+        return
+    }
+
+    if d.Precision != other.Precision {
+        panic("decimal precision mismatch")
+    }
+
+    // big.Int.Add 在 z 已存在时不会分配
+    d.Value.Add(d.Value, other.Value)
+}
+
+
+
 // Add adds two Decimal instances and returns a new Decimal instance
 func DecimalAdd(a, b *Decimal) *Decimal {
 	n := a.Clone()
