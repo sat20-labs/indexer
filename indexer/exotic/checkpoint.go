@@ -211,14 +211,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			},
 		},
 	},
-
-	100000: {
-		Tickers: map[string]*TickerStatus{
-			"RarePizza": {
-				Minted:      997000, 
-			},
-		},
-	},
 }
 
 func (p *ExoticIndexer) CheckPointWithBlockHeight(height int) {
