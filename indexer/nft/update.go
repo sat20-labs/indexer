@@ -8,6 +8,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	//inCommon "github.com/sat20-labs/indexer/indexer/common"
 
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 )
@@ -387,8 +388,12 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	p.CheckPointWithBlockHeight(block.Height)
 	// hook: process checkpoint
 	//p.processCallback.UpdateTransferFinished(block)
-
 	common.Log.Infof("NftIndexer.UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
+
+	// if inCommon.STEP_RUN_MODE && p.CheckSelf() {
+	// 	common.Log.Panic("")
+	// }
+
 }
 
 // 需要预加载satmap

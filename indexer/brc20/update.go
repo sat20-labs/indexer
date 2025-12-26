@@ -8,6 +8,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 )
 
 func (s *BRC20Indexer) CheckInscription(nft *common.Nft) bool {
@@ -275,6 +276,10 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block, coinbase []*common.Ra
 
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 	s.UpdateTransferFinished(block)
+
+	if inCommon.STEP_RUN_MODE && !s.CheckSelf(block.Height) {
+		common.Log.Panic("")
+	}
 }
 
 // 增加该address下的资产数据

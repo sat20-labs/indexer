@@ -6,6 +6,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 )
 
 // 每个deploy都调用，也可以用于更新
@@ -234,6 +235,10 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 
 	p.mutex.Unlock()
 	p.CheckPointWithBlockHeight(block.Height)
+
+	if inCommon.STEP_RUN_MODE && !p.CheckSelf(block.Height) {
+		common.Log.Panic("")
+	}
 }
 
 func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction,

@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 )
 
 type AddressStatus struct {
@@ -71,7 +72,7 @@ func NewBaseIndexer(
 	}
 
 	if chaincfgParam.Name != "mainnet" {
-		indexer.keepBlockHistory = 72 // testnet4的分岔很多也很长
+		indexer.keepBlockHistory = 12 // testnet4的分岔很多也很长
 	}
 
 	indexer.addressValueMap = make(map[string]*common.AddressValueV2, 0)
@@ -879,7 +880,7 @@ func (b *BaseIndexer) getAddressIdFromTxn(address string, bGenerateNew bool, txn
 	return addressId, bExist
 }
 
-func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}, stepByStep bool) int {
+func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	count, err := getBlockCount()
 	if err != nil {
 		common.Log.Errorf("failed to get block count %v", err)
@@ -890,7 +891,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}, stepByStep bool) in
 		return 0
 	}
 	
-	if stepByStep {
+	if inCommon.STEP_RUN_MODE {
 		count = uint64(b.lastHeight) + 1
 	}
 	b.stats.ChainTip = int(count)

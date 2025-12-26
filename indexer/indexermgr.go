@@ -16,6 +16,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/runes"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 
 	"github.com/btcsuite/btcd/chaincfg"
 )
@@ -214,7 +215,6 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	bWantExit := false
 	isRunning := false
 	disableSync := false // 启动rpc，不再同步数据
-	stepByStep := false   // 模拟工作时，一个块一个块慢慢同步，检查分叉处理的可靠性
 	tick := func() {
 		if disableSync {
 			return
@@ -223,7 +223,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 			isRunning = true
 			go func() {
 				for !bWantExit {
-					ret := b.base.SyncToChainTip(stopIndexerChan, stepByStep)
+					ret := b.base.SyncToChainTip(stopIndexerChan)
 					if ret == 0 {
 						if !bWantExit && b.base.GetHeight() == b.base.GetChainTip() {
 							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
@@ -260,7 +260,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 					} else if ret > 0 {
 						// handle reorg
 						b.handleReorg(ret)
-						b.base.SyncToChainTip(stopIndexerChan, stepByStep)
+						b.base.SyncToChainTip(stopIndexerChan)
 					} else {
 						if ret == -1 {
 							common.Log.Infof("IndexerMgr inner thread exit by SIGINT signal")
@@ -268,7 +268,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						}
 					}
 
-					if !stepByStep {
+					if !inCommon.STEP_RUN_MODE {
 						break
 					}
 				}

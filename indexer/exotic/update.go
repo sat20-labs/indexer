@@ -7,6 +7,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 )
 
 
@@ -54,9 +55,9 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 
 	p.CheckPointWithBlockHeight(block.Height)
 
-	// if !p.CheckSelf() {
-	// 	common.Log.Panic("")
-	// }
+	if inCommon.STEP_RUN_MODE && !p.CheckSelf() {
+		common.Log.Panic("")
+	}
 }
 
 func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxo uint64) {

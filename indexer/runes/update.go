@@ -8,6 +8,7 @@ import (
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/table"
@@ -68,9 +69,9 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 
 	s.CheckPointWithBlockHeight(block.Height)
 
-	// if !s.CheckSelf() {
-	// 	common.Log.Panic("")
-	// }
+	if inCommon.STEP_RUN_MODE && !s.CheckSelf() {
+		common.Log.Panic("")
+	}
 }
 
 func (s *Indexer) index_runes(tx_index uint32, tx *common.Transaction) (isParseOk bool, err error) {
