@@ -294,7 +294,7 @@ func (p *ExoticIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*c
 
 		tickerKeys := make([]string, len(tickerToLoad))
 		for k := range tickerToLoad {
-			tickerKeys = append(tickerKeys, GetTickerKey(k))
+			tickerKeys = append(tickerKeys, k)
 			if _, ok := p.utxoMap[k]; !ok {
 				p.utxoMap[k] = p.loadTickerToUtxoMapFromDB(k)
 			}
