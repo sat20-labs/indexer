@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -89,9 +90,8 @@ func (p *AssetOffsets) Size() int64 {
 	return total
 }
 
-// 按资产分割
+// 按资产数量分割
 func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
-	var left, right []*OffsetRange
 
 	if p == nil {
 		return nil, nil
@@ -100,13 +100,16 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 		return nil, p.Clone()
 	}
 
+	left := make(AssetOffsets, 0, len(*p))
+    right := make(AssetOffsets, 0, len(*p))
+
 	remaining := amt
 	offset := int64(0)
 	for _, r := range *p {
 		if remaining > 0 {
 			if r.End-r.Start <= remaining {
 				// 完全在左边
-				left = append(left, r)
+				left = append(left, r.Clone())
 				offset = r.End
 			} else {
 				// 跨越 offset，需要拆分
@@ -127,18 +130,18 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 }
 
 
-// 按聪数量分割, Append 的逆操作
-func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
-	var left, right []*OffsetRange
-
+// 按位置分割, Append 的逆操作
+func (p *AssetOffsets) Cut(offset int64) (AssetOffsets, AssetOffsets) {
 	if p == nil {
 		return nil, nil
 	}
-	if value == 0 {
+	if offset == 0 {
 		return nil, p.Clone()
 	}
 
-	offset := value
+	left := make(AssetOffsets, 0, len(*p))
+	right := make(AssetOffsets, 0, len(*p))
+
 	for _, r := range *p {
 		if r.Start >= offset {
 			// 完全在右边
@@ -159,7 +162,7 @@ func (p *AssetOffsets) Cut(value int64) (AssetOffsets, AssetOffsets) {
 	return left, right
 }
 
-// 同一个utxo中的offset合并
+// 同一个utxo中的offsetRange合并
 func (p *AssetOffsets) Cat(r2 *OffsetRange) {
 	if r2 == nil {
 		return
@@ -205,41 +208,79 @@ func (p *AssetOffsets) Insert(r2 *OffsetRange) {
 
 // another 已经调整过偏移值
 func (p *AssetOffsets) Merge(another AssetOffsets) {
-	len1 := len(*p)
-	len2 := len(another)
-	if len2 == 0 {
-		return
-	}
-	if len1 == 0 {
-		*p = another.Clone()
-		return
-	}
-	if (*p)[len1-1].End <= another[0].Start {
-		p.Append(another)
-		return
-	}
+    if len(another) == 0 {
+        return
+    }
+    if len(*p) == 0 {
+        *p = another.Clone()
+        return
+    }
 
-	for _, r := range another {
-		p.Insert(r)
-	}
+    a := *p
+    b := another
+
+    res := make(AssetOffsets, 0, len(a)+len(b))
+
+    i, j := 0, 0
+    var last *OffsetRange
+
+    push := func(r *OffsetRange) {
+        if last == nil {
+            last = r.Clone()
+            res = append(res, last)
+            return
+        }
+        if last.End == r.Start {
+            last.End = r.End
+        } else {
+            last = r.Clone()
+            res = append(res, last)
+        }
+    }
+
+    for i < len(a) && j < len(b) {
+        if a[i].Start <= b[j].Start {
+            push(a[i])
+            i++
+        } else {
+            push(b[j])
+            j++
+        }
+    }
+    for i < len(a) {
+        push(a[i])
+        i++
+    }
+    for j < len(b) {
+        push(b[j])
+        j++
+    }
+
+    *p = res
 }
+
 
 // merge的反操作
 // 从某个位置开始，取出一定数量的资产，偏移值不调整
-func (p *AssetOffsets) Pickup(offset int64, value int64) AssetOffsets {
+func (p *AssetOffsets) Pickup(offset int64, amt int64) AssetOffsets {
 	var right AssetOffsets
 
 	if p == nil {
 		return nil
 	}
-	if value == 0 {
+	if amt == 0 {
 		return nil
 	}
 
+	i := sort.Search(len(*p), func(i int) bool {
+		return (*p)[i].End > offset
+	})
+
 	var total int64
-	for _, r := range *p {
+	for ; i < len(*p); i++ {
+		r := (*p)[i]
 		if r.End > offset {
-			left := value - total
+			left := amt - total
 			if r.Start >= offset {
 				if r.Size() <= left {
 					n := r.Clone()
@@ -261,19 +302,19 @@ func (p *AssetOffsets) Pickup(offset int64, value int64) AssetOffsets {
 				}
 			}
 		}
-		if total == value {
+		if total == amt {
 			break
 		}
 	}
 
-	if right.Size() != value {
+	if right.Size() != amt {
 		return nil
 	}
 
 	return right
 }
 
-// another 已经调整过偏移值，并且偏移值都大于p
+// 两个utxo的range合并， another是后一个，已经调整过偏移值
 func (p *AssetOffsets) Append(another AssetOffsets) {
 	len1 := len(*p)
 	len2 := len(another)
@@ -599,16 +640,14 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 	if len(p.Offsets) == 0 {
 		return p.Assets.GetBindingSatAmout()
 	}
-	offset := make(AssetOffsets, 0)
+	var size int64
 	for _, assetOffset := range p.Offsets {
-		for _, off := range assetOffset {
-			offset.Insert(off)
-		}
+		size += assetOffset.Size()
 	}
 	n := int64(len(p.SatBindingMap))
 	// 每个brc20的transfer nft，都看作是占用330聪
 	
-	return offset.Size() - n + n * 330
+	return size - n + n * 330
 }
 
 // 添加一个output，按照value值将其合并到原来的output中，形成更大的output

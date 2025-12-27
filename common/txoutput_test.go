@@ -418,3 +418,158 @@ func TestTxOutput_Cut_BindingSatZero_WithOffsets(t *testing.T) {
 
 }
 
+func TestSplitRemainingNegative(t *testing.T) {
+    p := AssetOffsets{
+        &OffsetRange{Start: 0, End: 10},   // size = 10
+        &OffsetRange{Start: 11, End: 20},  // size = 9
+        &OffsetRange{Start: 21, End: 30},  // size = 9
+    }
+
+    // 按资产数量切 15
+    left, right := p.Split(15)
+
+    fmt.Printf("left:")
+    for _, r := range left {
+        fmt.Printf("  [%d, %d)", r.Start, r.End)
+    }
+	fmt.Printf("\n")
+
+    fmt.Printf("right:")
+    for _, r := range right {
+        fmt.Printf("  [%d, %d)", r.Start, r.End)
+    }
+	fmt.Printf("\n")
+}
+
+func TestAssetOffsets_Pickup(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  AssetOffsets
+		offset int64
+		amt    int64
+		want   AssetOffsets
+	}{
+		{
+			name: "offset inside first range",
+			input: AssetOffsets{
+				{Start: 0, End: 10},   // size 10
+				{Start: 20, End: 30},  // size 10
+			},
+			offset: 5,
+			amt:    5,
+			want: AssetOffsets{
+				{Start: 5, End: 10},
+			},
+		},
+		{
+			name: "offset equals range start",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 10, End: 20},
+			},
+			offset: 10,
+			amt:    5,
+			want: AssetOffsets{
+				{Start: 10, End: 15},
+			},
+		},
+		{
+			name: "cross multiple ranges",
+			input: AssetOffsets{
+				{Start: 0, End: 10},   // size 10
+				{Start: 20, End: 30},  // size 10
+				{Start: 40, End: 50},  // size 10
+			},
+			offset: 5,
+			amt:    20,
+			want: AssetOffsets{
+				{Start: 5, End: 10},   // 5
+				{Start: 20, End: 30},  // 10
+				{Start: 40, End: 45},  // 5
+			},
+		},
+		{
+			name: "exactly exhaust available assets",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 20, End: 30},
+			},
+			offset: 0,
+			amt:    20,
+			want: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 20, End: 30},
+			},
+		},
+		{
+			name: "insufficient assets returns nil",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+			},
+			offset: 5,
+			amt:    10,
+			want:   nil,
+		},
+		{
+			name: "offset beyond all ranges",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+			},
+			offset: 20,
+			amt:    1,
+			want:   nil,
+		},
+		{
+			name: "amt is zero",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+			},
+			offset: 0,
+			amt:    0,
+			want:   nil,
+		},
+		{
+			name: "offset hits gap between ranges",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 20, End: 30},
+			},
+			offset: 15,
+			amt:    5,
+			want: AssetOffsets{
+				{Start: 20, End: 25},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.input.Pickup(tt.offset, tt.amt)
+
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("expected nil, got %+v", got)
+				}
+				return
+			}
+
+			if got == nil {
+				t.Fatalf("expected %+v, got nil", tt.want)
+			}
+
+			if len(got) != len(tt.want) {
+				t.Fatalf("len mismatch: want %d, got %d", len(tt.want), len(got))
+			}
+
+			for i := range got {
+				if got[i].Start != tt.want[i].Start || got[i].End != tt.want[i].End {
+					t.Fatalf("range[%d] mismatch: want [%d,%d), got [%d,%d)",
+						i,
+						tt.want[i].Start, tt.want[i].End,
+						got[i].Start, got[i].End,
+					)
+				}
+			}
+		})
+	}
+}
