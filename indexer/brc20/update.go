@@ -920,10 +920,10 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 			if err != nil {
 				continue
 			}
-			// 有很多没有资产的数据，这些不用加入ticker中
-			if value.AssetAmt().Sign() == 0 {
-				continue
-			}
+			// 有很多没有资产的数据，这些也加入ticker中
+			// if value.AssetAmt().Sign() == 0 {
+			// 	continue
+			// }
 			holder.Tickers[v.ticker] = &value
 		}
 
