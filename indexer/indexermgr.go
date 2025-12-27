@@ -368,8 +368,8 @@ func (b *IndexerMgr) forceUpdateDB(wantToDelete map[string]uint64) {
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
 	b.RunesIndexer.UpdateDB()
-	b.brc20Indexer.UpdateDB()
 	b.brc20Indexer.CheckEmptyAddress(wantToDelete)
+	b.brc20Indexer.UpdateDB()
 
 	common.Log.Infof("IndexerMgr.forceUpdateDB: takes: %v", time.Since(startTime))
 }
@@ -458,8 +458,8 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.nsBackupDB.UpdateDB()
 	b.ftBackupDB.UpdateDB()
 	b.runesBackupDB.UpdateDB()
-	b.brc20BackupDB.UpdateDB()
 	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
+	b.brc20BackupDB.UpdateDB()
 	b.baseBackupDB.CleanEmptyAddress(org, wantToDelete)
 
 	b.base.SetSyncStats(b.baseBackupDB.GetSyncStats())

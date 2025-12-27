@@ -119,7 +119,6 @@ func (s *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*commo
 
 	result := s.loadHolderInfoFromDBV2(addrId)
 
-
 	// 根据缓存更新
 	holder, ok := s.holderMap[addrId]
 	if ok {
@@ -275,7 +274,7 @@ func (s *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 	return result[start:end]
 }
 
-func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) (*common.BRC20TransferInfo) {
+func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) *common.BRC20TransferInfo {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -374,7 +373,6 @@ func (s *BRC20Indexer) GetHolderAbbrInfo(addressId uint64, tickerName string) *c
 	return s.getHolderAbbrInfo(addressId, strings.ToLower(tickerName))
 }
 
-
 // transfer
 func (s *BRC20Indexer) getHolderAbbrInfo(addressId uint64, tickerName string) *common.BRC20TickAbbrInfo {
 
@@ -390,30 +388,24 @@ func (s *BRC20Indexer) getHolderAbbrInfo(addressId uint64, tickerName string) *c
 	return tickAbbrInfo
 }
 
+// 所有进行过有效的brc20操作的地址都必须永久保留
+// 在holderMap被清零之前调用会更好
 func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	
-	hasAssetAddress := make(map[string]uint64)
+
+	existingAddress := make(map[string]uint64)
 	needCheckInDB := make([]uint64, 0)
 	idToStr := make(map[uint64]string)
 	for k, v := range wantToDelete {
-		hasAsset := false
-		info, ok := s.holderMap[v]
+		existing := false
+		_, ok := s.holderMap[v]
 		if ok {
-			for _, v := range info.Tickers {
-				if v.AvailableBalance.Sign() != 0 {
-					hasAsset = true
-					break
-				}
-				if v.TransferableBalance.Sign() != 0 {
-					hasAsset = true
-					break
-				}
-			}
+			existing = true
+			break
 		}
-		if hasAsset {
-			hasAssetAddress[k] = v
+		if existing {
+			existingAddress[k] = v
 		} else {
 			needCheckInDB = append(needCheckInDB, v)
 			idToStr[v] = k
@@ -421,13 +413,13 @@ func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 	}
 
 	if len(needCheckInDB) > 0 {
-		hasAssetList := s.checkHolderAssetFromDBV2(needCheckInDB)
-		for _, addressId := range hasAssetList {
-			hasAssetAddress[idToStr[addressId]] = addressId
+		existingList := s.CheckHolderExistingFromDB(needCheckInDB)
+		for _, addressId := range existingList {
+			existingAddress[idToStr[addressId]] = addressId
 		}
 	}
 
-	for k := range hasAssetAddress {
+	for k := range existingAddress {
 		delete(wantToDelete, k)
 	}
 }

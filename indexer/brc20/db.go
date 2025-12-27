@@ -10,7 +10,6 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-
 func initStatusFromDB(ldb common.KVDB) *common.BRC20Status {
 	stats := &common.BRC20Status{}
 	err := db.GetValueFromDB([]byte(BRC20_DB_STATUS_KEY), stats, ldb)
@@ -28,7 +27,6 @@ func initStatusFromDB(ldb common.KVDB) *common.BRC20Status {
 
 	return stats
 }
-
 
 func (s *BRC20Indexer) initTickInfoFromDB(tickerName string) *BRC20TickInfo {
 	tickinfo := newTickerInfo(tickerName)
@@ -110,8 +108,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
 	return &result
 }
 
-
-func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*common.Decimal  {
+func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*common.Decimal {
 	result := make(map[string]*common.Decimal)
 
 	common.Log.Debug("BRC20Indexer loadHolderInfoFromDBV2 ...")
@@ -147,9 +144,8 @@ func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*comm
 	return result
 }
 
-
 func (s *BRC20Indexer) checkHolderAssetFromDB(addressId uint64) bool {
-	
+
 	hasAsset := false
 	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addressId))
 	s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
@@ -168,14 +164,33 @@ func (s *BRC20Indexer) checkHolderAssetFromDB(addressId uint64) bool {
 	return hasAsset
 }
 
-func (s *BRC20Indexer) checkHolderAssetFromDBV2(addrs []uint64) []uint64 {
+func (s *BRC20Indexer) checkHolderExistingFromDB(addressId uint64) bool {
+
+	existing := false
+	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_HOLDER_ASSET, common.Uint64ToString(addressId))
+	s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+		// 设置前缀扫描选项
+		var info common.BRC20TickAbbrInfo
+		err := db.DecodeBytes(v, &info)
+		if err == nil {
+			existing = true
+			return fmt.Errorf("found")
+		}
+		return nil
+	})
+
+	return existing
+}
+
+// 仅用于写入数据库后马上做地址检查，所以直接读数据库，不需要读缓存
+func (s *BRC20Indexer) CheckHolderExistingFromDB(addrs []uint64) []uint64 {
 	sort.Slice(addrs, func(i, j int) bool {
 		return addrs[i] < addrs[j]
 	})
 
 	hasAssetAddress := make([]uint64, 0)
 	for _, addressId := range addrs {
-		if s.checkHolderAssetFromDB(addressId) {
+		if s.checkHolderExistingFromDB(addressId) {
 			hasAssetAddress = append(hasAssetAddress, addressId)
 		}
 	}
@@ -204,7 +219,7 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 	common.Log.Debug("BRC20Indexer loadTickListFromDB ...")
 
 	type pair struct {
-		id int64
+		id   int64
 		name string
 	}
 
@@ -214,17 +229,17 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 		//key := string(k)
 		//tickname, err := parseTickListKey(key)
 		//if err == nil {
-			var ticker common.BRC20Ticker
-			err := db.DecodeBytes(v, &ticker)
-			if err == nil {
-				tickers = append(tickers, &pair{
-					id: ticker.Id,
-					name: strings.ToLower(ticker.Name),
-				})
-			} else {
-				common.Log.Panicln("DecodeBytes " + err.Error())
-			}
-		
+		var ticker common.BRC20Ticker
+		err := db.DecodeBytes(v, &ticker)
+		if err == nil {
+			tickers = append(tickers, &pair{
+				id:   ticker.Id,
+				name: strings.ToLower(ticker.Name),
+			})
+		} else {
+			common.Log.Panicln("DecodeBytes " + err.Error())
+		}
+
 		count++
 
 		return nil

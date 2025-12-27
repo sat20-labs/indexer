@@ -492,6 +492,18 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 
+	898651: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qltqe4c8g86cam5rlj2xylxvvdtm0mlxe3tea6q": "3"}},
+		},
+	},
+	
+	901301: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1qltqe4c8g86cam5rlj2xylxvvdtm0mlxe3tea6q": "3"}},
+		},
+	},
+
 	/*
 		780000: {
 			Height: 780000,

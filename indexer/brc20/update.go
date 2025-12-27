@@ -554,7 +554,9 @@ func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB
 			amt := value.AssetAmt()
 			if writeToDB {
 				if amt.Sign() == 0 && len(value.TransferableData) == 0 {
-					err := wb.Delete([]byte(addressTickerKey))
+					// 我们保留一个空记录，以便维持该addressId不被删除
+					// err := wb.Delete([]byte(addressTickerKey))
+					err := db.SetDB([]byte(addressTickerKey), value, wb)
 					if err != nil {
 						common.Log.Panicf("Error deleting db %s: %v\n", addressTickerKey, err)
 					}
@@ -581,7 +583,14 @@ func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB
 				}
 			}
 		} else {
-			err := wb.Delete([]byte(addressTickerKey))
+			// 我们保留一个空记录，以便维持该addressId不被删除
+			value = &common.BRC20TickAbbrInfo{
+				AvailableBalance: nil,
+				TransferableBalance: nil,
+				TransferableData: nil,
+			}
+			err := db.SetDB([]byte(addressTickerKey), value, wb)
+			//err := wb.Delete([]byte(addressTickerKey))
 			if err != nil {
 				common.Log.Panicf("Error deleting db %s: %v\n", addressTickerKey, err)
 			}
@@ -911,6 +920,10 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 			if err != nil {
 				continue
 			}
+			// 有很多没有资产的数据，这些不用加入ticker中
+			if value.AssetAmt().Sign() == 0 {
+				continue
+			}
 			holder.Tickers[v.ticker] = &value
 		}
 
@@ -943,7 +956,7 @@ func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction,
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	
-	if tx.TxId == "309f44dbafb6392b2010524353387318ae1cc4a3da9c570615026b14e9268785" {
+	if tx.TxId == "56ac05e0d79dbc8c633a48c4a9cbfdc3484c9681a91ec208909263b59f0cdfe3" {
 		common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 	}
 
