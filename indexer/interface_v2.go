@@ -121,8 +121,10 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 
 	//t1 = time.Now()
 	assetmap := b.GetAssetsWithUtxo(info.UtxoId)
+	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	//common.Log.Infof("GetAssetsWithUtxo takes %v", time.Since(t1))
 	//t1 = time.Now()
+	builder := common.NewTxAssetsBuilder(len(assetmap)+len(assetmap2))
 	for k, v := range assetmap {
 		offsets := v
 		value := v.Size()
@@ -142,12 +144,12 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			BindingSat: uint32(n),
 		}
 
-		output.Assets.Add(&asset)
+		builder.Add(&asset)
+		//output.Assets.Add(&asset)
 		output.Offsets[k] = offsets
 	}
 	//common.Log.Infof("filling assetsInUtxo takes %v", time.Since(t1))
 
-	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	for k, v := range assetmap2 {
 		if excludingInvalid && v.Invalid {
 			continue
@@ -165,8 +167,10 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 			output.Invalids[k] = v.Invalid
 		}
 
-		output.Assets.Add(&asset)
+		builder.Add(&asset)
+		//output.Assets.Add(&asset)
 	}
+	output.Assets = builder.Build()
 
 	return output
 }

@@ -620,6 +620,8 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	if p.OutValue.Value+another.OutValue.Value < 0 {
 		return fmt.Errorf("out of bounds")
 	}
+
+	builder := NewTxAssetsBuilder(len(another.Assets))
 	value := p.OutValue.Value
 	for _, asset := range another.Assets {
 		// 只将有效的资产合并进来，否则会影响原来可能存在的同名字资产
@@ -627,7 +629,8 @@ func (p *TxOutput) Append(another *TxOutput) error {
 			continue
 		}
 
-		p.Assets.Add(&asset)
+		builder.AddClone(&asset)
+		//p.Assets.Add(&asset)
 
 		offsets, ok := another.Offsets[asset.Name]
 		if !ok {
@@ -647,6 +650,10 @@ func (p *TxOutput) Append(another *TxOutput) error {
 		}
 		p.Offsets[asset.Name] = existingOffsets
 	}
+	builder.AddSlice(p.Assets)
+	p.Assets = builder.Build()
+
+
 	for k, v := range another.SatBindingMap {
 		if invalid, ok := another.Invalids[v.Name]; ok && invalid {
 			continue
@@ -682,6 +689,8 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	part1 := NewTxOutput(value1)
 	part2 := NewTxOutput(value2)
 
+	builder1 := NewTxAssetsBuilder(len(p.Assets))
+	builder2 := NewTxAssetsBuilder(len(p.Assets))
 	for _, asset := range p.Assets {
 		if invalid, ok := p.Invalids[asset.Name]; ok && invalid {
 			continue
@@ -699,7 +708,8 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 					Amount:     *NewDefaultDecimal(amt1),
 					BindingSat: asset.BindingSat,
 				}
-				part1.Assets.Add(&asset1)
+				builder1.Add(&asset1)
+				//part1.Assets.Add(&asset1)
 				part1.Offsets[asset.Name] = offset1
 			}
 
@@ -710,7 +720,8 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 					Amount:     *NewDefaultDecimal(amt2),
 					BindingSat: asset.BindingSat,
 				}
-				part2.Assets.Add(&asset2)
+				builder2.Add(&asset2)
+				//part2.Assets.Add(&asset2)
 				part2.Offsets[asset.Name] = offset2
 			}
 		} else {
@@ -741,7 +752,8 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 						Amount:     *amt,
 						BindingSat: asset.BindingSat,
 					}
-					part1.Assets.Add(&asset)
+					builder1.Add(&asset)
+					//part1.Assets.Add(&asset)
 					part1.Offsets[asset.Name] = offset1
 				}
 
@@ -755,14 +767,18 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 						Amount:     *amt,
 						BindingSat: asset.BindingSat,
 					}
-					part2.Assets.Add(&asset)
+					builder2.Add(&asset)
+					//part2.Assets.Add(&asset)
 					part2.Offsets[asset.Name] = offset2
 				}
 			} else {
-				part1.Assets.Add(&asset) // runes
+				builder1.Add(&asset)
+				//part1.Assets.Add(&asset) // runes
 			}
 		}
 	}
+	part1.Assets = builder1.Build()
+	part2.Assets = builder2.Build()
 
 	if len(p.SatBindingMap) > 0 {
 		satmap1 := make(map[int64]*AssetInfo)
@@ -913,16 +929,18 @@ func (p *TxOutput) Merge(another *TxOutput) error {
 		return nil
 	}
 
+	builder := NewTxAssetsBuilder(len(another.Assets))
 	for _, asset := range another.Assets {
 		// 只将有效的资产合并进来，否则会影响原来可能存在的同名字资产
 		if invalid, ok := another.Invalids[asset.Name]; ok && invalid {
 			continue
 		}
 
-		err := p.Assets.Add(&asset)
-		if err != nil {
-			return err
-		}
+		builder.Add(&asset)
+		//err := p.Assets.Add(&asset)
+		// if err != nil {
+		// 	return err
+		// }
 		offset, ok := another.Offsets[asset.Name]
 		if ok {
 			existing, ok := p.Offsets[asset.Name]
@@ -934,6 +952,8 @@ func (p *TxOutput) Merge(another *TxOutput) error {
 			p.Offsets[asset.Name] = existing
 		}
 	}
+	builder.AddSlice(p.Assets)
+	p.Assets = builder.Build()
 
 	for k, v := range another.SatBindingMap {
 		if invalid, ok := another.Invalids[v.Name]; ok && invalid {

@@ -160,13 +160,21 @@ func (p *TxAssets) Merge(another TxAssets) error {
 	if another == nil {
 		return nil
 	}
-	cp := p.Clone()
+	// cp := p.Clone()
+	// for _, asset := range another {
+	// 	if err := cp.Add(&asset); err != nil {
+	// 		return err
+	// 	}
+	// }
+	// *p = cp
+
+	builder := NewTxAssetsBuilder(len(another))
 	for _, asset := range another {
-		if err := cp.Add(&asset); err != nil {
-			return err
-		}
+		builder.AddClone(&asset)
 	}
-	*p = cp
+	builder.AddSlice(*p)
+	*p = builder.Build()
+
 	return nil
 }
 
@@ -185,7 +193,7 @@ func (p *TxAssets) Split(another TxAssets) error {
 	return nil
 }
 
-// Add 将另一个资产列表合并到当前列表中
+// Add 将另一个资产列表合并到当前列表中 (效率低， 仅用于添加一个)
 func (p *TxAssets) Add(asset *AssetInfo) error {
 	if asset == nil {
 		return nil
@@ -316,6 +324,13 @@ func (b *TxAssetsBuilder) Add(asset *AssetInfo) {
     // 关键点：
     // 直接接管 asset，不 Clone，不复制 big.Int
     b.m[asset.Name] = asset
+}
+
+// 不分配内存，直接使用asset
+func (b *TxAssetsBuilder) AddSlice(assets TxAssets) {
+	for _, asset := range assets {
+		b.Add(&asset)
+	}
 }
 
 // 分配内存版本

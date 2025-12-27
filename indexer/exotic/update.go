@@ -329,27 +329,29 @@ func (p *ExoticIndexer) TxInputProcess(txIndex int, tx *common.Transaction,
 		holder, ok := p.holderInfo[utxo]
 		if ok {
 			tickers := make(map[string]bool)
+			builder := common.NewTxAssetsBuilder(len(holder.Tickers))
 			for ticker, assetInfo := range holder.Tickers {
-				//for _, info := range assetVector {
-					asset := common.AssetInfo{
-						Name: common.AssetName{
-							Protocol: common.PROTOCOL_NAME_ORDX,
-							Type:     common.ASSET_TYPE_EXOTIC,
-							Ticker:   ticker,
-						},
-						Amount:     *common.NewDecimal(assetInfo.AssetAmt(), 0),
-						BindingSat: 1,
-					}
-					input.Assets.Add(&asset)
-					old, ok := input.Offsets[asset.Name]
-					if ok {
-						old.Merge(assetInfo.Offsets)
-					} else {
-						input.Offsets[asset.Name] = assetInfo.Offsets.Clone()
-					}
-				//}
+				asset := common.AssetInfo{
+					Name: common.AssetName{
+						Protocol: common.PROTOCOL_NAME_ORDX,
+						Type:     common.ASSET_TYPE_EXOTIC,
+						Ticker:   ticker,
+					},
+					Amount:     *common.NewDecimal(assetInfo.AssetAmt(), 0),
+					BindingSat: 1,
+				}
+				builder.Add(&asset)
+				//input.Assets.Add(&asset)
+				old, ok := input.Offsets[asset.Name]
+				if ok {
+					old.Merge(assetInfo.Offsets)
+				} else {
+					input.Offsets[asset.Name] = assetInfo.Offsets.Clone()
+				}
 				tickers[ticker] = true
 			}
+			builder.AddSlice(input.Assets)
+			input.Assets = builder.Build()
 
 			action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: tickers, Action: -1}
 			p.holderActionList = append(p.holderActionList, &action)

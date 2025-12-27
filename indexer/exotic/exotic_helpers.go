@@ -306,25 +306,6 @@ func (p *ExoticIndexer) InitRarityDB(height int) {
 	common.Log.Infof("InitRarityDB %d takes %v", height, time.Since(start))
 }
 
-func AddAsset(output *common.TxOutput, name string, offset int64, amt int64) {
-	asset := common.AssetInfo{
-		Name: common.AssetName{
-			Protocol: common.PROTOCOL_NAME_ORDX,
-			Type:     common.ASSET_TYPE_EXOTIC,
-			Ticker:   name,
-		},
-		Amount:     *common.NewDecimal(amt, 0),
-		BindingSat: 1,
-	}
-	output.Assets.Add(&asset)
-	output.Offsets[asset.Name] = common.AssetOffsets{
-		{
-			Start: offset,
-			End:   offset + amt,
-		},
-	}
-}
-
 func (p *ExoticIndexer) GenerateRodarmorRarityAssets(block *common.Block,
 	coinbase []*common.Range) {
 

@@ -354,6 +354,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				for sat, offset := range sats {
 					addSatInfoToOutput(&input.TxOutput, sat, offset, builder)
 				}
+				builder.AddSlice(input.Assets)
 				input.TxOutput.Assets = builder.Build()
 
 				p.utxoMap[input.UtxoId] = sats
@@ -503,6 +504,7 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 					addSatInfoToOutput(&txOut.TxOutput, sat, offset, builder) // 合并资产信息，供下一个模块处理
 				}
 			}
+			builder.AddSlice(input.Assets)
 			txOut.TxOutput.Assets = builder.Build()
 		}
 	}

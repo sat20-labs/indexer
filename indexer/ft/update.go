@@ -181,12 +181,10 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 			}
 
 			if holder != nil {
-
 				tickers := make(map[string]bool)
+				builder := common.NewTxAssetsBuilder(len(holder.Tickers))
 				for ticker, assetInfo := range holder.Tickers {
-
 					tickerInfo := p.tickerMap[ticker]
-
 					assetName := common.AssetName{
 						Protocol: common.PROTOCOL_NAME_ORDX,
 						Type:     common.ASSET_TYPE_FT,
@@ -197,10 +195,13 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 						Amount:     *common.NewDecimal(assetInfo.AssetAmt(), 0),
 						BindingSat: uint32(tickerInfo.Ticker.N),
 					}
-					input.Assets.Add(&asset)
+					builder.Add(&asset)
+					//input.Assets.Add(&asset)
 					input.Offsets[asset.Name] = assetInfo.Offsets.Clone()
 					tickers[ticker] = true
 				}
+				builder.AddSlice(input.Assets)
+				input.Assets = builder.Build()
 
 				action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: tickers, Action: -1}
 				p.holderActionList = append(p.holderActionList, &action)
