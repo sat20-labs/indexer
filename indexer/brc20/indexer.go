@@ -387,7 +387,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 		return mid[i].amt.Cmp(mid[j].amt) > 0
 	})
 	limit := 20 //len(mid) // 40
-	rpc := base.NewRpcIndexer(s.nftIndexer.GetBaseIndexer())
+	baseIndexer := (s.nftIndexer.GetBaseIndexer())
 	for i, item := range mid {
 		if i > limit {
 			break
@@ -395,7 +395,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 		if item.amt.Sign() == 0 {
 			continue
 		}
-		address, err := rpc.GetAddressByID(item.addressId)
+		address, err := baseIndexer.GetAddressByID(item.addressId)
 		if err != nil {
 			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
 			address = "-\t"
@@ -406,7 +406,7 @@ func (s *BRC20Indexer) printHoldersWithMap(holders map[uint64]*common.Decimal) {
 		if i > limit {
 			break
 		}
-		address, err := rpc.GetAddressByID(item.addressId)
+		address, err := baseIndexer.GetAddressByID(item.addressId)
 		if err != nil {
 			common.Log.Panicf("printHoldersWithMap GetAddressByID %x failed, %v", item.addressId, err)
 			address = "-\t"
@@ -504,6 +504,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		//s.printHistoryWithAddress(name, 0x3b0cee)
 	}
 
+	// 下面这个方式遍历所有ticker极慢，需要参考nft模块的方案 TODO
 	startTime := time.Now()
 	allTickers := s.GetAllTickers()
 	for _, name := range allTickers {

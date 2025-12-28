@@ -197,12 +197,11 @@ func (s *Indexer) CheckSelf() bool {
 	}
 
 	checkAmount := func(address string, expectedmap map[string]string) bool {
-		addressId := s.baseIndexer.GetAddressId(address)
-		utxos := s.baseIndexer.GetUTXOs(addressId)
+		addressId, utxos := s.baseIndexer.GetUTXOsWithAddress(address)
 		assets := s.GetAddressAssets(addressId, utxos)
 
 		if len(assets) != len(expectedmap) {
-			common.Log.Errorf("assets account different, have %d but expected %d", len(assets), len(expectedmap))
+			common.Log.Errorf("assets count different, have %d but expected %d", len(assets), len(expectedmap))
 			return false
 		}
 		for r, b := range expectedmap {
@@ -616,15 +615,16 @@ func (s *Indexer) CheckSelf() bool {
 		common.Log.Infof("address %s checked!", address2)
 	}
 
+	// 下面这个方式极慢，需要参考nft模块的方案 TODO
 	// check all runes minted amount
 	allRunes := s.GetAllRuneInfos()
 	common.Log.Infof("total runes: %d", len(allRunes))
 	startTime := time.Now()
 	for _, rune := range allRunes {
 		//common.Log.Infof("checking ticker %s", name)
-		startTime2 := time.Now()
+		//startTime2 := time.Now()
 		holdermap := s.GetHoldersWithTick(rune.Id)
-		common.Log.Infof("GetHoldersWithTick %s took %v.", rune.Id, time.Since(startTime2))
+		//common.Log.Infof("GetHoldersWithTick %s took %v.", rune.Id, time.Since(startTime2))
 		var holderAmount *common.Decimal
 		for _, amt := range holdermap {
 			holderAmount = holderAmount.Add(amt)
@@ -638,22 +638,22 @@ func (s *Indexer) CheckSelf() bool {
 			return false
 		}
 
-		//if rune.Number < 10 {
+		if rune.Number < 10 {
 			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
-		//} 
+		} 
 
-		startTime2 = time.Now()
+		//startTime2 = time.Now()
 		_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
-		common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
+		//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
 		if total == 0 {
 			if holderAmount.Sign() != 0 {
 				common.Log.Errorf("rune ticker %s GetAllUtxoBalances failed", rune.Name)
 				return false
 			}
 		} else {
-			startTime2 = time.Now()
+			//startTime2 = time.Now()
 			utxos, _ := s.GetAllUtxoBalances(rune.Id, 0, total)
-			common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
+			//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
 			var amontInUtxos uint128.Uint128
 			for _, balance := range utxos.Balances {
 				amontInUtxos = amontInUtxos.Add(balance.Balance)
