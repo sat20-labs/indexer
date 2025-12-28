@@ -232,10 +232,20 @@ func (b *BaseIndexer) forceUpdateDB() {
 		for k, v := range wantToDelete {
 			org[k] = v
 		}
+		// address := "bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p"
+		// id, ok := wantToDelete[address] 
+		// if ok {
+		// 	common.Log.Infof("%s %x", address, id )
+		// }
 
 		// startTime = time.Now()
 		b.updateDBCB(wantToDelete)
 		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
+
+		// _, ok = wantToDelete[address] 
+		// if ok {
+		// 	common.Log.Infof("want to delete %s", address)
+		// }
 
 		b.CleanEmptyAddress(org, wantToDelete)
 
@@ -452,8 +462,11 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 			if err != nil {
 				common.Log.Panicf("Error setting in db %v", err)
 			}
+			if err := wb.Put(db.GetAddressIdKey(v.AddressId), []byte(k)); err != nil { // id->address
+				common.Log.Panicf("Error setting in db %v", err)
+			}
+			// 删除就会导致绑定关系丢失，所以暂时先保存所有地址和id的对应关系，
 
-			// 删除就会导致绑定关系丢失
 			// err := wb.Delete((key))
 			// if err != nil {
 			// 	common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
@@ -496,19 +509,19 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	return wantToDeleteMap
 }
 
+// org数量极大，最终不删除的比较少，要看如何优化。 TODO
 func (b *BaseIndexer) CleanEmptyAddress(org, wantToDelete map[string]uint64) {
 	wb := b.db.NewWriteBatch()
 	defer wb.Close()
 	for k, v := range org {
-		//key1 := db.GetAddressDBKeyV2(k)
-		key2 := db.GetAddressIdKey(v)
 		_, ok := wantToDelete[k]
 		if ok {
-			// TODO 暂时不删除，让测试走完，以后再优化
-			//wb.Delete(key1)
-			//wb.Delete(key2)
+			key1 := db.GetAddressDBKeyV2(k)
+			key2 := db.GetAddressIdKey(v)
+			wb.Delete(key1)
+			wb.Delete(key2)
 		} else {
-			// 前面已经先保存了address->id
+			// 前面已经先保存了
 			// empty := &common.AddressValueInDBV2{
 			// 	AddressId: v,
 			// }
@@ -516,9 +529,9 @@ func (b *BaseIndexer) CleanEmptyAddress(org, wantToDelete map[string]uint64) {
 			// if err != nil {
 			// 	common.Log.Panicf("Error setting in db %v", err)
 			// }
-			if err := wb.Put(key2, []byte(k)); err != nil { // id->address
-				common.Log.Panicf("Error setting in db %v", err)
-			}
+			// if err := wb.Put(key2, []byte(k)); err != nil { // id->address
+			// 	common.Log.Panicf("Error setting in db %v", err)
+			// }
 		}
 	}
 	err := wb.Flush()

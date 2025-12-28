@@ -1,7 +1,6 @@
 package runes
 
 import (
-	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
@@ -196,6 +195,55 @@ func (s *Indexer) CheckSelf() bool {
 		return false
 	}
 
+	checkHolders := func(name string) bool {
+
+		rune := s.GetRuneInfo(name)
+
+		holdermap := s.GetHoldersWithTick(rune.Id)
+		//common.Log.Infof("GetHoldersWithTick %s took %v.", rune.Id, time.Since(startTime2))
+		var holderAmount *common.Decimal
+		for _, amt := range holdermap {
+			holderAmount = holderAmount.Add(amt)
+		}
+		if rune.HolderCount != uint64(len(holdermap)) {
+			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, len(holdermap))
+			return false
+		}
+		if rune.TotalHolderAmt().Cmp(holderAmount) != 0 {
+			common.Log.Errorf("rune ticker %s holder amount different. %s %s", rune.Name, rune.TotalHolderAmt(), holderAmount)
+			return false
+		}
+
+		if rune.Number < 10 {
+			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
+		} 
+
+		//startTime2 = time.Now()
+		_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
+		//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
+		if total == 0 {
+			if holderAmount.Sign() != 0 {
+				common.Log.Errorf("rune ticker %s GetAllUtxoBalances failed", rune.Name)
+				return false
+			}
+		} else {
+			//startTime2 = time.Now()
+			utxos, _ := s.GetAllUtxoBalances(rune.Id, 0, total)
+			//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
+			var amontInUtxos uint128.Uint128
+			for _, balance := range utxos.Balances {
+				amontInUtxos = amontInUtxos.Add(balance.Balance)
+			}
+			amt := common.NewDecimalFromUint128(amontInUtxos, int(rune.Divisibility))
+
+			if amt.Cmp(holderAmount) != 0 {
+				common.Log.Errorf("rune ticker %s amount in utoxs incorrect. %s %s", rune.Name, holderAmount.String(), amt.String())
+				return false
+			}
+		}
+		return true
+	}
+
 	checkAmount := func(address string, expectedmap map[string]string) bool {
 		addressId, utxos := s.baseIndexer.GetUTXOsWithAddress(address)
 		assets := s.GetAddressAssets(addressId, utxos)
@@ -215,10 +263,16 @@ func (s *Indexer) CheckSelf() bool {
 				common.Log.Errorf("rune %s amount %s incorrect. expected %s", r, asset.Balance.String(), b)
 				return false
 			}
+
+			if !checkHolders(r) {
+				common.Log.Errorf("rune %s checkHolders failed", r)
+				return false
+			}
+
 			common.Log.Infof("runes %s checked.", r)
 		}
 		return true
-	}
+	}	
 
 	if s.chaincfgParam.Net == wire.MainNet && s.height == 919482 {
 		expectedmap1 := map[string]string{
@@ -619,54 +673,14 @@ func (s *Indexer) CheckSelf() bool {
 	// check all runes minted amount
 	allRunes := s.GetAllRuneInfos()
 	common.Log.Infof("total runes: %d", len(allRunes))
-	startTime := time.Now()
-	for _, rune := range allRunes {
-		//common.Log.Infof("checking ticker %s", name)
-		//startTime2 := time.Now()
-		holdermap := s.GetHoldersWithTick(rune.Id)
-		//common.Log.Infof("GetHoldersWithTick %s took %v.", rune.Id, time.Since(startTime2))
-		var holderAmount *common.Decimal
-		for _, amt := range holdermap {
-			holderAmount = holderAmount.Add(amt)
-		}
-		if rune.HolderCount != uint64(len(holdermap)) {
-			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, len(holdermap))
-			return false
-		}
-		if rune.TotalHolderAmt().Cmp(holderAmount) != 0 {
-			common.Log.Errorf("rune ticker %s holder amount different. %s %s", rune.Name, rune.TotalHolderAmt(), holderAmount)
-			return false
-		}
-
-		if rune.Number < 10 {
-			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
-		} 
-
-		//startTime2 = time.Now()
-		_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
-		//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
-		if total == 0 {
-			if holderAmount.Sign() != 0 {
-				common.Log.Errorf("rune ticker %s GetAllUtxoBalances failed", rune.Name)
-				return false
-			}
-		} else {
-			//startTime2 = time.Now()
-			utxos, _ := s.GetAllUtxoBalances(rune.Id, 0, total)
-			//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
-			var amontInUtxos uint128.Uint128
-			for _, balance := range utxos.Balances {
-				amontInUtxos = amontInUtxos.Add(balance.Balance)
-			}
-			amt := common.NewDecimalFromUint128(amontInUtxos, int(rune.Divisibility))
-
-			if amt.Cmp(holderAmount) != 0 {
-				common.Log.Errorf("rune ticker %s amount in utoxs incorrect. %s %s", rune.Name, holderAmount.String(), amt.String())
-				return false
-			}
-		}
-	}
-	common.Log.Infof("rune check amount took %v.", time.Since(startTime))
+	// startTime := time.Now()
+	// for _, rune := range allRunes {
+	// 	if !checkHolders(rune.Name) {
+	// 		common.Log.Errorf("rune %s checkHolders failed", rune.Name)
+	// 		return false
+	// 	}
+	// }
+	// common.Log.Infof("rune check amount took %v.", time.Since(startTime))
 
 	common.Log.Infof("runes checked.")
 	return true

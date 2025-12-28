@@ -502,6 +502,11 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},
 		},
 	},
+	894465: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},
+		},
+	},
 	894901: {
 		Tickers: map[string]*TickerStatus{
 			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},

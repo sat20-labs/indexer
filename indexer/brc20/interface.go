@@ -402,7 +402,6 @@ func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 		_, ok := s.holderMap[v]
 		if ok {
 			existing = true
-			break
 		}
 		if existing {
 			existingAddress[k] = v

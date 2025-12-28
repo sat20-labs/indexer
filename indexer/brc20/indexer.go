@@ -446,9 +446,9 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	common.Log.Infof("stats: %v", s.status)
 
 	isMainnet := s.nftIndexer.GetBaseIndexer().IsMainnet()
-	var names []string
+	//var names []string
 
-	s.CheckPointWithBlockHeight(height)
+	//s.CheckPointWithBlockHeight(height)
 
 	// holdermap := s.GetHoldersWithTick("meme")
 	// for k, v := range holdermap {
@@ -462,47 +462,47 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 	// 	}
 	// }
 
-	if isMainnet {
-		names = []string{
-			"ordi",
-			// "sats",
-			// "doge",
-			// "rats",
-			// "𝛑",
-			// "pizza",
-			// "ligo",
-			// "piin",
-		}
-	} else {
-		names = []string{
-			"ordi",
-			"usdt",
-			"test",
-			"husk",
-			"gc  ",
-			"ttt3",
-			"doge",
-			"rats",
-			"ttt3",
-			"tbtc",
-			"brc20",
-			"sats",
-			"bfun ",
-			"⚽ ",
-		}
-	}
-	for _, name := range names {
-		s.printTicker(name)
-		//s.printHistory(name)
-		s.printHolders(name)
-		//s.printHistoryWithAddress(name, 0x51cd94cd)
-		//s.printHistoryWithAddress(name, 0x306ce3)
-		// s.printHistoryWithAddress(name, 0x38815d)
-		// s.printHistoryWithAddress(name, 0x3b37a3)
-		// s.printHistoryWithAddress(name, 0x3ff5fe)
-		//s.printHistoryWithAddress(name, 0x1569f9)
-		//s.printHistoryWithAddress(name, 0x3b0cee)
-	}
+	// if isMainnet {
+	// 	names = []string{
+	// 		"ordi",
+	// 		"sats",
+	// 		"doge",
+	// 		"rats",
+	// 		"𝛑",
+	// 		"pizza",
+	// 		"ligo",
+	// 		"piin",
+	// 	}
+	// } else {
+	// 	names = []string{
+	// 		"ordi",
+	// 		"usdt",
+	// 		"test",
+	// 		"husk",
+	// 		"gc  ",
+	// 		"ttt3",
+	// 		"doge",
+	// 		"rats",
+	// 		"ttt3",
+	// 		"tbtc",
+	// 		"brc20",
+	// 		"sats",
+	// 		"bfun ",
+	// 		"⚽ ",
+	// 	}
+	// }
+	// for _, name := range names {
+	// 	s.printTicker(name)
+	// 	//s.printHistory(name)
+	// 	s.printHolders(name)
+	// 	//s.printHistoryWithAddress(name, 0x51cd94cd)
+	// 	//s.printHistoryWithAddress(name, 0x306ce3)
+	// 	// s.printHistoryWithAddress(name, 0x38815d)
+	// 	// s.printHistoryWithAddress(name, 0x3b37a3)
+	// 	// s.printHistoryWithAddress(name, 0x3ff5fe)
+	// 	//s.printHistoryWithAddress(name, 0x1569f9)
+	// 	//s.printHistoryWithAddress(name, 0x3b0cee)
+	// }
 
 	// 下面这个方式遍历所有ticker极慢，需要参考nft模块的方案 TODO
 	startTime := time.Now()
