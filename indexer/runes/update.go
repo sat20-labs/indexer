@@ -40,7 +40,7 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		return
 	}
 
-	if s.height != (block.Height-1) {
+	if s.height != 0 && s.height != (block.Height-1) {
 		common.Log.Panicf("RuneIndexer.UpdateTransfer-> err: status.Height(%d) < block.Height-1(%d), missing intermediate blocks", s.Status.Height, block.Height-1)
 	}
 	s.height = (block.Height)
