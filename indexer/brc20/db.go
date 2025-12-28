@@ -90,7 +90,9 @@ func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
 			var info common.BRC20TickAbbrInfo
 			err = db.DecodeBytes(v, &info)
 			if err == nil {
-				result.Tickers[ticker] = &info
+				if info.AssetAmt().Sign() != 0 || len(info.TransferableData) != 0 {
+					result.Tickers[ticker] = &info
+				}
 			} else {
 				common.Log.Panicln("DecodeBytes " + err.Error())
 			}
@@ -126,7 +128,10 @@ func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*comm
 			var info common.BRC20TickAbbrInfo
 			err = db.DecodeBytes(v, &info)
 			if err == nil {
-				result[ticker] = info.AssetAmt()
+				amt := info.AssetAmt()
+				if amt.Sign() != 0 {
+					result[ticker] = info.AssetAmt()
+				}
 			} else {
 				common.Log.Panicln("DecodeBytes " + err.Error())
 			}

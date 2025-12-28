@@ -354,8 +354,8 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 				for sat, offset := range sats {
 					addSatInfoToOutput(&input.TxOutput, sat, offset, builder)
 				}
-				builder.AddSlice(input.Assets)
-				input.TxOutput.Assets = builder.Build()
+				builder.AddSlice(input.Assets) // TODO 如果一直跑block，其资产数据已经缓存在tx中，不需要再获取，这是一个很好的优化地方，对所有类型的indexer都一样
+				input.Assets = builder.Build()
 
 				p.utxoMap[input.UtxoId] = sats
 				delete(p.utxoMap, input.UtxoId)
@@ -504,7 +504,7 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 					addSatInfoToOutput(&txOut.TxOutput, sat, offset, builder) // 合并资产信息，供下一个模块处理
 				}
 			}
-			builder.AddSlice(input.Assets)
+			builder.AddSlice(txOut.TxOutput.Assets)
 			txOut.TxOutput.Assets = builder.Build()
 		}
 	}
