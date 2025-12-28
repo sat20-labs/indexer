@@ -475,7 +475,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 	inputTransferNfts map[int64]*TransferNftInfo) {
 	// 检查是否存在nft。如果存在，就更新对应的holder数据
 	utxoId := output.UtxoId
-	// if utxoId == 3804104076034048 {
+	// if txId == "672f335b384bc15e9a05cc6583e6c586e77a82e9ac1eda7960efe2af372514f5" {
 	// 	common.Log.Infof("")
 	// }
 	// ids := s.nftIndexer.GetNftsWithUtxo(utxoId) // 有可能多个transfer nft，合并输出到一个output中
@@ -921,9 +921,9 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 				continue
 			}
 			// 有很多没有资产的数据，这些也加入ticker中
-			// if value.AssetAmt().Sign() == 0 {
-			// 	continue
-			// }
+			if value.AssetAmt().Sign() == 0 && len(value.TransferableData) == 0 {
+				continue
+			}
 			holder.Tickers[v.ticker] = &value
 		}
 
@@ -956,9 +956,9 @@ func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction,
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	
-	if tx.TxId == "56ac05e0d79dbc8c633a48c4a9cbfdc3484c9681a91ec208909263b59f0cdfe3" {
-		common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
-	}
+	// if tx.TxId == "672f335b384bc15e9a05cc6583e6c586e77a82e9ac1eda7960efe2af372514f5" {
+	// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
+	// }
 
 	inputTransferNfts := make(map[int64]*TransferNftInfo)
 	hasTransfer := false
