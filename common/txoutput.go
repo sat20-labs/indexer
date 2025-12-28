@@ -811,7 +811,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 					part2.Offsets[asset.Name] = offset2
 				}
 			} else {
-				builder1.Add(&asset)
+				builder1.AddClone(&asset)
 				//part1.Assets.Add(&asset) // runes
 			}
 		}
@@ -975,7 +975,7 @@ func (p *TxOutput) Merge(another *TxOutput) error {
 			continue
 		}
 
-		builder.Add(&asset)
+		builder.AddClone(&asset)
 		//err := p.Assets.Add(&asset)
 		// if err != nil {
 		// 	return err

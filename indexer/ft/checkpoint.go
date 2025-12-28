@@ -10,6 +10,7 @@ import (
 type CheckPoint struct {
 	Height      int
 	TickerCount int
+	CheckHolder bool
 	Tickers     map[string]*TickerStatus
 }
 
@@ -241,9 +242,11 @@ func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
 	}
 
 	if matchHeight != 0 {
-		tickers := p.getAllTickers()
-		if checkpoint.TickerCount != 0 && len(tickers) != checkpoint.TickerCount {
-			common.Log.Panicf("ticker count different")
+		if checkpoint.TickerCount != 0 {
+			tickers := p.getAllTickers()
+			if len(tickers) != checkpoint.TickerCount {
+				common.Log.Panicf("ticker count different")
+			}
 		}
 	}
 	
@@ -291,38 +294,39 @@ func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
 			}
 		}
 
-		holdermap := p.getHolderAndAmountWithTick(name)
-		var holderAmount int64
-		for _, amt := range holdermap {
-			holderAmount += amt
-		}
-		if holderAmount != ticker.TotalMinted {
-			common.Log.Infof("block %d, ticker %s, asset amount different %d %d",
-				height, name, ticker.TotalMinted, holderAmount)
+		if checkpoint.CheckHolder {
+			holdermap := p.getHolderAndAmountWithTick(name)
+			var holderAmount int64
+			for _, amt := range holdermap {
+				holderAmount += amt
+			}
+			if holderAmount != ticker.TotalMinted {
+				common.Log.Infof("block %d, ticker %s, asset amount different %d %d",
+					height, name, ticker.TotalMinted, holderAmount)
 
-			printAddress := make(map[uint64]bool)
-			for k, v := range holdermap {
-				old, ok := p.holderMapInPrevBlock[k]
-				if ok {
-					if old != v {
-						common.Log.Infof("%x changed %d -> %d", k, old, v)
+				printAddress := make(map[uint64]bool)
+				for k, v := range holdermap {
+					old, ok := p.holderMapInPrevBlock[k]
+					if ok {
+						if old != v {
+							common.Log.Infof("%x changed %d -> %d", k, old, v)
+							printAddress[k] = true
+						}
+					} else {
+						common.Log.Infof("%x added %d -> %d", k, old, v)
 						printAddress[k] = true
 					}
-				} else {
-					common.Log.Infof("%x added %d -> %d", k, old, v)
-					printAddress[k] = true
 				}
-			}
-			for k := range printAddress {
-				p.printHistoryWithAddress(name, k)
-			}
+				for k := range printAddress {
+					p.printHistoryWithAddress(name, k)
+				}
 
-			//p.printHistory(name)
-			//p.printHistoryWithAddress(name, 0x52b1777c)
-			common.Log.Panicf("%s amount different %d %d", name, ticker.TotalMinted, holderAmount)
+				//p.printHistory(name)
+				//p.printHistoryWithAddress(name, 0x52b1777c)
+				common.Log.Panicf("%s amount different %d %d", name, ticker.TotalMinted, holderAmount)
+			}
+			p.holderMapInPrevBlock = holdermap
 		}
-		p.holderMapInPrevBlock = holdermap
-
 	}
 	common.Log.Infof("FTIndexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }

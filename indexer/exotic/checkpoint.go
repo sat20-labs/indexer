@@ -10,6 +10,7 @@ import (
 type CheckPoint struct {
 	Height      int
 	TickerCount int
+	CheckHolder bool
 	Tickers     map[string]*TickerStatus
 }
 
@@ -237,9 +238,11 @@ func (p *ExoticIndexer) CheckPointWithBlockHeight(height int) {
 	}
 
 	if matchHeight != 0 {
-		tickers := p.getAllTickers()
-		if checkpoint.TickerCount != 0 && len(tickers) != checkpoint.TickerCount {
-			common.Log.Panicf("ticker count different")
+		if checkpoint.TickerCount != 0 {
+			tickers := p.getAllTickers()
+			if len(tickers) != checkpoint.TickerCount {
+				common.Log.Panicf("ticker count different")
+			}
 		}
 	}
 	
@@ -281,20 +284,21 @@ func (p *ExoticIndexer) CheckPointWithBlockHeight(height int) {
 			}
 		}
 
-		holdermap := p.getHolderAndAmountWithTick(name)
-		var holderAmount int64
-		for _, amt := range holdermap {
-			holderAmount += amt
-		}
-		if holderAmount != ticker.TotalMinted {
-			common.Log.Infof("block %d, ticker %s, asset amount different %d %d",
-				height, name, ticker.TotalMinted, holderAmount)
+		if checkpoint.CheckHolder {
+			holdermap := p.getHolderAndAmountWithTick(name)
+			var holderAmount int64
+			for _, amt := range holdermap {
+				holderAmount += amt
+			}
+			if holderAmount != ticker.TotalMinted {
+				common.Log.Infof("block %d, ticker %s, asset amount different %d %d",
+					height, name, ticker.TotalMinted, holderAmount)
 
-			//p.printHistory(name)
-			//p.printHistoryWithAddress(name, 0x52b1777c)
-			common.Log.Panicf("%s amount different %d %d", name, ticker.TotalMinted, holderAmount)
+				//p.printHistory(name)
+				//p.printHistoryWithAddress(name, 0x52b1777c)
+				common.Log.Panicf("%s amount different %d %d", name, ticker.TotalMinted, holderAmount)
+			}
 		}
-
 	}
 	common.Log.Infof("ExoticIndexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }

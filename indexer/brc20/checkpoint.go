@@ -14,6 +14,7 @@ import (
 type CheckPoint struct {
 	Height      int
 	TickerCount int
+	CheckHolder bool
 	Tickers     map[string]*TickerStatus
 }
 
@@ -491,6 +492,16 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "9128777.40996118"}},
 		},
 	},
+	847145: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},
+		},
+	},
+	892933: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},
+		},
+	},
 
 	898651: {
 		Tickers: map[string]*TickerStatus{
@@ -562,13 +573,15 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 	}
 
 	if matchHeight != 0 {
-		tickers := p.getAllTickers()
-		if checkpoint.TickerCount != 0 && len(tickers) != checkpoint.TickerCount {
-			for i := len(tickers) - 20; i < len(tickers) - 1; i++ {
-				p.printTicker(tickers[i])
-				common.Log.Info("")
+		if checkpoint.TickerCount != 0 {
+			tickers := p.getAllTickers()
+			if len(tickers) != checkpoint.TickerCount {
+				for i := len(tickers) - 20; i < len(tickers) - 1; i++ {
+					p.printTicker(tickers[i])
+					common.Log.Info("")
+				}
+				common.Log.Panicf("ticker count different")
 			}
-			common.Log.Panicf("ticker count different")
 		}
 	}
 	// 太花时间
@@ -620,38 +633,40 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 			}
 		}
 
-		holdermap := p.getHoldersWithTick(name)
-		var holderAmount *common.Decimal
-		for _, amt := range holdermap {
-			holderAmount = holderAmount.Add(amt)
-		}
-		if holderAmount.Cmp(&ticker.Minted) != 0 {
-			common.Log.Infof("block %d, ticker %s, asset amount different %s %s",
-				height, name, ticker.Minted.String(), holderAmount.String())
+		if checkpoint.CheckHolder {
+			holdermap := p.getHoldersWithTick(name) // 效率太低，没事尽可能不要检查
+			var holderAmount *common.Decimal
+			for _, amt := range holdermap {
+				holderAmount = holderAmount.Add(amt)
+			}
+			if holderAmount.Cmp(&ticker.Minted) != 0 {
+				common.Log.Infof("block %d, ticker %s, asset amount different %s %s",
+					height, name, ticker.Minted.String(), holderAmount.String())
 
-			printAddress := make(map[uint64]bool)
-			for k, v := range holdermap {
-				old, ok := p.holderMapInPrevBlock[k]
-				if ok {
-					if old.Cmp(v) != 0 {
-						common.Log.Infof("%x changed %s -> %s", k, old.String(), v.String())
+				printAddress := make(map[uint64]bool)
+				for k, v := range holdermap {
+					old, ok := p.holderMapInPrevBlock[k]
+					if ok {
+						if old.Cmp(v) != 0 {
+							common.Log.Infof("%x changed %s -> %s", k, old.String(), v.String())
+							printAddress[k] = true
+						}
+					} else {
+						common.Log.Infof("%x added %s -> %s", k, old.String(), v.String())
 						printAddress[k] = true
 					}
-				} else {
-					common.Log.Infof("%x added %s -> %s", k, old.String(), v.String())
-					printAddress[k] = true
 				}
-			}
-			for k := range printAddress {
-				p.printHistoryWithAddress(name, k)
-			}
+				for k := range printAddress {
+					p.printHistoryWithAddress(name, k)
+				}
 
-			//p.printHistory(name)
-			//p.printHistoryWithAddress(name, 0x52b1777c)
-			common.Log.Panicf("%s amount different %s %s", name, ticker.Minted.String(), holderAmount.String())
+				//p.printHistory(name)
+				//p.printHistoryWithAddress(name, 0x52b1777c)
+				common.Log.Panicf("%s amount different %s %s", name, ticker.Minted.String(), holderAmount.String())
+			}
+			p.holderMapInPrevBlock = holdermap
+
 		}
-		p.holderMapInPrevBlock = holdermap
-
 	}
 	common.Log.Infof("BRC20Indexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
