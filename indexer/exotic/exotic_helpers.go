@@ -84,7 +84,7 @@ var _defaultAssetInUtxo = map[string]map[string]common.AssetOffsets{
 var _defaultAssetInBlockSubSidy = map[string]map[int]bool{}
 
 
-// 在区块的coinbase输入中生成稀有聪资产
+// 在区块的输出中生成稀有聪资产
 func (p *ExoticIndexer) generateRarityAssetWithBlock(block *common.Block, coinbaseInput *common.TxOutput) {
 
 	// 根据交易本身生成的稀有聪
