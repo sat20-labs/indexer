@@ -149,8 +149,8 @@ func NewCompilingOutput(tx *TxOutput) *TxOutputV2 {
 		satCursor:    make(map[AssetName]int),
 	}
 }
-
-// 为编译数据增加两个新的函数，加快处理速度，小心内存碎片的处理
+ 
+// 为编译数据增加两个新的函数，加快处理速度，小心内存碎片的处理 TODO 测试不充分，很可能有bug，而且初步验证效果不明显，暂时放弃。
 // CompilingAppend 是编译期快路径：
 // - 不做资产合并、不排序
 // - 仅保证 offsets / sat 偏移正确
