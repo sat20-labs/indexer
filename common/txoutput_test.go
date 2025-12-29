@@ -573,3 +573,98 @@ func TestAssetOffsets_Pickup(t *testing.T) {
 		})
 	}
 }
+
+
+func TestAssetOffsets_CutRange(t *testing.T) {
+	tests := []struct {
+		name  string
+		input AssetOffsets
+		start int64
+		end   int64
+		want  AssetOffsets
+	}{
+		{
+			name: "simple overlap across ranges",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 10, End: 20},
+			},
+			start: 5,
+			end:   15,
+			want: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 10},
+			},
+		},
+		{
+			name: "exclude range_start_equal_end",
+			input: AssetOffsets{
+				{Start: 0, End: 10},
+				{Start: 10, End: 20},
+			},
+			start: 5,
+			end:   10,
+			want: AssetOffsets{
+				{Start: 0, End: 5},
+			},
+		},
+		{
+			name:  "end_le_start_returns_nil",
+			input: AssetOffsets{{Start: 0, End: 10}},
+			start: 10,
+			end:   10,
+			want:  nil,
+		},
+		{
+			name:  "no_overlap",
+			input: AssetOffsets{{Start: 0, End: 10}},
+			start: 20,
+			end:   30,
+			want:  nil,
+		},
+		{
+			name: "full_range",
+			input: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 10},
+			},
+			start: 0,
+			end:   10,
+			want: AssetOffsets{
+				{Start: 0, End: 5},
+				{Start: 5, End: 10},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.input.CutRange(tt.start, tt.end)
+
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("expected nil, got %+v", got)
+				}
+				return
+			}
+
+			if got == nil {
+				t.Fatalf("expected %+v, got nil", tt.want)
+			}
+
+			if len(got) != len(tt.want) {
+				t.Fatalf("len mismatch: want %d, got %d", len(tt.want), len(got))
+			}
+
+			for i := range got {
+				if got[i].Start != tt.want[i].Start || got[i].End != tt.want[i].End {
+					t.Fatalf("range[%d] mismatch: want [%d,%d), got [%d,%d)",
+						i,
+						tt.want[i].Start, tt.want[i].End,
+						got[i].Start, got[i].End,
+					)
+				}
+			}
+		})
+	}
+}

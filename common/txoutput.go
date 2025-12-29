@@ -12,8 +12,8 @@ import (
 // 所有聪
 var ASSET_ALL_SAT AssetName = AssetName{
 	Protocol: "",
-	Type: "*",
-	Ticker: "",
+	Type:     "*",
+	Ticker:   "",
 }
 
 // 白聪
@@ -39,19 +39,17 @@ func (p *OffsetRange) ToRange() *Range {
 	}
 	return &Range{
 		Start: p.Start,
-		Size: p.End-p.Start,
+		Size:  p.End - p.Start,
 	}
 }
-
 
 func (p *OffsetRange) Size() int64 {
 	if p == nil {
 		return 0
 	}
-	
-	return p.End-p.Start
-}
 
+	return p.End - p.Start
+}
 
 // 有序的数组，
 type AssetOffsets []*OffsetRange
@@ -101,7 +99,7 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 	}
 
 	left := make(AssetOffsets, 0, len(*p))
-    right := make(AssetOffsets, 0, len(*p))
+	right := make(AssetOffsets, 0, len(*p))
 
 	remaining := amt
 	offset := int64(0)
@@ -128,7 +126,6 @@ func (p *AssetOffsets) Split(amt int64) (AssetOffsets, AssetOffsets) {
 
 	return left, right
 }
-
 
 // 按位置分割, Append 的逆操作
 func (p *AssetOffsets) Cut(offset int64) (AssetOffsets, AssetOffsets) {
@@ -162,6 +159,54 @@ func (p *AssetOffsets) Cut(offset int64) (AssetOffsets, AssetOffsets) {
 	return left, right
 }
 
+// 取出某个范围内的ranges，不改变内部，输出的偏移值做调整
+func (p *AssetOffsets) CutRange(start, end int64) AssetOffsets {
+	var result AssetOffsets
+
+	if p == nil {
+		return nil
+	}
+
+	// invalid or empty interval
+	if end <= start {
+		return nil
+	}
+
+	i := sort.Search(len(*p), func(i int) bool {
+		return (*p)[i].End > start
+	})
+	// ensure ranges starting at `end` are excluded (end is exclusive)
+	j := sort.Search(len(*p), func(i int) bool {
+		return (*p)[i].Start >= end
+	})
+
+	for ; i < j; i++ {
+		r := (*p)[i]
+		// r.End > start is guaranteed by i, but keep check defensively
+		if r.End <= start {
+			continue
+		}
+
+		if r.Start >= start {
+			// range starts within [start, end)
+			if r.End <= end {
+				result = append(result, &OffsetRange{Start: r.Start - start, End: r.End - start}) // 中间
+			} else {
+				result = append(result, &OffsetRange{Start: r.Start - start, End: end - start}) // 最右
+			}
+		} else {
+			// r.Start < start, overlaps from the left
+			if r.End <= end {
+				result = append(result, &OffsetRange{Start: 0, End: r.End - start}) // 最左
+			} else {
+				result = append(result, &OffsetRange{Start: 0, End: end - start}) // 内切
+			}
+		}
+	}
+
+	return result
+}
+
 // 同一个utxo中的offsetRange合并
 func (p *AssetOffsets) Cat(r2 *OffsetRange) {
 	if r2 == nil {
@@ -178,6 +223,25 @@ func (p *AssetOffsets) Cat(r2 *OffsetRange) {
 		}
 	} else {
 		*p = append(*p, r2.Clone())
+	}
+}
+
+// 同一个utxo中的offsetRange合并，注意内存共享问题
+func (p *AssetOffsets) Cat_NoSafe(r2 *OffsetRange) {
+	if r2 == nil {
+		return
+	}
+	var r1 *OffsetRange
+	len1 := len(*p)
+	if len1 > 0 {
+		r1 = (*p)[len1-1]
+		if r1.End == r2.Start {
+			r1.End = r2.End
+		} else {
+			*p = append(*p, r2)
+		}
+	} else {
+		*p = append(*p, r2)
 	}
 }
 
@@ -208,57 +272,56 @@ func (p *AssetOffsets) Insert(r2 *OffsetRange) {
 
 // another 已经调整过偏移值
 func (p *AssetOffsets) Merge(another AssetOffsets) {
-    if len(another) == 0 {
-        return
-    }
-    if len(*p) == 0 {
-        *p = another.Clone()
-        return
-    }
+	if len(another) == 0 {
+		return
+	}
+	if len(*p) == 0 {
+		*p = another.Clone()
+		return
+	}
 
-    a := *p
-    b := another
+	a := *p
+	b := another
 
-    res := make(AssetOffsets, 0, len(a)+len(b))
+	res := make(AssetOffsets, 0, len(a)+len(b))
 
-    i, j := 0, 0
-    var last *OffsetRange
+	i, j := 0, 0
+	var last *OffsetRange
 
-    push := func(r *OffsetRange) {
-        if last == nil {
-            last = r.Clone()
-            res = append(res, last)
-            return
-        }
-        if last.End == r.Start {
-            last.End = r.End
-        } else {
-            last = r.Clone()
-            res = append(res, last)
-        }
-    }
+	push := func(r *OffsetRange) {
+		if last == nil {
+			last = r.Clone()
+			res = append(res, last)
+			return
+		}
+		if last.End == r.Start {
+			last.End = r.End
+		} else {
+			last = r.Clone()
+			res = append(res, last)
+		}
+	}
 
-    for i < len(a) && j < len(b) {
-        if a[i].Start <= b[j].Start {
-            push(a[i])
-            i++
-        } else {
-            push(b[j])
-            j++
-        }
-    }
-    for i < len(a) {
-        push(a[i])
-        i++
-    }
-    for j < len(b) {
-        push(b[j])
-        j++
-    }
+	for i < len(a) && j < len(b) {
+		if a[i].Start <= b[j].Start {
+			push(a[i])
+			i++
+		} else {
+			push(b[j])
+			j++
+		}
+	}
+	for i < len(a) {
+		push(a[i])
+		i++
+	}
+	for j < len(b) {
+		push(b[j])
+		j++
+	}
 
-    *p = res
+	*p = res
 }
-
 
 // merge的反操作
 // 从某个位置开始，取出一定数量的资产，偏移值不调整
@@ -349,152 +412,150 @@ func (p *AssetOffsets) Append(another AssetOffsets) {
 // Remove 从 p 中移除 another 描述的区间集合（假定 p 与 another 都是按升序、区间不重叠的列表，且 another 已经是相对于 p 的全局坐标）。
 // 该操作相当于用 p - another，结果仍保持有序且不重叠。
 func (p *AssetOffsets) Remove(another AssetOffsets) {
-    if p == nil || len(*p) == 0 || len(another) == 0 {
-        return
-    }
+	if p == nil || len(*p) == 0 || len(another) == 0 {
+		return
+	}
 
-    var res AssetOffsets
-    i, j := 0, 0
+	var res AssetOffsets
+	i, j := 0, 0
 
-    for i < len(*p) && j < len(another) {
-        cur := (*p)[i]
-        rem := another[j]
+	for i < len(*p) && j < len(another) {
+		cur := (*p)[i]
+		rem := another[j]
 
-        // another 在 cur 之前（不可能发生重叠）
-        if rem.End <= cur.Start {
-            j++
-            continue
-        }
+		// another 在 cur 之前（不可能发生重叠）
+		if rem.End <= cur.Start {
+			j++
+			continue
+		}
 
-        // another 在 cur 之后（cur 完全保留）
-        if rem.Start >= cur.End {
-            res = append(res, cur.Clone())
-            i++
-            continue
-        }
+		// another 在 cur 之后（cur 完全保留）
+		if rem.Start >= cur.End {
+			res = append(res, cur.Clone())
+			i++
+			continue
+		}
 
-        // 有重叠
-        // 保留 cur 被覆盖前的左边部分（如果有）
-        if rem.Start > cur.Start {
-            res = append(res, &OffsetRange{Start: cur.Start, End: rem.Start})
-        }
+		// 有重叠
+		// 保留 cur 被覆盖前的左边部分（如果有）
+		if rem.Start > cur.Start {
+			res = append(res, &OffsetRange{Start: cur.Start, End: rem.Start})
+		}
 
-        // 根据 rem.End 与 cur.End 的关系决定如何推进指针
-        if rem.End >= cur.End {
-            // rem 覆盖 cur 的右端或完全覆盖 cur
-            if rem.End == cur.End {
-                // 两者在边界对齐，cur 和 rem 同时结束，推进两者
-                i++
-                j++
-            } else {
-                // rem 延伸到 cur 之后，cur 被完全消耗，推进 cur，保持 rem 以继续覆盖后续 cur
-                i++
-            }
-        } else {
-            // rem 在 cur 里面结束（rem.End < cur.End），保留右边剩余部分并推进 rem
-            (*p)[i] = &OffsetRange{Start: rem.End, End: cur.End}
-            j++
-        }
-    }
+		// 根据 rem.End 与 cur.End 的关系决定如何推进指针
+		if rem.End >= cur.End {
+			// rem 覆盖 cur 的右端或完全覆盖 cur
+			if rem.End == cur.End {
+				// 两者在边界对齐，cur 和 rem 同时结束，推进两者
+				i++
+				j++
+			} else {
+				// rem 延伸到 cur 之后，cur 被完全消耗，推进 cur，保持 rem 以继续覆盖后续 cur
+				i++
+			}
+		} else {
+			// rem 在 cur 里面结束（rem.End < cur.End），保留右边剩余部分并推进 rem
+			(*p)[i] = &OffsetRange{Start: rem.End, End: cur.End}
+			j++
+		}
+	}
 
-    // 将剩余未处理的 cur 直接添加
-    for i < len(*p) {
-        res = append(res, (*p)[i].Clone())
-        i++
-    }
+	// 将剩余未处理的 cur 直接添加
+	for i < len(*p) {
+		res = append(res, (*p)[i].Clone())
+		i++
+	}
 
-    *p = res
+	*p = res
 }
 
 // 求包含关系
 func AssetOffsetsContains(container, target AssetOffsets) bool {
-    i, j := 0, 0
+	i, j := 0, 0
 
-    for j < len(target) {
-        if i >= len(container) {
-            return false
-        }
-
-        c := container[i]
-        t := target[j]
-
-        // 如果 container 当前区间完全在 target 之前，跳过它
-        if c.End <= t.Start {
-            i++
-            continue
-        }
-
-        // 如果 container 当前区间完全在 target 后面，则不可能覆盖
-        if c.Start > t.Start {
-            return false
-        }
-
-        // 现在 c.Start <= t.Start < c.End
-
-        if c.End >= t.End {
-            // container[i] 完全覆盖 target[j]，继续下一个 target
-            j++
-        } else {
-            // container[i] 只覆盖了 target[j] 的前半段，target必然有部分没有覆盖到
+	for j < len(target) {
+		if i >= len(container) {
 			return false
-        }
-    }
+		}
 
-    return true
+		c := container[i]
+		t := target[j]
+
+		// 如果 container 当前区间完全在 target 之前，跳过它
+		if c.End <= t.Start {
+			i++
+			continue
+		}
+
+		// 如果 container 当前区间完全在 target 后面，则不可能覆盖
+		if c.Start > t.Start {
+			return false
+		}
+
+		// 现在 c.Start <= t.Start < c.End
+
+		if c.End >= t.End {
+			// container[i] 完全覆盖 target[j]，继续下一个 target
+			j++
+		} else {
+			// container[i] 只覆盖了 target[j] 的前半段，target必然有部分没有覆盖到
+			return false
+		}
+	}
+
+	return true
 }
-
 
 // 求两个数组的交集
 func IntersectAssetOffsets(a, b AssetOffsets) AssetOffsets {
-    i, j := 0, 0
-    var res AssetOffsets
+	i, j := 0, 0
+	var res AssetOffsets
 
-    for i < len(a) && j < len(b) {
-        r1 := a[i]
-        r2 := b[j]
+	for i < len(a) && j < len(b) {
+		r1 := a[i]
+		r2 := b[j]
 
-        // 计算交集区间
-        start := max(r1.Start, r2.Start)
-        end := min(r1.End,  r2.End)
+		// 计算交集区间
+		start := max(r1.Start, r2.Start)
+		end := min(r1.End, r2.End)
 
-        // 如果有交集
-        if start < end {
-            res = append(res, &OffsetRange{Start: start, End: end})
-        }
+		// 如果有交集
+		if start < end {
+			res = append(res, &OffsetRange{Start: start, End: end})
+		}
 
-        // 谁先结束就移动谁
-        if r1.End < r2.End {
-            i++
-        } else {
-            j++
-        }
-    }
+		// 谁先结束就移动谁
+		if r1.End < r2.End {
+			i++
+		} else {
+			j++
+		}
+	}
 
-    return res
+	return res
 }
 
-
 type TxOutput struct {
-	UtxoId      uint64
-	OutPointStr string
-	OutValue    wire.TxOut
-	Assets  	TxAssets
-	Offsets 	map[AssetName]AssetOffsets
+	UtxoId        uint64
+	OutPointStr   string
+	OutValue      wire.TxOut
+	Assets        TxAssets
+	Offsets       map[AssetName]AssetOffsets
 	SatBindingMap map[int64]*AssetInfo // 用于brc20，key是sat的offset, 只有brc20才赋值
-	Invalids 	map[AssetName]bool // 表示该Utxo中对应的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后，默认都是有效的
+	Invalids      map[AssetName]bool   // 表示该Utxo中对应的资产数据只能看，不能用。用于brc20: inscribe-transfer用过后，默认都是有效的
 	// 注意BindingSat属性，TxOutput.OutValue.Value必须大于等于
 	// Assets数组中任何一个AssetInfo.BindingSat
 }
 
 func NewTxOutput(value int64) *TxOutput {
 	return &TxOutput{
-		UtxoId:      INVALID_ID,
-		OutPointStr: "",
-		OutValue:    wire.TxOut{Value: value},
-		Assets:      nil,
-		Offsets:     make(map[AssetName]AssetOffsets),
+		UtxoId:        INVALID_ID,
+		OutPointStr:   "",
+		OutValue:      wire.TxOut{Value: value},
+		Assets:        nil,
+		Offsets:       make(map[AssetName]AssetOffsets),
 		SatBindingMap: make(map[int64]*AssetInfo),
-		Invalids: 	make(map[AssetName]bool),
+		Invalids:      make(map[AssetName]bool),
 	}
 }
 
@@ -542,7 +603,7 @@ func (p *TxOutput) getAssetOffsetMap() map[AssetName][]*OffsetToAmount {
 	return assetOffsetMap
 }
 
-func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
+func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo {
 	if p == nil {
 		return nil
 	}
@@ -553,23 +614,23 @@ func (p *TxOutput) ToAssetsInUtxo() *AssetsInUtxo{
 		assets = make([]*DisplayAsset, 0)
 		for _, asset := range p.Assets {
 			display := DisplayAsset{
-				AssetName: asset.Name,
-				Amount: asset.Amount.String(),
-				Precision: asset.Amount.Precision,
-				BindingSat: int(asset.BindingSat),
-				Offsets: p.Offsets[asset.Name],
+				AssetName:    asset.Name,
+				Amount:       asset.Amount.String(),
+				Precision:    asset.Amount.Precision,
+				BindingSat:   int(asset.BindingSat),
+				Offsets:      p.Offsets[asset.Name],
 				OffsetToAmts: assetOffsetMap[asset.Name],
-				Invalid: p.Invalids[asset.Name],
+				Invalid:      p.Invalids[asset.Name],
 			}
 			assets = append(assets, &display)
 		}
 	}
 	return &AssetsInUtxo{
-		UtxoId: p.UtxoId,
+		UtxoId:   p.UtxoId,
 		OutPoint: p.OutPointStr,
-		Value: p.OutValue.Value,
+		Value:    p.OutValue.Value,
 		PkScript: p.OutValue.PkScript,
-		Assets: assets,
+		Assets:   assets,
 	}
 }
 
@@ -646,8 +707,8 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 	}
 	n := int64(len(p.SatBindingMap))
 	// 每个brc20的transfer nft，都看作是占用330聪
-	
-	return size - n + n * 330
+
+	return size - n + n*330
 }
 
 // 添加一个output，按照value值将其合并到原来的output中，形成更大的output
@@ -692,7 +753,6 @@ func (p *TxOutput) Append(another *TxOutput) error {
 	builder.AddSlice(p.Assets)
 	p.Assets = builder.Build()
 
-
 	for k, v := range another.SatBindingMap {
 		if invalid, ok := another.Invalids[v.Name]; ok && invalid {
 			continue
@@ -714,9 +774,8 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	if p == nil {
 		return nil, nil, fmt.Errorf("TxOutput is nil")
 	}
-
-	if p.Value() < offset {
-		return nil, nil, fmt.Errorf("offset too large")
+	if offset < 0 || offset > p.OutValue.Value {
+		return nil, nil, fmt.Errorf("invalid offset")
 	}
 	if p.Value() == offset {
 		return p.Clone(), nil, nil
@@ -766,7 +825,7 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 		} else {
 			newOffsets, ok := p.Offsets[asset.Name]
 			if ok {
-				// brc20 
+				// brc20: 跟上面聪资产不同的地方在于聪绑定的资产只能用Decimal描述，没有确定性
 				offset1, offset2 := newOffsets.Cut(offset)
 				satmap1 := make(map[int64]*AssetInfo)
 				satmap2 := make(map[int64]*AssetInfo)
@@ -870,7 +929,7 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 				if amt.Int64()%int64(n) != 0 {
 					return nil, nil, fmt.Errorf("amt must be times of %d", n)
 				}
-				
+
 				offsets := p.Offsets[asset.Name]
 				if offsets == nil {
 					return nil, nil, fmt.Errorf("can't find offset for asset %s", asset.Name.String())
@@ -883,8 +942,8 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 					if len(offset2) == 0 {
 						offset = 330
 					} else {
-						if offset2[0].Start + offset < 330 {
-							return nil, nil, fmt.Errorf("no 330 plain sat, %d", offset2[0].Start + offset)
+						if offset2[0].Start+offset < 330 {
+							return nil, nil, fmt.Errorf("no 330 plain sat, %d", offset2[0].Start+offset)
 						} else {
 							offset = 330
 						}
@@ -944,8 +1003,8 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 				// 如果是非聪绑定资产，需要对结果微调下
 				if asset1.BindingSat == 0 && len(part1.SatBindingMap) == 0 {
 					info := AssetInfo{
-						Name: *name,
-						Amount: *amt,
+						Name:       *name,
+						Amount:     *amt,
 						BindingSat: asset1.BindingSat,
 					}
 					part2 = part1.Clone()
@@ -960,7 +1019,6 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 	}
 	return part1, part2, nil
 }
-
 
 // 仅将资产合并，不扩大原来的value
 func (p *TxOutput) Merge(another *TxOutput) error {
@@ -1035,7 +1093,6 @@ func (p *TxOutput) RemoveAsset(name *AssetName) {
 	delete(p.Offsets, *name)
 }
 
-
 // 将output中的某一类资产减去对应数量，只适合非绑定聪的资产
 func (p *TxOutput) RemoveAssetWithAmt(name *AssetName, amt *Decimal) (*Decimal, error) {
 	if name == nil || *name == ASSET_PLAIN_SAT {
@@ -1059,11 +1116,11 @@ func (p *TxOutput) RemoveAssetWithAmt(name *AssetName, amt *Decimal) (*Decimal, 
 	}
 
 	removedAsset := &AssetInfo{
-		Name: *name,
-		Amount: *amt,
+		Name:       *name,
+		Amount:     *amt,
 		BindingSat: asset.BindingSat,
 	}
-	
+
 	if asset.Amount.Cmp(amt) <= 0 {
 		p.RemoveAsset(name)
 		return amt.Sub(&asset.Amount), nil
@@ -1168,10 +1225,10 @@ func (p *TxOutput) GetAssetV2(assetName *AssetName) (*Decimal, bool) {
 // should fill out Assets parameters.
 func GenerateTxOutput(tx *wire.MsgTx, index int) *TxOutput {
 	return &TxOutput{
-		UtxoId:      INVALID_ID,
-		OutPointStr: tx.TxHash().String() + ":" + strconv.Itoa(index),
-		OutValue:    *tx.TxOut[index],
-		Offsets:     make(map[AssetName]AssetOffsets),
+		UtxoId:        INVALID_ID,
+		OutPointStr:   tx.TxHash().String() + ":" + strconv.Itoa(index),
+		OutValue:      *tx.TxOut[index],
+		Offsets:       make(map[AssetName]AssetOffsets),
 		SatBindingMap: make(map[int64]*AssetInfo),
 	}
 }
