@@ -1006,6 +1006,8 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 
 	// 1. 无 pointer：铭刻 sat = inscription 所在 txIn 的第 0 个 sat
 	// 2. 有 pointer：铭刻 sat = reveal tx 所有 txIn 拼接后的第 pointer 个 sat
+	//    a. 如果pointer超出输出的范围，默认使用第一个非0输出
+	//    b. 如果pointer==0，但输出都是0，输出到fee
 	index := int(insc.TxInIndex) // index of input in tx
 	var inOffset, outOffset int64
 	var output *common.TxOutputV2
@@ -1163,7 +1165,13 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 	var addressId, utxoId uint64
 	var sat, outpoint int64
 	if output != nil {
-		sat = int64(common.ToUtxoId(output.OutHeight, output.OutTxIndex, inscriptionId))
+		if output.OutTxIndex == 0 {
+			// 如果output是coinbase
+			sat = int64(common.ToUtxoId(output.OutHeight, 0, input.InTxIndex)) // fee spent的铭文都输出到其作为fee的第一聪
+		} else {
+			sat = int64(common.ToUtxoId(output.OutHeight, output.OutTxIndex, inscriptionId))
+		}
+		
 		addressId = output.AddressId
 		utxoId = output.UtxoId
 		outpoint = outOffset
