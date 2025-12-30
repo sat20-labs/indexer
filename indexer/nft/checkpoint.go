@@ -192,6 +192,16 @@ func (p *NftIndexer) CheckPointWithBlockHeight(height int) {
 		return
 	}
 
+	if isMainnet {
+		if height >= common.Jubilee_Height && p.status.CurseCount != 472043 {
+			common.Log.Panicf("invalid curse count %d", p.status.CurseCount)
+		}
+	} else {
+		if p.status.CurseCount > 0 {
+			common.Log.Panicf("invalid curse count %d", p.status.CurseCount)
+		}
+	}
+
 	if checkpoint.NftCount != 0 && checkpoint.NftCount != p.status.Count+p.status.CurseCount {
 		common.Log.Panicf("inscription count different %d %d", checkpoint.NftCount, p.status.Count+p.status.CurseCount)
 	}
