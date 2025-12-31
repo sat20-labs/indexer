@@ -10,6 +10,10 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+type TransferNftHistory struct {
+	UtxoId []uint64
+}
+
 func initStatusFromDB(ldb common.KVDB) *common.BRC20Status {
 	stats := &common.BRC20Status{}
 	err := db.GetValueFromDB([]byte(BRC20_DB_STATUS_KEY), stats, ldb)
@@ -211,7 +215,7 @@ func (s *BRC20Indexer) loadTickAbbrInfoFromDB(addressId uint64, ticker string) *
 		common.Log.Debugf("GetMintFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Debugf("GetMintFromDB error: %v", err)
+		common.Log.Errorf("GetMintFromDB error: %v", err)
 		return nil
 	}
 
@@ -325,6 +329,7 @@ func (s *BRC20Indexer) loadMintDataFromDB(tickerName string) map[int64]*common.B
 	return result
 }
 
+// 按时间排序的历史数据
 func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BRC20ActionHistory {
 	result := make([]*common.BRC20ActionHistory, 0)
 	count := 0
@@ -335,7 +340,7 @@ func (s *BRC20Indexer) loadTransferHistoryFromDB(tickerName string) []*common.BR
 
 			key := string(k)
 
-			tick, _, _ := ParseTransferHistoryKey(key)
+			tick, _, _, _ := ParseTransferHistoryKey(key)
 			if tick == tickerName {
 				var history common.BRC20ActionHistory
 
@@ -391,6 +396,55 @@ func (s *BRC20Indexer) loadTransferHistoryWithHeightFromDB(tickerName string, he
 	return result
 }
 
+func (s *BRC20Indexer) loadTransferHistoryWithHolderFromDB(tickerName string, holder uint64) []*common.BRC20ActionHistory {
+	startTime := time.Now()
+	common.Log.Debug("BRC20Indexer loadTransferHistoryWithHolderFromDB ...")
+	prefix := fmt.Sprintf("%s%s-%x-", DB_PREFIX_TRANSFER_HISTORY_HOLDER, encodeTickerName(tickerName), holder)
+	historyKeys := make([]string, 0)
+	s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+		_, _, nftId, err := ParseHolderTransferHistoryKey(string(k))
+		if err != nil {
+			return nil
+		}
+
+		var history TransferNftHistory
+		err = db.DecodeBytes(v, &history)
+		if err == nil {
+			for _, utxoId := range history.UtxoId {
+				key := GetTransferHistoryKey(tickerName, utxoId, nftId)
+				historyKeys = append(historyKeys, key)
+			}
+		} else {
+			common.Log.Errorln("loadTransferHistoryWithHolderFromDB DecodeBytes " + err.Error())
+		}
+
+		return nil
+	})
+
+	sort.Slice(historyKeys, func(i, j int) bool {
+		return historyKeys[i] < historyKeys[j]
+	})
+	
+	result := make([]*common.BRC20ActionHistory, 0)
+	for _, key := range historyKeys {
+		var history common.BRC20ActionHistory
+		err := db.GetValueFromDB([]byte(key), &history, s.db)
+		if err == common.ErrKeyNotFound {
+			common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
+			continue
+		} else if err != nil {
+			common.Log.Errorf("GetTickFromDB error: %v", err)
+			continue
+		}
+		result = append(result, &history)
+	}
+
+	elapsed := time.Since(startTime).Milliseconds()
+	common.Log.Debugf("loadTransferHistoryWithHolderFromDB %s loaded %d records in %d ms", tickerName, len(result), elapsed)
+
+	return result
+}
+
 func (s *BRC20Indexer) loadTickerFromDB(tickerName string) *common.BRC20Ticker {
 	var result common.BRC20Ticker
 
@@ -400,7 +454,7 @@ func (s *BRC20Indexer) loadTickerFromDB(tickerName string) *common.BRC20Ticker {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Debugf("GetTickFromDB error: %v", err)
+		common.Log.Errorf("GetTickFromDB error: %v", err)
 		return nil
 	}
 
@@ -416,7 +470,7 @@ func (s *BRC20Indexer) loadTransferFromDB(utxoId uint64) *TransferNftInfo {
 		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Debugf("GetTickFromDB error: %v", err)
+		common.Log.Errorf("GetTickFromDB error: %v", err)
 		return nil
 	}
 

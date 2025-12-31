@@ -37,22 +37,55 @@ func GetTransferHistoryKey(tickname string, utxoId uint64, nftId int64) string {
 	return fmt.Sprintf("%s%s-%x-%x-%x", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickname), height, txIndx, nftId)
 }
 
-func ParseTransferHistoryKey(input string) (string, int, error) {
+func ParseTransferHistoryKey(input string) (string, int, int64, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TRANSFER_HISTORY) {
-		return "", 0, fmt.Errorf("invalid string format")
+		return "", -1, -1, fmt.Errorf("invalid string format")
 	}
 	parts := strings.Split(input, "-")
 
 	if len(parts) != 5 {
-		return "", 0, fmt.Errorf("invalid string format")
+		return "", -1, -1, fmt.Errorf("invalid string format")
 	}
 
 	height, err := strconv.ParseInt(parts[2], 16, 32)
 	if err != nil {
-		return "", 0, err
+		return "", -1, -1, err
 	}
 
-	return decoderTickerName(parts[1]), int(height), nil
+	nftId, err := strconv.ParseInt(parts[3], 16, 64)
+	if err != nil {
+		return "", -1, -1, err
+	}
+
+	return decoderTickerName(parts[1]), int(height), nftId, nil
+}
+
+
+func GetHolderTransferHistoryKey(tickname string, holder uint64, nftId int64) string {
+	return fmt.Sprintf("%s%s-%x-%x", DB_PREFIX_TRANSFER_HISTORY_HOLDER, encodeTickerName(tickname), holder, nftId)
+}
+
+func ParseHolderTransferHistoryKey(input string) (string, uint64, int64, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_TRANSFER_HISTORY_HOLDER) {
+		return "", common.INVALID_ID, -1, fmt.Errorf("invalid string format")
+	}
+	parts := strings.Split(input, "-")
+
+	if len(parts) != 4 {
+		return "", common.INVALID_ID, -1, fmt.Errorf("invalid string format")
+	}
+
+	holder, err := strconv.ParseUint(parts[2], 16, 64)
+	if err != nil {
+		return "", common.INVALID_ID, -1, err
+	}
+
+	nftId, err := strconv.ParseInt(parts[3], 16, 64)
+	if err != nil {
+		return "", common.INVALID_ID, -1, err
+	}
+
+	return decoderTickerName(parts[1]), holder, nftId, nil
 }
 
 func parseTickListKey(input string) (string, error) {

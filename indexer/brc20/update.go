@@ -501,6 +501,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 				s.removeTransferNft(transfer)
 				flag := common.BRC20_Action_Transfer_Spent
 				method := "spend"
+				oldUtxoId := transfer.UtxoId
 				if !transfer.TransferNft.IsInvalid {
 					method = "transfer"
 					flag = common.BRC20_Action_Transfer
@@ -530,7 +531,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 					Ticker:     transfer.Ticker,
 					Amount:     transfer.TransferNft.Amount,
 					Action:     flag,
-					FromUtxoId: transfer.UtxoId, // old utxo
+					FromUtxoId: oldUtxoId, // old utxo
 				}
 				s.holderActionList = append(s.holderActionList, &action)
 				delete(inputTransferNfts, nftId)
@@ -693,6 +694,42 @@ func (s *BRC20Indexer) UpdateDB() {
 		if err != nil {
 			common.Log.Panicf("Error setting %s in db %v", key, err)
 		}
+
+		if action.FromAddr != common.INVALID_ID {
+			if action.Action == common.BRC20_Action_Transfer {
+				// transfer
+				key = GetHolderTransferHistoryKey(action.Ticker, action.FromAddr, action.NftId)
+				value := &TransferNftHistory{UtxoId: []uint64{action.FromUtxoId, action.ToUtxoId}}
+				err := db.SetDB([]byte(key), value, wb)
+				if err != nil {
+					common.Log.Panicf("Error setting %s in db %v", key, err)
+				}
+
+				key = GetHolderTransferHistoryKey(action.Ticker, action.ToAddr, action.NftId)
+				value = &TransferNftHistory{UtxoId: []uint64{action.ToUtxoId}}
+				err = db.SetDB([]byte(key), value, wb)
+				if err != nil {
+					common.Log.Panicf("Error setting %s in db %v", key, err)
+				}
+			} else {
+				// spent
+				key = GetHolderTransferHistoryKey(action.Ticker, action.FromAddr, action.NftId)
+				value := &TransferNftHistory{UtxoId: []uint64{action.FromUtxoId, action.ToUtxoId}}
+				err := db.SetDB([]byte(key), value, wb)
+				if err != nil {
+					common.Log.Panicf("Error setting %s in db %v", key, err)
+				}
+			}
+		} else {
+			// inscribe
+			key = GetHolderTransferHistoryKey(action.Ticker, action.ToAddr, action.NftId)
+			value := &TransferNftHistory{UtxoId: []uint64{action.ToUtxoId}}
+			err := db.SetDB([]byte(key), value, wb)
+			if err != nil {
+				common.Log.Panicf("Error setting %s in db %v", key, err)
+			}
+		}
+
 	}
 	// 写入最终结果
 	for addressId, holder := range s.holderMap {

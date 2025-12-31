@@ -278,17 +278,17 @@ func TestParseValidateData(t *testing.T) {
 		common.Log.Panicf("ReadBRC20HolderCSV failed, %v", err)
 	}
 	
-	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
+	heightToHolderRecords := make(map[int]map[string]*validate.BRC20HolderCSVRecord)
 	for _, record := range validateHolderData {
-		holders, ok := _heightToHolderRecords[record.LastHeight]
+		holders, ok := heightToHolderRecords[record.LastHeight]
 		if !ok {
 			holders = make(map[string]*validate.BRC20HolderCSVRecord)
-			_heightToHolderRecords[record.LastHeight] = holders
+			heightToHolderRecords[record.LastHeight] = holders
 		}
 		holders[record.Address] = record
 	}
 
-	fmt.Printf("len %d", len(_heightToHolderRecords))
+	fmt.Printf("len %d", len(heightToHolderRecords))
 }
 
 func TestParseValidateDir(t *testing.T) {
@@ -298,17 +298,32 @@ func TestParseValidateDir(t *testing.T) {
 		common.Log.Panicf("ReadBRC20HolderCSVDir failed, %v", err)
 	}
 	
-	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
+	var startHeight, endHeight int
+	startHeight = 0xffffffff
+
+	heightToHolderRecords := make(map[int]map[string]map[string]*validate.BRC20HolderCSVRecord)
 	for _, record := range validateHolderData {
-		holders, ok := _heightToHolderRecords[record.LastHeight]
+		tickerToHolders, ok := heightToHolderRecords[record.LastHeight]
+		if !ok {
+			tickerToHolders = make(map[string]map[string]*validate.BRC20HolderCSVRecord)
+			heightToHolderRecords[record.LastHeight] = tickerToHolders
+		}
+		holders, ok := tickerToHolders[record.Token]
 		if !ok {
 			holders = make(map[string]*validate.BRC20HolderCSVRecord)
-			_heightToHolderRecords[record.LastHeight] = holders
+			tickerToHolders[record.Token] = holders
 		}
 		holders[record.Address] = record
+
+		if record.LastHeight > endHeight {
+			endHeight = record.LastHeight
+		}
+		if record.LastHeight < startHeight {
+			startHeight = record.LastHeight
+		}
 	}
 
-	fmt.Printf("len %d", len(_heightToHolderRecords))
+	fmt.Printf("len %d", len(heightToHolderRecords))
 }
 
 
@@ -338,4 +353,36 @@ func TestParseValidateData_history(t *testing.T) {
 	}
 
 	fmt.Printf("len %d", len(validateHolderData))
+}
+
+
+func TestCompareValidateFile(t *testing.T) {
+
+	validateData1, err := validate.ReadBRC20CSVDir("./validate/ordi")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	}
+
+	validateData2, err := validate.ReadBRC20CSV("./validate/ordi_records.csv")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	}
+
+	// validateData2, err := validate.ReadBRC20CSV("./validate/ordi.csv")
+	// if err != nil {
+	// 	common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
+	// }
+
+	diff1 := findDiffInMap(validateData1, validateData2)
+	fmt.Printf("diff1 %d\n", len(diff1))
+	for _, d := range diff1 {
+		fmt.Printf("%v\n", validateData1[d])
+	}
+
+	diff2 := findDiffInMap(validateData2, validateData1)
+	fmt.Printf("diff2 %d\n", len(diff2))
+	for _, d := range diff2 {
+		fmt.Printf("%v\n", validateData2[d])
+	}
+
 }

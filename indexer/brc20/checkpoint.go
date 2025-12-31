@@ -2,6 +2,7 @@ package brc20
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ var _historyEndHeight int
 var _heightToInscriptionMap map[int]map[string]int64
 var _holderStartHeight, _holderEndHeight int
 
-var _heightToHolderRecords map[int]map[string]*validate.BRC20HolderCSVRecord
+var _heightToHolderRecords map[int]map[string]map[string]*validate.BRC20HolderCSVRecord
 
 var testnet4_checkpoint = map[int]*CheckPoint{
 	0: {
@@ -929,20 +930,9 @@ func (p *BRC20Indexer) validateHistory(height int) {
 
 		if item.Amount.String() != valid.Amount {
 			// validate的数据，最多8位小数，并且做了4舍5入
-			parts := strings.Split(valid.Amount, ".")
-			d := 8
-			if len(parts) == 2 {
-				d = len(parts[1])
-			}
-			if item.Amount.Precision > d {
-				amt := item.Amount.SetPrecisionWithRound(d)
-				if amt.String() != valid.Amount {
-					common.Log.Panicf("%d #%d %s different asset amount %s-%s in tx  %s, %d", height,
-						valid.InscriptionNumber, valid.InscriptionID, amt.String(), valid.Amount, valid.TxID, valid.TxIdx)
-				}
-			} else {
-				common.Log.Panicf("%d #%d %s different asset amount %s in tx  %s, %d", height,
-					valid.InscriptionNumber, valid.InscriptionID, item.Amount.String(), valid.TxID, valid.TxIdx)
+			if !compareDecimal(&item.Amount, valid.Amount) {
+				common.Log.Panicf("%d #%d %s different asset amount %s-%s in tx  %s, %d", height,
+						valid.InscriptionNumber, valid.InscriptionID, item.Amount.String(), valid.Amount, valid.TxID, valid.TxIdx)
 			}
 		}
 
@@ -962,6 +952,43 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	}
 
 	common.Log.Infof("BRC20Indexer.validateHistory %d history records are checked.", len(validateRecords))
+}
+
+func compareDecimal(amt *common.Decimal, str string) bool {
+
+	if strings.Contains(str, "E") {
+		// f, ok := new(big.Float).SetString("1.21906E+11")
+		// if !ok {
+		// 	common.Log.Panicf("SetString %s failed", str)
+		// }
+		// str = f.Text('f', -1)
+		parts := strings.Split(str, "E")
+		parts = strings.Split(parts[0], ".")
+		d := 0
+		if len(parts) == 2 {
+			d = len(parts[1])
+		}
+
+		f, ok := new(big.Float).SetString(amt.String())
+		if !ok {
+			common.Log.Panicf("SetString %s failed", amt.String())
+		}
+		n := f.Text('E', d)
+		return n == str
+	}
+
+	parts := strings.Split(str, ".")
+	d := 8
+	if len(parts) == 2 {
+		d = len(parts[1])
+	} else {
+		d = 0
+	}
+	if amt.Precision > d {
+		amt := amt.SetPrecisionWithRound(d)
+		return amt.String() == str
+	}
+	return false
 }
 
 // 找出T1中key不在T2的元素
@@ -985,12 +1012,17 @@ func readHolderDataToMap(dir string) (int, int) {
 	var startHeight, endHeight int
 	startHeight = 0xffffffff
 
-	_heightToHolderRecords = make(map[int]map[string]*validate.BRC20HolderCSVRecord)
+	_heightToHolderRecords = make(map[int]map[string]map[string]*validate.BRC20HolderCSVRecord)
 	for _, record := range validateHolderData {
-		holders, ok := _heightToHolderRecords[record.LastHeight]
+		tickerToHolders, ok := _heightToHolderRecords[record.LastHeight]
+		if !ok {
+			tickerToHolders = make(map[string]map[string]*validate.BRC20HolderCSVRecord)
+			_heightToHolderRecords[record.LastHeight] = tickerToHolders
+		}
+		holders, ok := tickerToHolders[record.Token]
 		if !ok {
 			holders = make(map[string]*validate.BRC20HolderCSVRecord)
-			_heightToHolderRecords[record.LastHeight] = holders
+			tickerToHolders[record.Token] = holders
 		}
 		holders[record.Address] = record
 
@@ -1020,31 +1052,39 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 		return
 	}
 
-	holders, ok := _heightToHolderRecords[height]
+	tickerToHolders, ok := _heightToHolderRecords[height]
 	if !ok {
 		return
 	}
 
 	// 执行验证
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
-	for address, record := range holders {
-		addressId := baseIndexer.GetAddressIdFromDB(address)
-		if addressId == common.INVALID_ID {
-			common.Log.Panicf("validateHolderData GetAddressIdFromDB %s failed", address)
+	for ticker, holders := range tickerToHolders {
+		for address, record := range holders {
+			addressId := baseIndexer.GetAddressIdFromDB(address)
+			if addressId == common.INVALID_ID {
+				common.Log.Panicf("validateHolderData GetAddressIdFromDB %s failed", address)
+			}
+			info := p.getHolderAbbrInfo(addressId, record.Token)
+			if info == nil {
+				p.printHistoryWithAddress(ticker, addressId)
+				common.Log.Panicf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Token)
+			}
+			if info.AvailableBalance.String() != record.AvailableBalance {
+				if !compareDecimal(info.AvailableBalance, record.AvailableBalance) {
+					p.printHistoryWithAddress(ticker, addressId)
+					common.Log.Panicf("validateHolderData %s %s available balance different %s %s",
+						address, record.Token, record.AvailableBalance, info.AvailableBalance.String())
+				}
+			}
+			if info.TransferableBalance.String() != record.TransferableBalance {
+				if !compareDecimal(info.TransferableBalance, record.TransferableBalance) {
+					p.printHistoryWithAddress(ticker, addressId)
+					common.Log.Panicf("validateHolderData %s %s transferable balance different %s %s",
+						address, record.Token, record.TransferableBalance, info.TransferableBalance.String())
+				}
+			}
 		}
-		info := p.getHolderAbbrInfo(addressId, record.Token)
-		if info == nil {
-			common.Log.Panicf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Token)
-		}
-		if info.AvailableBalance.String() != record.AvailableBalance {
-			common.Log.Panicf("validateHolderData %s %s available balance different %s %s",
-				address, record.Token, record.AvailableBalance, info.AvailableBalance.String())
-		}
-		if info.TransferableBalance.String() != record.TransferableBalance {
-			common.Log.Panicf("validateHolderData %s %s transferable balance different %s %s",
-				address, record.Token, record.TransferableBalance, info.TransferableBalance.String())
-		}
+		common.Log.Infof("BRC20Indexer.validateHolderData %s %d addresses are checked.", ticker, len(holders))
 	}
-
-	common.Log.Infof("BRC20Indexer.validateHolderData %d addresses are checked.", len(holders))
 }
