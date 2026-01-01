@@ -23,6 +23,7 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 	if nft.Base.Sat < 0 {
 		// 788200: c1e0db6368a43f5589352ed44aa1ff9af33410e4a9fd9be0f6ac42d9e4117151
 		// 788312: 99e70421ab229d1ccf356e594512da6486e2dd1abdf6c2cb5014875451ee8073
+		// 905467: c5ce8f9e0dee52be34cc75b7d4df66d8fe58d6d02c2737a898d7d1755f61fc24
 		// unbound nft，负数铭文，没有绑定任何聪，也不在哪个utxo中，也没有地址，仅保存数据
 		// 在Jubilee之前属于cursed铭文，Jubilee之后，正常编号
 		p.status.Unbound++
@@ -42,9 +43,7 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 		p.actionBufferMap[input.InTxIndex] = txMap
 	}
 	txMap[input.TxInIndex] = append(txMap[input.TxInIndex], info)
-	if nft.Base.Sat >= 0 { // unbound 不能进入，因为unbound
-		p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
-	}
+	p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
 
 	p.nftAdded = append(p.nftAdded, nft)
 }
@@ -326,6 +325,11 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			for _, info := range addedNft { // 新增加的nft，有可能已经是重复铭刻
 				nft := info.Nft
 				newSat := true
+				if info.Nft.Base.Sat < 0 {
+					p.addNftToSatMap(nft)
+					// unbound 不加入utxomap
+					continue
+				} 
 				for sat, offset := range sats {
 					if offset == info.InOffset {
 						if sat != nft.Base.Sat {
