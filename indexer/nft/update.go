@@ -42,7 +42,9 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 		p.actionBufferMap[input.InTxIndex] = txMap
 	}
 	txMap[input.TxInIndex] = append(txMap[input.TxInIndex], info)
-	p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
+	if nft.Base.Sat >= 0 { // unbound 不能进入，因为unbound
+		p.nftAddedUtxoMap[input.UtxoId] = append(p.nftAddedUtxoMap[input.UtxoId], info)
+	}
 
 	p.nftAdded = append(p.nftAdded, nft)
 }
@@ -68,10 +70,12 @@ func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) int {
 				// }
 
 				idx := txIndex
-				if info.Nft.Base.Sat < 0 {
-					// unbound
-					idx += totalTxs + 1
-				}
+				if block.Height <= common.Jubilee_Height {
+					if info.Nft.Base.Sat < 0 {
+						// unbound
+						idx += totalTxs + 1
+					}
+				} // else c5ce8f9e0dee52be34cc75b7d4df66d8fe58d6d02c2737a898d7d1755f61fc24i0 
 				_, outTxIndex, _ := common.FromUtxoId(info.UtxoId)
 				if outTxIndex == 0 {
 					// fee spent

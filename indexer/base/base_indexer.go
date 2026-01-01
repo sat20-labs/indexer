@@ -1626,3 +1626,21 @@ func (b *BaseIndexer) GetUtxoAddress(utxoId uint64) (uint64, error) {
 
 	return value.AddressId, nil
 }
+
+func (b *BaseIndexer) GetUtxoInfo(utxo string) (uint64, error) {
+	// 有可能还没有写入数据库，所以先读缓存
+	utxoInfo, ok := b.utxoIndex.Index[utxo]
+	if ok {
+		return utxoInfo.UtxoId, nil
+	}
+
+	output := &common.UtxoValueInDB{}
+	key := db.GetUTXODBKey(utxo)
+	//err := db.GetValueFromDB(key, txn, output)
+	err := db.GetValueFromDBWithProto3(key, b.db, output)
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+
+	return output.UtxoId, nil
+}
