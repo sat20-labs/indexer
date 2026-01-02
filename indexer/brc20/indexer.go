@@ -199,7 +199,6 @@ func (s *BRC20Indexer) Repair() bool {
 		}
 	}
 
-
 	common.Log.Infof("start to wrie holders history...")
 	count := 0
 	for ticker, holders := range tickerToHolderHistory {
@@ -331,7 +330,7 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 }
 
 // 在系统初始化时调用一次，如果有历史数据的话。一般在NewSatIndex之后调用。
-func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
+func (s *BRC20Indexer) Init(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
 
@@ -340,10 +339,15 @@ func (s *BRC20Indexer) InitIndexer(nftIndexer *nft.NftIndexer) {
 
 	s.status = initStatusFromDB(s.db)
 	common.Log.Infof("brc20 db version: %s", version)
-	common.Log.Info("InitIndexer ...")
+	common.Log.Info("Init ...")
 
 	elapsed := time.Since(startTime).Milliseconds()
-	common.Log.Infof("InitIndexer %d ms", elapsed)
+	common.Log.Infof("Init %d ms", elapsed)
+
+	
+	//s.printTickerHistoryWithHeight("cats", 814163)
+	//s.printTickerHistoryWithHeight("mask", 885497)
+	//common.Log.Panicf("")
 }
 
 func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
@@ -429,12 +433,10 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
 		abbrInfo.AvailableBalance.String(), abbrInfo.TransferableBalance.String())
 }
 
-func (s *BRC20Indexer) printHistory(name string) {
-	history := s.loadTickerHistory(name)
+func (s *BRC20Indexer) printHistory(history []*common.BRC20ActionHistory) map[uint64]*common.Decimal {
+	holders := make(map[uint64]*common.Decimal)
 	var total *common.Decimal
 	var count int
-	common.Log.Infof("ticker %s (data from history)", name)
-	holders := make(map[uint64]*common.Decimal)
 	baseIndexer := s.nftIndexer.GetBaseIndexer()
 	for _, item := range history {
 		flag := ""
@@ -468,8 +470,8 @@ func (s *BRC20Indexer) printHistory(name string) {
 		// 	h, i, j, item.NftId, from, to, flag, item.Amount.String(), holders[item.ToAddr].String(), total.String(),
 		// 	item.Action)
 		nft := s.nftIndexer.GetNftWithId(item.NftId)
-		common.Log.Infof("%s: %s -> %s, %s%s, %s, total = %s, %d",
-			nft.Base.InscriptionId, from, to, flag, item.Amount.String(), holders[item.ToAddr].String(), total.String(),
+		common.Log.Infof("%d %s: %s -> %s, %s%s, %s, total = %s, %d",
+			nft.Base.Id, nft.Base.InscriptionId, from, to, flag, item.Amount.String(), holders[item.ToAddr].String(), total.String(),
 			item.Action)
 
 		count++
@@ -479,6 +481,21 @@ func (s *BRC20Indexer) printHistory(name string) {
 	}
 	common.Log.Infof("total in mint: %s", total.String())
 	common.Log.Infof("holders from history")
+	return holders
+}
+
+func (s *BRC20Indexer) printTickerHistory(name string) {
+	history := s.loadTickerHistory(name)
+	common.Log.Infof("ticker %s history:", name)
+	holders := s.printHistory(history)
+	s.printHoldersWithMap(holders)
+}
+
+
+func (s *BRC20Indexer) printTickerHistoryWithHeight(name string, height int) {
+	history := s.loadTransferHistoryWithHeightFromDB(name, height)
+	common.Log.Infof("ticker %s history in height %d:", name, height)
+	holders := s.printHistory(history)
 	s.printHoldersWithMap(holders)
 }
 
@@ -643,7 +660,7 @@ func (s *BRC20Indexer) CheckSelf(height int) bool {
 		//fmt.Printf("\"%s\": {Minted: \"%s\", HolderCount: %d, TxCount: %d},\n", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
-			s.printHistory(name)
+			s.printTickerHistory(name)
 			s.printHolders(name)
 			return false
 		}

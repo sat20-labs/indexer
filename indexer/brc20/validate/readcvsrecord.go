@@ -32,7 +32,7 @@ type BRC20CSVRecord struct {
 	From               string
 	To                 string
 
-	Value            int64
+	Value              int64
 	Fee                int64
 
 	Amount             string

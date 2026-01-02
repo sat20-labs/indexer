@@ -984,7 +984,7 @@ func compareDecimal(amt *common.Decimal, str string) bool {
 	} else {
 		d = 0
 	}
-	if amt.Precision > d {
+	if amt != nil && amt.Precision > d {
 		amt := amt.SetPrecisionWithRound(d)
 		return amt.String() == str
 	}
@@ -1059,32 +1059,56 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 
 	// 执行验证
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
+	var failed []string
 	for ticker, holders := range tickerToHolders {
+		verified := true
 		for address, record := range holders {
 			addressId := baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
-				common.Log.Panicf("validateHolderData GetAddressIdFromDB %s failed", address)
+				common.Log.Errorf("validateHolderData GetAddressIdFromDB %s failed", address)
+				failed = append(failed, ticker)
+				verified = false
+				continue
 			}
 			info := p.getHolderAbbrInfo(addressId, record.Token)
 			if info == nil {
-				p.printHistoryWithAddress(ticker, addressId)
-				common.Log.Panicf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Token)
+				// p.printTicker(ticker)
+				// p.printHolders(ticker)
+				// p.printHistoryWithAddress(ticker, addressId)
+				common.Log.Errorf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Token)
+				failed = append(failed, ticker)
+				verified = false
+				continue
 			}
 			if info.AvailableBalance.String() != record.AvailableBalance {
 				if !compareDecimal(info.AvailableBalance, record.AvailableBalance) {
-					p.printHistoryWithAddress(ticker, addressId)
-					common.Log.Panicf("validateHolderData %s %s available balance different %s %s",
+					//p.printHistoryWithAddress(ticker, addressId)
+					common.Log.Errorf("validateHolderData %s %s available balance different %s %s",
 						address, record.Token, record.AvailableBalance, info.AvailableBalance.String())
+					failed = append(failed, ticker)
+					verified = false
+					continue
 				}
 			}
 			if info.TransferableBalance.String() != record.TransferableBalance {
 				if !compareDecimal(info.TransferableBalance, record.TransferableBalance) {
-					p.printHistoryWithAddress(ticker, addressId)
-					common.Log.Panicf("validateHolderData %s %s transferable balance different %s %s",
+					//p.printHistoryWithAddress(ticker, addressId)
+					common.Log.Errorf("validateHolderData %s %s transferable balance different %s %s",
 						address, record.Token, record.TransferableBalance, info.TransferableBalance.String())
+					failed = append(failed, ticker)
+					verified = false
+					continue
 				}
 			}
 		}
-		common.Log.Infof("BRC20Indexer.validateHolderData %s %d addresses are checked.", ticker, len(holders))
+		if verified {
+			common.Log.Infof("BRC20Indexer.validateHolderData %s %d check succeeded.", ticker, len(holders))
+		} else {
+			common.Log.Infof("BRC20Indexer.validateHolderData %s check failed.", ticker)
+		}
+	}
+
+	if len(failed) > 0 {
+		common.Log.Panicf("check %v holders failed", failed)
 	}
 }

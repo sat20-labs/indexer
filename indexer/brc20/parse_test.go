@@ -293,7 +293,7 @@ func TestParseValidateData(t *testing.T) {
 
 func TestParseValidateDir(t *testing.T) {
 	var err error
-	validateHolderData, err := validate.ReadBRC20HolderCSVDir("../../brc20-top")
+	validateHolderData, err := validate.ReadBRC20HolderCSVDir("./validate/holders")
 	if err != nil {
 		common.Log.Panicf("ReadBRC20HolderCSVDir failed, %v", err)
 	}
@@ -323,7 +323,8 @@ func TestParseValidateDir(t *testing.T) {
 		}
 	}
 
-	fmt.Printf("len %d", len(heightToHolderRecords))
+	// 928228-928300
+	fmt.Printf("len %d, height %d-%d\n", len(heightToHolderRecords), startHeight, endHeight)
 }
 
 

@@ -77,17 +77,15 @@ func (s *BRC20Indexer) UpdateInscribeMint(input *common.TxInput, mint *common.BR
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
-		// 忽略某些不知道什么原因，unisat认为是无效的brc20铸造铭文，仅仅为了让校验数据可以正确匹配
-		var excludingInscriptions = map[string]bool {
-			// "06ccbac09747a62b2b6c000786b0c5c34ded98d50e8e84986f1c4884bc60e461i0": true, // vindicated
-			// "23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1i0": true, // reinscription
-			// "8642d3bc8e84ca265c87689241398aaff4d323ab411028deaeae371d1555b276i0": true, // reinscription
-		}
-		if _, ok := excludingInscriptions[mint.Nft.Base.InscriptionId]; ok {
-			return
-		}
-	}
+	// if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
+	// 	var excludingInscriptions = map[string]bool {
+	// 		// "06ccbac09747a62b2b6c000786b0c5c34ded98d50e8e84986f1c4884bc60e461i0": true, // vindicated
+	// 		// "23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1i0": true, // reinscription
+	// 	}
+	// 	if _, ok := excludingInscriptions[mint.Nft.Base.InscriptionId]; ok {
+	// 		return
+	// 	}
+	// }
 
 	s.actionBufferMap[input.UtxoId] = &ActionInfo{
 		Action: common.BRC20_Action_InScribe_Mint,

@@ -10,13 +10,13 @@ import (
 	"github.com/sat20-labs/indexer/config"
 	base_indexer "github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/brc20"
+	inCommon "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/exotic"
 	"github.com/sat20-labs/indexer/indexer/ft"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/runes"
-	inCommon "github.com/sat20-labs/indexer/indexer/common"
 
 	"github.com/btcsuite/btcd/chaincfg"
 )
@@ -59,7 +59,7 @@ type IndexerMgr struct {
 
 	// 跑数据
 	lastCheckHeight int
-	base           *base_indexer.BaseIndexer
+	base            *base_indexer.BaseIndexer
 	// 备份所有需要写入数据库的数据
 	baseBackupDB   *base_indexer.BaseIndexer
 	exoticBackupDB *exotic.ExoticIndexer
@@ -174,7 +174,7 @@ func (b *IndexerMgr) Init() {
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
-	b.brc20Indexer.InitIndexer(b.nft)
+	b.brc20Indexer.Init(b.nft)
 	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.base)
 	b.RunesIndexer.Init()
 	b.miniMempool.init()
