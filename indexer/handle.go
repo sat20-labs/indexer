@@ -925,6 +925,17 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 		return
 	}
 
+	// 必须要有MIME类型，并且是“text/plain”或“application/json”
+	if len(insc.Inscription.ContentType) == 0 {
+		common.Log.Debugf("invalid brc20 inscription %s, should provide content type", nft.Base.InscriptionId)
+		return 
+	}
+	parts := strings.Split(string(insc.Inscription.ContentType), ";")
+	if parts[0] != "text/plain" && parts[0] != "application/json" {
+		common.Log.Debugf("invalid brc20 inscription %s, invalid content type %s", nft.Base.InscriptionId, insc.Inscription.ContentType)
+		return
+	}
+
 	switch strings.ToLower(ordxBaseContent.Op) {
 	case "deploy":
 		deployInfo := common.ParseBrc20DeployContent(content)

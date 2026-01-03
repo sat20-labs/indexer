@@ -30,14 +30,19 @@ type TickerStatus struct {
 	Holders     map[string]string
 }
 
-var _validateHistoryData map[string]*validate.BRC20CSVRecord
-var _heightToHistoryRecords map[int][]*validate.BRC20CSVRecord // 按顺序
-var _historyStartHeight int = 0xffffffff
-var _historyEndHeight int
+type ValidateHistoryData struct {
+	name string
+	path string
+	start int
+	end int
+	history map[string]*validate.BRC20CSVRecord
+	heightToHistoryRecords map[int][]*validate.BRC20CSVRecord
+	heightToInscriptionMap map[int]map[string]int64
+}
 
-var _heightToInscriptionMap map[int]map[string]int64
+var _validateHistoryData *ValidateHistoryData
+
 var _holderStartHeight, _holderEndHeight int
-
 var _heightToHolderRecords map[int]map[string]map[string]*validate.BRC20HolderCSVRecord
 
 var testnet4_checkpoint = map[int]*CheckPoint{
@@ -702,77 +707,111 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 	common.Log.Infof("BRC20Indexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
 
+func loadHistoryRecords(path string) (*ValidateHistoryData, error) {
+	var history map[string]*validate.BRC20CSVRecord
+	var start, end int
+	var err error
+	if strings.Contains(path, ".csv") {
+		history, start, end, err = validate.ReadBRC20CSV(path)
+	} else {
+		history, start, end, err = validate.ReadBRC20CSVDir(path)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	validateHistoryData := &ValidateHistoryData{
+		path: path,
+		start: start,
+		end: end,
+		history: history,
+		heightToHistoryRecords: make(map[int][]*validate.BRC20CSVRecord),
+		heightToInscriptionMap: make(map[int]map[string]int64),
+	}
+
+	for _, record := range history {
+		v := validateHistoryData.heightToHistoryRecords[record.Height]
+		if len(v) == 0 {
+			validateHistoryData.heightToHistoryRecords[record.Height] = append([]*validate.BRC20CSVRecord(nil), record)
+		} else {
+			validateHistoryData.heightToHistoryRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
+		}
+		
+		if record.Type == common.BRC20_Action_InScribe_Deploy ||
+			record.Type == common.BRC20_Action_InScribe_Mint ||
+			record.Type == common.BRC20_Action_InScribe_Transfer {
+			inscs, ok := validateHistoryData.heightToInscriptionMap[record.Height]
+			if !ok {
+				inscs = make(map[string]int64)
+				validateHistoryData.heightToInscriptionMap[record.Height] = inscs
+			}
+			inscs[record.InscriptionID] = record.InscriptionNumber
+		}
+	}
+
+
+	return validateHistoryData, nil		
+}
+
+
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *BRC20Indexer) validateHistory(height int) {
 
 	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
 
-	name := "ordi"
+	var path string
 	if _validateHistoryData == nil {
 		if isMainnet {
 			if height < 779832 || height > 929000 { // TODO 修改校验数据需要修改这个值
 				return
 			}
-			var err error
-			path := "./indexer/brc20/validate/ordi"
-			_validateHistoryData, err = validate.ReadBRC20CSVDir(path)
-			if err != nil {
-				common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
-			}
+			path = "./indexer/brc20/validate/ordi"
 		} else {
 			if height < 28865 || height > 114000 { // TODO 修改校验数据需要修改这个值
 				return
 			}
-			var err error
-			path := "./indexer/brc20/validate/ordi-testnet4.csv"
-			_validateHistoryData, err = validate.ReadBRC20CSV(path)
-			if err != nil {
-				common.Log.Panicf("ReadBRC20CSV failed, %v", err)
-			}
+			path = "./indexer/brc20/validate/ordi-testnet4.csv"
 		}
 	}
-	
-	if _heightToHistoryRecords == nil {
-		_heightToHistoryRecords = make(map[int][]*validate.BRC20CSVRecord)
-		
-		_heightToInscriptionMap = make(map[int]map[string]int64)
-		for _, record := range _validateHistoryData {
-			v := _heightToHistoryRecords[record.Height]
-			if len(v) == 0 {
-				_heightToHistoryRecords[record.Height] = append([]*validate.BRC20CSVRecord(nil), record)
-			} else {
-				_heightToHistoryRecords[record.Height] = validate.InsertByInscriptionNumber(v, record)
-			}
-			
-			if record.Type == common.BRC20_Action_InScribe_Deploy ||
-				record.Type == common.BRC20_Action_InScribe_Mint ||
-				record.Type == common.BRC20_Action_InScribe_Transfer {
-				inscs, ok := _heightToInscriptionMap[record.Height]
-				if !ok {
-					inscs = make(map[string]int64)
-					_heightToInscriptionMap[record.Height] = inscs
-				}
-				inscs[record.InscriptionID] = record.InscriptionNumber
-			}
+	if _validateHistoryData == nil {
+		var err error
+		_validateHistoryData, err = loadHistoryRecords(path)
+		if err != nil {
+			common.Log.Panicf("loadHistoryRecords failed, %v", err)
+		}
+		_validateHistoryData.name = "ordi"
+	}
+	p.validateHistoryWithTicker(height, _validateHistoryData)
+}
 
-			if record.Height > _historyEndHeight {
-				_historyEndHeight = record.Height
-			}
-			if record.Height < _historyStartHeight {
-				_historyStartHeight = record.Height
-			}
-		}
+func (p *BRC20Indexer) validateAllHistory(name, path string) {
+	validateHistoryData, err := loadHistoryRecords(path)
+	if err != nil {
+		common.Log.Panicf("loadHistoryRecords failed, %v", err)
 	}
-	if len(_validateHistoryData) == 0 {
+	validateHistoryData.name = name
+	for i := validateHistoryData.start; i <= validateHistoryData.end; i++ {
+		if i == 814156 {
+			continue
+		}
+		p.validateHistoryWithTicker(i, validateHistoryData)
+	}
+}
+
+// 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
+func (p *BRC20Indexer) validateHistoryWithTicker(height int, validateHistoryData *ValidateHistoryData) {
+
+	if height < validateHistoryData.start || height > validateHistoryData.end {
 		return
 	}
-	if height < _historyStartHeight || height > _historyEndHeight {
+	
+	if len(validateHistoryData.history) == 0 {
 		return
 	}
 
 	tobeValidating := make([]*HolderAction, 0)
 	for _, v := range p.holderActionList {
-		if v.Height != height || v.Ticker != name {
+		if v.Height != height || v.Ticker != validateHistoryData.name {
 			continue
 		}
 		if v.Action == common.BRC20_Action_Transfer_Spent {
@@ -800,7 +839,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	// 执行验证
 
 	// 确保本区块铸造的铭文和number一致
-	inscriptionMap, ok := _heightToInscriptionMap[height]
+	inscriptionMap, ok := validateHistoryData.heightToInscriptionMap[height]
 	if ok {
 		nftIndexer := p.nftIndexer
 		for id, num := range inscriptionMap {
@@ -823,7 +862,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		}
 	}
 
-	validateRecords := _heightToHistoryRecords[height]
+	validateRecords := validateHistoryData.heightToHistoryRecords[height]
 	validateMap := make(map[string]*validate.BRC20CSVRecord)
 	for _, item := range validateRecords {
 		key := fmt.Sprintf("%d-%x", item.InscriptionNumber, item.TxIdx)
@@ -831,7 +870,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	}
 
 	if len(validateRecords) != len(tobeValidating) {
-		more := p.loadTransferHistoryWithHeightFromDB(name, height)
+		more := p.loadTransferHistoryWithHeightFromDB(validateHistoryData.name, height)
 		for _, item := range more {
 			if item.Action == common.BRC20_Action_Transfer_Spent {
 				continue
@@ -951,7 +990,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		// }
 	}
 
-	common.Log.Infof("BRC20Indexer.validateHistory %d history records are checked.", len(validateRecords))
+	common.Log.Infof("BRC20Indexer.validateHistory height %d, total %d history records are checked.", height, len(validateRecords))
 }
 
 func compareDecimal(amt *common.Decimal, str string) bool {

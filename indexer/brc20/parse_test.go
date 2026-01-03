@@ -338,33 +338,33 @@ func TestParseCompressFile(t *testing.T) {
 
 func TestParseValidateDir_history(t *testing.T) {
 	var err error
-	validateData, err := validate.ReadBRC20CSVDir("./validate/ordi")
+	validateData, start, end, err := validate.ReadBRC20CSVDir("./validate/ordi")
 	if err != nil {
 		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
 	}
 
-	fmt.Printf("len %d", len(validateData))
+	fmt.Printf("len %d, height %d %d", len(validateData), start, end)
 }
 
 
 func TestParseValidateData_history(t *testing.T) {
-	validateHolderData, err := validate.ReadBRC20CSV("./validate/ordi.csv")
+	validateHolderData, start, end, err := validate.ReadBRC20CSV("./validate/ordi.csv")
 	if err != nil {
 		common.Log.Panicf("ReadBRC20CSV failed, %v", err)
 	}
 
-	fmt.Printf("len %d", len(validateHolderData))
+	fmt.Printf("len %d, height %d %d", len(validateHolderData), start, end)
 }
 
 
 func TestCompareValidateFile(t *testing.T) {
 
-	validateData1, err := validate.ReadBRC20CSVDir("./validate/ordi")
+	validateData1, _, _, err := validate.ReadBRC20CSVDir("./validate/ordi")
 	if err != nil {
 		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
 	}
 
-	validateData2, err := validate.ReadBRC20CSV("./validate/ordi_records.csv")
+	validateData2, _, _, err := validate.ReadBRC20CSV("./validate/ordi_records.csv")
 	if err != nil {
 		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
 	}

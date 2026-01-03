@@ -82,7 +82,7 @@ func parseI64(s string) int64 {
 }
 
 
-func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
+func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, int, int, error) {
 	if strings.HasSuffix(path, ".gz") {
 		csvPath, cleanup, err := DecompressToTempCSV(path)
 		if err != nil {
@@ -94,7 +94,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 	
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 	defer f.Close()
 
@@ -106,7 +106,7 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 	// 读取 header
 	header, err := r.Read()
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	col := make(map[string]int)
@@ -115,9 +115,8 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 		col[h] = i
 	}
 
-	height := 790577
-	invalidCount := 0
-	count := 0
+	var start, end int
+	start = 0xffffffff
 	result := make(map[string]*BRC20CSVRecord)
 	for {
 		row, err := r.Read()
@@ -125,15 +124,18 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 			break
 		}
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
 
 		h := parseInt32(row[col["height"]])
+		if h < start {
+			start = h
+		}
+		if h > end {
+			end = h
+		}
 
 		if row[col["valid"]] == "0" {
-			if h == height {
-				invalidCount++
-			}
 			continue
 		}
 
@@ -169,10 +171,6 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 			H: parseInt32(row[col["h"]]),
 		}
 
-		if rec.Height == height {
-			count++
-		}
-
 		utxoId := common.ToUtxoId(rec.Height, rec.TxIdx, rec.Vout)
 		key := fmt.Sprintf("%d-%x-%d", rec.InscriptionNumber, utxoId, rec.Offset)
 
@@ -186,14 +184,14 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, error) {
 		result[key] = rec
 	}
 	//common.Log.Infof("block %d: %d %d", height,count, invalidCount)
-	return result, nil
+	return result, start, end, nil
 }
 
 
-func ReadBRC20CSVDir(dir string) (map[string]*BRC20CSVRecord, error) {
+func ReadBRC20CSVDir(dir string) (map[string]*BRC20CSVRecord, int, int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	var files []string
@@ -210,12 +208,20 @@ func ReadBRC20CSVDir(dir string) (map[string]*BRC20CSVRecord, error) {
 	// 保证确定性顺序
 	sort.Strings(files)
 
+	start := 0xffffffff
+	end := 0
 	result := make(map[string]*BRC20CSVRecord, 0)
 	for _, path := range files {
-		records, err := ReadBRC20CSV(path)
+		records, start1, end1, err := ReadBRC20CSV(path)
 		if err != nil {
 			common.Log.Errorf("read csv file %s failed, %v", path, err)
 			continue
+		}
+		if start1 < start {
+			start = start1
+		}
+		if end1 > end {
+			end = end1
 		}
 		for k, v := range records {
 			old, ok := result[k]
@@ -229,7 +235,7 @@ func ReadBRC20CSVDir(dir string) (map[string]*BRC20CSVRecord, error) {
 		}
 	}
 
-	return result, nil
+	return result, start, end, nil
 }
 
 // height 必须相同
