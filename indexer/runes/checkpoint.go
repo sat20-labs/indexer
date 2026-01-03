@@ -251,6 +251,14 @@ func readHolderDataToMap(dir string) (int, int) {
 	return start, end
 }
 
+func addFailedItem(failed map[string]map[string]bool, ticker, address string) {
+	holders, ok := failed[ticker]
+	if !ok {
+		holders = make(map[string]bool)
+		failed[ticker] = holders
+	}
+	holders[address] = true
+}
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *Indexer) validateHolderData(height int) {
@@ -272,14 +280,14 @@ func (p *Indexer) validateHolderData(height int) {
 
 	// 执行验证
 	baseIndexer := p.baseIndexer
-	var failed []string
+	failed := make(map[string]map[string]bool)
 	for ticker, holders := range tickerToHolders {
 		verified := true
 		for address, record := range holders {
 			addressId := baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
 				common.Log.Errorf("validateHolderData GetAddressIdFromDB %s failed", address)
-				failed = append(failed, ticker)
+				addFailedItem(failed, ticker, address)
 				verified = false
 				continue
 			}
@@ -289,7 +297,7 @@ func (p *Indexer) validateHolderData(height int) {
 				// p.printHolders(ticker)
 				// p.printHistoryWithAddress(ticker, addressId)
 				common.Log.Errorf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Ticker)
-				failed = append(failed, ticker)
+				addFailedItem(failed, ticker, address)
 				verified = false
 				continue
 			}
@@ -298,7 +306,7 @@ func (p *Indexer) validateHolderData(height int) {
 					//p.printHistoryWithAddress(ticker, addressId)
 					common.Log.Errorf("validateHolderData %s %s available balance different %s %s",
 						address, record.Ticker, record.Balance, info.String())
-					failed = append(failed, ticker)
+					addFailedItem(failed, ticker, address)
 					verified = false
 					continue
 				}
