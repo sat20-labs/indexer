@@ -105,7 +105,7 @@ func ReadCSVFile(path string) (map[string]*HolderCSVRecord, int, int, error) {
 		}
 
 		rec := &HolderCSVRecord{
-			Ticker:   strings.ToLower(row[col["rune"]]),
+			Ticker:   row[col["rune"]],
 			Height:   parseInt32(row[col["height"]]),
 			Address:     row[col["address"]],
 		

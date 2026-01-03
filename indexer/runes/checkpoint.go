@@ -251,13 +251,13 @@ func readHolderDataToMap(dir string) (int, int) {
 	return start, end
 }
 
-func addFailedItem(failed map[string]map[string]bool, ticker, address string) {
+func addFailedItem(failed map[string]map[string]*common.Decimal, ticker, address string, amt *common.Decimal) {
 	holders, ok := failed[ticker]
 	if !ok {
-		holders = make(map[string]bool)
+		holders = make(map[string]*common.Decimal)
 		failed[ticker] = holders
 	}
-	holders[address] = true
+	holders[address] = amt
 }
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
@@ -280,14 +280,14 @@ func (p *Indexer) validateHolderData(height int) {
 
 	// 执行验证
 	baseIndexer := p.baseIndexer
-	failed := make(map[string]map[string]bool)
+	failed := make(map[string]map[string]*common.Decimal)
 	for ticker, holders := range tickerToHolders {
 		verified := true
 		for address, record := range holders {
 			addressId := baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
 				common.Log.Errorf("validateHolderData GetAddressIdFromDB %s failed", address)
-				addFailedItem(failed, ticker, address)
+				addFailedItem(failed, ticker, address, nil)
 				verified = false
 				continue
 			}
@@ -297,16 +297,17 @@ func (p *Indexer) validateHolderData(height int) {
 				// p.printHolders(ticker)
 				// p.printHistoryWithAddress(ticker, addressId)
 				common.Log.Errorf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Ticker)
-				addFailedItem(failed, ticker, address)
+				addFailedItem(failed, ticker, address, nil)
 				verified = false
 				continue
 			}
 			if info.String() != record.Balance {
-				if !indexerCommon.CompareDecimal(info, record.Balance) {
+				// record.balance是不考虑精度的整数
+				if !indexerCommon.CompareForRunes(info.Value, record.Balance) {
 					//p.printHistoryWithAddress(ticker, addressId)
 					common.Log.Errorf("validateHolderData %s %s available balance different %s %s",
-						address, record.Ticker, record.Balance, info.String())
-					addFailedItem(failed, ticker, address)
+						address, record.Ticker, record.Balance, info.Value.String())
+					addFailedItem(failed, ticker, address, info)
 					verified = false
 					continue
 				}

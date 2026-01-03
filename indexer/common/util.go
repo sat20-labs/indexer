@@ -74,7 +74,7 @@ func CompareDecimal(amt *common.Decimal, str string) bool {
 		if !ok {
 			common.Log.Panicf("SetString %s failed", amt.String())
 		}
-		n := f.Text('E', d)
+		n := f.Text('E', d) // 没有做四舍五入，而是直接切断了
 		return n == str
 	}
 
@@ -87,6 +87,83 @@ func CompareDecimal(amt *common.Decimal, str string) bool {
 	}
 	if amt != nil && amt.Precision > d {
 		amt := amt.SetPrecisionWithRound(d)
+		return amt.String() == str
+	}
+	return false
+}
+
+func IntToSciHalfUp10(n *big.Int, decimals int) string {
+    s := n.String()
+    if len(s) == 0 {
+        return "0E+0"
+    }
+
+    // 10 进制指数
+    exp := len(s) - 1
+
+    // 需要的有效数字数 = 1 + decimals
+    need := 1 + decimals
+
+    // 确保有一位用于判断进位
+    cut := need + 1
+
+    // 不足补零
+    if len(s) < cut {
+        s = s + strings.Repeat("0", cut-len(s))
+    }
+
+    main := s[:need]      // 主体
+    roundDigit := s[need] // 判断位
+
+    // half-up 舍入
+    if roundDigit >= '5' {
+        i := new(big.Int)
+        i.SetString(main, 10)
+        i.Add(i, big.NewInt(1))
+        main = i.String()
+    }
+
+    // 处理进位导致长度变化（如 9.9999 → 10.000）
+    if len(main) > need {
+        exp++
+        main = main[:need]
+    }
+
+    // 组装 mantissa
+    if decimals > 0 {
+        return fmt.Sprintf(
+            "%s.%sE+%d",
+            main[:1],
+            main[1:],
+            exp,
+        )
+    }
+
+    return fmt.Sprintf("%sE+%d", main[:1], exp)
+}
+
+
+
+func CompareForRunes(amt *big.Int, str string) bool {
+
+	if strings.Contains(str, "E") {
+		// f, ok := new(big.Float).SetString("1.21906E+11")
+		// if !ok {
+		// 	common.Log.Panicf("SetString %s failed", str)
+		// }
+		// str = f.Text('f', -1)
+		parts := strings.Split(str, "E")
+		parts = strings.Split(parts[0], ".")
+		d := 0
+		if len(parts) == 2 {
+			d = len(parts[1])
+		}
+
+		n := IntToSciHalfUp10(amt, d)
+		return n == str
+	}
+
+	if amt != nil {
 		return amt.String() == str
 	}
 	return false
