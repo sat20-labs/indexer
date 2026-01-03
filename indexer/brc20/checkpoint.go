@@ -40,7 +40,7 @@ type ValidateHistoryData struct {
 	heightToInscriptionMap map[int]map[string]int64
 }
 
-var _validateHistoryData *ValidateHistoryData
+var _validateHistoryData map[string]*ValidateHistoryData // key: ticker
 
 var _holderStartHeight, _holderEndHeight int
 var _heightToHolderRecords map[int]map[string]map[string]*validate.BRC20HolderCSVRecord
@@ -757,31 +757,45 @@ func loadHistoryRecords(path string) (*ValidateHistoryData, error) {
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *BRC20Indexer) validateHistory(height int) {
 
-	isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
-
-	var path string
+	if height > 930000 {
+		return
+	}
+	
 	if _validateHistoryData == nil {
+		_validateHistoryData = make(map[string]*ValidateHistoryData)
+		
+		isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
+		var path string
 		if isMainnet {
-			if height < 779832 || height > 929000 { // TODO 修改校验数据需要修改这个值
-				return
-			}
 			path = "./indexer/brc20/validate/ordi"
 		} else {
-			if height < 28865 || height > 114000 { // TODO 修改校验数据需要修改这个值
-				return
-			}
 			path = "./indexer/brc20/validate/ordi-testnet4.csv"
 		}
-	}
-	if _validateHistoryData == nil {
-		var err error
-		_validateHistoryData, err = loadHistoryRecords(path)
+		data, err := loadHistoryRecords(path)
 		if err != nil {
 			common.Log.Panicf("loadHistoryRecords failed, %v", err)
 		}
-		_validateHistoryData.name = "ordi"
+		data.name = "ordi"
+		_validateHistoryData[data.name] = data
+
+		if isMainnet {
+			path = "./indexer/brc20/validate/cats_records.csv"
+		} else {
+			path = ""
+		}
+		if path != "" {
+			data, err := loadHistoryRecords(path)
+			if err != nil {
+				common.Log.Panicf("loadHistoryRecords failed, %v", err)
+			}
+			data.name = "cats"
+			_validateHistoryData[data.name] = data
+		}
 	}
-	p.validateHistoryWithTicker(height, _validateHistoryData)
+
+	for _, data := range _validateHistoryData {
+		p.validateHistoryWithTicker(height, data)
+	}
 }
 
 func (p *BRC20Indexer) validateAllHistory(name, path string) {
@@ -990,7 +1004,8 @@ func (p *BRC20Indexer) validateHistoryWithTicker(height int, validateHistoryData
 		// }
 	}
 
-	common.Log.Infof("BRC20Indexer.validateHistory height %d, total %d history records are checked.", height, len(validateRecords))
+	common.Log.Infof("BRC20Indexer.validateHistory height %d, ticker %s, total %d history records are checked.", 
+		height, validateHistoryData.name, len(validateRecords))
 }
 
 func compareDecimal(amt *common.Decimal, str string) bool {
