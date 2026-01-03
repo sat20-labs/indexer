@@ -666,6 +666,13 @@ func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 		if nft.Base.Parent != ticker.Nft.Base.InscriptionId {
 			return nil
 		}
+		// 需要检查铸造地址是否是ticker的持有人？
+		nftOwnAddressId := s.nft.GetNftHolderWithInscriptionId(ticker.Nft.Base.InscriptionId)
+		if nft.OwnerAddressId != nftOwnAddressId {
+			common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, only deployer can inscribe mint",
+				nft.Base.InscriptionId, content.Ticker)
+			return nil
+		}
 	}
 
 	mint := &common.BRC20Mint{
