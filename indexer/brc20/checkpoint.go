@@ -25,6 +25,8 @@ type TickerStatus struct {
 	Max         string
 	Minted      string
 	MintCount   int
+	StartInscription int64
+	EndInscription int64
 	HolderCount int
 	TxCount     int
 	Holders     map[string]string
@@ -432,11 +434,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		TickerCount: 0,
 		Tickers:     nil,
 	},
-	780070: {
-		Tickers: map[string]*TickerStatus{
-			"ordi": {Holders: map[string]string{}},
-		},
-	},
 
 	790693: {
 		Tickers: map[string]*TickerStatus{
@@ -462,12 +459,229 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			}},
 		},
 	},
+	809135: {
+		Tickers: map[string]*TickerStatus{
+			"sats": {
+				StartInscription: 357097,
+				EndInscription: 34539796, // 5d417bdd264635c441a4327711f4635c085092aa359b5a03dde4b16687fe8dadi0
+			},
+		},
+	},
+	885497: {
+		Tickers: map[string]*TickerStatus{
+			"mask": {
+				StartInscription: 371263,
+				EndInscription: 88047520, // f3c824f50af6a9d0f6a87d3b073b27de4d413bc6b66d33b9fe809cb8b7f2eb50i0
+			},
+		},
+	},
+	829293: {
+		Tickers: map[string]*TickerStatus{
+			"eorb": {
+				StartInscription: 9950800,
+				EndInscription: 60016949, // 31ac41b829e26e8b2496e10f648565197b74b01456e738627ee9fd88725df5f6i0
+			},
+		},
+	},
+	815454: {
+		Tickers: map[string]*TickerStatus{
+			"rats": {
+				StartInscription: 398115,
+				EndInscription: 37867163, // 75e872b4e72a421743416ca67020c2cb2686131f84e9fb589d7ba953f35b8ed2i0
+			},
+		},
+	},
+	822672: {
+		Tickers: map[string]*TickerStatus{
+			"𝛑": {
+				StartInscription: 5496738,
+				EndInscription: 50855505, // a6d7b40197e18752d017e60c98fe5854706a3870e057098586eff54a311048fci0
+			},
+		},
+	},
+	825856: {
+		Tickers: map[string]*TickerStatus{
+			"ligo": {
+				StartInscription: 45733545,
+				EndInscription: 55437206, // 69558d1209c2ef4eaa5167254ee87a59f56cb356956fb52521ea1798504cf4e0i0
+			},
+		},
+	},
+	818151: {
+		Tickers: map[string]*TickerStatus{
+			"mmss": {
+				StartInscription: 41742160,
+				EndInscription: 43314829, // ea4c4ae3882089bd23fc80313fa3325a321a27ff7d38fe2cea1a5c4ff4c1381bi0
+			},
+		},
+	},
+	819632: {
+		Tickers: map[string]*TickerStatus{
+			"mice": {
+				StartInscription: 396419,
+				EndInscription: 45838885, // e330aba6299c2a9b26626ea21df9292c5b7ec24d7508e470aad4a4ef71eb25e0i0
+			},
+		},
+	},
+	816571: {
+		Tickers: map[string]*TickerStatus{
+			"bear": {
+				StartInscription: 455802,
+				EndInscription: 40004247, // b46bc35d1860202c05a970e71719bd400595f46b1e886686fbd59d1f652acf80i0
+			},
+		},
+	},
+	904297: {
+		Tickers: map[string]*TickerStatus{
+			"dior": {
+				StartInscription: 457175,
+				EndInscription: 99244754, // fa155146443ca4056c78188d27a4667633200332020fa81682bfefbc7642d20ai0
+			},
+		},
+	},
+	924030: {
+		Tickers: map[string]*TickerStatus{
+			"safe": {
+				StartInscription: 365009,
+				EndInscription: 111208385, // ba61f2cd48a7182ae58980d9f55f7f9e448728ae973091151d5c5bdeac8d127ai0
+			},
+		},
+	},
+	846620: {
+		Tickers: map[string]*TickerStatus{
+			"pizza": {
+				StartInscription: 66796189,
+				EndInscription: 71393287, // ce26816f6746f66db8f8cf4a8b819e895a39612153e4cb08e3bbb5956291cd8ci0
+			},
+		},
+	},
+	890074: {
+		Tickers: map[string]*TickerStatus{
+			"lamb": {
+				StartInscription: 1201893,
+				EndInscription: 91852665, // 38964fd1efa4d1f20407085b88b40f11fd0868753a71198e83f4c03da200eed3i0
+			},
+		},
+	},
+	919806: {
+		Tickers: map[string]*TickerStatus{
+			"bhai": {
+				StartInscription: 54257198,
+				EndInscription: 107978530, // e363a89d9042f99e497e1d7447ba8c6aa6529fc0343d6e401c843cb5fa37ae4fi0
+			},
+		},
+	},
+	817034: {
+		Tickers: map[string]*TickerStatus{
+			"csas": {
+				StartInscription: 38407786,
+				EndInscription: 40788895, // 792534904afec63dfcc51b91309440b34b65b376ff5636b85d8d05099aa2fe5ci0
+			},
+		},
+	},
+	827093: {
+		Tickers: map[string]*TickerStatus{
+			"scat": {
+				StartInscription: 2698231,
+				EndInscription: 57106023, // 8885e4e3c1c5d321bd0e32c38e3426fd0361b85d80faf6e047c64f3df0f3362fi0
+			},
+		},
+	},
+	780070: {
+		Tickers: map[string]*TickerStatus{
+			"ordi": {
+				StartInscription: 348020,
+				EndInscription: 384419, // 17352fd494b0cd70f0a835575178bdbaeca789fa2fd49c4c552bc9abfdb96b5bi0
+			},
+		},
+	},
+	788747: {
+		Tickers: map[string]*TickerStatus{
+			"vmpx": {
+				StartInscription: 4344148,
+				EndInscription: 4618990, // d89c9e2a26515bead26eebfcbf6bac4e32c695f939819906f0151e115e7e2c31i0
+			},
+		},
+	},
+	814163: {
+		Tickers: map[string]*TickerStatus{
+			"cats": {
+				StartInscription: 393917,
+				EndInscription: 36021604, // 5bace5476d13576f35c221b7d16560cf974a7185c27857c52d6b7aff859b8e0ci0
+			},
+		},
+	},
+	815976: {
+		Tickers: map[string]*TickerStatus{
+			"roup": {
+				StartInscription: 38468453,
+				EndInscription: 38705364, // 9f0b7314f5cec246b9c87519e7f21a521b3040d2f9e52e32735bf7f0a648f6d0i0
+			},
+		},
+	},
+	816036: {
+		Tickers: map[string]*TickerStatus{
+			"piin": {
+				StartInscription: 38491175,
+				EndInscription: 38824924, // 425428f09936f294590de75a26b0798fee57bd52afc6b7d98c70c0fa3b23c395i0
+			},
+		},
+	},
+	833610: {
+		Tickers: map[string]*TickerStatus{
+			"x@ai": {
+				StartInscription: 53465785,
+				EndInscription: 63572866, // 70f2f2b91c3d66bf87c7bf949761c9fff33538baa9f3bca319200e00e2d870aai0
+			},
+		},
+	},
+	884603: {
+		Tickers: map[string]*TickerStatus{
+			"socfi": {
+				StartInscription: 85297408,
+				EndInscription: 86389325, // c56b039d9ed222a1160a14a41881e830aca6f02c095f15fcf223d18afd663ba6i0
+			},
+		},
+	},
+	801562: {
+		Tickers: map[string]*TickerStatus{
+			"btcs": {
+				StartInscription: 1666016,
+				EndInscription: 21250469, // 41f8698c0da5ff590ec6025a093ecff0eed395e3a3a8e3b060456e49bc0b694fi0
+			},
+		},
+	},
+	847556: {
+		Tickers: map[string]*TickerStatus{
+			"fifa": {
+				StartInscription: 393929,
+				EndInscription: 71623425, // 2cdd55b9f56a444fda440879abedbab7a3b85c8e7089f54564d6b52a8433f59bi0
+			},
+		},
+	},
+	880713: {
+		Tickers: map[string]*TickerStatus{
+			"beat": {
+				StartInscription: 462814,
+				EndInscription: 83618015, // f261178cec87a6b40b6a0a48a3870a7236541e5ce52b8cffbb6a1e54b01665dbi0
+			},
+		},
+	},
+	788985: {
+		Tickers: map[string]*TickerStatus{
+			"core": {
+				StartInscription: 390397,
+				EndInscription: 5122369, // a1b1cd19b301e57d917a300064722b91bc33dd869269c616e8104fe3d0fdbb66i0
+			},
+		},
+	},
 
 	813844: {
 		Tickers: map[string]*TickerStatus{
 			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "51"}},
 		},
 	},
+	
 	815725: {
 		Tickers: map[string]*TickerStatus{
 			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "567663.09894504"}},
@@ -646,6 +860,24 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		}
 		if tickerStatus.MintCount != 0 && ticker.MintCount != uint64(tickerStatus.MintCount) {
 			common.Log.Panicf("%s MinteMintCountd different, %d %d", name, ticker.MintCount, tickerStatus.MintCount)
+		}
+		if tickerStatus.StartInscription != 0{
+			nft := p.nftIndexer.GetNftWithInscriptionId(ticker.StartInscriptionId)
+			if nft == nil {
+				common.Log.Panicf("%s GetNftWithInscriptionId %s failed", name, ticker.StartInscriptionId)
+			}
+			if tickerStatus.StartInscription != nft.Base.Id {
+				common.Log.Panicf("%s start inscription different %d %d", name, tickerStatus.StartInscription, nft.Base.Id)
+			}
+		}
+		if tickerStatus.EndInscription != 0{
+			nft := p.nftIndexer.GetNftWithInscriptionId(ticker.EndInscriptionId)
+			if nft == nil {
+				common.Log.Panicf("%s GetNftWithInscriptionId %s failed", name, ticker.EndInscriptionId)
+			}
+			if tickerStatus.EndInscription != nft.Base.Id {
+				common.Log.Panicf("%s start inscription different %d %d", name, tickerStatus.EndInscription, nft.Base.Id)
+			}
 		}
 		if tickerStatus.HolderCount != 0 && ticker.HolderCount != uint64(tickerStatus.HolderCount) {
 			common.Log.Panicf("%s HolderCount different, %d %d", name, ticker.HolderCount, tickerStatus.HolderCount)
