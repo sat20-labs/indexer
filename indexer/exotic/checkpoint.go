@@ -171,12 +171,38 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	0: {
 		Tickers: map[string]*TickerStatus{
 			Pizza: {DeployHeight: PIZZA_HEIGHT},
-			Uncommon: {DeployHeight: 0}, 
-			Rare: {DeployHeight: 0}, 
-			Epic: {DeployHeight: 0}, 
+			Mythic: {DeployHeight: 0},
+			Uncommon: {DeployHeight: 1}, 
+			Rare: {DeployHeight: DificultyAdjustmentInterval}, 
+			Legendary: {DeployHeight: CycleInterval},
+			Epic: {DeployHeight: HalvingInterval}, 
 			Block9: {DeployHeight: 9},
 			Block78: {DeployHeight: 78},
 			Nakamoto: {DeployHeight: 9},
+		},
+	},
+
+	FirstTxHeight: {
+		Tickers: map[string]*TickerStatus{
+			FirstTransaction: {
+				Minted: FirstTxValue,
+			},
+		},
+	},
+
+	DificultyAdjustmentInterval: {
+		Tickers: map[string]*TickerStatus{
+			Uncommon: {
+				Minted: 2015,
+				Holders: map[string]int64{
+				},
+			},
+			Rare: {
+				Minted: 1,
+			},
+			Mythic: {
+				Minted: 1,
+			},
 		},
 	},
 
@@ -184,31 +210,39 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Tickers: map[string]*TickerStatus{
 			Uncommon: {
 				Minted: 9996,
-				HolderCount: 43,
 				Holders: map[string]int64{
-					
 				},
 			},
 			Rare: {
 				Minted: 4,
-				HolderCount: 3,
 				Holders: map[string]int64{
-					
 				},
 			},
 			FirstTransaction: {
-				Minted: 2814999961782,
-				HolderCount: 9,
+				Minted: FirstTxValue,
 				Holders: map[string]int64{
-					
 				},
 			},
-			Vintage: {
-				Minted: 5005000000000,
-				HolderCount: 13,
-				Holders: map[string]int64{
-					
-				},
+			// Vintage: {
+			// 	Minted: 5005000000000,
+			// 	Holders: map[string]int64{
+			// 	},
+			// },
+		},
+	},
+
+	PIZZA_HEIGHT: {
+		Tickers: map[string]*TickerStatus{
+			Pizza: {
+				Minted: PIZZA_VALUE,
+			},
+		},
+	},
+
+	HalvingInterval: {
+		Tickers: map[string]*TickerStatus{
+			Epic: {
+				Minted: 1,
 			},
 		},
 	},

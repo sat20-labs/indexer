@@ -14,13 +14,15 @@ const MAX_SUBSIDY_HEIGHT = 6929999 // subsidy = 0 when exceeds this height
 
 var PizzaRanges = ReadRangesFromOrdResponse(PIZZA_RANGES)
 var NakamotoBlocks = []int{9, 286, 688, 877, 1760, 2459, 2485, 3479, 5326, 9443, 9925, 10645, 14450, 15625, 15817, 19093, 23014, 28593, 29097}
-// f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16:0
+var FirstTxOutPoint = "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16:0"
 var FirstTransactionRanges = []*common.Range{
 	{
 		Start: 45000000000,
 		Size:  1000000000,
 	},
 }
+const FirstTxValue = 1000000000
+var FirstTxHeight = 170
 
 var HitmanRanges = SatingRangesToOrdinalsRanges(hitmanSatingRanges)
 var JpegRanges = SatingRangesToOrdinalsRanges(jpegSatingRanges)
