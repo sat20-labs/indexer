@@ -905,7 +905,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 			}
 			if tickerStatus.EndInscription != nft.Base.Id {
 				common.Log.Panicf("%s end inscription different %d %s <> %d %s", 
-					name, tickerStatus.EndInscription, ticker.EndInscriptionId, nft.Base.Id, nft.Base.InscriptionId)
+					name, tickerStatus.EndInscription, tickerStatus.EndInscriptionId, nft.Base.Id, nft.Base.InscriptionId)
 			}
 		}
 		if tickerStatus.HolderCount != 0 && ticker.HolderCount != uint64(tickerStatus.HolderCount) {
