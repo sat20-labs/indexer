@@ -225,12 +225,12 @@ func (s *BRC20Indexer) GetMintAmount(tick string) (*common.Decimal, int64) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	ticker := s.GetTicker(strings.ToLower(tick))
+	ticker := s.loadTickInfo(strings.ToLower(tick))
 	if ticker == nil {
 		return nil, 0
 	}
 
-	return ticker.Minted.Clone(), int64(ticker.MintCount)
+	return ticker.Ticker.Minted.Clone(), int64(ticker.Ticker.MintCount)
 }
 
 func (s *BRC20Indexer) GetMint(tickerName string, id int64) *common.BRC20Mint {

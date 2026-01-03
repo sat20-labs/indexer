@@ -7,13 +7,9 @@ import (
 	"net/http"
 
 	"github.com/sat20-labs/indexer/common"
+	indexerwire "github.com/sat20-labs/indexer/rpcserver/wire"
 )
 
-
-type TickerInfoResp struct {
-	BaseResp
-	Data *common.TickerInfo `json:"data"`
-}
 
 func GetTickerStatus(host, ticker string) (*common.TickerInfo, error) {
 	
@@ -35,7 +31,7 @@ func GetTickerStatus(host, ticker string) (*common.TickerInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	var data TickerInfoResp
+	var data indexerwire.TickerInfoResp
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", url, err)
@@ -45,42 +41,7 @@ func GetTickerStatus(host, ticker string) (*common.TickerInfo, error) {
 }
 
 
-type ListResp struct {
-	Start int64  `json:"start" example:"0"`
-	Total uint64 `json:"total" example:"9992"`
-}
-
-// mint history
-type MintHistoryRespV3 struct {
-	BaseResp
-	Data *MintHistoryDataV3 `json:"data"`
-}
-
-type MintHistoryDataV3 struct {
-	ListResp
-	Detail *MintHistoryV3 `json:"detail"`
-}
-
-type MintHistoryV3 struct {
-	TypeName string               `json:"type"`
-	Ticker   string               `json:"ticker,omitempty"`
-	Total    int                  `json:"total,omitempty"`
-	Start    int                  `json:"start,omitempty"`
-	Limit    int                  `json:"limit,omitempty"`
-	Items    []*MintHistoryItemV3 `json:"items,omitempty"`
-}
-
-type MintHistoryItemV3 struct {
-	MintAddress    string `json:"mintaddress,omitempty" example:"bc1p9jh2caef2ejxnnh342s4eaddwzntqvxsc2cdrsa25pxykvkmgm2sy5ycc5"`
-	HolderAddress  string `json:"holderaddress,omitempty"`
-	Balance        string `json:"balance,omitempty" example:"546" description:"Balance of the holder"`
-	InscriptionID  string `json:"inscriptionId,omitempty" example:"bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0"`
-	InscriptionNum int64  `json:"inscriptionNumber,omitempty" example:"67269474" description:"Inscription number of the holder"`
-}
-
-
-
-func GetMintHistory(host, ticker string, start, limit int) (*MintHistoryDataV3, error) {
+func GetMintHistory(host, ticker string, start, limit int) (*indexerwire.MintHistoryDataV3, error) {
 	var url string
 	if start == 0 && limit == 0 {
 		url = fmt.Sprintf("%s/v3/tick/history/%s", host, ticker)
@@ -105,7 +66,7 @@ func GetMintHistory(host, ticker string, start, limit int) (*MintHistoryDataV3, 
 	if err != nil {
 		return nil, err
 	}
-	var data MintHistoryRespV3
+	var data indexerwire.MintHistoryRespV3
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", url, err)
@@ -114,26 +75,7 @@ func GetMintHistory(host, ticker string, start, limit int) (*MintHistoryDataV3, 
 	return data.Data, nil
 }
 
-type MintDetailInfo struct {
-	ID             int64           `json:"id" example:"1"`
-	Ticker         string          `json:"ticker,omitempty"`
-	MintAddress    string          `json:"address,omitempty"`
-	Amount         int64           `json:"amount,omitempty"`
-	MintTime       int64           `json:"mintTimes,omitempty"`
-	Delegate       string          `json:"delegate,omitempty"`
-	Content        []byte          `json:"content,omitempty"`
-	ContentType    string          `json:"contenttype,omitempty"`
-	Ranges         []*common.Range `json:"ranges,omitempty"`
-	InscriptionID  string          `json:"inscriptionId,omitempty"`
-	InscriptionNum int64           `json:"inscriptionNumber,omitempty"`
-}
-
-type MintDetailInfoResp struct {
-	BaseResp
-	Data *MintDetailInfo `json:"data"`
-}
-
-func GetMintDetails(host, inscriptionId string) (*MintDetailInfo, error) {
+func GetMintDetails(host, inscriptionId string) (*indexerwire.MintDetailInfo, error) {
 	
 	url := fmt.Sprintf("%s/mint/details/%s", host, inscriptionId)
 
@@ -153,7 +95,7 @@ func GetMintDetails(host, inscriptionId string) (*MintDetailInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	var data MintDetailInfoResp
+	var data indexerwire.MintDetailInfoResp
 	err = json.Unmarshal(respBytes, &data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", url, err)
@@ -162,8 +104,8 @@ func GetMintDetails(host, inscriptionId string) (*MintDetailInfo, error) {
 	return data.Data, nil
 }
 
-func loadMintHistory(host, ticker string, total int) map[string]*MintHistoryItemV3 {
-	historymap := make(map[string]*MintHistoryItemV3)
+func loadMintHistory(host, ticker string, total int) map[string]*indexerwire.MintHistoryItemV3 {
+	historymap := make(map[string]*indexerwire.MintHistoryItemV3)
 	limit := 100
 	for i := 0; i < total; i += limit {
 		start := int(i)
@@ -182,9 +124,9 @@ func loadMintHistory(host, ticker string, total int) map[string]*MintHistoryItem
 }
 
 func TestCompareMintHistory() {
-	host1 := "http://192.168.1.102:8019/btc/testnet"
-	host2 := "http://127.0.0.1:8029/btc/testnet"
-	tickerName := "dogcoin"
+	host1 := "http://192.168.1.102:8019/btc/mainnet"
+	host2 := "http://127.0.0.1:8019/btc/mainnet"
+	tickerName := "pearl"
 
 	status, err := GetTickerStatus(host1, tickerName)
 	if err != nil {
@@ -235,6 +177,113 @@ func TestCompareMintHistory() {
 				common.Log.Infof("missing %s %s in host1", item1.InscriptionID, item1.Balance)
 			}	
 		}	
+	}
+
+	common.Log.Info("completed")
+}
+
+func GetHolders(host, ticker string, start, limit int) (*indexerwire.HolderListDataV3, error) {
+	var url string
+	if start == 0 && limit == 0 {
+		url = fmt.Sprintf("%s/v3/tick/holders/%s", host, ticker)
+	} else {
+		url = fmt.Sprintf("%s/v3/tick/holders/%s?start=%d&limit=%d", host, ticker, start, limit)
+	}
+	
+
+	response, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve data for %s from the API, error: %v", url, err)
+
+	}
+	defer response.Body.Close()
+	
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to retrieve data for %s from the API, error: %v", url, err)
+	}
+
+	respBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	var data indexerwire.HolderListRespV3
+	err = json.Unmarshal(respBytes, &data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", url, err)
+	}
+	
+	return data.Data, nil
+}
+
+
+func loadAllHolders(host, ticker string, total int) map[string]string {
+	result := make(map[string]string)
+	limit := 100
+	for i := 0; i < total; i += limit {
+		start := int(i)
+		holders, err := GetHolders(host, ticker, start, limit)
+		if err != nil {
+			common.Log.Infof("GetHolders failed, %v\n", err)
+			break
+		}
+
+		for _, item := range holders.Detail {
+			result[item.Wallet] = item.TotalBalance
+		}
+	}
+
+	return result
+}
+
+
+func TestCompareHolders() {
+	host1 := "http://192.168.1.102:8019/btc/mainnet"
+	host2 := "http://127.0.0.1:8019/btc/mainnet"
+	tickerName := "pearl"
+
+	status, err := GetTickerStatus(host1, tickerName)
+	if err != nil {
+		common.Log.Infof("GetTickerStatus failed, %v\n", err)
+		return
+	}
+	common.Log.Infof("status1 %s %d %d\n", status.TotalMinted, status.MintTimes, status.HoldersCount)
+
+	status2, err := GetTickerStatus(host2, tickerName)
+	if err != nil {
+		common.Log.Infof("GetTickerStatus failed, %v\n", err)
+		return
+	}
+	common.Log.Infof("status2 %s %d %d\n", status2.TotalMinted, status2.MintTimes, status2.HoldersCount)
+
+
+	if status.HoldersCount != status2.HoldersCount {
+		common.Log.Errorf("holder count different %d %d", status.HoldersCount, status2.HoldersCount)
+	}
+
+	holders1 := loadAllHolders(host1, tickerName, status.HoldersCount)
+	holders2 := loadAllHolders(host2, tickerName, status2.HoldersCount)
+
+	if len(holders1) > len(holders2) {
+		for k, v1 := range holders1 {
+			v2, ok := holders2[k]
+			if !ok {
+				common.Log.Infof("missing %s in host2", k)
+			}	
+			if v1 != v2 {
+				common.Log.Infof("%s has diferrent value %s %s", k, v1, v2)
+			}
+		}
+	} else {
+		for k, v2 := range holders2 {
+			v1, ok := holders1[k]
+			if !ok {
+				common.Log.Infof("missing %s in host1", k)
+			}	
+			if v1 != v2 {
+				common.Log.Infof("%s has diferrent value %s %s", k, v1, v2)
+			}
+		}
 	}
 
 	common.Log.Info("completed")

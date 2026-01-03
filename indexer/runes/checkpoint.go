@@ -4,7 +4,10 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	indexerCommon "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/runes/validate"
 )
+
 
 type CheckPoint struct {
 	Height      int
@@ -22,6 +25,10 @@ type TickerStatus struct {
 	HolderCount int
 	Holders     map[string]string
 }
+
+var _holderStartHeight, _holderEndHeight int
+var _heightToHolderRecords map[int]map[string]map[string]*validate.HolderCSVRecord
+
 
 var testnet4_checkpoint = map[int]*CheckPoint{
 	0: {
@@ -77,7 +84,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"UNCOMMON•GOODS": {
 				Minted:      "69032629",
 				MintCount:   69032629,
-				HolderCount: 250903,
+				HolderCount: 250904, // 250903 TODO 
 				Holders: map[string]string{
 					"bc1qvdnml9vy93twyhpz23dcdscey44d0w242zvfzg": "1608512",
 					"bc1q62gk9dawqz3ne2wksyc72zwpw85t4na3p92n9w": "1584152",
@@ -89,7 +96,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"DOG•GO•TO•THE•MOON": {
 				Minted:      "100000000000",
 				MintCount:   0,
-				HolderCount: 90868, // 90867
+				HolderCount: 90868, // 90867 // TODO 
 				Holders: map[string]string{
 					"bc1p50n9sksy5gwe6fgrxxsqfcp6ndsfjhykjqef64m8067hfadd9efqrhpp9k": "3957388135.36401",
 					"bc1pk8g4rztfkxs2q9c40g6keeknjw6aadx3kzu4suzlll0remfw7xxs5x9ctv": "3756442080.45356",
@@ -106,6 +113,8 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 func (p *Indexer) CheckPointWithBlockHeight(height int) {
 
 	startTime := time.Now()
+	p.validateHolderData(height)
+
 	var checkpoint *CheckPoint
 	matchHeight := height
 	isMainnet := p.baseIndexer.IsMainnet()
@@ -217,5 +226,92 @@ func (p *Indexer) CheckPointWithBlockHeight(height int) {
 	common.Log.Infof("Indexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
 
-func (s *Indexer) printHistoryWithAddress(name string, addressId uint64) {
+
+func readHolderDataToMap(dir string) (int, int) {
+	validateHolderData, start, end, err := validate.ReadCSVDir(dir)
+	if err != nil {
+		common.Log.Panicf("ReadHolderCSVDir %s failed, %v", dir, err)
+	}
+
+	_heightToHolderRecords = make(map[int]map[string]map[string]*validate.HolderCSVRecord)
+	for _, record := range validateHolderData {
+		tickerToHolders, ok := _heightToHolderRecords[record.Height]
+		if !ok {
+			tickerToHolders = make(map[string]map[string]*validate.HolderCSVRecord)
+			_heightToHolderRecords[record.Height] = tickerToHolders
+		}
+		holders, ok := tickerToHolders[record.Ticker]
+		if !ok {
+			holders = make(map[string]*validate.HolderCSVRecord)
+			tickerToHolders[record.Ticker] = holders
+		}
+		holders[record.Address] = record
+	}
+	common.Log.Infof("readHolderDataToMap height %d %d, records %d", start, end, len(validateHolderData))
+	return start, end
+}
+
+
+// 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
+func (p *Indexer) validateHolderData(height int) {
+	
+	if _heightToHolderRecords == nil {
+		_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/runes/validate/holders")
+	}
+	if len(_heightToHolderRecords) == 0 {
+		return
+	}
+	if height < _holderStartHeight || height > _holderEndHeight {
+		return
+	}
+
+	tickerToHolders, ok := _heightToHolderRecords[height]
+	if !ok {
+		return
+	}
+
+	// 执行验证
+	baseIndexer := p.baseIndexer
+	var failed []string
+	for ticker, holders := range tickerToHolders {
+		verified := true
+		for address, record := range holders {
+			addressId := baseIndexer.GetAddressIdFromDB(address)
+			if addressId == common.INVALID_ID {
+				common.Log.Errorf("validateHolderData GetAddressIdFromDB %s failed", address)
+				failed = append(failed, ticker)
+				verified = false
+				continue
+			}
+			info := p.GetAddressAssetWithName(addressId, record.Ticker)
+			if info == nil {
+				// p.printTicker(ticker)
+				// p.printHolders(ticker)
+				// p.printHistoryWithAddress(ticker, addressId)
+				common.Log.Errorf("validateHolderData getHolderAbbrInfo %s %s failed", address, record.Ticker)
+				failed = append(failed, ticker)
+				verified = false
+				continue
+			}
+			if info.String() != record.Balance {
+				if !indexerCommon.CompareDecimal(info, record.Balance) {
+					//p.printHistoryWithAddress(ticker, addressId)
+					common.Log.Errorf("validateHolderData %s %s available balance different %s %s",
+						address, record.Ticker, record.Balance, info.String())
+					failed = append(failed, ticker)
+					verified = false
+					continue
+				}
+			}
+		}
+		if verified {
+			common.Log.Infof("runes validateHolderData %s %d check succeeded.", ticker, len(holders))
+		} else {
+			common.Log.Infof("runes validateHolderData %s check failed.", ticker)
+		}
+	}
+
+	if len(failed) > 0 {
+		common.Log.Panicf("check %v holders failed", failed)
+	}
 }

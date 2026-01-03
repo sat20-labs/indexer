@@ -2,13 +2,12 @@ package brc20
 
 import (
 	"fmt"
-	"math/big"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-
+	indexerCommon "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
@@ -1242,39 +1241,7 @@ func (p *BRC20Indexer) validateHistoryWithTicker(height int, validateHistoryData
 
 func compareDecimal(amt *common.Decimal, str string) bool {
 
-	if strings.Contains(str, "E") {
-		// f, ok := new(big.Float).SetString("1.21906E+11")
-		// if !ok {
-		// 	common.Log.Panicf("SetString %s failed", str)
-		// }
-		// str = f.Text('f', -1)
-		parts := strings.Split(str, "E")
-		parts = strings.Split(parts[0], ".")
-		d := 0
-		if len(parts) == 2 {
-			d = len(parts[1])
-		}
-
-		f, ok := new(big.Float).SetString(amt.String())
-		if !ok {
-			common.Log.Panicf("SetString %s failed", amt.String())
-		}
-		n := f.Text('E', d)
-		return n == str
-	}
-
-	parts := strings.Split(str, ".")
-	d := 8
-	if len(parts) == 2 {
-		d = len(parts[1])
-	} else {
-		d = 0
-	}
-	if amt != nil && amt.Precision > d {
-		amt := amt.SetPrecisionWithRound(d)
-		return amt.String() == str
-	}
-	return false
+	return indexerCommon.CompareDecimal(amt, str)
 }
 
 // 找出T1中key不在T2的元素
@@ -1319,6 +1286,7 @@ func readHolderDataToMap(dir string) (int, int) {
 			startHeight = record.LastHeight
 		}
 	}
+	common.Log.Infof("readHolderDataToMap height %d %d, records %d", startHeight, endHeight, len(validateHolderData))
 	return startHeight, endHeight
 }
 
