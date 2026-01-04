@@ -150,7 +150,7 @@ func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BR
 		ToAddr:     mint.Nft.OwnerAddressId,
 		ToUtxoId:   mint.Nft.UtxoId,
 		Ticker:     name,
-		Amount:     mint.Amt,
+		Amount:     *mint.Amt.Clone(),
 		Action:     common.BRC20_Action_InScribe_Mint,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
@@ -249,7 +249,7 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 		ToAddr:     transfer.Nft.OwnerAddressId,
 		ToUtxoId:   transfer.Nft.UtxoId,
 		Ticker:     tickerName,
-		Amount:     transfer.Amt,
+		Amount:     *transfer.Amt.Clone(),
 		Action:     common.BRC20_Action_InScribe_Transfer,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
@@ -400,7 +400,7 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height, inde
 		ToAddr:     fromAddress,
 		ToUtxoId:   nft.UtxoId,
 		Ticker:     transfer.Ticker,
-		Amount:     transfer.TransferNft.Amount,
+		Amount:     *transfer.TransferNft.Amount.Clone(),
 		Action:     common.BRC20_Action_Transfer,
 	}
 	s.holderActionList = append(s.holderActionList, &action)
@@ -528,7 +528,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 					FromAddr:   fromAddressId,
 					ToAddr:     toAddressId,
 					Ticker:     transfer.Ticker,
-					Amount:     transfer.TransferNft.Amount,
+					Amount:     *transfer.TransferNft.Amount.Clone(),
 					Action:     flag,
 					FromUtxoId: oldUtxoId, // old utxo
 				}
@@ -829,7 +829,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		transferTxMap := make(map[*common.Transaction]map[string]bool) // 该交易影响哪些ticker
 		for _, tx := range block.Transactions[1:] {
 			for _, input := range tx.Inputs {
-				// if tx.TxId == "e7115ee426b1a36f7aa9a0463798ec1aa173953a45daa7966bee8096a5254778" {
+				// if tx.TxId == "228e74cf8cfef4be045380f60457b2472fc5a671715beea91e4b954b7b27f022" {
 				// 	common.Log.Infof("utxoId = %d", input.UtxoId)
 				// }
 				nft, ok := s.transferNftMap[input.UtxoId] // 本区块生成的transfer没有在这里面
@@ -877,7 +877,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		for _, v := range utxoToLoad {
 			if v.ticker == "" {
 				var value TransferNftInfo
-				// if v.utxoId == 1015880032452608 {
+				// if v.utxoId == 31980498781208576 {
 				// 	common.Log.Infof("")
 				// }
 				key := GetUtxoToTransferKey(v.utxoId)
@@ -925,6 +925,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 				}
 				for name := range names {
 					tickers[name] = true
+					tickerToLoad[name] = true
 				}
 			}
 		}
@@ -935,6 +936,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 					addressId: addressId,
 					ticker:    name,
 				})
+				tickerToLoad[name] = true
 			}
 		}
 		sort.Slice(addressToLoadVector, func(i, j int) bool {
@@ -967,6 +969,9 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 
 		tickerKeys := make([]string, 0, len(tickerToLoad))
 		for k := range tickerToLoad {
+			if _, ok := s.tickerMap[k]; ok {
+				continue
+			}
 			tickerKeys = append(tickerKeys, GetTickerKey(k))
 		}
 		sort.Slice(tickerKeys, func(i, j int) bool {
