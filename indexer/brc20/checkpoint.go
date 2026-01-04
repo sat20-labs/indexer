@@ -581,16 +581,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	
-	829293: {
-		Tickers: map[string]*TickerStatus{
-			"eorb": { // TODO failed
-				StartInscription: 9950800,
-				EndInscription: 60016949, 
-				EndInscriptionId: "31ac41b829e26e8b2496e10f648565197b74b01456e738627ee9fd88725df5f6i0",
-			},
-		},
-	},
-	
 	822672: {
 		Tickers: map[string]*TickerStatus{
 			"𝛑": { // TODO failed
@@ -615,6 +605,15 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 				StartInscription: 2698231,
 				EndInscription: 57106023, 
 				EndInscriptionId: "8885e4e3c1c5d321bd0e32c38e3426fd0361b85d80faf6e047c64f3df0f3362fi0",
+			},
+		},
+	},
+	829293: {
+		Tickers: map[string]*TickerStatus{
+			"eorb": { // TODO failed
+				StartInscription: 9950800,
+				EndInscription: 60016949, 
+				EndInscriptionId: "31ac41b829e26e8b2496e10f648565197b74b01456e738627ee9fd88725df5f6i0",
 			},
 		},
 	},
@@ -883,6 +882,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 				common.Log.Panicf("%s GetNftWithInscriptionId %s failed", name, ticker.EndInscriptionId)
 			}
 			if tickerStatus.EndInscription != nft.Base.Id {
+				//p.printTickerHistoryWithHeight(name, height)
 				common.Log.Panicf("%s end inscription different %d %s <> %d %s", 
 					name, tickerStatus.EndInscription, tickerStatus.EndInscriptionId, nft.Base.Id, nft.Base.InscriptionId)
 			}

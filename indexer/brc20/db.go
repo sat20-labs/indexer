@@ -396,6 +396,35 @@ func (s *BRC20Indexer) loadTransferHistoryWithHeightFromDB(tickerName string, he
 	return result
 }
 
+// 无效，原因是height的顺序跟key的顺序不一致
+func (s *BRC20Indexer) loadLatestTransferHistoryFromDB(tickerName string, limit int) []*common.BRC20ActionHistory {
+	result := make([]*common.BRC20ActionHistory, 0)
+	count := 0
+	startTime := time.Now()
+	common.Log.Debug("BRC20Indexer loadLatestTransferHistoryFromDB ...")
+	prefix := fmt.Sprintf("%s%s-", DB_PREFIX_TRANSFER_HISTORY, encodeTickerName(tickerName))
+	s.db.BatchRead([]byte(prefix), true, func(k, v []byte) error {
+		var history common.BRC20ActionHistory
+		err := db.DecodeBytes(v, &history)
+		if err == nil {
+			result = append(result, &history)
+		} else {
+			common.Log.Errorln("loadLatestTransferHistoryFromDB DecodeBytes " + err.Error())
+		}
+		count++
+		if count == limit {
+			return fmt.Errorf("reach limit")
+		}
+
+		return nil
+	})
+
+	elapsed := time.Since(startTime).Milliseconds()
+	common.Log.Debugf("loadLatestTransferHistoryFromDB %s loaded %d records in %d ms", tickerName, count, elapsed)
+
+	return result
+}
+
 func (s *BRC20Indexer) loadTransferHistoryWithHolderFromDB(tickerName string, holder uint64) []*common.BRC20ActionHistory {
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadTransferHistoryWithHolderFromDB ...")
