@@ -129,8 +129,8 @@ func (s *Indexer) Init() {
 	}
 }
 
-func (s *Indexer) Clone() *Indexer {
-	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, s.baseIndexer)
+func (s *Indexer) Clone(baseIndexer *base.BaseIndexer) *Indexer {
+	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, baseIndexer)
 	cloneIndex.height = s.height
 	cloneIndex.Status.Version = s.Status.Version
 	cloneIndex.Status.Height = s.Status.Height

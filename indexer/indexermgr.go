@@ -467,13 +467,12 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 
 func (b *IndexerMgr) prepareDBBuffer() {
 	b.baseBackupDB = b.base.Clone(true)
-
-	b.exoticBackupDB = b.exotic.Clone()
-	b.ftBackupDB = b.ftIndexer.Clone()
-	b.nsBackupDB = b.ns.Clone()
-	b.nftBackupDB = b.nft.Clone()
-	b.brc20BackupDB = b.brc20Indexer.Clone()
-	b.runesBackupDB = b.RunesIndexer.Clone()
+	b.exoticBackupDB = b.exotic.Clone(b.baseBackupDB)
+	b.runesBackupDB = b.RunesIndexer.Clone(b.baseBackupDB)
+	b.nftBackupDB = b.nft.Clone(b.baseBackupDB)
+	b.nsBackupDB = b.ns.Clone(b.nftBackupDB)
+	b.ftBackupDB = b.ftIndexer.Clone(b.nftBackupDB)
+	b.brc20BackupDB = b.brc20Indexer.Clone(b.nftBackupDB)
 	common.Log.Infof("prepareDBBuffer backup instance with %d", b.baseBackupDB.GetHeight())
 }
 

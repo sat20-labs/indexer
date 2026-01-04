@@ -122,12 +122,12 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer,
 	p.nftAddedUtxoMap = make(map[uint64][]*InscribeInfo)
 }
 
-func (p *NftIndexer) Clone() *NftIndexer {
+func (p *NftIndexer) Clone(baseIndexer *base.BaseIndexer) *NftIndexer {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
 	newInst := NewNftIndexer(p.db)
-	newInst.baseIndexer = p.baseIndexer
+	newInst.baseIndexer = baseIndexer
 
 	newInst.disabledSats = p.disabledSats // 仅在rpc中使用
 	newInst.utxoMap = make(map[uint64]map[int64]int64)

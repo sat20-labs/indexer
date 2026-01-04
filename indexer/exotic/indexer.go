@@ -134,9 +134,10 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 }
 
 // 只保存UpdateDB需要用的数据
-func (p *ExoticIndexer) Clone() *ExoticIndexer {
+func (p *ExoticIndexer) Clone(baseIndexer *base.BaseIndexer) *ExoticIndexer {
 	newInst := NewExoticIndexer(p.db)
 	newInst.status = p.status.Clone()
+	newInst.baseIndexer = baseIndexer
 
 	newInst.holderActionList = make([]*HolderAction, len(p.holderActionList))
 	copy(newInst.holderActionList, p.holderActionList)

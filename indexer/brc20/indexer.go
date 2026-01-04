@@ -224,9 +224,9 @@ func (s *BRC20Indexer) Repair() bool {
 }
 
 // 只保存UpdateDB需要用的数据
-func (s *BRC20Indexer) Clone() *BRC20Indexer {
+func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 	newInst := NewIndexer(s.db)
-	newInst.nftIndexer = s.nftIndexer
+	newInst.nftIndexer = nftIndexer
 
 	newInst.tickerMap = make(map[string]*BRC20TickInfo, 0)
 	for key, value := range s.tickerMap {
@@ -344,7 +344,7 @@ func (s *BRC20Indexer) Init(nftIndexer *nft.NftIndexer) {
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("Init %d ms", elapsed)
 
-	
+	//s.validateAllHistory("cats", "./indexer/brc20/validate/cats_records.csv")
 	//s.printTickerHistoryWithHeight("cats", 814163)
 	//s.printTickerHistoryWithHeight("mask", 885497)
 	//common.Log.Panicf("")

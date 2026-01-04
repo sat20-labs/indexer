@@ -45,12 +45,12 @@ func (p *NameService) reset() {
 	p.updateAdded = make([]*NameUpdate, 0)
 }
 
-func (p *NameService) Clone() *NameService {
+func (p *NameService) Clone(nftIndexer *nft.NftIndexer) *NameService {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
 	newInst := NewNameService(p.db)
-	newInst.nftIndexer = p.nftIndexer
+	newInst.nftIndexer = nftIndexer
 
 	newInst.nameAdded = make([]*NameRegister, len(p.nameAdded))
 	copy(newInst.nameAdded, p.nameAdded)
