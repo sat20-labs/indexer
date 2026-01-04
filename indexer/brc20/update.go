@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/db"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 func (s *BRC20Indexer) CheckInscription(nft *common.Nft) bool {
@@ -168,7 +168,7 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *c
 
 	if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
 		// 忽略某些不知道什么原因，unisat认为是无效的brc20铭文，仅仅为了让校验数据可以正确匹配
-		var excludingInscriptions = map[string]bool {
+		var excludingInscriptions = map[string]bool{
 			// "ea7e189806151db47817a8ab8a114a3b600be927705ad4b243af72701ee0ede4i0": true, // reinscription
 		}
 		if _, ok := excludingInscriptions[transfer.Nft.Base.InscriptionId]; ok {
@@ -196,9 +196,8 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	_, ok := s.transferNftMap[transfer.Nft.UtxoId]
 	if ok {
 		common.Log.Debugf("%s inscription is ignored", transfer.Nft.Base.InscriptionId)
-		return 
+		return
 	}
-
 
 	tickerName := strings.ToLower(transfer.Name)
 	addressId := transfer.Nft.OwnerAddressId
@@ -260,7 +259,7 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 }
 
 func (s *BRC20Indexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
-	
+
 	startTime := time.Now()
 	s.PrepareUpdateTransfer(block, coinbase)
 
@@ -585,9 +584,9 @@ func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB
 		} else {
 			// 我们保留一个空记录，以便维持该addressId不被删除
 			value = &common.BRC20TickAbbrInfo{
-				AvailableBalance: nil,
+				AvailableBalance:    nil,
 				TransferableBalance: nil,
-				TransferableData: nil,
+				TransferableData:    nil,
 			}
 			err := db.SetDB([]byte(addressTickerKey), value, wb)
 			//err := wb.Delete([]byte(addressTickerKey))
@@ -885,8 +884,8 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 				if err != nil {
 					continue // 没有transfer铭文，忽略
 				}
-				common.Log.Debugf("brc20 preload load transfer nft %d %s from %x %s", 
-				value.TransferNft.NftId, value.Ticker, v.utxoId, v.tx.TxId)
+				common.Log.Debugf("brc20 preload load transfer nft %d %s from %x %s",
+					value.TransferNft.NftId, value.Ticker, v.utxoId, v.tx.TxId)
 				v.ticker = value.Ticker
 				s.transferNftMap[v.utxoId] = &value
 
@@ -981,7 +980,10 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 			var ticker common.BRC20Ticker
 			err := db.GetValueFromDB([]byte(key), &ticker, s.db)
 			if err != nil {
-				common.Log.Panicf("brc20 preload load ticker %s failed, %v", key, err)
+				// n, _ := parseTickerKey(key)
+				// common.Log.Panicf("brc20 preload load ticker %s %s failed, %v", key, n, err)
+				// 可能是本区块刚部署的ticker
+				continue
 			}
 
 			s.tickerMap[strings.ToLower(ticker.Name)] = &BRC20TickInfo{
@@ -994,12 +996,12 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		return nil
 	})
 }
-func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction, 
+func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range,
 ) *common.TxOutput {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	
+
 	// if tx.TxId == "672f335b384bc15e9a05cc6583e6c586e77a82e9ac1eda7960efe2af372514f5" {
 	// 	common.Log.Infof("utxoId = %d", tx.Outputs[0].UtxoId)
 	// }

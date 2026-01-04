@@ -60,7 +60,6 @@ func ParseTransferHistoryKey(input string) (string, int, int64, error) {
 	return decoderTickerName(parts[1]), int(height), nftId, nil
 }
 
-
 func GetHolderTransferHistoryKey(tickname string, holder uint64, nftId int64) string {
 	return fmt.Sprintf("%s%s-%x-%x", DB_PREFIX_TRANSFER_HISTORY_HOLDER, encodeTickerName(tickname), holder, nftId)
 }
@@ -88,7 +87,7 @@ func ParseHolderTransferHistoryKey(input string) (string, uint64, int64, error) 
 	return decoderTickerName(parts[1]), holder, nftId, nil
 }
 
-func parseTickListKey(input string) (string, error) {
+func parseTickerKey(input string) (string, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_TICKER) {
 		return "", fmt.Errorf("invalid string format")
 	}
@@ -158,12 +157,11 @@ func parseTickerToHolderKey(input string) (string, uint64, error) {
 
 func newTickerInfo(name string) *BRC20TickInfo {
 	return &BRC20TickInfo{
-		Name:           name,
+		Name: name,
 		//InscriptionMap: make(map[string]*common.BRC20MintAbbrInfo, 0),
-		MintAdded:      make([]*common.BRC20Mint, 0),
+		MintAdded: make([]*common.BRC20Mint, 0),
 	}
 }
-
 
 func GetCurseInscriptionKey(inscriptionId string) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_CURSE_INSCRIPTION_ID, inscriptionId)
