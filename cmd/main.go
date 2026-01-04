@@ -9,5 +9,7 @@ func main() {
 
 	//OrdNumDiff_Test()
 
-	TestCompareMintHistory()
+	// TestCompareMintHistory()
+
+	TestCompareHolders()
 }

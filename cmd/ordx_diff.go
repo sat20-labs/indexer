@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strconv"
 
 	"github.com/sat20-labs/indexer/common"
 	indexerwire "github.com/sat20-labs/indexer/rpcserver/wire"
@@ -219,7 +221,7 @@ func GetHolders(host, ticker string, start, limit int) (*indexerwire.HolderListD
 
 func loadAllHolders(host, ticker string, total int) map[string]string {
 	result := make(map[string]string)
-	limit := 100
+	limit := total
 	for i := 0; i < total; i += limit {
 		start := int(i)
 		holders, err := GetHolders(host, ticker, start, limit)
@@ -238,8 +240,8 @@ func loadAllHolders(host, ticker string, total int) map[string]string {
 
 
 func TestCompareHolders() {
-	host1 := "http://192.168.1.102:8019/btc/mainnet"
-	host2 := "http://127.0.0.1:8019/btc/mainnet"
+	host1 := "http://192.168.1.102:8009/btc/mainnet"
+	host2 := "http://127.0.0.1:8009/btc/mainnet"
 	tickerName := "pearl"
 
 	status, err := GetTickerStatus(host1, tickerName)
@@ -284,6 +286,27 @@ func TestCompareHolders() {
 				common.Log.Infof("%s has diferrent value %s %s", k, v1, v2)
 			}
 		}
+	}
+
+	type pair struct {
+		address string
+		amt int64
+	}
+
+	mid := make([]*pair, 0, len(holders1))
+	for address, amt := range holders1 {
+		n, _ := strconv.ParseInt(amt, 10, 64)
+		mid = append(mid, &pair{
+			address: address,
+			amt: n,
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].amt > mid[j].amt
+	})
+
+	for _, item := range mid {
+		fmt.Printf("\"%s\": %d,\n", item.address, item.amt)
 	}
 
 	common.Log.Info("completed")

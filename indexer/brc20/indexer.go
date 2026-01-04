@@ -293,6 +293,10 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 		if ok {
 			ticker.MintAdded = append([]*common.BRC20Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
 		}
+		if ticker.Ticker.TransactionCount == value.Ticker.TransactionCount {
+			// 没有更多交易
+			delete(s.tickerMap, key)
+		}
 	}
 
 	for addressId, old := range another.holderMap {
