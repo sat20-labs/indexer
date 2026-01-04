@@ -194,10 +194,10 @@ func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	key := DB_PREFIX_TICKER + tickerName
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
-		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
+		common.Log.Debugf("getTickerFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Errorf("GetTickFromDB error: %v", err)
+		common.Log.Errorf("getTickerFromDB error: %v", err)
 		return nil
 	}
 

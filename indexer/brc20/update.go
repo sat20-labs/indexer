@@ -829,9 +829,9 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		transferTxMap := make(map[*common.Transaction]map[string]bool) // 该交易影响哪些ticker
 		for _, tx := range block.Transactions[1:] {
 			for _, input := range tx.Inputs {
-				if tx.TxId == "e7115ee426b1a36f7aa9a0463798ec1aa173953a45daa7966bee8096a5254778" {
-					common.Log.Infof("utxoId = %d", input.UtxoId)
-				}
+				// if tx.TxId == "e7115ee426b1a36f7aa9a0463798ec1aa173953a45daa7966bee8096a5254778" {
+				// 	common.Log.Infof("utxoId = %d", input.UtxoId)
+				// }
 				nft, ok := s.transferNftMap[input.UtxoId] // 本区块生成的transfer没有在这里面
 				if ok {
 					if !nft.TransferNft.IsInvalid {
@@ -885,6 +885,8 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 				if err != nil {
 					continue // 没有transfer铭文，忽略
 				}
+				common.Log.Debugf("brc20 preload load transfer nft %d %s from %x %s", 
+				value.TransferNft.NftId, value.Ticker, v.utxoId, v.tx.TxId)
 				v.ticker = value.Ticker
 				s.transferNftMap[v.utxoId] = &value
 
@@ -963,7 +965,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 			holder.Tickers[v.ticker] = &value
 		}
 
-		tickerKeys := make([]string, len(tickerToLoad))
+		tickerKeys := make([]string, 0, len(tickerToLoad))
 		for k := range tickerToLoad {
 			tickerKeys = append(tickerKeys, GetTickerKey(k))
 		}
@@ -974,7 +976,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 			var ticker common.BRC20Ticker
 			err := db.GetValueFromDB([]byte(key), &ticker, s.db)
 			if err != nil {
-				continue
+				common.Log.Panicf("brc20 preload load ticker %s failed, %v", key, err)
 			}
 
 			s.tickerMap[strings.ToLower(ticker.Name)] = &BRC20TickInfo{

@@ -430,10 +430,10 @@ func (s *BRC20Indexer) loadTransferHistoryWithHolderFromDB(tickerName string, ho
 		var history common.BRC20ActionHistory
 		err := db.GetValueFromDB([]byte(key), &history, s.db)
 		if err == common.ErrKeyNotFound {
-			common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
+			common.Log.Debugf("BRC20ActionHistory key: %s, error: ErrKeyNotFound ", key)
 			continue
 		} else if err != nil {
-			common.Log.Errorf("GetTickFromDB error: %v", err)
+			common.Log.Errorf("BRC20ActionHistory error: %v", err)
 			continue
 		}
 		result = append(result, &history)
@@ -451,10 +451,10 @@ func (s *BRC20Indexer) loadTickerFromDB(tickerName string) *common.BRC20Ticker {
 	key := GetTickerKey(tickerName)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
-		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
+		common.Log.Debugf("loadTickerFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Errorf("GetTickFromDB error: %v", err)
+		common.Log.Errorf("loadTickerFromDB error: %v", err)
 		return nil
 	}
 
@@ -467,10 +467,10 @@ func (s *BRC20Indexer) loadTransferFromDB(utxoId uint64) *TransferNftInfo {
 	key := GetUtxoToTransferKey(utxoId)
 	err := db.GetValueFromDB([]byte(key), &result, s.db)
 	if err == common.ErrKeyNotFound {
-		common.Log.Debugf("GetTickFromDB key: %s, error: ErrKeyNotFound ", key)
+		common.Log.Debugf("loadTransferFromDB key: %s, error: ErrKeyNotFound ", key)
 		return nil
 	} else if err != nil {
-		common.Log.Errorf("GetTickFromDB error: %v", err)
+		common.Log.Errorf("loadTransferFromDB error: %v", err)
 		return nil
 	}
 
