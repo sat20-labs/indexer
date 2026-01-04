@@ -69,7 +69,7 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 
 	s.CheckPointWithBlockHeight(block.Height)
 
-	if inCommon.STEP_RUN_MODE && !s.CheckSelf() {
+	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !s.CheckSelf() {
 		common.Log.Panic("")
 	}
 }

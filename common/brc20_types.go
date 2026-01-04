@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"strconv"
 )
 
 type BRC20Status struct {
@@ -95,14 +96,20 @@ func (s *BRC20DeployContent) Validate() error {
 		return err
 	}
 	if s.Lim == "" {
-		return fmt.Errorf("miss lim")
+		// 没设置时=Max
 	}
 	if s.Max == "" {
 		return fmt.Errorf("miss max")
 	}
-	// if d.Decimal == "" {
-	// 	return fmt.Errorf("miss decimal")
-	// }
+	if s.Decimal != "" {
+		n, err := strconv.Atoi(s.Decimal)
+		if err != nil {
+			return err
+		}
+		if n > 18 {
+			return fmt.Errorf("decimal too big %d", n)
+		}
+	}
 	// if d.SelfMint == "" {
 	// 	return fmt.Errorf("miss self_mint")
 	// }

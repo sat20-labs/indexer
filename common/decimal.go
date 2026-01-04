@@ -601,7 +601,7 @@ func (d *Decimal) IsOverflowUint64() bool {
 		return false
 	}
 
-	integerPart := new(big.Int).SetUint64(math.MaxInt64)
+	integerPart := new(big.Int).SetUint64(math.MaxUint64)
 	value := new(big.Int).Mul(integerPart, precisionFactor[d.Precision])
 	return d.Value.Cmp(value) > 0
 }

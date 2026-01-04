@@ -602,22 +602,12 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		common.Log.Warnf("deploy, but max invalid. ticker: %s, max: '%s'", content.Ticker, content.Max)
 		return nil
 	}
-	if max.Sign() < 0 || max.IsOverflowUint64() {
-		common.Log.Warnf("deploy, but max invalid (range)")
-		return nil
-		// return
-	}
-
 	if max.Sign() == 0 {
-		if ticker.SelfMint {
-			ticker.Max = *max.GetMaxUint64()
-		} else {
-			common.Log.Warnf("deploy, but max invalid (0)")
-			return nil
-		}
-	} else {
-		ticker.Max = *max
-	}
+		common.Log.Warnf("deploy, but max invalid (0)")
+		return nil
+	} 
+	ticker.Max = *max
+	
 
 	// minted
 	minted, err := common.NewDecimalFromString("0", int(ticker.Decimal))
@@ -629,26 +619,23 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	ticker.Minted = *minted
 
 	// lim
-	lim, err := ParseBrc20Amount(content.Lim, int(ticker.Decimal))
-	if err != nil {
-		// limit invalid
-		common.Log.Warnf("deploy, but limit invalid. ticker: %s, limit: '%s'", content.Ticker, content.Lim)
-		return nil
-	}
-	if lim.Sign() < 0 || lim.IsOverflowUint64() {
-		common.Log.Warnf("deploy, but lim invalid (range)")
-		return nil
-	}
-	if lim.Sign() == 0 {
-		if ticker.SelfMint {
-			ticker.Limit = *max
-		} else {
-			common.Log.Warnf("deploy, but lim invalid (0)")
+	var lim *common.Decimal
+	if content.Lim == "" {
+		lim = max.Clone()
+	} else {
+		lim, err = ParseBrc20Amount(content.Lim, int(ticker.Decimal))
+		if err != nil {
+			// limit invalid
+			common.Log.Warnf("deploy, but limit invalid. ticker: %s, limit: '%s'", content.Ticker, content.Lim)
 			return nil
 		}
-	} else {
-		ticker.Limit = *lim
 	}
+	if lim.Sign() == 0 {
+		common.Log.Warnf("deploy, but lim invalid (0)")
+		return nil
+	}
+	ticker.Limit = *lim
+	
 
 	return ticker
 }
@@ -666,7 +653,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 		if nft.Base.Parent != ticker.Nft.Base.InscriptionId {
 			return nil
 		}
-		// 需要检查铸造地址是否是ticker的持有人？
+		// 需要检查铸造地址是否是ticker的持有人
 		nftOwnAddressId := s.nft.GetNftHolderWithInscriptionId(ticker.Nft.Base.InscriptionId)
 		if nft.OwnerAddressId != nftOwnAddressId {
 			common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, only deployer can inscribe mint",
@@ -731,11 +718,11 @@ func (s *IndexerMgr) handleBrc20TransferTicker(out *common.TxOutputV2,
 	// check amount
 	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
 	if err != nil {
-		common.Log.Warnf("transfer, but invalid amount")
+		common.Log.Warnf("%s transfer, but invalid amount", inscriptionId)
 		return nil
 	}
 	if amt.Sign() <= 0 || amt.Cmp(&ticker.Max) > 0 {
-		common.Log.Warnf("transfer, invalid amount(range)")
+		common.Log.Warnf("%s transfer, invalid amount(range)", inscriptionId)
 		return nil
 	}
 
@@ -1393,11 +1380,23 @@ func (b *IndexerMgr) isLptTicker(name string) bool {
 }
 
 func ParseBrc20Amount(amt string, dec int) (*common.Decimal, error) {
+	if len(amt) == 0 {
+		return nil, fmt.Errorf("empty amount string")
+	}
 	if len(amt) > 0 {
 		if amt[0] == '+' || amt[0] == '-' {
 			return nil, fmt.Errorf("invalid amount: %s", amt)
 		}
+		if amt[0] == '.' || amt[len(amt)-1] == '.' {
+			return nil, fmt.Errorf("invalid amount: %s", amt)
+		}
 	}
 	ret, err := common.NewDecimalFromString(amt, dec)
+	if err != nil {
+		return nil, err
+	}
+	if ret.IsOverflowUint64() {
+		return nil, fmt.Errorf("amount overflow uint64: %s", amt)
+	}
 	return ret, err
 }

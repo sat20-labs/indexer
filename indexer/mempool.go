@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strings"
 
 	"sync"
 	"time"
@@ -821,7 +822,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 			if txOut.Value != 0 {
 				curr, input, err = input.Cut(txOut.Value)
 				if err != nil {
-					common.Log.Errorf("rebuildTxOutput Cut failed, %v", err)
+					common.Log.Errorf("rebuildTxOutput %s Cut %d failed, %v", tx.TxID(), i, err)
 					return nil, nil, err
 				}
 				curr.OutValue.PkScript = txOut.PkScript
@@ -831,7 +832,7 @@ func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*co
 		} else {
 			curr, input, err = input.Cut(txOut.Value)
 			if err != nil {
-				common.Log.Errorf("rebuildTxOutput Cut failed, %v", err)
+				common.Log.Errorf("rebuildTxOutput %s Cut %d failed, %v", tx.TxID(), i, err)
 				return nil, nil, err
 			}
 			curr.OutValue.PkScript = txOut.PkScript
@@ -1089,9 +1090,13 @@ func processInscription(tx *wire.MsgTx, i int,
                 if transferInfo == nil {
                     continue
                 }
+                if len(insc[common.FIELD_CONTENT_TYPE]) == 0 {
+                    continue
+                }
 
-                switch string(insc[common.FIELD_CONTENT_TYPE]) {
-                case "application/json", "text/plain", "text/plain;charset=utf-8":
+                parts := strings.Split(string(insc[common.FIELD_CONTENT_TYPE]), ";")
+                switch parts[0] {
+                case "application/json", "text/plain":
                     // valid
                 default:
                     continue

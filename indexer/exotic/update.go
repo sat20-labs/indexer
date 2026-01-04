@@ -55,7 +55,7 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 
 	p.CheckPointWithBlockHeight(block.Height)
 
-	if inCommon.STEP_RUN_MODE && !p.CheckSelf() {
+	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !p.CheckSelf() {
 		common.Log.Panic("")
 	}
 }

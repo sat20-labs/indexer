@@ -2,7 +2,8 @@ package common
 
 import "github.com/sat20-labs/indexer/common"
 
-var STEP_RUN_MODE = false
+var STEP_RUN_MODE = true
+var CHECK_SELF = false
 
 type BlockProcCallback interface {
 	PrepareUpdateTransfer(block *common.Block, coinbase []*common.Range)

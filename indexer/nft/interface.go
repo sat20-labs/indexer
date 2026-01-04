@@ -300,8 +300,9 @@ func (p *NftIndexer) loadNftFromDB(nftId int64) (*common.Nft, error) {
 		Base: &baseContent,
 	}
 
-	p.inscriptionToNftIdMap[baseContent.InscriptionId] = nft
-	p.nftIdToinscriptionMap[baseContent.Id] = nft
+	// 需要外部加写锁
+	//p.inscriptionToNftIdMap[baseContent.InscriptionId] = nft
+	//p.nftIdToinscriptionMap[baseContent.Id] = nft
 	return nft, nil
 }
 

@@ -275,7 +275,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block, coinbase []*common.Ra
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 	s.UpdateTransferFinished(block)
 
-	if inCommon.STEP_RUN_MODE && !s.CheckSelf(block.Height) {
+	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !s.CheckSelf(block.Height) {
 		common.Log.Panic("")
 	}
 }
@@ -433,7 +433,8 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 			// 	delete(s.holderMap, nft.AddressId)
 			// }
 		} else {
-			common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
+			// 已经转移过的transfer nft不一定能找到
+			// common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
 		}
 	} else {
 		// 已经转移过的transfer nft不一定能找到
@@ -769,9 +770,9 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if block.Height == 29601 {
-		common.Log.Infof("")
-	}
+	// if block.Height == 29601 {
+	// 	common.Log.Infof("")
+	// }
 
 	// pebble 随机读取性能差，调整读的顺序
 	// 预加载相关地址的数据: ticker, holder, utxo
@@ -876,9 +877,9 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		for _, v := range utxoToLoad {
 			if v.ticker == "" {
 				var value TransferNftInfo
-				if v.utxoId == 1015880032452608 {
-					common.Log.Infof("")
-				}
+				// if v.utxoId == 1015880032452608 {
+				// 	common.Log.Infof("")
+				// }
 				key := GetUtxoToTransferKey(v.utxoId)
 				err := db.GetValueFromTxn([]byte(key), &value, txn)
 				if err != nil {
@@ -980,6 +981,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 				Name:   strings.ToLower(ticker.Name),
 				Ticker: &ticker,
 			}
+			common.Log.Infof("load ticker %s", ticker.Name)
 		}
 
 		return nil
