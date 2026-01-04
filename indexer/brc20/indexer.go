@@ -570,6 +570,8 @@ func (s *BRC20Indexer) printTicker(name string) {
 	common.Log.Infof("Divisibility: %d", ticker.Decimal)
 	common.Log.Infof("Minted: %s", ticker.Minted.String())
 	common.Log.Infof("MintCount: %d", ticker.MintCount)
+	common.Log.Infof("StartInscription: %s", ticker.StartInscriptionId)
+	common.Log.Infof("EndInscription: %s", ticker.EndInscriptionId)
 	common.Log.Infof("HolderCount: %d", ticker.HolderCount)
 	common.Log.Infof("TX Count: %d", ticker.TransactionCount)
 	common.Log.Infof("%d %s", ticker.Nft.Base.Id, ticker.Nft.Base.InscriptionId)
