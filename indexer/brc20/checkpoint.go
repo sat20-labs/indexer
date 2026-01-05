@@ -1020,29 +1020,28 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		data.name = "ordi"
 		_validateHistoryData[data.name] = data
 
-		
-		var files map[string]string
 		if _enable_checking_more_history {
+			var files map[string]string
 			if isMainnet {
 				files = map[string]string{
-				"cats": "./indexer/brc20/validate/cats_records.csv",
-				"mmss": "./indexer/brc20/validate/MMSS_records.csv",
-				"dior": "./indexer/brc20/validate/dior_records.csv",
-				"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
-				"scat": "./indexer/brc20/validate/scat_records.csv",
-			}
+					"cats": "./indexer/brc20/validate/cats_records.csv",
+					"mmss": "./indexer/brc20/validate/MMSS_records.csv",
+					"dior": "./indexer/brc20/validate/dior_records.csv",
+					"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
+					"scat": "./indexer/brc20/validate/scat_records.csv",
+				}
 			} else {
 				
 			}
-		}
-
-		for name, path := range files {
-			data, err := loadHistoryRecords(path)
-			if err != nil {
-				common.Log.Panicf("loadHistoryRecords failed, %v", err)
+		
+			for name, path := range files {
+				data, err := loadHistoryRecords(path)
+				if err != nil {
+					common.Log.Panicf("loadHistoryRecords failed, %v", err)
+				}
+				data.name = name
+				_validateHistoryData[data.name] = data
 			}
-			data.name = name
-			_validateHistoryData[data.name] = data
 		}
 	}
 
