@@ -11,6 +11,18 @@ type InscriptionResult = ord0_14_1.InscriptionResult
 
 func GetProtocol(insc *InscriptionResult) (string, []byte) {
 	content := insc.Inscription.Body
+
+	var raw map[string]json.RawMessage
+	err := json.Unmarshal([]byte(content), &raw)
+	if err == nil {
+		if v, ok := raw["p"]; ok {
+			var p string
+			if err := json.Unmarshal(v, &p); err == nil {
+				return p, content
+			}
+		}
+	}
+
 	protocol := insc.Inscription.Metaprotocol
 	if protocol != nil {
 		jsonStr, err := common.Cbor2json(insc.Inscription.Metadata)
@@ -20,13 +32,7 @@ func GetProtocol(insc *InscriptionResult) (string, []byte) {
 		return string(protocol), content
 	}
 
-	var ordxContent common.OrdxBaseContent
-	err := json.Unmarshal([]byte(content), &ordxContent)
-	if err != nil {
-		return "", nil
-	}
-
-	return ordxContent.P, content
+	return "", nil
 }
 
 func IsOrdXProtocol(insc *InscriptionResult) (string, bool) {
