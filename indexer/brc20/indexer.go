@@ -419,8 +419,8 @@ func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {
 		// 	available.String(), transferrable.String(), method)
 
 		nft := s.nftIndexer.GetNftWithId(item.NftId)
-		common.Log.Infof("%s: %s -> %s, %s%s, total = %s (%s, %s), %s",
-			nft.Base.InscriptionId, from, to, flag, item.Amount.String(), total.String(),
+		common.Log.Infof("%d %s: %s -> %s, %s%s, total = %s (%s, %s), %s",
+			nft.Base.Id, nft.Base.InscriptionId, from, to, flag, item.Amount.String(), total.String(),
 			available.String(), transferrable.String(), method)
 
 		count++

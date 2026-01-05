@@ -1022,10 +1022,10 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		var files map[string]string
 		if isMainnet {
 			files = map[string]string{
-			"cats": "./indexer/brc20/validate/cats_records.csv",
-			"mmss": "./indexer/brc20/validate/MMSS_records.csv",
-			"dior": "./indexer/brc20/validate/dior_records.csv",
-			"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
+			// "cats": "./indexer/brc20/validate/cats_records.csv",
+			// "mmss": "./indexer/brc20/validate/MMSS_records.csv",
+			// "dior": "./indexer/brc20/validate/dior_records.csv",
+			// "𝛑": "./indexer/brc20/validate/𝛑_records.csv",
 		}
 		} else {
 			
