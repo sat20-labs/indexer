@@ -35,6 +35,7 @@ type MiniMemPool struct {
     running  bool
     lastSyncTime int64
     peer *peer.Peer
+    ticker *time.Ticker
 
     mutex   sync.RWMutex
 }
@@ -67,6 +68,8 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
     addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
     go p.listenP2PTx(addr)
 
+    p.traceThread()
+
     // zmqTxPort := "38333"
     // zmqBlockPort := "38332"
     // if !instance.IsMainnet() {
@@ -79,6 +82,21 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
 
     // go p.listenZMQTx(zmqTxAddr)
     // go p.listenZMQBlock(zmqBlockAddr)
+}
+
+func (p *MiniMemPool) traceThread() {
+    go func() {
+		p.ticker = time.NewTicker(60*time.Second)
+		for {
+			select {
+			case <-p.ticker.C:
+                p.mutex.RLock()
+                common.Log.Infof("mempool: tx = %d, spent utxo = %d, unconfirmd utxo = %d", 
+                    len(p.txMap), len(p.spentUtxoMap), len(p.unConfirmedUtxoMap))
+                p.mutex.RUnlock()
+            }
+		}
+	}()
 }
 
 
