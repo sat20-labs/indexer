@@ -1137,11 +1137,19 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 		*/
 
 	default:
+
 		// 3. 如果content中的内容格式，符合 *.* 或者 * , 并且字段在32字节以内，符合名字规范，就把它当做一个名字来处理
 		// text/plain;charset=utf-8 abc
 		// 或者简单文本 xxx.xx 或者 xx
 		if protocol == "" {
-			s.handleSnsName(string(insc.Inscription.Body), nft)
+			protocol := insc.Inscription.Metaprotocol
+			if string(protocol) == "ordx" {
+				s.handleOrdX(input, output, inOffset, outOffset, insc, nft)
+			} else {
+				if len(insc.Inscription.Body) <= common.MAX_NAME_LEN {
+					s.handleSnsName(string(insc.Inscription.Body), nft)
+				}
+			}
 		}
 	}
 

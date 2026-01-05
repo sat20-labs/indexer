@@ -564,11 +564,11 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 
 	818151: {
 		Tickers: map[string]*TickerStatus{
-			// "mmss": { // TODO failed
-			// 	StartInscription: 41742160,
-			// 	EndInscription: 43314829, 
-			// 	EndInscriptionId: "ea4c4ae3882089bd23fc80313fa3325a321a27ff7d38fe2cea1a5c4ff4c1381bi0",
-			// },
+			"mmss": {
+				StartInscription: 41742160,
+				EndInscription: 43314829, 
+				EndInscriptionId: "ea4c4ae3882089bd23fc80313fa3325a321a27ff7d38fe2cea1a5c4ff4c1381bi0",
+			},
 		},
 	},
 	819632: {
@@ -583,7 +583,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	
 	822672: {
 		Tickers: map[string]*TickerStatus{
-			"𝛑": { // TODO failed
+			"𝛑": {
 				StartInscription: 5496738,
 				EndInscription: 50855505, 
 				EndInscriptionId: "a6d7b40197e18752d017e60c98fe5854706a3870e057098586eff54a311048fci0",
@@ -592,7 +592,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	825856: {
 		Tickers: map[string]*TickerStatus{
-			"ligo": { // TODO failed
+			"ligo": {
 				StartInscription: 45733545,
 				EndInscription: 55437206, 
 				EndInscriptionId: "69558d1209c2ef4eaa5167254ee87a59f56cb356956fb52521ea1798504cf4e0i0",
@@ -1022,10 +1022,10 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		var files map[string]string
 		if isMainnet {
 			files = map[string]string{
-			// "cats": "./indexer/brc20/validate/cats_records.csv",
-			// "mmss": "./indexer/brc20/validate/MMSS_records.csv",
-			// "dior": "./indexer/brc20/validate/dior_records.csv",
-			// "𝛑": "./indexer/brc20/validate/𝛑_records.csv",
+			"cats": "./indexer/brc20/validate/cats_records.csv",
+			"mmss": "./indexer/brc20/validate/MMSS_records.csv",
+			"dior": "./indexer/brc20/validate/dior_records.csv",
+			"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
 		}
 		} else {
 			

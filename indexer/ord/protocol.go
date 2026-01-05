@@ -23,15 +23,6 @@ func GetProtocol(insc *InscriptionResult) (string, []byte) {
 		}
 	}
 
-	protocol := insc.Inscription.Metaprotocol
-	if protocol != nil {
-		jsonStr, err := common.Cbor2json(insc.Inscription.Metadata)
-		if err == nil {
-			content = jsonStr
-		}
-		return string(protocol), content
-	}
-
 	return "", nil
 }
 
