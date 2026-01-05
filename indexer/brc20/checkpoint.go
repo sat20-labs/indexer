@@ -11,6 +11,8 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
+var _enable_checking_more_history = false
+
 type CheckPoint struct {
 	Height      int
 	TickerCount int
@@ -601,7 +603,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	827093: {
 		Tickers: map[string]*TickerStatus{
-			"scat": { // TODO failed
+			"scat": {
 				StartInscription: 2698231,
 				EndInscription: 57106023, 
 				EndInscriptionId: "8885e4e3c1c5d321bd0e32c38e3426fd0361b85d80faf6e047c64f3df0f3362fi0",
@@ -1020,16 +1022,20 @@ func (p *BRC20Indexer) validateHistory(height int) {
 
 		
 		var files map[string]string
-		if isMainnet {
-			files = map[string]string{
-			// "cats": "./indexer/brc20/validate/cats_records.csv",
-			// "mmss": "./indexer/brc20/validate/MMSS_records.csv",
-			// "dior": "./indexer/brc20/validate/dior_records.csv",
-			// "𝛑": "./indexer/brc20/validate/𝛑_records.csv",
+		if _enable_checking_more_history {
+			if isMainnet {
+				files = map[string]string{
+				"cats": "./indexer/brc20/validate/cats_records.csv",
+				"mmss": "./indexer/brc20/validate/MMSS_records.csv",
+				"dior": "./indexer/brc20/validate/dior_records.csv",
+				"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
+				"scat": "./indexer/brc20/validate/scat_records.csv",
+			}
+			} else {
+				
+			}
 		}
-		} else {
-			
-		}
+
 		for name, path := range files {
 			data, err := loadHistoryRecords(path)
 			if err != nil {
