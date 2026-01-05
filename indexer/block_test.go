@@ -4,12 +4,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
+	"github.com/sat20-labs/indexer/indexer/ord"
+	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,6 +65,39 @@ func GetRawData(txID string, network string) ([][]byte, error) {
 	}
 	return rawData, nil
 }
+
+
+func GetTxHexData(txID string, network string) (string, error) {
+	url := ""
+	switch network {
+	case common.ChainTestnet:
+		url = fmt.Sprintf("https://mempool.space/testnet/api/tx/%s/hex", txID)
+	case common.ChainTestnet4:
+		url = fmt.Sprintf("https://mempool.space/testnet4/api/tx/%s/hex", txID)
+	case common.ChainMainnet:
+		url = fmt.Sprintf("https://mempool.space/api/tx/%s/hex", txID)
+	default:
+		return "", fmt.Errorf("unsupported network: %s", network)
+	}
+
+	response, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
+
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to retrieve transaction data for %s from the API, error: %v", txID, err)
+	}
+
+	respBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode hex string to byte array for %s, error: %v", txID, err)
+	}
+	return string(respBytes), nil
+}
+
 
 func GetBlock(height int, isMainnet bool) (*common.Block, error) {
 	var err error
@@ -148,5 +185,56 @@ func TestParseTxFromUtxoId(t *testing.T) {
 		}
 		break
 	}
+
+}
+
+func TestProcessTx(t *testing.T) {
+	// input 0, output 0
+	height := 892744
+	hexTx, err := GetTxHexData("b6acb4825c44d63f1db29562ac534c9a7b66fb826ebd1e953f9fb9d301deb3ec", "mainnet")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err := DecodeMsgTx(hexTx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, input := range tx.TxIn {
+		inscriptions := ord0_14_1.GetInscriptionsInTxInput(input.Witness, height, i)
+		for _, insc := range inscriptions {
+			protocol, content := ord.GetProtocol(insc)
+			switch protocol {
+			case "ordx":
+				fmt.Printf("%s: %s\n", protocol, content)
+			case "brc-20":
+				content := string(insc.Inscription.Body)
+				ordxBaseContent := common.ParseBrc20BaseContent(content)
+				if ordxBaseContent == nil {
+					common.Log.Debugf("invalid content %s", content)
+					return
+				}
+
+				switch strings.ToLower(ordxBaseContent.Op) {
+				case "deploy":
+					deployInfo := common.ParseBrc20DeployContent(content)
+					if deployInfo == nil {
+					}
+				case "mint":
+					mintInfo := common.ParseBrc20MintContent(content)
+					if mintInfo == nil {
+						return
+					}
+				case "transfer":
+					transferInfo := common.ParseBrc20TransferContent(content)
+					if transferInfo == nil {
+						return
+					}
+				}
+			}
+		}
+	}
+	
 
 }
