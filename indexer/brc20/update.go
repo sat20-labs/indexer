@@ -21,6 +21,12 @@ func (s *BRC20Indexer) CheckInscription(nft *common.Nft) bool {
 		return false
 	}
 
+	_, txIndex, _ := common.FromUtxoId(nft.UtxoId)
+	if txIndex == 0 {
+		// fee spent
+		return false
+	}
+
 	return true
 }
 
