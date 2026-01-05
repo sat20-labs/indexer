@@ -54,7 +54,7 @@ func GetInscriptionNumber(utxo string, inscriptionId int) int64 {
 	return common.INVALID_INSCRIPTION_NUM
 }
 
-
+// 校验数据不规范，需要做一些处理，非通用接口
 func CompareDecimal(amt *common.Decimal, str string) bool {
 
 	if strings.Contains(str, "E") {
@@ -86,10 +86,14 @@ func CompareDecimal(amt *common.Decimal, str string) bool {
 		d = 0
 	}
 	if amt != nil && amt.Precision > d {
-		amt := amt.SetPrecisionWithRound(d)
-		return amt.String() == str
+		amt1 := amt.SetPrecisionWithRound(d)
+		if amt1.String() == str {
+			return true
+		}
+		amt2 := amt.SetPrecision(d)
+		return amt2.String() == str
 	}
-	return false
+	return amt.String() == str
 }
 
 func IntToSciHalfUp10(n *big.Int, decimals int) string {

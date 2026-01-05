@@ -1018,17 +1018,24 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		data.name = "ordi"
 		_validateHistoryData[data.name] = data
 
+		
+		var files map[string]string
 		if isMainnet {
-			path = "./indexer/brc20/validate/cats_records.csv"
-		} else {
-			path = ""
+			files = map[string]string{
+			// "cats": "./indexer/brc20/validate/cats_records.csv",
+			// "mmss": "./indexer/brc20/validate/MMSS_records.csv",
+			// "dior": "./indexer/brc20/validate/dior_records.csv",
+			// "𝛑": "./indexer/brc20/validate/𝛑_records.csv",
 		}
-		if path != "" {
+		} else {
+			
+		}
+		for name, path := range files {
 			data, err := loadHistoryRecords(path)
 			if err != nil {
 				common.Log.Panicf("loadHistoryRecords failed, %v", err)
 			}
-			data.name = "cats"
+			data.name = name
 			_validateHistoryData[data.name] = data
 		}
 	}
@@ -1249,6 +1256,11 @@ func (p *BRC20Indexer) validateHistoryWithTicker(height int, validateHistoryData
 }
 
 func compareDecimal(amt *common.Decimal, str string) bool {
+	str = strings.TrimSpace(str)
+	d, err := common.NewDecimalFromString(str, 18)
+	if err == nil {
+		str = d.String()
+	}
 
 	return indexerCommon.CompareDecimal(amt, str)
 }

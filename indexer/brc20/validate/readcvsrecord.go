@@ -42,10 +42,6 @@ type BRC20CSVRecord struct {
 
 	Height              int
 	TxIdx               int
-	BlockHash           string
-	BlockTime           int64
-
-	H                   int
 }
 
 
@@ -165,10 +161,6 @@ func ReadBRC20CSV(path string) (map[string]*BRC20CSVRecord, int, int, error) {
 
 			Height:    h,
 			TxIdx:     parseInt32(row[col["txidx"]]),
-			BlockHash: row[col["blockhash"]],
-			BlockTime: parseI64(row[col["blocktime"]]),
-
-			H: parseInt32(row[col["h"]]),
 		}
 
 		utxoId := common.ToUtxoId(rec.Height, rec.TxIdx, rec.Vout)

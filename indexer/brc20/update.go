@@ -990,7 +990,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 				Name:   strings.ToLower(ticker.Name),
 				Ticker: &ticker,
 			}
-			common.Log.Infof("load ticker %s", ticker.Name)
+			//common.Log.Infof("load ticker %s", ticker.Name)
 		}
 
 		return nil
