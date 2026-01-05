@@ -111,7 +111,7 @@ func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BR
 	}
 
 	ticker.TransactionCount++
-	if common.DecimalAdd(&ticker.Minted, &mint.Amt).Cmp(&ticker.Max) > 0 {
+	if common.DecimalAdd(&ticker.Minted, &mint.Amt).Cmp(&ticker.Max) >= 0 {
 		mint.Amt = *ticker.Max.Sub(&ticker.Minted)
 		ticker.EndInscriptionId = mint.Nft.Base.InscriptionId
 	}
