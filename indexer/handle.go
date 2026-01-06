@@ -888,6 +888,7 @@ func (s *IndexerMgr) handleOrdX(in *common.TxInput, out *common.TxOutputV2,
 	}
 }
 
+// 仅做语法的检查，不做需要实时数据支持的检查
 func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 	insc *ord.InscriptionResult, nft *common.Nft) {
 
@@ -930,11 +931,6 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 				common.Log.Errorf("deploy, tick length 5, but not enabled")
 				return
 			}
-		}
-
-		if s.brc20Indexer.TickExisted(deployInfo.Ticker) {
-			common.Log.Warnf("ticker %s exists", deployInfo.Ticker)
-			return
 		}
 
 		ticker := s.handleBrc20DeployTicker(out, deployInfo, nft)
