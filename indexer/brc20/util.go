@@ -1,6 +1,8 @@
 package brc20
 
 import (
+	"fmt"
+
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 )
@@ -82,4 +84,27 @@ func DetectInscriptionStatus(script []byte, inscId int, blockHeight int) Inscrip
 
 func IsCursed(script []byte, inscId int, blockHeight int) bool {
 	return DetectInscriptionStatus(script, inscId, blockHeight) == InscriptionCursed
+}
+
+
+func ParseBrc20Amount(amt string, dec int) (*common.Decimal, error) {
+	if len(amt) == 0 {
+		return nil, fmt.Errorf("empty amount string")
+	}
+	if len(amt) > 0 {
+		if amt[0] == '+' || amt[0] == '-' {
+			return nil, fmt.Errorf("invalid amount: %s", amt)
+		}
+		if amt[0] == '.' || amt[len(amt)-1] == '.' {
+			return nil, fmt.Errorf("invalid amount: %s", amt)
+		}
+	}
+	ret, err := common.NewDecimalFromString(amt, dec)
+	if err != nil {
+		return nil, err
+	}
+	if ret.IsOverflowUint64() {
+		return nil, fmt.Errorf("amount overflow uint64: %s", amt)
+	}
+	return ret, err
 }

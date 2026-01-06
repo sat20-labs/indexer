@@ -20,6 +20,7 @@ func (p *BRC20Status) Clone() *BRC20Status {
 type BRC20Mint struct {
 	BRC20MintInDB
 	Nft *Nft
+	AmtStr string
 }
 
 type BRC20MintInDB struct {
@@ -38,6 +39,7 @@ type BRC20TransferInDB struct {
 
 type BRC20Transfer struct {
 	BRC20TransferInDB
+	AmtStr string
 	Nft *Nft
 }
 

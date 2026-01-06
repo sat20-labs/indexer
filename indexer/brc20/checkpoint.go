@@ -612,7 +612,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	829293: {
 		Tickers: map[string]*TickerStatus{
-			"eorb": { // TODO failed
+			"eorb": {
 				StartInscription: 9950800,
 				EndInscription: 60016949, 
 				EndInscriptionId: "31ac41b829e26e8b2496e10f648565197b74b01456e738627ee9fd88725df5f6i0",
@@ -621,7 +621,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	833610: {
 		Tickers: map[string]*TickerStatus{
-			"x@ai": { // TODO failed
+			"x@ai": {
 				StartInscription: 53465785,
 				EndInscription: 63572866, 
 				EndInscriptionId: "70f2f2b91c3d66bf87c7bf949761c9fff33538baa9f3bca319200e00e2d870aai0",
@@ -630,7 +630,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	846620: {
 		Tickers: map[string]*TickerStatus{
-			"pizza": {
+			"pizza": { // TODO failed
 				StartInscription: 66796189,
 				EndInscription: 71393287, 
 				EndInscriptionId: "ce26816f6746f66db8f8cf4a8b819e895a39612153e4cb08e3bbb5956291cd8ci0",
@@ -747,11 +747,42 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"ordi": {Holders: map[string]string{"bc1qhuv3dhpnm0wktasd3v0kt6e4aqfqsd0uhfdu7d": "9128777.40996118"}},
 		},
 	},
+	844542: {
+		Tickers: map[string]*TickerStatus{
+			"pizza": {Holders: map[string]string{
+				"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa": "1000",
+			}},
+		},
+	},
+	844547: {
+		Tickers: map[string]*TickerStatus{
+			"pizza": {Holders: map[string]string{
+				"1XPTgDRhN8RFnzniWCddobD9iKZatrvH4": "1000",
+				"17SkEw2md5avVNyYgj6RiXuQKNwkXaxFyQ": "1000",
+			}},
+		},
+	},
+	844860: {
+		Tickers: map[string]*TickerStatus{
+			"pizza": {Holders: map[string]string{
+				"bc1qx3c8p5feegjdrc00f2rqt26v7f35a79p9fy24g": "20000",
+			}},
+		},
+	},
 	847145: {
 		Tickers: map[string]*TickerStatus{
 			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},
 		},
 	},
+	846715: {
+		Tickers: map[string]*TickerStatus{
+			"tokeo": {Holders: map[string]string{
+				"bc1ptkh0lz9j9xzv0qgvncvx9s6rhp7jtdh8mfj65g3dwunrmvnfq54sq3zcze": "1000",
+				"bc1p4u0v6fw23hh53ggmpv2u6hc9mn8qyzxhwm39ay64u2g3q7awxnzsyjh2hj": "3000",
+			}},
+		},
+	},
+	
 	892933: {
 		Tickers: map[string]*TickerStatus{
 			"ordi": {Holders: map[string]string{"bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p": "138"}},

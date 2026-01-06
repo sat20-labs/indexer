@@ -1,6 +1,7 @@
 package brc20
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,6 +50,11 @@ func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *commo
 	}
 
 	name := strings.ToLower(ticker.Name)
+	tickerInfo := s.loadTickInfo(name)
+	if tickerInfo != nil {
+		common.Log.Warnf("%s exists", ticker.Name)
+		return
+	}
 
 	ticker.Id = int64(s.status.TickerCount)
 	s.status.TickerCount++
@@ -99,7 +105,7 @@ func (s *BRC20Indexer) UpdateInscribeMint(input *common.TxInput, mint *common.BR
 	}
 }
 
-func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BRC20Mint) {
+func (s *BRC20Indexer) updateInscribeMint(tx *common.Transaction, input *common.TxInput, mint *common.BRC20Mint) {
 	if !s.CheckInscription(mint.Nft) {
 		common.Log.Debugf("%s inscription is invalid", mint.Nft.Base.InscriptionId)
 		return
@@ -115,6 +121,46 @@ func (s *BRC20Indexer) updateInscribeMint(input *common.TxInput, mint *common.BR
 		// 已经足够了
 		return
 	}
+
+	amt, err := ParseBrc20Amount(mint.AmtStr, int(ticker.Decimal))
+	if err != nil {
+		common.Log.Debugf("mint %s, but invalid amount(%s)", ticker.Name, mint.AmtStr)
+		return
+	}
+
+	if amt.Sign() <= 0 || amt.Cmp(&ticker.Limit) > 0 {
+		common.Log.Debugf("mint %s, invalid amount(%s), limit(%s)", ticker.Name, mint.AmtStr, ticker.Limit.String())
+		return
+	}
+	mint.Amt = *amt
+
+	if ticker.SelfMint {
+		// 1. parent
+		if mint.Nft.Base.Parent != ticker.Nft.Base.InscriptionId {
+			return
+		}
+
+		// 2. 必须spent 部署ticker的铭文
+		assetName := common.AssetName{
+			Protocol: common.PROTOCOL_NAME_ORD,
+			Type: common.ASSET_TYPE_NFT,
+			Ticker: fmt.Sprintf("%d", ticker.Nft.Base.Sat),
+		}
+		found := false
+		for _, txIn := range tx.Inputs {
+			d := txIn.GetAsset(&assetName)
+			if d.Sign() > 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			common.Log.Debugf("%s not include inscrption %s, invalid mint %s", 
+			mint.Nft.Base.InscriptionId, ticker.Nft.Base.InscriptionId, ticker.Name)
+			return
+		}
+	}
+
 
 	ticker.TransactionCount++
 	if common.DecimalAdd(&ticker.Minted, &mint.Amt).Cmp(&ticker.Max) >= 0 {
@@ -206,6 +252,25 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	}
 
 	tickerName := strings.ToLower(transfer.Name)
+	tickerInfo := s.tickerMap[tickerName]
+	if tickerInfo == nil {
+		return
+	}
+	ticker := tickerInfo.Ticker
+
+	amt, err := ParseBrc20Amount(transfer.AmtStr, int(ticker.Decimal))
+	if err != nil {
+		common.Log.Debugf("transfer %s, but invalid amount(%s)", ticker.Name, transfer.AmtStr)
+		return
+	}
+
+	if amt.Sign() <= 0 {
+		common.Log.Debugf("transfer %s, invalid amount(%s)", ticker.Name, transfer.AmtStr)
+		return
+	}
+	transfer.Amt = *amt
+
+	
 	addressId := transfer.Nft.OwnerAddressId
 	holder := s.loadHolderInfo(addressId, tickerName)
 
@@ -224,10 +289,9 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	tickAbbrInfo.AvailableBalance = tickAbbrInfo.AvailableBalance.Sub(&transfer.Amt)
 	tickAbbrInfo.TransferableBalance = tickAbbrInfo.TransferableBalance.Add(&transfer.Amt)
 
-	ticker := s.tickerMap[tickerName]
-	transfer.Id = int64(ticker.Ticker.TransactionCount)
-	ticker.Ticker.TransactionCount++
-	s.tickerUpdated[tickerName] = ticker.Ticker
+	transfer.Id = int64(ticker.TransactionCount)
+	ticker.TransactionCount++
+	s.tickerUpdated[tickerName] = ticker
 
 	nft := common.TransferNFT{
 		NftId:     transfer.Nft.Base.Id,
@@ -1034,7 +1098,7 @@ func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction,
 				s.updateInscribeDeploy(input, deploy)
 			case common.BRC20_Action_InScribe_Mint:
 				mint := item.Info.(*common.BRC20Mint)
-				s.updateInscribeMint(input, mint)
+				s.updateInscribeMint(tx, input, mint)
 			case common.BRC20_Action_InScribe_Transfer:
 				transfer := item.Info.(*common.BRC20Transfer)
 				s.updateInscribeTransfer(input, transfer)

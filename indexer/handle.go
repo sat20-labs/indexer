@@ -2,12 +2,12 @@ package indexer
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/ord"
@@ -582,6 +582,10 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 
 	if content.SelfMint == "true" {
 		ticker.SelfMint = true
+		if len(content.Ticker) != 5 {
+			common.Log.Warnf("deploy, but not support self_mint. ticker: %s", content.Ticker)
+			return nil
+		}
 	}
 
 	// dec
@@ -596,7 +600,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	}
 
 	// max
-	max, err := ParseBrc20Amount(content.Max, int(ticker.Decimal))
+	max, err := brc20.ParseBrc20Amount(content.Max, int(ticker.Decimal))
 	if err != nil {
 		// max invalid
 		common.Log.Warnf("deploy, but max invalid. ticker: %s, max: '%s'", content.Ticker, content.Max)
@@ -623,7 +627,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	if content.Lim == "" {
 		lim = max.Clone()
 	} else {
-		lim, err = ParseBrc20Amount(content.Lim, int(ticker.Decimal))
+		lim, err = brc20.ParseBrc20Amount(content.Lim, int(ticker.Decimal))
 		if err != nil {
 			// limit invalid
 			common.Log.Warnf("deploy, but limit invalid. ticker: %s, limit: '%s'", content.Ticker, content.Lim)
@@ -642,25 +646,13 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 
 func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 	content *common.BRC20MintContent, nft *common.Nft) *common.BRC20Mint {
-	ticker := s.brc20Indexer.GetTicker(content.Ticker)
-	if ticker == nil {
-		common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
-			nft.Base.InscriptionId, content.Ticker)
-		return nil
-	}
-
-	if ticker.SelfMint {
-		if nft.Base.Parent != ticker.Nft.Base.InscriptionId {
-			return nil
-		}
-		// 需要检查铸造地址是否是ticker的持有人
-		nftOwnAddressId := s.nft.GetNftHolderWithInscriptionId(ticker.Nft.Base.InscriptionId)
-		if nft.OwnerAddressId != nftOwnAddressId {
-			common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, only deployer can inscribe mint",
-				nft.Base.InscriptionId, content.Ticker)
-			return nil
-		}
-	}
+	// ticker有可能是同一个区块部署的，这里可能就获取不到，导致失败，所以这里不要做任何检查
+	// ticker := s.brc20Indexer.GetTicker(content.Ticker) 
+	// if ticker == nil {
+	// 	common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
+	// 		nft.Base.InscriptionId, content.Ticker)
+	// 	return nil
+	// }
 
 	mint := &common.BRC20Mint{
 		BRC20MintInDB: common.BRC20MintInDB{
@@ -668,44 +660,35 @@ func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 			Name:  strings.ToLower(content.Ticker),
 		},
 		Nft: nft,
+		AmtStr: content.Amt,
 	}
 
 	// check mint amount
-	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
-	if err != nil {
-		common.Log.Warnf("mint %s, but invalid amount(%s)", content.Ticker, content.Amt)
-		return nil
-	}
-
-	if amt.Sign() <= 0 || amt.Cmp(&ticker.Limit) > 0 {
-		common.Log.Warnf("mint %s, invalid amount(%s), limit(%s)", content.Ticker, content.Amt, ticker.Limit.String())
-		return nil
-	}
-
-	// check max，需要延迟判断
-	// mintedAmt := ticker.Minted.Add(amt)
-	// cmpResult := mintedAmt.Cmp(&ticker.Max)
-	// if cmpResult > 0 {
-	// 	amt = ticker.Max.Sub(&ticker.Minted)
-	// 	common.Log.Debugf("mint %s, invalid amount(%s), max(%s), change to %s", content.Ticker, content.Amt, ticker.Max.String(), amt.String())
-	// }
-	// if amt.Sign() <= 0 {
-	// 	common.Log.Debugf("mint %s, invalid amount(%s)", content.Ticker, amt.String())
+	// amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
+	// if err != nil {
+	// 	common.Log.Warnf("mint %s, but invalid amount(%s)", content.Ticker, content.Amt)
 	// 	return nil
 	// }
-	mint.Amt = *amt
+
+	// if amt.Sign() <= 0 || amt.Cmp(&ticker.Limit) > 0 {
+	// 	common.Log.Warnf("mint %s, invalid amount(%s), limit(%s)", content.Ticker, content.Amt, ticker.Limit.String())
+	// 	return nil
+	// }
+
+	// mint.Amt = *amt
 	return mint
 }
 
 func (s *IndexerMgr) handleBrc20TransferTicker(out *common.TxOutputV2,
 	content *common.BRC20TransferContent, nft *common.Nft) *common.BRC20Transfer {
-	inscriptionId := nft.Base.InscriptionId
-	ticker := s.brc20Indexer.GetTicker(content.Ticker)
-	if ticker == nil {
-		common.Log.Warnf("IndexerMgr.handleBrc20TransferTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
-			inscriptionId, content.Ticker)
-		return nil
-	}
+	// ticker有可能是同一个区块部署的，这里可能就获取不到，导致失败，所以这里不要做任何检查
+	//inscriptionId := nft.Base.InscriptionId
+	// ticker := s.brc20Indexer.GetTicker(content.Ticker)
+	// if ticker == nil {
+	// 	common.Log.Warnf("IndexerMgr.handleBrc20TransferTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
+	// 		inscriptionId, content.Ticker)
+	// 	return nil
+	// }
 
 	transfer := &common.BRC20Transfer{
 		BRC20TransferInDB: common.BRC20TransferInDB{
@@ -713,20 +696,21 @@ func (s *IndexerMgr) handleBrc20TransferTicker(out *common.TxOutputV2,
 			Name:  strings.ToLower(content.Ticker),
 		},
 		Nft: nft,
+		AmtStr: content.Amt,
 	}
 
 	// check amount
-	amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
-	if err != nil {
-		common.Log.Warnf("%s transfer, but invalid amount", inscriptionId)
-		return nil
-	}
-	if amt.Sign() <= 0 || amt.Cmp(&ticker.Max) > 0 {
-		common.Log.Warnf("%s transfer, invalid amount(range)", inscriptionId)
-		return nil
-	}
+	// amt, err := brc20.ParseBrc20Amount(content.Amt, int(ticker.Decimal))
+	// if err != nil {
+	// 	common.Log.Warnf("%s transfer, but invalid amount", inscriptionId)
+	// 	return nil
+	// }
+	// if amt.Sign() <= 0 || amt.Cmp(&ticker.Max) > 0 {
+	// 	common.Log.Warnf("%s transfer, invalid amount(range)", inscriptionId)
+	// 	return nil
+	// }
 
-	transfer.Amt = *amt
+	//transfer.Amt = *amt
 
 	return transfer
 }
@@ -965,17 +949,11 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 		if mintInfo == nil {
 			return
 		}
-		// if mintInfo.BRC20BaseContent.Ticker != "box1" {
-		// 	return
-		// } else {
-		// 	common.Log.Info("mint brc20 ticker is box1")
-		// }
 
 		mint := s.handleBrc20MintTicker(out, mintInfo, nft)
 		if mint == nil {
 			return
 		}
-		//common.Log.Infof("nft.Base.InscriptionId: %s, nft.Base.Id: %d", nft.Base.InscriptionId, nft.Base.Id)
 		s.brc20Indexer.UpdateInscribeMint(input, mint)
 
 	case "transfer":
@@ -983,11 +961,6 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 		if transferInfo == nil {
 			return
 		}
-		// if transferInfo.BRC20BaseContent.Ticker != "box1" {
-		// 	return
-		// } else {
-		// 	common.Log.Info("transfer brc20 ticker is box1")
-		// }
 
 		transfer := s.handleBrc20TransferTicker(out, transferInfo, nft)
 		if transfer == nil {
@@ -1385,26 +1358,4 @@ func (b *IndexerMgr) isLptTicker(name string) bool {
 	// _, err :=  strconv.Atoi(num)
 	// return err == nil
 
-}
-
-func ParseBrc20Amount(amt string, dec int) (*common.Decimal, error) {
-	if len(amt) == 0 {
-		return nil, fmt.Errorf("empty amount string")
-	}
-	if len(amt) > 0 {
-		if amt[0] == '+' || amt[0] == '-' {
-			return nil, fmt.Errorf("invalid amount: %s", amt)
-		}
-		if amt[0] == '.' || amt[len(amt)-1] == '.' {
-			return nil, fmt.Errorf("invalid amount: %s", amt)
-		}
-	}
-	ret, err := common.NewDecimalFromString(amt, dec)
-	if err != nil {
-		return nil, err
-	}
-	if ret.IsOverflowUint64() {
-		return nil, fmt.Errorf("amount overflow uint64: %s", amt)
-	}
-	return ret, err
 }
