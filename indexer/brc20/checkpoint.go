@@ -12,6 +12,14 @@ import (
 )
 
 var _enable_checking_more_history = false
+var _moreCheckingFiles map[string]string =  map[string]string{
+	"cats": "./indexer/brc20/validate/cats_records.csv",
+	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
+	//"dior": "./indexer/brc20/validate/dior_records.csv", 数据缺失
+	"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
+	"scat": "./indexer/brc20/validate/scat_records.csv",
+	"pizza": "./indexer/brc20/validate/pizza_records.csv", 
+}
 
 type CheckPoint struct {
 	Height      int
@@ -630,7 +638,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 	846620: {
 		Tickers: map[string]*TickerStatus{
-			"pizza": { // TODO failed
+			"pizza": {
 				StartInscription: 66796189,
 				EndInscription: 71393287, 
 				EndInscriptionId: "ce26816f6746f66db8f8cf4a8b819e895a39612153e4cb08e3bbb5956291cd8ci0",
@@ -782,6 +790,32 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			}},
 		},
 	},
+
+	892751: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "23200000000000 12098888888888.88889 11101111111111.11111"}},
+		},
+	},
+	892756: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12098888888888.88889 1101111111111.11111"}},
+		},
+	},
+	930295: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12100000000000 1100000000000"}},
+		},
+	},
+	930546: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12200000000000 1000000000000"}},
+		},
+	},
+	930998: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 0 0"}},
+		},
+	},
 	
 	892933: {
 		Tickers: map[string]*TickerStatus{
@@ -928,6 +962,15 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		}
 
 		for address, amt := range tickerStatus.Holders {
+			parts := strings.Split(amt, " ")
+			var total, available, transferable string
+			if len(parts) == 3 {
+				total = parts[0]
+				available = parts[1]
+				transferable = parts[2]
+			} else {
+				total = amt
+			}
 			addressId := baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
 				common.Log.Panicf("%s GetAddressIdFromDB %s failed", name, address)
@@ -936,9 +979,20 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 			if abbrInfo == nil {
 				common.Log.Panicf("%s getHolderAbbrInfo %x %s failed", name, addressId, address)
 			}
-			if abbrInfo.AssetAmt().String() != amt {
-				p.printHistoryWithAddress(name, addressId)
-				common.Log.Panicf("%s holder %s amt different, %s %s", name, address, abbrInfo.AssetAmt().String(), amt)
+			if available == "" && transferable == "" {
+				if abbrInfo.AssetAmt().String() != total {
+					p.printHistoryWithAddress(name, addressId)
+					common.Log.Panicf("%s holder %s amt different, %s %s", name, address, abbrInfo.AssetAmt().String(), total)
+				}
+			} else {
+				if abbrInfo.AvailableBalance.String() != available {
+					p.printHistoryWithAddress(name, addressId)
+					common.Log.Panicf("%s holder %s available different, %s %s", name, address, abbrInfo.AvailableBalance.String(), available)
+				}
+				if abbrInfo.TransferableBalance.String() != transferable {
+					p.printHistoryWithAddress(name, addressId)
+					common.Log.Panicf("%s holder %s transferable different, %s %s", name, address, abbrInfo.TransferableBalance.String(), transferable)
+				}
 			}
 		}
 
@@ -1054,13 +1108,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 		if _enable_checking_more_history {
 			var files map[string]string
 			if isMainnet {
-				files = map[string]string{
-					"cats": "./indexer/brc20/validate/cats_records.csv",
-					"mmss": "./indexer/brc20/validate/MMSS_records.csv",
-					"dior": "./indexer/brc20/validate/dior_records.csv",
-					"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
-					"scat": "./indexer/brc20/validate/scat_records.csv",
-				}
+				files = _moreCheckingFiles
 			} else {
 				
 			}

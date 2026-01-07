@@ -218,15 +218,15 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *c
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
-		// 忽略某些不知道什么原因，unisat认为是无效的brc20铭文，仅仅为了让校验数据可以正确匹配
-		var excludingInscriptions = map[string]bool{
-			// "ea7e189806151db47817a8ab8a114a3b600be927705ad4b243af72701ee0ede4i0": true, // reinscription
-		}
-		if _, ok := excludingInscriptions[transfer.Nft.Base.InscriptionId]; ok {
-			return
-		}
-	}
+	// if !s.nftIndexer.GetBaseIndexer().IsMainnet() {
+	// 	// 忽略某些不知道什么原因，unisat认为是无效的brc20铭文，仅仅为了让校验数据可以正确匹配
+	// 	var excludingInscriptions = map[string]bool{
+	// 		// "ea7e189806151db47817a8ab8a114a3b600be927705ad4b243af72701ee0ede4i0": true, // reinscription
+	// 	}
+	// 	if _, ok := excludingInscriptions[transfer.Nft.Base.InscriptionId]; ok {
+	// 		return
+	// 	}
+	// }
 
 	s.actionBufferMap[input.UtxoId] = &ActionInfo{
 		Action: common.BRC20_Action_InScribe_Transfer,
