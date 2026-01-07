@@ -80,7 +80,7 @@ func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *commo
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
-	common.Log.Debugf("mint-deploy %d: %x deploy ticker = %s",
+	common.Log.Debugf("inscribe-deploy %d: %x deploy ticker = %s",
 		ticker.Nft.UtxoId, ticker.Nft.OwnerAddressId, ticker.Name)
 }
 
@@ -208,7 +208,7 @@ func (s *BRC20Indexer) updateInscribeMint(tx *common.Transaction, input *common.
 	s.holderActionList = append(s.holderActionList, &action)
 
 	s.addHolderBalance(transferInfo, mint.Nft.OwnerAddressId)
-	common.Log.Debugf("mint-mint %d: %x mint ticker = %s +%s -> %s",
+	common.Log.Debugf("inscribe-mint %d: %x mint ticker = %s +%s -> %s",
 		mint.NftId, mint.Nft.OwnerAddressId, mint.Name, mint.Amt.String(),
 		ticker.Minted.String())
 }
@@ -235,13 +235,16 @@ func (s *BRC20Indexer) UpdateInscribeTransfer(input *common.TxInput, transfer *c
 }
 
 func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *common.BRC20Transfer) {
+	
+	// if transfer.Nft.Base.InscriptionId == "fc0aeccbce575bd6998267b2c0fdc7e066e97ae396dadc8c24ed5c961f7d519ai0" ||
+	// transfer.Nft.Base.InscriptionId == "1bdd33ead5357c725945818a5cdfaab5edaca71974b95aa2c4b8fc583ee7e201i0" {
+	// 	common.Log.Infof("")
+	// }
+
 	if !s.CheckInscription(transfer.Nft) {
 		common.Log.Debugf("%s inscription is invalid", transfer.Nft.Base.InscriptionId)
 		return
 	}
-	// if transfer.Nft.Base.InscriptionId == "b73abee8f9cf28bf58bc45476b32ff1f4bcb01f58d0101ea83a094acdeb73cff" {
-	// 	common.Log.Infof("")
-	// }
 
 	// transfer铭文，实质是将一定数量的token绑定到一个utxo中，所以一个utxo中如果有多个transfer铭文，只有第一个transfer铭文有效
 	// 比如：mainnet：e298f7bbea84879bc69a711e27302fc05e34c41fe5d054f22ce0aa1fc8e20add，批量生成多个transfer铭文，只有第一个有效
@@ -323,7 +326,7 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	}
 	s.holderActionList = append(s.holderActionList, &action)
 
-	common.Log.Debugf("mint-transfer %d: %x transfer ticker = %s +%s -> %s",
+	common.Log.Debugf("inscribe-transfer %d: %x transfer ticker = %s +%s -> %s",
 		transfer.NftId, transfer.Nft.OwnerAddressId, transfer.Name,
 		transfer.Amt.String(), tickAbbrInfo.TransferableBalance.String())
 }
@@ -347,6 +350,12 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block, coinbase []*common.Ra
 	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !s.CheckSelf(block.Height) {
 		common.Log.Panic("")
 	}
+
+	// if block.Height == 892751 {
+	// 	addressId := s.nftIndexer.GetBaseIndexer().GetAddressId("bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2")
+	// 	s.printHistoryWithAddress("※ ", addressId)
+	// 	s.printTickerHistory("※ ")
+	// }
 }
 
 // 增加该address下的资产数据
@@ -604,7 +613,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 				s.holderActionList = append(s.holderActionList, &action)
 				delete(inputTransferNfts, nftId)
 
-				common.Log.Debugf("%s %d: %x -> %x, ticker = %s, %s",
+				common.Log.Debugf("transfer: %s %d: %x -> %x, ticker = %s, %s",
 					method, action.NftId, action.FromAddr, action.ToAddr, action.Ticker,
 					action.Amount.String())
 			}
