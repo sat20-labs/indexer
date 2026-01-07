@@ -1083,10 +1083,6 @@ func loadHistoryRecords(path string) (*ValidateHistoryData, error) {
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *BRC20Indexer) validateHistory(height int) {
-
-	if height > 930000 {
-		return
-	}
 	
 	if _validateHistoryData == nil {
 		_validateHistoryData = make(map[string]*ValidateHistoryData)
@@ -1397,9 +1393,6 @@ func readHolderDataToMap(dir string) (int, int) {
 
 // 逐个区块对比某个brc20 ticker的相关事件，效率很低，只适合开发阶段做数据的校验，后续要关闭该校验
 func (p *BRC20Indexer) validateHolderData(height int) {
-	if height < 779832 || height > 929000 { // 修改验证数据，需要修改这个值
-		return
-	}
 
 	if _heightToHolderRecords == nil {
 		_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
