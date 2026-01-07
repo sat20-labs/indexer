@@ -551,3 +551,108 @@ func SplitCSVFile(
 	closeCurrent()
 	return nil
 }
+
+
+func FilterCSVFile(
+	srcCSV string,
+	dst string,
+	filterHeight int,
+) error {
+
+	in, err := os.Open(srcCSV)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	reader := csv.NewReader(in)
+	reader.ReuseRecord = true
+
+	// ===== 关键修复点：header 深拷贝 =====
+	rawHeader, err := reader.Read()
+	if err != nil {
+		return fmt.Errorf("read header failed: %w", err)
+	}
+
+	header := make([]string, len(rawHeader))
+	copy(header, rawHeader)
+	// ===================================
+
+	col := make(map[string]int)
+	for i, h := range header {
+		h = strings.TrimPrefix(h, "\ufeff")
+		col[h] = i
+	}
+
+	var (
+		fileIdx   = 0
+		rowCount  = 0
+		outFile   *os.File
+		outWriter *csv.Writer
+	)
+
+	closeCurrent := func() {
+		if outWriter != nil {
+			outWriter.Flush()
+		}
+		if outFile != nil {
+			outFile.Close()
+		}
+	}
+
+	openNewFile := func() error {
+		closeCurrent()
+
+		fileIdx++
+		rowCount = 0
+
+		f, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+
+		w := csv.NewWriter(f)
+
+		// 写 header
+		if err := w.Write(header); err != nil {
+			f.Close()
+			return err
+		}
+
+		outFile = f
+		outWriter = w
+		return nil
+	}
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			closeCurrent()
+			return err
+		}
+
+		h := parseInt32(record[col["height"]])
+		if h == filterHeight {
+			continue
+		}
+
+		if outWriter == nil {
+			if err := openNewFile(); err != nil {
+				return err
+			}
+		}
+
+		if err := outWriter.Write(record); err != nil {
+			closeCurrent()
+			return err
+		}
+
+		rowCount++
+	}
+
+	closeCurrent()
+	return nil
+}
