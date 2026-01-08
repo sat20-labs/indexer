@@ -801,6 +801,11 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12098888888888.88889 1101111111111.11111"}},
 		},
 	},
+	930294: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12098888888888.88889 1101111111111.11111"}},
+		},
+	},
 	930295: {
 		Tickers: map[string]*TickerStatus{
 			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12100000000000 1100000000000"}},
@@ -811,9 +816,14 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12200000000000 1000000000000"}},
 		},
 	},
+	930901: {
+		Tickers: map[string]*TickerStatus{
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 12200000000000 1000000000000"}},
+		},
+	},
 	930998: {
 		Tickers: map[string]*TickerStatus{
-			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 0 0"}},
+			"※ ": {Holders: map[string]string{"bc1p0l6lrn6p2hevjcdtkdghmv0yzxc8pwkvgr3svekqy5yq8vvplewsrxs0c2": "13200000000000 13200000000000 0"}},
 		},
 	},
 	
@@ -962,6 +972,11 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		}
 
 		for address, amt := range tickerStatus.Holders {
+			// if name == "※ " {
+			// 	common.Log.Infof("")
+			// 	addressId := baseIndexer.GetAddressIdFromDB(address)
+			// 	p.printHistoryWithAddress(name, addressId)
+			// }
 			parts := strings.Split(amt, " ")
 			var total, available, transferable string
 			if len(parts) == 3 {

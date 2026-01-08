@@ -149,7 +149,7 @@ const (
 	BRC20_Action_InScribe_Mint
 	BRC20_Action_InScribe_Transfer // 铸造一个transfer铭文
 	BRC20_Action_Transfer          // 转移一个transfer铭文
-	BRC20_Action_Transfer_Spent    // 一个已经转移的transfer铭文被花费
+	BRC20_Action_Transfer_Spent    // 一个已经转移的transfer铭文被花费，不影响任何资产数据，仅仅做跟踪
 )
 
 type BRC20ActionHistory struct {
