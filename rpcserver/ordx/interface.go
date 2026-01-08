@@ -591,9 +591,35 @@ func (s *Model) GetAbbrAssetsWithUtxo(utxo string) ([]*rpcwire.AssetAbbrInfo, er
 
 func (s *Model) GetSeedsWithUtxo(utxo string) ([]*rpcwire.Seed, error) {
 	result := make([]*rpcwire.Seed, 0)
+
+	// sat为全局编码时的计算方式
+	// assets := s.indexer.GetAssetsWithUtxo(s.indexer.GetUtxoId(utxo))
+	// for ticker, info := range assets {
+	// 	seed := rpcwire.Seed{TypeName: ticker.Type, Ticker: ticker.Ticker, Seed: common.GenerateSeed2(info.ToRanges())}
+	// 	result = append(result, &seed)
+	// }
+
+
+	// sat没有全局编码时，用全部资产来表示
 	assets := s.indexer.GetAssetsWithUtxo(s.indexer.GetUtxoId(utxo))
+	assetVector := make([]*common.AssetInfo, 0)
 	for ticker, info := range assets {
-		seed := rpcwire.Seed{TypeName: ticker.Type, Ticker: ticker.Ticker, Seed: common.GenerateSeed2(info.ToRanges())}
+		assetVector = append(assetVector, &common.AssetInfo{
+			Name: ticker,
+			Amount: *common.NewDecimal(info.Size(), 0),
+			BindingSat: 1,
+		})
+	}
+	sort.Slice(assetVector, func(i, j int) bool {
+		if assetVector[i].Name.String() == assetVector[j].Name.String() {
+			return assetVector[i].Amount.Cmp(&assetVector[j].Amount) < 0
+		}
+		return assetVector[i].Name.String() < assetVector[j].Name.String()
+	})
+	seed := common.GenerateSeed(assetVector)
+
+	for _, info := range assetVector {
+		seed := rpcwire.Seed{TypeName: info.Name.Type, Ticker: info.Name.Ticker, Seed: seed}
 		result = append(result, &seed)
 	}
 

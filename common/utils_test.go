@@ -283,7 +283,7 @@ func TestDecode3(t *testing.T) {
 	fmt.Printf("%x %x %x\n", v1, v2, v3)
 }
 
-func TestGenerateSeed(t *testing.T) {
+func TestGenerateSeed2(t *testing.T) {
 
 	range1 := []*Range{{Start: 1234567890123456, Size: 1000}}
 
@@ -296,4 +296,36 @@ func TestGenerateSeed(t *testing.T) {
 	seed = GenerateSeed2(range2)
 	fmt.Printf("%s\n", seed) // 8869c43df2f8a6d7
 
+}
+
+
+func TestGenerateSeed(t *testing.T) {
+
+	assetVector := []*AssetInfo{
+		{
+			Name: AssetName{
+				Protocol: "ord",
+				Type: "o",
+				Ticker: "12345678",
+			},
+			Amount: *NewDecimal(1, 0),
+			BindingSat: 1,
+		},
+		{
+			Name: AssetName{
+				Protocol: "ordx",
+				Type: "f",
+				Ticker: "rarepizza",
+			},
+			Amount: *NewDecimal(1000, 0),
+			BindingSat: 1,
+		},
+	}
+
+	seed := GenerateSeed(assetVector)
+	fmt.Printf("%s\n", seed) // 482f0fd575b0d16
+
+	assetVector[0].Name.Ticker = "12345679"
+	seed = GenerateSeed(assetVector)
+	fmt.Printf("%s\n", seed) // d5d7f609a69c9bae
 }

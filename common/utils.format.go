@@ -172,6 +172,7 @@ func GenerateSeed(data interface{}) string {
 	return fmt.Sprintf("%x", result)
 }
 
+// sat为全局统一编码时的计算方式
 func GenerateSeed2(ranges []*Range) string {
 	bytes, err := json.Marshal(ranges)
 	if err != nil {
