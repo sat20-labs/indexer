@@ -1155,4 +1155,6 @@ func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction,
 func (s *BRC20Indexer) UpdateTransferFinished(block *common.Block) {
 	s.actionBufferMap = make(map[uint64]*ActionInfo)
 	s.CheckPointWithBlockHeight(block.Height)
+	// addressId := s.nftIndexer.GetBaseIndexer().GetAddressIdFromDB("bc1psknlr5rlekaln34hvghslcjnvftgrxheysexe6p5gase343n23fqc0t3kj")
+	// s.printHistoryWithAddress("doge", addressId)
 }

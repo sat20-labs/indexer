@@ -334,13 +334,27 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 					if offset == info.InOffset {
 						if sat != nft.Base.Sat {
 							nft.Base.Sat = sat // 同一个聪，需要命名一致
-							// 根据ordinals规则，判断是否是reinscription
-							if nft.Base.CurseType == 0 {
+							// 根据ordinals规则，判断是否是reinscription 
+							// Jubilee之后，不再判断curseType，因为没有curse
+							if nft.Base.BlockHeight < int32(common.Jubilee_Height) {
+								if nft.Base.CurseType == 0 {
+									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
+									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+										// 已经存在非cursed的铭文，后面的铭文都是reinscription
+										// Jubilee后，也是需要记录reinscription
+										nft.Base.CurseType = int32(ordCommon.Reinscription)
+										nft.Base.Reinscription = 1
+										common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
+									}
+								}
+							} else {
 								nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 								if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
 									// 已经存在非cursed的铭文，后面的铭文都是reinscription
 									// Jubilee后，也是需要记录reinscription
-									nft.Base.CurseType = int32(ordCommon.Reinscription)
+									if nft.Base.CurseType == 0 {
+										nft.Base.CurseType = int32(ordCommon.Reinscription)
+									}
 									nft.Base.Reinscription = 1
 									common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 								}
@@ -435,7 +449,7 @@ func (p *NftIndexer) addNftToSatMap(nft *common.Nft) {
 		p.satMap[nft.Base.Sat] = info
 	}
 	info.Nfts[nft] = true
-	if nft.Base.CurseType < 0 {
+	if nft.Base.CurseType < 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
 		info.CurseCount++
 	}
 }

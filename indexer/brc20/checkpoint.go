@@ -874,6 +874,22 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"ordi": {Holders: map[string]string{"bc1qltqe4c8g86cam5rlj2xylxvvdtm0mlxe3tea6q": "3"}},
 		},
 	},
+
+	910683: {
+		Tickers: map[string]*TickerStatus{
+			"doge": {Holders: map[string]string{"bc1psknlr5rlekaln34hvghslcjnvftgrxheysexe6p5gase343n23fqc0t3kj": "67200"}},
+		},
+	},
+	910763: {
+		Tickers: map[string]*TickerStatus{
+			"doge": {Holders: map[string]string{"bc1psknlr5rlekaln34hvghslcjnvftgrxheysexe6p5gase343n23fqc0t3kj": "239400"}},
+		},
+	},
+	910909: {
+		Tickers: map[string]*TickerStatus{
+			"doge": {Holders: map[string]string{"bc1psknlr5rlekaln34hvghslcjnvftgrxheysexe6p5gase343n23fqc0t3kj": "294000"}},
+		},
+	},
 }
 
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
@@ -1449,7 +1465,7 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 			}
 			if info.AvailableBalance.String() != record.AvailableBalance {
 				if !compareDecimal(info.AvailableBalance, record.AvailableBalance) {
-					//p.printHistoryWithAddress(ticker, addressId)
+					p.printHistoryWithAddress(ticker, addressId)
 					common.Log.Errorf("validateHolderData %s %s available balance different %s %s",
 						address, record.Token, record.AvailableBalance, info.AvailableBalance.String())
 					failed = append(failed, ticker)
@@ -1459,7 +1475,7 @@ func (p *BRC20Indexer) validateHolderData(height int) {
 			}
 			if info.TransferableBalance.String() != record.TransferableBalance {
 				if !compareDecimal(info.TransferableBalance, record.TransferableBalance) {
-					//p.printHistoryWithAddress(ticker, addressId)
+					p.printHistoryWithAddress(ticker, addressId)
 					common.Log.Errorf("validateHolderData %s %s transferable balance different %s %s",
 						address, record.Token, record.TransferableBalance, info.TransferableBalance.String())
 					failed = append(failed, ticker)
