@@ -354,7 +354,7 @@ func (s *BRC20Indexer) UpdateTransfer(block *common.Block, coinbase []*common.Ra
 	common.Log.Infof("BRC20Indexer->UpdateTransfer loop %d in %v", len(block.Transactions), time.Since(startTime))
 	s.UpdateTransferFinished(block)
 
-	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !s.CheckSelf(block.Height) {
+	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !s.CheckSelf() {
 		common.Log.Panic("")
 	}
 

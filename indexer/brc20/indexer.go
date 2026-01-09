@@ -589,9 +589,10 @@ func (s *BRC20Indexer) printTicker(name string) {
 }
 
 // 自检。如果错误，将停机
-func (s *BRC20Indexer) CheckSelf(height int) bool {
+func (s *BRC20Indexer) CheckSelf() bool {
 	common.Log.Infof("BRC20Indexer->CheckSelf ...")
 	common.Log.Infof("stats: %v", s.status)
+	height := s.nftIndexer.GetBaseIndexer().GetHeight()
 
 	isMainnet := s.nftIndexer.GetBaseIndexer().IsMainnet()
 	//var names []string

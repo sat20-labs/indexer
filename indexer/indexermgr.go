@@ -334,26 +334,103 @@ func (b *IndexerMgr) closeDB() {
 	common.Log.Infof("IndexerMgr->closeDB ")
 	b.dbgc()
 
-	b.runesDB.Close()
-	b.brc20DB.Close()
-	b.ftDB.Close()
-	b.exoticDB.Close()
-	b.nsDB.Close()
-	b.nftDB.Close()
-	b.baseDB.Close()
-	b.localDB.Close()
-	b.kvDB.Close()
+	if b.runesDB != nil {
+		b.runesDB.Close()
+		b.runesDB = nil
+	}
+	if b.brc20DB != nil {
+		b.brc20DB.Close()
+		b.brc20DB = nil
+	}
+	if b.ftDB != nil {
+		b.ftDB.Close()
+		b.ftDB = nil
+	}
+	if b.exoticDB != nil {
+		b.exoticDB.Close()
+		b.exoticDB = nil
+	}
+	if b.nsDB != nil {
+		b.nsDB.Close()
+		b.nsDB = nil
+	}
+	if b.nftDB != nil {
+		b.nftDB.Close()
+		b.nftDB = nil
+	}
+	if b.baseDB != nil {
+		b.baseDB.Close()
+		b.baseDB = nil
+	}
+	if b.localDB != nil {
+		b.localDB.Close()
+		b.localDB = nil
+	}
+	if b.kvDB != nil {
+		b.kvDB.Close()
+		b.kvDB = nil
+	}
 }
 
 func (b *IndexerMgr) checkSelf() {
 	start := time.Now()
-	if b.base.CheckSelf() &&
-		b.exotic.CheckSelf() &&
-		b.nft.CheckSelf(b.baseDB) &&
-		b.ns.CheckSelf(b.baseDB) &&
-		b.ftIndexer.CheckSelf(b.base.GetSyncHeight()) &&
-		b.RunesIndexer.CheckSelf() &&
-		b.brc20Indexer.CheckSelf(b.base.GetSyncHeight()) {
+	// 关闭所有无关实例
+	// 检查一个关闭一个，节省空间
+	ok := false
+	for {
+		ok = b.brc20Indexer.CheckSelf()
+		if !ok {
+			break
+		}
+		b.brc20DB.Close()
+		b.brc20DB = nil
+
+		ok = b.RunesIndexer.CheckSelf()
+		if !ok {
+			break
+		}
+		b.runesDB.Close()
+		b.runesDB = nil
+
+		ok = b.ftIndexer.CheckSelf()
+		if !ok {
+			break
+		}
+		b.ftDB.Close()
+		b.ftDB = nil
+
+		ok = b.ns.CheckSelf()
+		if !ok {
+			break
+		}
+		b.nsDB.Close()
+		b.nsDB = nil
+		
+		ok = b.nft.CheckSelf()
+		if !ok {
+			break
+		}
+		b.nftDB.Close()
+		b.nftDB = nil
+
+		ok = b.exotic.CheckSelf()
+		if !ok {
+			break
+		}
+		b.exoticDB.Close()
+		b.exoticDB = nil
+
+		ok = b.base.CheckSelf()
+		if !ok {
+			break
+		}
+		b.baseDB.Close()
+		b.baseDB = nil
+		
+		break
+	}
+
+	if ok {
 		common.Log.Infof("IndexerMgr.checkSelf succeed. %v", time.Since(start))
 	} else {
 		b.closeDB()

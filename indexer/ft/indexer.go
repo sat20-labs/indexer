@@ -171,7 +171,6 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 
 	s.nftIndexer = nftIndexer
-	height := nftIndexer.GetBaseIndexer().GetSyncHeight()
 
 	startTime := time.Now()
 	common.Log.Infof("ordx db version: %s", s.GetDBVersion())
@@ -196,14 +195,16 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 		s.mutex.Unlock()
 	}
 
-	s.CheckSelf(height)
+	s.CheckSelf()
 
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("InitSatIndexFromDB %d ms\n", elapsed)
 }
 
 // 自检。如果错误，将停机
-func (s *FTIndexer) CheckSelf(height int) bool {
+func (s *FTIndexer) CheckSelf() bool {
+
+	height := s.nftIndexer.GetBaseIndexer().GetHeight()
 
 	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
 	startTime := time.Now()

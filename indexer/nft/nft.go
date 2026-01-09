@@ -361,9 +361,11 @@ func (p *NftIndexer) getNftInBufferWithInscriptionId(inscriptionId string) *comm
 }
 
 // 耗时很长。仅用于在数据编译完成时验证数据，或者测试时验证数据。
-func (p *NftIndexer) CheckSelf(baseDB common.KVDB) bool {
+func (p *NftIndexer) CheckSelf() bool {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
+
+	baseDB := p.baseIndexer.GetBaseDB()
 
 	common.Log.Info("NftIndexer->checkSelf ... ")
 

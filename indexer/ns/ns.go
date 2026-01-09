@@ -186,7 +186,7 @@ func (p *NameService) UpdateDB() {
 }
 
 // 耗时很长。仅用于在数据编译完成时验证数据，或者测试时验证数据。
-func (p *NameService) CheckSelf(baseDB common.KVDB) bool {
+func (p *NameService) CheckSelf() bool {
 
 	common.Log.Info("NameService->checkSelf ... ")
 

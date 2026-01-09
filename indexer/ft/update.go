@@ -237,7 +237,7 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 	p.mutex.Unlock()
 	p.CheckPointWithBlockHeight(block.Height)
 
-	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !p.CheckSelf(block.Height) {
+	if inCommon.STEP_RUN_MODE && inCommon.CHECK_SELF && !p.CheckSelf() {
 		common.Log.Panic("")
 	}
 }
