@@ -305,7 +305,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		var allInput *common.TxOutput
 		//t2 := time.Now()
 		for _, input := range tx.Inputs {
-			// if tx.TxId == "23316f7a5e793bed487ece25aeae12aff283403687e024b518eb9c6fe73991a1" {
+			// if tx.TxId == "71432faeff2536ed0d313008453d9623e5d6a2a18c47d2a5b411e18a31cec325" {
 			// 	common.Log.Infof("%d %d %d", block.Height, input.InTxIndex, input.TxInIndex)
 			// }
 
@@ -340,22 +340,26 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 								if nft.Base.CurseType == 0 {
 									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
+										// pre_jubilee_first_reinscription_after_cursed_inscription_is_blessed
 										// 已经存在非cursed的铭文，后面的铭文都是reinscription
 										// Jubilee后，也是需要记录reinscription
 										nft.Base.CurseType = int32(ordCommon.Reinscription)
-										nft.Base.Reinscription = 1
+										nft.Base.Reinscription = int32(len(nftsInSat.Nfts) - nftsInSat.CurseCount)
 										common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 									}
 								}
 							} else {
 								nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 								if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
-									// 已经存在非cursed的铭文，后面的铭文都是reinscription
+									// post_jubilee_first_reinscription_after_vindicated_inscription_not_vindicated
+									// 已经存在非vindated的铭文，后面的铭文都是reinscription
 									// Jubilee后，也是需要记录reinscription
-									if nft.Base.CurseType == 0 {
-										nft.Base.CurseType = int32(ordCommon.Reinscription)
+									
+									nft.Base.Reinscription = int32(len(nftsInSat.Nfts) - nftsInSat.CurseCount)
+									if nft.Base.CurseType == 0 && nft.Base.Reinscription > 1 {
+										// 从第二个reinscription开始，需要vindicate
+										nft.Base.CurseType = int32(ordCommon.Reinscription) 
 									}
-									nft.Base.Reinscription = 1
 									common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 								}
 							}
@@ -435,7 +439,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 
 }
 
-// 需要预加载satmap
+// 需要预加载satmap，这个时候还没有处理vindicate
 func (p *NftIndexer) addNftToSatMap(nft *common.Nft) {
 	info, ok := p.satMap[nft.Base.Sat]
 	if !ok {
@@ -449,7 +453,7 @@ func (p *NftIndexer) addNftToSatMap(nft *common.Nft) {
 		p.satMap[nft.Base.Sat] = info
 	}
 	info.Nfts[nft] = true
-	if nft.Base.CurseType < 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
+	if nft.Base.CurseType != 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
 		info.CurseCount++
 	}
 }
