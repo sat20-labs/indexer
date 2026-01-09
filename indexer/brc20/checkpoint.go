@@ -1220,9 +1220,6 @@ func (p *BRC20Indexer) validateHistoryWithTicker(height int, validateHistoryData
 				common.Log.Panicf("height %d can't find inscription %s", height, id)
 			}
 			//  d9c7fa01de4890691f4402eba152bbdb113f41c488c033a5cbe648549708a3fbi0
-			// ordinals.com 的编号是99979585，跟我们一致
-			// unisat 的编号是99979770，应该是将这个错误的认为是fee spent了。在这个区块内的brc20铭文的编号可能会受到影响
-			// c9ca1421aa495248e3f1c63dcde4d8fdd015c7a2598ae06c4b4bc756d76b23cbi0 ordi transfer铭文，手工修改编号 99979599 -> 99979600
 			if num != nft.Base.Id {
 				for i := int64(nft.Base.Id - 100); i < nft.Base.Id + 10; i++ {
 					n := nftIndexer.GetNftWithIdWithNoLock(i)
