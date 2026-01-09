@@ -15,16 +15,17 @@ import (
 func (s *BRC20Indexer) CheckInscription(nft *common.Nft) bool {
 	/*
 	从brc20的索引器看，Jubilee=824544
-	1. 有效 9531292334d3488ec05ef410814a3a1a701842138b62328ae349259f633e46a3i0 reinscription 825956 第一个reinscription，所有有效？
-	2. 无效 71432faeff2536ed0d313008453d9623e5d6a2a18c47d2a5b411e18a31cec325i0 reinscription 910683 第n个reinscription，所以无效？
-	这就很奇怪了！
+	1. 有效 9531292334d3488ec05ef410814a3a1a701842138b62328ae349259f633e46a3i0 reinscription 825956 第一个reinscription，而且第一个铭文是诅咒铭文，所有有效
+	2. 无效 b558ef37323ff59e1bcd23475071de1d93909b1856b90357fe3f7c0a9afb96c1i0 reinscription 910835 第一个reinscription，但前面铭文是blessed，所以无效
+	3. 无效 71432faeff2536ed0d313008453d9623e5d6a2a18c47d2a5b411e18a31cec325i0 reinscription 910683 第9个reinscription，但前面铭文都是诅咒铭文，按道理应该有效，但被设置为无效！
+	这就很奇怪了！这里brc20的规则有点问题。
 	*/
 	if nft.Base.CurseType != 0 {
 		common.Log.Debugf("%s inscription is cursed, %d", nft.Base.InscriptionId, nft.Base.CurseType)
 		return false
 	}
 
-	if nft.Base.Reinscription > 1 {
+	if nft.Base.Reinscription > 0 {
 		return false
 	}
 

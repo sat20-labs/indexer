@@ -30,6 +30,10 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 		nft.Base.Sat = -int64(p.status.Unbound) // 从-1开始
 	}
 
+	if nft.Base.CurseType < 0 && nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
+		nft.Base.CurseType = int32(ordCommon.Vindicated)
+	}
+
 	info := &InscribeInfo{
 		Input:    input,
 		InOffset: inOffset,
@@ -127,10 +131,6 @@ func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) int {
 
 func (p *NftIndexer) nftMint(info *InscribeInfo) {
 	nft := info.Nft
-
-	if nft.Base.CurseType < 0 && nft.Base.BlockHeight >= int32(common.Jubilee_Height) {
-		nft.Base.CurseType = int32(ordCommon.Vindicated)
-	}
 
 	if nft.Base.CurseType < 0 {
 		p.status.CurseCount++
@@ -335,30 +335,31 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 						if sat != nft.Base.Sat {
 							nft.Base.Sat = sat // 同一个聪，需要命名一致
 							// 根据ordinals规则，判断是否是reinscription 
-							// Jubilee之后，不再判断curseType，因为没有curse
 							if nft.Base.BlockHeight < int32(common.Jubilee_Height) {
 								if nft.Base.CurseType == 0 {
 									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
 									if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
 										// pre_jubilee_first_reinscription_after_cursed_inscription_is_blessed
 										// 已经存在非cursed的铭文，后面的铭文都是reinscription
-										// Jubilee后，也是需要记录reinscription
-										nft.Base.CurseType = int32(ordCommon.Reinscription)
 										nft.Base.Reinscription = int32(len(nftsInSat.Nfts) - nftsInSat.CurseCount)
 										common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 									}
 								}
 							} else {
 								nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
-								if int(nftsInSat.CurseCount) < len(nftsInSat.Nfts) {
-									// post_jubilee_first_reinscription_after_vindicated_inscription_not_vindicated
-									// 已经存在非vindated的铭文，后面的铭文都是reinscription
-									// Jubilee后，也是需要记录reinscription
-									
-									nft.Base.Reinscription = int32(len(nftsInSat.Nfts) - nftsInSat.CurseCount)
-									if nft.Base.CurseType == 0 && nft.Base.Reinscription > 1 {
-										// 从第二个reinscription开始，需要vindicate
-										nft.Base.CurseType = int32(ordCommon.Reinscription) 
+								// post_jubilee_first_reinscription_after_vindicated_inscription_not_vindicated
+								// jubilee后，即使第一个铭文是诅咒铭文，因为vindicate后，第二个铭文不管是啥，都算是reinscription。
+								// 但如果第一个铭文是vindicated，那第二个铭文就是blessed
+								// 也就是说，不管如何，一个聪上，只有一个blessed的铭文，其他都是cursed/vindicated，同时可能是reinscription
+								// 核心标准是判断是否有blessed铭文
+								// 已经存在非vindated的铭文，后面的铭文都是reinscription
+								// Jubilee后，也是需要记录reinscription
+								if len(nftsInSat.Nfts) > 0 {
+									nft.Base.Reinscription = int32(len(nftsInSat.Nfts))
+									if nft.Base.Reinscription == 1 && nftsInSat.CurseCount == 1 {
+										// 如果第一个铭文是vindicated，那第二个铭文是not vindicated
+										nft.Base.CurseType = 0
+										nft.Base.Reinscription = 0
 									}
 									common.Log.Debugf("%s is reinscription in sat %d", nft.Base.InscriptionId, nft.Base.Sat)
 								}
@@ -453,7 +454,7 @@ func (p *NftIndexer) addNftToSatMap(nft *common.Nft) {
 		p.satMap[nft.Base.Sat] = info
 	}
 	info.Nfts[nft] = true
-	if nft.Base.CurseType != 0 && nft.Base.BlockHeight < int32(common.Jubilee_Height) {
+	if nft.Base.CurseType != 0 { // 包括vindicated
 		info.CurseCount++
 	}
 }

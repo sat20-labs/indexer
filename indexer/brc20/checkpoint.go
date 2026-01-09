@@ -11,14 +11,14 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
-var _enable_checking_more_history = false
+var _enable_checking_more_history = true
 var _moreCheckingFiles map[string]string =  map[string]string{
 	"cats": "./indexer/brc20/validate/cats_records.csv",
 	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
-	//"dior": "./indexer/brc20/validate/dior_records.csv", 数据缺失
 	"𝛑": "./indexer/brc20/validate/𝛑_records.csv",
 	"scat": "./indexer/brc20/validate/scat_records.csv",
 	"pizza": "./indexer/brc20/validate/pizza_records.csv", 
+	"doge": "./indexer/brc20/validate/doge_records.csv", 
 }
 
 type CheckPoint struct {
@@ -1013,16 +1013,16 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 			if available == "" && transferable == "" {
 				if abbrInfo.AssetAmt().String() != total {
 					p.printHistoryWithAddress(name, addressId)
-					common.Log.Panicf("%s holder %s amt different, %s %s", name, address, abbrInfo.AssetAmt().String(), total)
+					common.Log.Panicf("%s holder %s amt different, %s %s", name, address, total, abbrInfo.AssetAmt().String())
 				}
 			} else {
 				if abbrInfo.AvailableBalance.String() != available {
 					p.printHistoryWithAddress(name, addressId)
-					common.Log.Panicf("%s holder %s available different, %s %s", name, address, abbrInfo.AvailableBalance.String(), available)
+					common.Log.Panicf("%s holder %s available different, %s %s", name, address, available, abbrInfo.AvailableBalance.String())
 				}
 				if abbrInfo.TransferableBalance.String() != transferable {
 					p.printHistoryWithAddress(name, addressId)
-					common.Log.Panicf("%s holder %s transferable different, %s %s", name, address, abbrInfo.TransferableBalance.String(), transferable)
+					common.Log.Panicf("%s holder %s transferable different, %s %s", name, address, transferable, abbrInfo.TransferableBalance.String())
 				}
 			}
 		}

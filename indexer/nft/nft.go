@@ -22,7 +22,7 @@ type SatInfo struct {
 	AddressId  uint64
 	UtxoId     uint64
 	Offset     int64
-	CurseCount int // CurseCount+2 <= len(Nfts)，至少有两个非诅咒的铭文，意味着该sat是reinscription
+	CurseCount int // 包括vindicated。 CurseCount+2 <= len(Nfts)，至少有两个非诅咒的铭文，意味着该sat是reinscription
 	Nfts       map[*common.Nft]bool
 }
 
