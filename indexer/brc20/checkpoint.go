@@ -480,6 +480,24 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	787203: {
+		Tickers: map[string]*TickerStatus{
+			"moon": {
+				StartInscription: 388310,
+				EndInscription: 1921687, 
+				EndInscriptionId: "8a2492bacddedca911bce25fc4bf809eaae513b9ecdcf3a2858e5e39b3958709i0",
+			},
+		},
+	},
+	788285: {
+		Tickers: map[string]*TickerStatus{
+			"trac": {
+				StartInscription: 3350070,
+				EndInscription: 3614643, 
+				EndInscriptionId: "2e7d4d3fcfe10c93e24612c9fc634c22c7556c9c13a78c6a603639c923c6e244i0",
+			},
+		},
+	},
 	788747: {
 		Tickers: map[string]*TickerStatus{
 			"vmpx": {
@@ -570,6 +588,15 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	817992: {
+		Tickers: map[string]*TickerStatus{
+			"tbci": {
+				StartInscription: 42757432,
+				EndInscription: 42791842, 
+				EndInscriptionId: "894f173c71ed349ed900de3549d796223faa44deb817e683e673f5134c759781i0",
+			},
+		},
+	},
 	
 
 	818151: {
@@ -654,6 +681,15 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	859888: {
+		Tickers: map[string]*TickerStatus{
+			"𐊶": {
+				StartInscription: 75488734,
+				EndInscription: 75489822, 
+				EndInscriptionId: "9aed941d2659dad4136d2abc7db09aec8a79b82a97324f42220e53bf9015eef2i0",
+			},
+		},
+	},
 	880713: {
 		Tickers: map[string]*TickerStatus{
 			"beat": {
@@ -714,6 +750,15 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 				StartInscription: 365009,
 				EndInscription: 111208385, 
 				EndInscriptionId: "ba61f2cd48a7182ae58980d9f55f7f9e448728ae973091151d5c5bdeac8d127ai0",
+			},
+		},
+	},
+	931309: {
+		Tickers: map[string]*TickerStatus{
+			"benz": {
+				StartInscription: 447905,
+				EndInscription: 116438194,
+				EndInscriptionId: "61a7c40cb9107ddeb6225e02cc5678ea9d8d3bc8e316e285a33f5203e99f5e8ei0",
 			},
 		},
 	},
