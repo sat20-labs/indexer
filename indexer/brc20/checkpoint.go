@@ -11,7 +11,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
-var _enable_checking_more_history = false
+var _enable_checking_more_history = true
 var _moreCheckingFiles map[string]string =  map[string]string{
 	"cats": "./indexer/brc20/validate/cats_records.csv",
 	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
@@ -1468,7 +1468,9 @@ func readHolderDataToMap(dir string) (int, int) {
 func (p *BRC20Indexer) validateHolderData(height int) {
 
 	if _heightToHolderRecords == nil {
-		_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
+		if p.nftIndexer.GetBaseIndexer().IsMainnet() {
+			_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
+		}
 	}
 	if len(_heightToHolderRecords) == 0 {
 		return
