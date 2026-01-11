@@ -332,9 +332,11 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 				Name:        "GC  ",
 				Max:         "210000",
 				Minted:      "210000",
-				MintCount:   2101,
+				MintCount:   2100,
+				EndInscription: 25700,
+				EndInscriptionId: "4848d2486a340aaff72b9772a88038e39c47ed463aa5e96bdb334552376fadbbi0",
 				HolderCount: 6,
-				TxCount:     2104,
+				TxCount:     2103,
 				Holders: map[string]string{
 					"tb1pz70t56u56kxr9hzeh3hx328y08e5ftlq4edtll59zalyg43mj9fq7wg9p9": "100000",
 					"tb1pgw439hxzr7vj0gzfqx69wl3plem4ne26kj7ktnuzj3lkpw5mmp3qhz7yv4": "100000",
@@ -506,11 +508,15 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	787203: {
+		TickerCount: 4311,
 		Tickers: map[string]*TickerStatus{
 			"moon": {
 				StartInscription: 388310,
 				EndInscription: 1921687, 
 				EndInscriptionId: "8a2492bacddedca911bce25fc4bf809eaae513b9ecdcf3a2858e5e39b3958709i0",
+			},
+			"$jio": {
+				StartInscription: 1921176,
 			},
 		},
 	},
@@ -1037,7 +1043,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 			common.Log.Panicf("%s Minted different, %s %s", name, ticker.Minted.String(), tickerStatus.Minted)
 		}
 		if tickerStatus.MintCount != 0 && ticker.MintCount != uint64(tickerStatus.MintCount) {
-			common.Log.Panicf("%s MinteMintCountd different, %d %d", name, ticker.MintCount, tickerStatus.MintCount)
+			common.Log.Panicf("%s MinteMintCount different, %d %d", name, ticker.MintCount, tickerStatus.MintCount)
 		}
 		if tickerStatus.StartInscription != 0{
 			nft := p.nftIndexer.GetNftWithInscriptionId(ticker.StartInscriptionId)

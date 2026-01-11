@@ -272,7 +272,7 @@ func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
 		if tickerStatus.MintCount != 0 {
 			_, mintCount := p.getMintAmount(name)
 			if mintCount != tickerStatus.MintCount {
-				common.Log.Panicf("%s MinteMintCountd different, %d %d", name, mintCount, tickerStatus.MintCount)
+				common.Log.Panicf("%s MinteMintCount different, %d %d", name, mintCount, tickerStatus.MintCount)
 			}
 		}
 
