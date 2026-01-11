@@ -11,7 +11,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
-var _enable_checking_more_history = true
+var _enable_checking_more_history = false
 var _moreCheckingFiles map[string]string =  map[string]string{
 	"cats": "./indexer/brc20/validate/cats_records.csv",
 	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
