@@ -226,6 +226,9 @@ func (s *BRC20Indexer) Repair() bool {
 
 // 只保存UpdateDB需要用的数据
 func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
 	newInst := NewIndexer(s.db)
 	newInst.nftIndexer = nftIndexer
 
@@ -288,6 +291,8 @@ func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 
 // update之后，删除原来instance中的数据
 func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	for key, value := range another.tickerMap {
 		ticker, ok := s.tickerMap[key]
@@ -612,16 +617,26 @@ func (s *BRC20Indexer) CheckSelf() bool {
 	// }
 
 	// if isMainnet {
-	// 	names = []string{
-	// 		"ordi",
-	// 		"sats",
-	// 		"doge",
-	// 		"rats",
-	// 		"𝛑",
-	// 		"pizza",
-	// 		"ligo",
-	// 		"piin",
-	// 	}
+		// names = []string{
+		// 	"ordi",
+		// 	"sats",
+		// 	"doge",
+		// 	"rats",
+		// 	"𝛑",
+		// 	"pizza",
+		// 	"ligo",
+		// 	"piin",
+		// 	"benz",
+		// 	"mask",
+		// 	"eorb",
+		// 	"mmss",
+		// 	"mice",
+		// 	"bear",
+		// 	"dior",
+		// 	"safe",
+		// 	"scat",
+
+		// }
 	// } else {
 	// 	names = []string{
 	// 		"ordi",
@@ -657,8 +672,10 @@ func (s *BRC20Indexer) CheckSelf() bool {
 	startTime := time.Now()
 	allTickers := s.GetAllTickers()
 	for _, name := range allTickers {
+	//for _, name := range names {
 		//common.Log.Infof("checking ticker %s", name)
 
+		//name := "benz"
 		ticker := s.GetTicker(name)
 
 		holdermap := s.GetHoldersWithTick(name)
@@ -666,6 +683,15 @@ func (s *BRC20Indexer) CheckSelf() bool {
 		for _, amt := range holdermap {
 			holderAmount = holderAmount.Add(amt)
 		}
+
+		// if name == "benz" {
+		// 	info1 := s.getHolderAbbrInfo(0x6a913542, "benz")
+		// 	info2 := holdermap[0x6a913542]
+		// 	if info2.Cmp(info1.AssetAmt()) != 0 {
+		// 		common.Log.Panic("")
+		// 	}
+		// }
+
 		// if name == "42-c" {
 		// 	common.Log.Info("")
 		// }
@@ -678,8 +704,8 @@ func (s *BRC20Indexer) CheckSelf() bool {
 		//fmt.Printf("\"%s\": {Minted: \"%s\", HolderCount: %d, TxCount: %d},\n", name, mintAmount.String(), ticker.HolderCount, ticker.TransactionCount)
 		if holderAmount.Cmp(mintAmount) != 0 {
 			common.Log.Errorf("ticker %s amount incorrect. %s %s", name, mintAmount.String(), holderAmount.String())
-			s.printTickerHistory(name)
-			s.printHolders(name)
+			//s.printTickerHistory(name)
+			//s.printHolders(name)
 			return false
 		}
 		//s.printTicker(name)

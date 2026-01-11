@@ -76,6 +76,9 @@ func (s *FTIndexer) GetDBVersion() string {
 
 // 只保存UpdateDB需要用的数据
 func (s *FTIndexer) Clone(nftIndexer *nft.NftIndexer) *FTIndexer {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
 	newInst := NewOrdxIndexer(s.db)
 	newInst.nftIndexer = nftIndexer
 
@@ -148,6 +151,8 @@ func (s *FTIndexer) Clone(nftIndexer *nft.NftIndexer) *FTIndexer {
 
 // update之后，删除原来instance中的数据
 func (s *FTIndexer) Subtract(another *FTIndexer) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	//s.holderActionList = s.holderActionList[len(another.holderActionList):]
 	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)

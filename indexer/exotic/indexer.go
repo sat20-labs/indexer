@@ -135,6 +135,9 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 
 // 只保存UpdateDB需要用的数据
 func (p *ExoticIndexer) Clone(baseIndexer *base.BaseIndexer) *ExoticIndexer {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
 	newInst := NewExoticIndexer(p.db)
 	newInst.status = p.status.Clone()
 	newInst.baseIndexer = baseIndexer
@@ -204,6 +207,8 @@ func (p *ExoticIndexer) Clone(baseIndexer *base.BaseIndexer) *ExoticIndexer {
 
 // update之后，删除原来instance中的数据
 func (p *ExoticIndexer) Subtract(another *ExoticIndexer) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	for name, ticker := range another.tickerAdded {
 		n, ok := p.tickerAdded[name]
