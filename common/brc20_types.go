@@ -64,6 +64,25 @@ type BRC20Ticker struct {
 	TransactionCount   uint64  `json:"transactionCount,omitempty"`
 }
 
+func (p *BRC20Ticker) Clone() *BRC20Ticker {
+	return &BRC20Ticker{
+		Nft: p.Nft,
+		Id:  p.Id,
+		Name: p.Name,
+		SelfMint: p.SelfMint,
+		Limit: *p.Limit.Clone(),
+		Max: *p.Max.Clone(),
+		Decimal: p.Decimal,
+		DeployTime: p.DeployTime,
+		Minted: *p.Minted.Clone(),
+		MintCount: p.MintCount,
+		StartInscriptionId: p.StartInscriptionId,
+		EndInscriptionId: p.EndInscriptionId,
+		HolderCount: p.HolderCount,
+		TransactionCount: p.TransactionCount,
+	}
+}
+
 type BRC20BaseContent struct {
 	P      string `json:"p,omitempty"`
 	Op     string `json:"op,omitempty"`

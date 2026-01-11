@@ -5,7 +5,8 @@ package common
 // 1.0.3  2025.08.21   升级数据库
 // 1.0.4  2025.11.06   brc20
 // 1.1.0  2025.12.24   using local range for asset binding
-const ORDX_INDEXER_VERSION = "1.1.0"
+// 1.2.0  2026.01.11   released
+const ORDX_INDEXER_VERSION = "1.2.0"
 
 
 // 1.1.0  2024.07.01-

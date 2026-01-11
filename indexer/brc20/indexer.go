@@ -251,7 +251,7 @@ func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 	for key, value := range s.tickerMap {
 		tick := BRC20TickInfo{}
 		tick.Name = value.Name
-		tick.Ticker = value.Ticker
+		tick.Ticker = value.Ticker.Clone()
 		tick.MintAdded = make([]*common.BRC20Mint, len(value.MintAdded))
 		copy(tick.MintAdded, value.MintAdded)
 
@@ -290,11 +290,13 @@ func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 	copy(newInst.holderActionList, s.holderActionList)
 
 	newInst.tickerAdded = make([]*common.BRC20Ticker, len(s.tickerAdded))
-	copy(newInst.tickerAdded, s.tickerAdded)
+	for i, ticker := range s.tickerAdded {
+		newInst.tickerAdded[i] = ticker.Clone()
+	}
 
 	newInst.tickerUpdated = make(map[string]*common.BRC20Ticker, 0)
 	for key, value := range s.tickerUpdated {
-		newInst.tickerUpdated[key] = value
+		newInst.tickerUpdated[key] = value.Clone()
 	}
 
 	newInst.status = s.status.Clone()
