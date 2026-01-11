@@ -606,9 +606,19 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		common.Log.Warnf("deploy, but max invalid. ticker: %s, max: '%s'", content.Ticker, content.Max)
 		return nil
 	}
+	/*
+	1. Maximum supply cannot exceed uint64_max
+	2. When max=0, there is an unlimited maximum issuance for self_mint deployments. 
+	For BRC-20, the meaning of max is the total upper limit of all mints (max_uint64 (2 ** 64-1) * (10 ** decimals))
+	*/
+	// 允许，比如 testnet4: limit 6b7a06ac09bbef76d64c14db8f2b4d7891a0f26b5e5b7b8215fc8082b07fae39i0
 	if max.Sign() == 0 {
-		common.Log.Warnf("deploy, but max invalid (0)")
-		return nil
+		if ticker.SelfMint {
+			max = common.NewDecimalMaxUint64(int(ticker.Decimal))
+		} else {
+			common.Log.Warnf("deploy, but max invalid (0)")
+			return nil
+		}
 	} 
 	ticker.Max = *max
 	

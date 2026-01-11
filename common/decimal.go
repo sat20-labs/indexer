@@ -112,6 +112,20 @@ func NewDecimal(v int64, p int) *Decimal {
 	return &Decimal{Precision: p, Value: value}
 }
 
+
+// v是整数部分的值，小数点不动 （跟NewDecimalFromString类似）
+func NewDecimalMaxUint64(p int) *Decimal {
+	if p > MAX_PRECISION {
+		Log.Panic("too big precision")
+	}
+	value := new(big.Int).SetUint64(math.MaxUint64)
+	if p != 0 {
+		value = new(big.Int).Mul(value, precisionFactor[p])
+	}
+
+	return &Decimal{Precision: p, Value: value}
+}
+
 // NewDecimalFromString creates a Decimal instance from a string
 func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 	if s == "" {

@@ -12,7 +12,7 @@ import (
 )
 
 // TODO 编译数据时将开关打开，可以对brc20的数据进行校验
-var _enable_checking_more_history = false
+var _enable_checking_more_history = true
 var _moreCheckingFiles map[string]string =  map[string]string{
 	"cats": "./indexer/brc20/validate/cats_records.csv",
 	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
@@ -176,6 +176,30 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 					"tb1pclqddn5aed3wtq78mgekrfe5c7s3dcvdz0a2ylcxmdhmuualr90sr04sc4": "18200",
 					"tb1pu0rx5g5v58mvegyqdxj64fkvdsjjgfcv9lyfp4eax02wunmurjhs2ls9uv": "1",
 				},
+			},
+		},
+	},
+
+	60141: {
+		Tickers: map[string]*TickerStatus{
+			"limit": {
+				StartInscription: 15609,
+			},
+		},
+	},
+
+	63643: {
+		Tickers: map[string]*TickerStatus{
+			"dildo": {
+				StartInscription: 96121,
+			},
+		},
+	},
+
+	63795: {
+		Tickers: map[string]*TickerStatus{
+			"brc20": {
+				StartInscription: 96135,
 			},
 		},
 	},
@@ -936,6 +960,15 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			"doge": {Holders: map[string]string{"bc1psknlr5rlekaln34hvghslcjnvftgrxheysexe6p5gase343n23fqc0t3kj": "294000"}},
 		},
 	},
+
+	930269: {
+		TickerCount: 367104,
+		Tickers: map[string]*TickerStatus{
+			"兀+": {
+				StartInscription: 115170032,
+			},
+		},
+	},
 }
 
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
@@ -968,11 +1001,14 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		if checkpoint.TickerCount != 0 {
 			tickers := p.getAllTickers()
 			if len(tickers) != checkpoint.TickerCount {
-				for i := len(tickers) - 20; i < len(tickers) - 1; i++ {
-					p.printTicker(tickers[i])
-					common.Log.Info("")
+				for i := 0; i < len(tickers); i++ {
+					//p.printTicker(tickers[i])
+					common.Log.Infof("%s", tickers[i])
+					if (i+1)%20 == 0 {
+						common.Log.Infof("")
+					}
 				}
-				common.Log.Panicf("ticker count different")
+				common.Log.Panicf("ticker count different: %d %d", checkpoint.TickerCount, len(tickers))
 			}
 		}
 	}
