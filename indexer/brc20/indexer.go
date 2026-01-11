@@ -1095,7 +1095,7 @@ func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 	return info
 }
 
-// 仅加载需要的ticker数据
+// 仅加载需要的ticker数据，需要加写锁
 func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) *HolderInfo {
 	holder := s.holderMap[addressId]
 	if holder == nil {

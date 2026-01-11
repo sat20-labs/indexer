@@ -367,13 +367,13 @@ func (s *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
 
 // transfer
 func (s *BRC20Indexer) GetHolderAbbrInfo(addressId uint64, tickerName string) *common.BRC20TickAbbrInfo {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	return s.getHolderAbbrInfo(addressId, strings.ToLower(tickerName))
 }
 
-// transfer
+// transfer，需要加写锁
 func (s *BRC20Indexer) getHolderAbbrInfo(addressId uint64, tickerName string) *common.BRC20TickAbbrInfo {
 
 	holder := s.loadHolderInfo(addressId, tickerName)
