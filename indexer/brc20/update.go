@@ -296,6 +296,7 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 		// 同一个区块先send出去的资产数量要扣除： e616b84d9917f81de1177e10eaa78617f4b66c0d65c89e6ccebe03b544570e1fi0，前面有4个send
 		return
 	}
+	holder.Updated()
 	tickAbbrInfo.AvailableBalance = tickAbbrInfo.AvailableBalance.Sub(&transfer.Amt)
 	tickAbbrInfo.TransferableBalance = tickAbbrInfo.TransferableBalance.Add(&transfer.Amt)
 
@@ -373,9 +374,10 @@ func (s *BRC20Indexer) addHolderBalance(transfer *TransferNftInfo, address uint6
 
 	info, ok := s.holderMap[address]
 	if !ok {
-		info = &HolderInfo{Tickers: make(map[string]*common.BRC20TickAbbrInfo)}
+		info = NewHolderInfo(0)
 		s.holderMap[address] = info
 	}
+	info.Updated()
 	tickAbbrInfo, ok := info.Tickers[tickerName]
 	if !ok {
 		tickAbbrInfo = common.NewBRC20TickAbbrInfo(nil, nil)
@@ -429,6 +431,7 @@ func (s *BRC20Indexer) subHolderBalance(transfer *TransferNftInfo, address uint6
 		common.Log.Panic("")
 	}
 
+	holdInfo.Updated()
 	tickAbbrInfo.TransferableBalance = tickAbbrInfo.TransferableBalance.Sub(amt)
 	common.Log.Debugf("sub %d: %x %s: -%s -> %s (%s, %s)", transfer.TransferNft.NftId, address, tickerName, amt.String(),
 		tickAbbrInfo.AssetAmt().String(), tickAbbrInfo.AvailableBalance.String(), tickAbbrInfo.TransferableBalance.String())
@@ -508,6 +511,7 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 	if ok {
 		tickInfo, ok := holder.Tickers[nft.Ticker]
 		if ok {
+			holder.Updated()
 			delete(tickInfo.TransferableData, nft.UtxoId)
 			// if tickInfo.AssetAmt().Sign() == 0 &&
 			// 	len(tickInfo.TransferableData) == 0 {
@@ -541,12 +545,10 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 	holder, ok := s.holderMap[nft.AddressId]
 	if !ok {
 		// 这个nft是一个已经使用过的铭文，但为了继续记录在数据库，还是要保留在holdermap中
-		holder = &HolderInfo{
-			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-		}
+		holder = NewHolderInfo(0)
 		s.holderMap[nft.AddressId] = holder
 	}
-
+	holder.Updated()
 	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
 	if !ok {
 		tickAbbrInfo = common.NewBRC20TickAbbrInfo(nil, nil)
@@ -1040,9 +1042,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		for _, v := range addressToLoadVector {
 			holder, ok := s.holderMap[v.addressId]
 			if !ok {
-				holder = &HolderInfo{
-					Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-				}
+				holder = NewHolderInfo(0)
 				s.holderMap[v.addressId] = holder
 			}
 			_, ok = holder.Tickers[v.ticker]

@@ -85,6 +85,9 @@ func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
 }
 
 func (p *MiniMemPool) traceThread() {
+    if p.ticker != nil {
+        return
+    }
     go func() {
 		p.ticker = time.NewTicker(60*time.Second)
 		for {

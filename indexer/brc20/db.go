@@ -76,8 +76,7 @@ func (s *BRC20Indexer) loadHoldersInTickerFromDB(name string) map[uint64]*common
 
 // 加载holder下的所有资产信息
 func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
-	var result HolderInfo
-	result.Tickers = make(map[string]*common.BRC20TickAbbrInfo)
+	result := NewHolderInfo(0)
 
 	common.Log.Debug("BRC20Indexer loadHolderInfoFromDB ...")
 	count := 0
@@ -111,7 +110,7 @@ func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("loadHolderInfoFromDB loaded %d records in %d ms", count, elapsed)
 
-	return &result
+	return result
 }
 
 func (s *BRC20Indexer) loadHolderInfoFromDBV2(addressId uint64) map[string]*common.Decimal {

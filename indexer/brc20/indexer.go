@@ -29,7 +29,22 @@ type HolderAction = common.BRC20ActionHistory
 
 type HolderInfo struct {
 	// AddressId uint64
+	FreshTime int64
 	Tickers map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
+}
+
+func NewHolderInfo(t int64) *HolderInfo {
+	if t == 0 {
+		t = time.Now().UnixMicro()
+	}
+	return &HolderInfo{
+		FreshTime: t,
+		Tickers: make(map[string]*common.BRC20TickAbbrInfo),
+	}
+}
+
+func (p *HolderInfo) Updated() {
+	p.FreshTime = time.Now().UnixMicro()
 }
 
 type TransferNftInfo struct {
@@ -249,9 +264,7 @@ func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 
 	newInst.holderMap = make(map[uint64]*HolderInfo)
 	for addressId, holder := range s.holderMap {
-		newHolder := &HolderInfo{
-			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-		}
+		newHolder := NewHolderInfo(holder.FreshTime)
 		for name, info := range holder.Tickers {
 			newInfo := &common.BRC20TickAbbrInfo{
 				AvailableBalance:    info.AvailableBalance.Clone(),
@@ -310,14 +323,8 @@ func (s *BRC20Indexer) Subtract(another *BRC20Indexer) {
 		if !ok {
 			continue
 		}
-		for name, oldInfo := range old.Tickers {
-			// 没有更新的ticker资产信息，可以删除
-			newInfo, ok := n.Tickers[name]
-			if ok {
-				if oldInfo.Equal(newInfo) {
-					delete(n.Tickers, name)
-				}
-			}
+		if n.FreshTime == old.FreshTime {
+			delete(s.holderMap, addressId)
 		}
 	}
 
@@ -635,7 +642,6 @@ func (s *BRC20Indexer) CheckSelf() bool {
 		// 	"dior",
 		// 	"safe",
 		// 	"scat",
-
 		// }
 	// } else {
 	// 	names = []string{
@@ -1125,9 +1131,7 @@ func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) *HolderInfo {
 	holder := s.holderMap[addressId]
 	if holder == nil {
-		holder = &HolderInfo{
-			Tickers: make(map[string]*common.BRC20TickAbbrInfo),
-		}
+		holder = NewHolderInfo(0)
 		s.holderMap[addressId] = holder
 	}
 
