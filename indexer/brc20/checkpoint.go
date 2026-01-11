@@ -11,7 +11,8 @@ import (
 	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 )
 
-var _enable_checking_more_history = true
+// TODO 编译数据时将开关打开，可以对brc20的数据进行校验
+var _enable_checking_more_history = false
 var _moreCheckingFiles map[string]string =  map[string]string{
 	"cats": "./indexer/brc20/validate/cats_records.csv",
 	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
@@ -1163,21 +1164,21 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	if _validateHistoryData == nil {
 		_validateHistoryData = make(map[string]*ValidateHistoryData)
 		
-		isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
-		var path string
-		if isMainnet {
-			path = "./indexer/brc20/validate/ordi"
-		} else {
-			path = "./indexer/brc20/validate/ordi-testnet4.csv"
-		}
-		data, err := loadHistoryRecords(path)
-		if err != nil {
-			common.Log.Panicf("loadHistoryRecords failed, %v", err)
-		}
-		data.name = "ordi"
-		_validateHistoryData[data.name] = data
-
 		if _enable_checking_more_history {
+			isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
+			var path string
+			if isMainnet {
+				path = "./indexer/brc20/validate/ordi"
+			} else {
+				path = "./indexer/brc20/validate/ordi-testnet4.csv"
+			}
+			data, err := loadHistoryRecords(path)
+			if err != nil {
+				common.Log.Panicf("loadHistoryRecords failed, %v", err)
+			}
+			data.name = "ordi"
+			_validateHistoryData[data.name] = data
+
 			var files map[string]string
 			if isMainnet {
 				files = _moreCheckingFiles
