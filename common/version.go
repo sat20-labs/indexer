@@ -6,7 +6,8 @@ package common
 // 1.0.4  2025.11.06   brc20
 // 1.1.0  2025.12.24   using local range for asset binding
 // 1.2.0  2026.01.11   released
-const ORDX_INDEXER_VERSION = "1.2.0"
+// 1.2.1  2026.01.16   对齐ticker的数量，包括brc20和runes
+const ORDX_INDEXER_VERSION = "1.2.1"
 
 
 // 1.1.0  2024.07.01-
