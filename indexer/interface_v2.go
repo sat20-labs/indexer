@@ -395,19 +395,23 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 
 // FT
 // return: 按照铸造顺序排序的完整的资产名称
-func (b *IndexerMgr) GetTickerMapV2(protocol string) []string {
+func (b *IndexerMgr) GetTickerMapV2(protocol string, start, limit int) ([]string, int) {
 	b.rpcEnter()
 	defer b.rpcLeft()
 
+	if start < 0 {
+		start = 0
+	}
+
 	switch protocol {
 	case common.PROTOCOL_NAME_ORDX:
-		return b.GetOrdxTickerMapV2()
+		return b.GetOrdxTickerMapV2(start, limit)
 	case common.PROTOCOL_NAME_BRC20:
-		return b.GetBRC20TickerMapV2()
+		return b.GetBRC20TickerMapV2(start, limit)
 	case common.PROTOCOL_NAME_RUNES:
-		return b.GetRunesTickerMapV2()
+		return b.GetRunesTickerMapV2(start, limit)
 	}
-	return nil
+	return nil, 0
 }
 
 // return: addressId -> asset amount

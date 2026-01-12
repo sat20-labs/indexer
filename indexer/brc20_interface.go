@@ -7,10 +7,9 @@ import (
 )
 
 
-func (b *IndexerMgr) GetBRC20TickerMapV2() []string {
-	return b.brc20Indexer.GetAllTickers()
+func (b *IndexerMgr) GetBRC20TickerMapV2(start, limit int) ([]string, int) {
+	return b.brc20Indexer.GetTickersWithRange(start, limit)
 }
-
 
 func (p *IndexerMgr) GetBRC20TickerV2(tickerName string) *common.TickerInfo {
 	ticker := p.brc20Indexer.GetTicker(tickerName)

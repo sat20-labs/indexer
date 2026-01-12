@@ -125,118 +125,26 @@ func (s *BRC20Indexer) GetDBVersion() string {
 
 func (s *BRC20Indexer) Repair() bool {
 
-	// tickerToHolderHistory := make(map[string]map[uint64]map[int64]*TransferNftHistory)
-	// needUpdateHistory := make(map[string]*common.BRC20ActionHistory)
-	// s.db.BatchRead([]byte(DB_PREFIX_TRANSFER_HISTORY), false, func(k, v []byte) error {
-	// 	key := string(k)
-	// 	tick, _, _, err := ParseTransferHistoryKey(key)
-	// 	if err != nil {
-	// 		return nil
-	// 	}
-	// 	var history common.BRC20ActionHistory
-	// 	err = db.DecodeBytes(v, &history)
-	// 	if err != nil {
-	// 		return nil
-	// 	}
-
-	// 	holders, ok := tickerToHolderHistory[tick]
-	// 	if !ok {
-	// 		holders = make(map[uint64]map[int64]*TransferNftHistory)
-	// 		tickerToHolderHistory[tick] = holders
-	// 	}
-
-	// 	switch history.Action {
-	// 	case common.BRC20_Action_InScribe_Deploy, common.BRC20_Action_InScribe_Mint, common.BRC20_Action_InScribe_Transfer:
-	// 		toNftMap, ok := holders[history.ToAddr]
-	// 		if !ok {
-	// 			toNftMap = make(map[int64]*TransferNftHistory)
-	// 			holders[history.ToAddr] = toNftMap
-	// 		}
-	// 		item, ok := toNftMap[history.NftId]
-	// 		if !ok {
-	// 			item = &TransferNftHistory{}
-	// 			toNftMap[history.NftId] = item
-	// 		}
-	// 		item.UtxoId = append(item.UtxoId, history.ToUtxoId)
-
-	// 	case common.BRC20_Action_Transfer:
-	// 		fromNftMap, ok := holders[history.FromAddr]
-	// 		if !ok {
-	// 			fromNftMap = make(map[int64]*TransferNftHistory)
-	// 			holders[history.FromAddr] = fromNftMap
-	// 		}
-	// 		item, ok := fromNftMap[history.NftId]
-	// 		if !ok {
-	// 			item = &TransferNftHistory{}
-	// 			fromNftMap[history.NftId] = item
-	// 		}
-	// 		item.UtxoId = append(item.UtxoId, history.ToUtxoId)
-	// 		history.FromUtxoId = item.UtxoId[0]
-	// 		needUpdateHistory[key] = &history
-
-	// 		toNftMap, ok := holders[history.ToAddr]
-	// 		if !ok {
-	// 			toNftMap = make(map[int64]*TransferNftHistory)
-	// 			holders[history.ToAddr] = toNftMap
-	// 		}
-	// 		item, ok = toNftMap[history.NftId]
-	// 		if !ok {
-	// 			item = &TransferNftHistory{}
-	// 			toNftMap[history.NftId] = item
-	// 		}
-	// 		item.UtxoId = append(item.UtxoId, history.ToUtxoId)
-
-	// 	case common.BRC20_Action_Transfer_Spent:
-	// 		fromNftMap, ok := holders[history.FromAddr]
-	// 		if !ok {
-	// 			fromNftMap = make(map[int64]*TransferNftHistory)
-	// 			holders[history.FromAddr] = fromNftMap
-	// 		}
-	// 		item, ok := fromNftMap[history.NftId]
-	// 		if !ok {
-	// 			item = &TransferNftHistory{}
-	// 			fromNftMap[history.NftId] = item
-	// 		}
-	// 		item.UtxoId = append(item.UtxoId, history.ToUtxoId)
-	// 	}
-
-	// 	return nil
-	// })
-
-	// common.Log.Infof("need update items %d", len(needUpdateHistory))
-
+	// tickers := s.loadTickListFromDBv2()
 	// wb := s.db.NewWriteBatch()
 	// defer wb.Close()
 
-	// for key, value := range needUpdateHistory {
-	// 	err := db.SetDB([]byte(key), value, wb)
+	// for id, name := range tickers {
+	// 	key := GetTickerIdKey(id)
+	// 	err := db.SetDB([]byte(key), name, wb)
 	// 	if err != nil {
 	// 		common.Log.Panicf("Error setting %s in db %v", key, err)
 	// 	}
 	// }
 
-	// common.Log.Infof("start to wrie holders history...")
-	// count := 0
-	// for ticker, holders := range tickerToHolderHistory {
-	// 	for addressId, nftHistoryMap := range holders {
-	// 		for nftId, history := range nftHistoryMap {
-	// 			key := GetHolderTransferHistoryKey(ticker, addressId, nftId)
-	// 			err := db.SetDB([]byte(key), history, wb)
-	// 			if err != nil {
-	// 				common.Log.Panicf("Error setting %s in db %v", key, err)
-	// 			}
-	// 			count++
-	// 		}
-	// 	}
-	// }
 	// err := wb.Flush()
 	// if err != nil {
 	// 	common.Log.Panicf("Error ordxwb flushing writes to db %v", err)
 	// }
 
-	// common.Log.Infof("BRC20Indexer repair done, write items %d", count)
+	// common.Log.Infof("BRC20Indexer repair done, write items %d", len(tickers))
 
-	//return true
+	// return true
 	return false
 }
 

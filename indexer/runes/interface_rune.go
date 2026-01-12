@@ -123,6 +123,47 @@ func (s *Indexer) GetAllRuneIds() []string {
 	return ret
 }
 
+// TODO 没有真正分页读取，而是全部读取，需要优化
+func (s *Indexer) GetRuneIdsWithRange(start, limit int) ([]string, int) {
+	type pair struct {
+		id uint64
+		name string
+	}
+	mid := make([]*pair, 0)
+	runeEntrys := s.idToEntryTbl.GetList()
+	for _, v := range runeEntrys {
+		mid = append(mid, &pair{
+			id: v.Number,
+			name: v.RuneId.String(),
+		})
+	}
+	sort.Slice(mid, func(i, j int) bool {
+		return mid[i].id < mid[j].id
+	})
+	
+	total := len(mid)
+	if start < 0 {
+		start = 0
+	}
+	if start >= total {
+		return nil, 0
+	}
+	if limit < 0 {
+		limit = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	
+	ret := make([]string, 0)
+	for i := start; i < end; i++ {
+		ret = append(ret, mid[i].name)
+	}
+
+	return ret, total
+}
+
 func (s *Indexer) GetAllRuneInfos() (ret []*RuneInfo) {
 	runeEntrys := s.idToEntryTbl.GetList()
 	// var i = 0

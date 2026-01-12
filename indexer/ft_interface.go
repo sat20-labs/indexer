@@ -21,8 +21,8 @@ func (b *IndexerMgr) GetTickerMap() (map[string]*common.Ticker, error) {
 	return b.ftIndexer.GetTickerMap()
 }
 
-func (b *IndexerMgr) GetOrdxTickerMapV2() []string {
-	return b.ftIndexer.GetAllTickers()
+func (b *IndexerMgr) GetOrdxTickerMapV2(start, limit int) ([]string, int) {
+	return b.ftIndexer.GetTickersWithRange(start, limit)
 }
 
 func (b *IndexerMgr) GetTicker(ticker string) *common.Ticker {

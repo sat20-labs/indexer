@@ -30,13 +30,26 @@ func (s *BRC20Indexer) GetAllTickers() []string {
 }
 
 func (s *BRC20Indexer) getAllTickers() []string {
-	ret := s.loadTickListFromDB()
+	ret, _ := s.getTickersWithRange(0, s.status.TickerCount)
+	return ret
+}
 
-	for _, ticker := range s.tickerAdded {
-		ret = append(ret, ticker.Name)
+func (s *BRC20Indexer) GetTickersWithRange(start, limit int) ([]string, int) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.getTickersWithRange(start, limit)
+}
+
+func (s *BRC20Indexer) getTickersWithRange(start, limit int) ([]string, int) {
+	ret := s.loadTickListFromDBv3(start, limit)
+
+	if len(ret) < limit {
+		for _, ticker := range s.tickerAdded {
+			ret = append(ret, ticker.Name)
+		}
 	}
 
-	return ret
+	return ret, s.status.TickerCount
 }
 
 func (s *BRC20Indexer) GetTickers(start, limit uint64, order Brc20TickerOrder) (ret []*BRC20TickInfo, total uint64) {

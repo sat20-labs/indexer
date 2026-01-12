@@ -13,4 +13,5 @@ const (
 	DB_PREFIX_TICKER_HOLDER        = "f-" // holder in a ticker
 	DB_PREFIX_UTXO_TRANSFER        = "g-" // utxo -> transfer nft
 	DB_PREFIX_TRANSFER_HISTORY_HOLDER  = "h-" // +addressId+ticker+nftId 个人历史数据，value: inscribe utxoId + transfer utxoId, 用于构造 DB_PREFIX_TRANSFER_HISTORY
+	DB_PREFIX_ID_TO_TICKER         = "i-" // id -> ticker
 )

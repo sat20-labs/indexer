@@ -271,6 +271,80 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 	return result
 }
 
+
+func (s *BRC20Indexer) loadTickListFromDBv2() map[int64]string {
+	count := 0
+	startTime := time.Now()
+	common.Log.Debug("BRC20Indexer loadTickListFromDB ...")
+
+
+	tickers := make(map[int64]string )
+	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
+
+		//key := string(k)
+		//tickname, err := parseTickListKey(key)
+		//if err == nil {
+		var ticker common.BRC20Ticker
+		err := db.DecodeBytes(v, &ticker)
+		if err == nil {
+			tickers[ticker.Id] = strings.ToLower(ticker.Name)
+		} else {
+			common.Log.Panicln("DecodeBytes " + err.Error())
+		}
+
+		count++
+
+		return nil
+	})
+	if err != nil {
+		common.Log.Panicf("Error prefetching ticklist from db: %v", err)
+	}
+
+	elapsed := time.Since(startTime).Milliseconds()
+	common.Log.Infof("loadTickListFromDB loaded %d records in %d ms", count, elapsed)
+
+	return tickers
+}
+
+
+func (s *BRC20Indexer) loadTickListFromDBv3(start, limit int) []string {
+	if start >= s.status.TickerCount {
+		return nil
+	}
+	if limit < 0 {
+		limit = s.status.TickerCount
+	}
+	
+	if start + limit > s.status.TickerCount {
+		limit = s.status.TickerCount -  start
+	}
+
+	prefix := []byte(DB_PREFIX_ID_TO_TICKER)
+	seekKey := GetTickerIdKey(int64(start))
+	
+	tickers := make([]string, 0, limit)
+	s.db.BatchReadV2(prefix, []byte(seekKey), false, func(k, v []byte) error {
+
+		//key := string(k)
+		//tickname, err := parseTickListKey(key)
+		//if err == nil {
+		var name string
+		err := db.DecodeBytes(v, &name)
+		if err == nil {
+			tickers = append(tickers, name)
+		} else {
+			common.Log.Panicln("DecodeBytes " + err.Error())
+		}
+		if len(tickers) == limit {
+			return fmt.Errorf("reach limit")
+		}
+
+		return nil
+	})
+
+	return tickers
+}
+
 func (s *BRC20Indexer) loadMintFromDB(ticker string, id int64) *common.BRC20Mint {
 	var result common.BRC20Mint
 

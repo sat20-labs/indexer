@@ -21,6 +21,30 @@ func (p *FTIndexer) GetAllTickers() []string {
 	return p.getAllTickers()
 }
 
+func (p *FTIndexer) GetTickersWithRange(start, limit int) ([]string, int) {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	
+
+	tickers := p.getAllTickers()
+	total := len(tickers)
+	if start < 0 {
+		start = 0
+	}
+	if start >= total {
+		return nil, 0
+	}
+	if limit < 0 {
+		limit = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return tickers[start:end], total
+}
+
 func (p *FTIndexer) getAllTickers() []string {
 	
 	type pair struct {

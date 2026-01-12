@@ -70,7 +70,6 @@ func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *commo
 	tickinfo.Ticker = ticker
 	s.tickerMap[name] = tickinfo
 	s.tickerAdded = append(s.tickerAdded, ticker)
-	s.tickerUpdated[name] = ticker
 
 	action := HolderAction{
 		Height:     int(ticker.Nft.Base.BlockHeight),
@@ -724,6 +723,21 @@ func (s *BRC20Indexer) UpdateDB() {
 
 	wb := s.db.NewWriteBatch()
 	defer wb.Close()
+
+	for _, ticker := range s.tickerAdded {
+		name := strings.ToLower(ticker.Name)
+		key := GetTickerKey(name)
+		err := db.SetDB([]byte(key), ticker, wb)
+		if err != nil {
+			common.Log.Panicf("Error setting %s in db %v", key, err)
+		}
+
+		key2 := GetTickerIdKey(ticker.Id)
+		err = db.SetDB([]byte(key2), name, wb)
+		if err != nil {
+			common.Log.Panicf("Error setting %s in db %v", key, err)
+		}
+	}
 
 	for _, ticker := range s.tickerUpdated {
 		key := GetTickerKey(strings.ToLower(ticker.Name))

@@ -51,8 +51,8 @@ func (b *IndexerMgr) GetRunesTickerMap() map[string]*common.TickerInfo {
 	return result
 }
 
-func (b *IndexerMgr) GetRunesTickerMapV2() []string {
-	return b.RunesIndexer.GetAllRuneIds()
+func (b *IndexerMgr) GetRunesTickerMapV2(start, limit int) ([]string, int) {
+	return b.RunesIndexer.GetRuneIdsWithRange(start, limit)
 }
 
 func (p *IndexerMgr) GetRunesTickerV2(tickerName string) *common.TickerInfo {

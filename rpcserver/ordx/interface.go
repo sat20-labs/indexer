@@ -72,16 +72,7 @@ func (s *Model) GetTickerStatus(tickerName string) (*rpcwire.TickerStatus, error
 
 func (s *Model) GetTickerList(protocol string, start, limit int) ([]*common.TickerInfo, int) {
 	result := make([]*common.TickerInfo, 0)
-	mid := s.indexer.GetTickerMapV2(protocol)
-
-	total := len(mid)
-	if start >= total {
-		return nil, 0
-	}
-	limit += start
-	if limit >= total {
-		limit = total
-	}
+	mid, total := s.indexer.GetTickerMapV2(protocol, start, limit)
 
 	assetName := common.AssetName{
 		Protocol: protocol,
@@ -89,8 +80,7 @@ func (s *Model) GetTickerList(protocol string, start, limit int) ([]*common.Tick
 		Ticker: "",
 	}
 
-	for i := start; i < limit; i++ {
-		name := mid[int64(i)]
+	for _, name := range mid {
 		assetName.Ticker = name
 		info, err := s.GetTickerInfo(assetName.String())
 		if err != nil {

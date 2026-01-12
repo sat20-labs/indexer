@@ -28,6 +28,10 @@ func GetTickerKey(tickname string) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_TICKER, encodeTickerName(tickname))
 }
 
+func GetTickerIdKey(id int64) string {
+	return fmt.Sprintf("%s%s", DB_PREFIX_ID_TO_TICKER, common.Uint64ToString(uint64(id)))
+}
+
 func GetMintHistoryKey(tickname string, id int64) string {
 	return fmt.Sprintf("%s%s-%s", DB_PREFIX_MINTHISTORY, encodeTickerName(tickname), common.Uint64ToString(uint64(id)))
 }

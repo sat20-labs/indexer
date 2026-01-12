@@ -585,7 +585,7 @@ func (p *IndexerMgr) repair() bool {
 	//p.compiling.Repair()
 
 	//p.nft.Repair()
-	//p.nft.CheckSelf(p.baseDB)
+	return p.brc20Indexer.Repair()
 
 	return false
 }
