@@ -72,7 +72,7 @@ func NewBaseIndexer(
 	}
 
 	if chaincfgParam.Name != "mainnet" {
-		indexer.keepBlockHistory = 12 // testnet4的分岔很多也很长
+		indexer.keepBlockHistory = 72 // testnet4的分岔很多也很长
 	}
 
 	indexer.addressValueMap = make(map[string]*common.AddressValueV2, 0)
