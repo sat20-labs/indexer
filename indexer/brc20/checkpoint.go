@@ -12,7 +12,7 @@ import (
 )
 
 // TODO 编译数据时将开关打开，可以对brc20的数据进行校验
-var _enable_checking_more_history = true
+var _enable_checking_more_files = false
 var _moreCheckingFiles map[string]string =  map[string]string{
 	"cats": "./indexer/brc20/validate/cats_records.csv",
 	"mmss": "./indexer/brc20/validate/MMSS_records.csv",
@@ -1206,7 +1206,7 @@ func (p *BRC20Indexer) validateHistory(height int) {
 	if _validateHistoryData == nil {
 		_validateHistoryData = make(map[string]*ValidateHistoryData)
 		
-		if _enable_checking_more_history {
+		if _enable_checking_more_files {
 			isMainnet := p.nftIndexer.GetBaseIndexer().IsMainnet()
 			var path string
 			if isMainnet {
@@ -1511,8 +1511,10 @@ func readHolderDataToMap(dir string) (int, int) {
 func (p *BRC20Indexer) validateHolderData(height int) {
 
 	if _heightToHolderRecords == nil {
-		if p.nftIndexer.GetBaseIndexer().IsMainnet() {
-			_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
+		if _enable_checking_more_files {
+			if p.nftIndexer.GetBaseIndexer().IsMainnet() {
+				_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/brc20/validate/holders")
+			}
 		}
 	}
 	if len(_heightToHolderRecords) == 0 {

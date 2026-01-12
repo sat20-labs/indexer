@@ -43,7 +43,7 @@ type Indexer struct {
 	holderMapInPrevBlock map[uint64]*common.Decimal
 }
 
-func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIndexer) *Indexer {
+func NewIndexer(db common.KVDB, param *chaincfg.Params, bCheckValidateFile bool) *Indexer {
 	logs := cmap.New[*store.DbLog]()
 	dbWrite := store.NewDbWrite(db, &logs)
 	table.IsLessStorage = true
@@ -51,8 +51,8 @@ func NewIndexer(db common.KVDB, param *chaincfg.Params, baseIndexer *base.BaseIn
 	if !common.IsMainnet() {
 		enableHeight = 30562
 	}
+	_enable_checking_more_files = bCheckValidateFile
 	return &Indexer{
-		baseIndexer:                baseIndexer,
 		dbWrite:                    dbWrite,
 		chaincfgParam:              param,
 		enableHeight:               enableHeight,
@@ -106,7 +106,8 @@ func (s *Indexer) setDefaultRune() {
 	})
 }
 
-func (s *Indexer) Init() {
+func (s *Indexer) Init(baseIndexer *base.BaseIndexer) {
+	s.baseIndexer = baseIndexer
 	isExist := s.Status.Init()
 	if !isExist && s.chaincfgParam.Net == wire.MainNet {
 		s.setDefaultRune()
@@ -130,7 +131,7 @@ func (s *Indexer) Init() {
 }
 
 func (s *Indexer) Clone(baseIndexer *base.BaseIndexer) *Indexer {
-	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, baseIndexer)
+	cloneIndex := NewIndexer(s.dbWrite.Db, s.chaincfgParam, _enable_checking_more_files)
 	cloneIndex.height = s.height
 	cloneIndex.Status.Version = s.Status.Version
 	cloneIndex.Status.Height = s.Status.Height

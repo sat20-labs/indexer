@@ -20,6 +20,7 @@ type YamlConf struct {
 	BasicIndex BasicIndex `yaml:"basic_index"`
 	RPCService RPCService `yaml:"rpc_service"`
 	PubKey	   string     `yaml:"pubkey"`
+	CheckValidateFiles bool `yaml:"check_validate_files"`
 }
 
 type DB struct {

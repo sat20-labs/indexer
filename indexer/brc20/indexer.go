@@ -89,11 +89,12 @@ type BRC20Indexer struct {
 	holderMapInPrevBlock map[uint64]*common.Decimal
 }
 
-func NewIndexer(db common.KVDB) *BRC20Indexer {
+func NewIndexer(db common.KVDB, bCheckValidateFiles bool) *BRC20Indexer {
 	enableHeight := 779832
 	if !common.IsMainnet() {
 		enableHeight = 27228
 	}
+	_enable_checking_more_files = bCheckValidateFiles
 	return &BRC20Indexer{
 		db:              db,
 		enableHeight:    enableHeight,
@@ -244,7 +245,7 @@ func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	newInst := NewIndexer(s.db)
+	newInst := NewIndexer(s.db, _enable_checking_more_files)
 	newInst.nftIndexer = nftIndexer
 
 	newInst.tickerMap = make(map[string]*BRC20TickInfo, 0)
@@ -369,6 +370,8 @@ func (s *BRC20Indexer) Init(nftIndexer *nft.NftIndexer) {
 	//s.printTickerHistoryWithHeight("mask", 885497)
 	//s.printLatestTickerHistory("𝛑", 100)
 	//common.Log.Panicf("")
+
+	common.Log.Infof("height = %d, total tickers %d", nftIndexer.GetBaseIndexer().GetSyncHeight(), s.status.TickerCount)
 }
 
 func (s *BRC20Indexer) printHistoryWithAddress(name string, addressId uint64) {

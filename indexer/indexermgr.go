@@ -173,10 +173,10 @@ func (b *IndexerMgr) Init() {
 	b.ftIndexer.Init(b.nft)
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
-	b.brc20Indexer = brc20.NewIndexer(b.brc20DB)
+	b.brc20Indexer = brc20.NewIndexer(b.brc20DB, b.cfg.CheckValidateFiles)
 	b.brc20Indexer.Init(b.nft)
-	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.base)
-	b.RunesIndexer.Init()
+	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.cfg.CheckValidateFiles)
+	b.RunesIndexer.Init(b.base)
 	b.miniMempool.init()
 
 	b.baseBackupDB = nil

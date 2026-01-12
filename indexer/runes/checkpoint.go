@@ -8,6 +8,8 @@ import (
 	"github.com/sat20-labs/indexer/indexer/runes/validate"
 )
 
+// TODO 编译数据时将开关打开，可以对brc20的数据进行校验
+var _enable_checking_more_files = false
 
 type CheckPoint struct {
 	Height      int
@@ -264,7 +266,9 @@ func addFailedItem(failed map[string]map[string]*common.Decimal, ticker, address
 func (p *Indexer) validateHolderData(height int) {
 	
 	if _heightToHolderRecords == nil {
-		_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/runes/validate/holders")
+		if _enable_checking_more_files {
+			_holderStartHeight, _holderEndHeight = readHolderDataToMap("./indexer/runes/validate/holders")
+		}
 	}
 	if len(_heightToHolderRecords) == 0 {
 		return
