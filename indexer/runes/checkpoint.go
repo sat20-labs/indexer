@@ -13,12 +13,13 @@ var _enable_checking_more_files = false
 
 type CheckPoint struct {
 	Height      int
-	TickerCount int
+	TickerCount uint64
 	CheckHolder bool
 	Tickers     map[string]*TickerStatus
 }
 
 type TickerStatus struct {
+	Number      uint64
 	Name        string
 	DeployHeight int
 	Max         string
@@ -52,6 +53,10 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 				},
 			},
 		},
+	},
+
+	106881: {
+		TickerCount: 23573,
 	},
 
 	114881: {
@@ -110,6 +115,123 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 
+	841000: {
+		TickerCount: 20805,
+		Tickers: map[string]*TickerStatus{
+			"PUNK•TWO•EIGH•NINE•THREE": {
+				Number: 	 20245,
+			},
+			"MERLINSTONE•THE•CODE•IS•LAW": {
+				Number: 	 20804,
+			},
+		},
+	},
+	841500: {
+		TickerCount: 63401,
+		Tickers: map[string]*TickerStatus{
+			"BIRD•ONE•ZERO•FIVE•EIGHT": {
+				Number: 	 63384,
+			},
+			"BIRD•SEVEN•ONE•SIX•THREE": {
+				Number: 	 63400,
+			},
+		},
+	},
+	845000: {
+		TickerCount: 70922,
+		Tickers: map[string]*TickerStatus{
+			"RATS•IN•THE•SEWER": {
+				Number: 	 70921,
+			},
+		},
+	},
+	850000: {
+		TickerCount: 82163,
+		Tickers: map[string]*TickerStatus{
+			"BLOCKS•OF•BITCOIN": {
+				Number: 	 82135,
+			},
+			"OCTOGLYPH•RARAMIPA": {
+				Number: 	 82162,
+			},
+		},
+	},
+	860000: {
+		TickerCount: 82163,
+		Tickers: map[string]*TickerStatus{
+			"BLOCKS•OF•BITCOIN": {
+				Number: 	 82135,
+			},
+			"OCTOGLYPH•RARAMIPA": {
+				Number: 	 82162,
+			},
+		},
+	},
+	870002: {
+		TickerCount: 143418,
+		Tickers: map[string]*TickerStatus{
+			"BITCOIN•BRO•BEARS": {
+				Number: 	 143417,
+			},
+		},
+	},
+	880000: {
+		TickerCount: 168568,
+		Tickers: map[string]*TickerStatus{
+			"GEGTHRQYNLBW": {
+				Number: 	 168567,
+			},
+		},
+	},
+	890009: {
+		TickerCount: 176535,
+		Tickers: map[string]*TickerStatus{
+			"MUPPET•COIN": {
+				Number: 	 176534,
+			},
+		},
+	},
+	900000: {
+		TickerCount: 178862,
+		Tickers: map[string]*TickerStatus{
+			"NIKOLA•TESLA•GODS": {
+				Number: 	 178861,
+			},
+		},
+	},
+	910000: {
+		TickerCount: 181633,
+		Tickers: map[string]*TickerStatus{
+			"AAAAAAAAAAAAAAABBRWCDRDAGNG": {
+				Number: 	 181632,
+			},
+		},
+	},
+	920019: {
+		TickerCount: 208203,
+		Tickers: map[string]*TickerStatus{
+			"VIKING•ID•CSZH•ODIN": {
+				Number: 	 208202,
+			},
+		},
+	},
+	930003: {
+		TickerCount: 208203,
+		Tickers: map[string]*TickerStatus{
+			"VIKING•ID•CSZH•ODIN": {
+				Number: 	 208202,
+			},
+		},
+	},
+	931977: {
+		TickerCount: 209424,
+		Tickers: map[string]*TickerStatus{
+			"LUNAR•RECORDS•FUND": {
+				Number: 	 209423,
+			},
+		},
+	},
+
 }
 
 func (p *Indexer) CheckPointWithBlockHeight(height int) {
@@ -139,9 +261,8 @@ func (p *Indexer) CheckPointWithBlockHeight(height int) {
 
 	if matchHeight != 0 {
 		if checkpoint.TickerCount != 0 {
-			tickers := p.GetAllRuneIds()
-			if len(tickers) != checkpoint.TickerCount {
-				common.Log.Panicf("ticker count different")
+			if p.Status.Number != checkpoint.TickerCount {
+				common.Log.Panicf("ticker count different, %d %d", checkpoint.TickerCount, p.Status.Number)
 			}
 		}
 	}
@@ -158,25 +279,28 @@ func (p *Indexer) CheckPointWithBlockHeight(height int) {
 		if ticker == nil {
 			common.Log.Panicf("CheckPointWithBlockHeight can't find ticker %s", name)
 		}
+		if tickerStatus.Number != 0 && ticker.Number != tickerStatus.Number {
+			common.Log.Panicf("%s number different, %d %d", name, tickerStatus.Number, ticker.Number)
+		}
 		if tickerStatus.Max != "" && ticker.Max().String() != tickerStatus.Max {
-			common.Log.Panicf("%s Max different, %s %s", name, ticker.MaxSupply.String(), tickerStatus.Max)
+			common.Log.Panicf("%s Max different, %s %s", name, tickerStatus.Max, ticker.MaxSupply.String())
 		}
 		if tickerStatus.Minted != "" && ticker.TotalMinted().String() != tickerStatus.Minted {
-			common.Log.Panicf("%s Minted different, %s %s", name, ticker.TotalMinted().String(), tickerStatus.Minted)
+			common.Log.Panicf("%s Minted different, %s %s", name, tickerStatus.Minted, ticker.TotalMinted().String())
 		}
 
 		if tickerStatus.MintCount != 0 {
 			if ticker.MintInfo != nil {
 				mintCount := ticker.MintInfo.Mints.Big().Int64()
 				if mintCount != tickerStatus.MintCount {
-					common.Log.Panicf("%s MinteMintCountd different, %d %d", name, mintCount, tickerStatus.MintCount)
+					common.Log.Panicf("%s MinteMintCountd different, %d %d", name, tickerStatus.MintCount, mintCount)
 				}
 			}
 		}
 
 		if tickerStatus.HolderCount != 0 {
 			if ticker.HolderCount != uint64(tickerStatus.HolderCount) {
-				common.Log.Panicf("%s HolderCount different, %d %d", name, ticker.HolderCount, tickerStatus.HolderCount)
+				common.Log.Panicf("%s HolderCount different, %d %d", name, tickerStatus.HolderCount, ticker.HolderCount)
 			}
 		}
 
@@ -187,7 +311,7 @@ func (p *Indexer) CheckPointWithBlockHeight(height int) {
 			}
 			d := p.GetAddressAssetWithName(addressId, name)
 			if d.String() != amt {
-				common.Log.Panicf("%s holder %s amt different, %s %s", name, address, d, amt)
+				common.Log.Panicf("%s holder %s amt different, %s %s", name, address, amt, d)
 			}
 		}
 
