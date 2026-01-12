@@ -438,7 +438,7 @@ var testnet4_checkpoint = map[int]*CheckPoint{
 		Height:      113208,
 		TickerCount: 254,
 		Tickers: map[string]*TickerStatus{
-			"GC  ": {Minted: "210000", HolderCount: 6, TxCount: 2104},
+			"GC  ": {Minted: "210000", HolderCount: 6, TxCount: 2103},
 			"ordi": {Minted: "1251660992", HolderCount: 152, TxCount: 125664},
 			"rats": {Minted: "2723000", HolderCount: 7, TxCount: 2730},
 			"Usdt": {Minted: "24000000", HolderCount: 13, TxCount: 24009},
