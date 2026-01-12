@@ -97,7 +97,6 @@ func (s *Indexer) getRuneInfoWithId(runeId *runestone.RuneId) (ret *RuneInfo) {
 	runeEntry := s.idToEntryTbl.Get(runeId)
 	return s.genRuneInfo(runeEntry)
 }
-
 func (s *Indexer) GetAllRuneIds() []string {
 	type pair struct {
 		id uint64
@@ -247,6 +246,9 @@ func (s *Indexer) GetRuneIdWithName(runeName string) (*runestone.RuneId, error) 
 		return nil, err
 	}
 	runeId := s.runeToIdTbl.Get(&spaceRune.Rune)
+	if runeId == nil {
+		return nil, fmt.Errorf("not found")
+	}
 	return runeId, nil
 }
 

@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/OLProtocol/go-bitcoind"
+	//"github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
-	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
+	//ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
@@ -606,33 +606,58 @@ func (s *Indexer) mint(runeId *runestone.RuneId) (lot *runestone.Lot, err error)
 	return
 }
 
+/*
+1. 从 artifact 中取出 “是否请求 etching”
+2. 如果没有 etching → return None
+3. 如果 rune 被指定:
+     必须同时满足：
+       - >= minimum
+       - 非 reserved
+       - 尚未被注册
+       - tx 对 rune 有密码学承诺
+     否则 etching 失败
+4. 如果 rune 未指定:
+     分配一个新的 reserved rune
+     并且增加 ReservedRunes 计数
+5. 返回 RuneId(block, tx_index) + rune
+*/
 func (s *Indexer) etched(txIndex uint32, tx *common.Transaction, artifact *runestone.Artifact) (
 	runeId *runestone.RuneId, r *runestone.Rune) {
+
+	var runeOpt *runestone.Rune
+
+	// 1. Extract rune option from artifact
 	if artifact.Runestone != nil {
 		if artifact.Runestone.Etching == nil {
-			return
+			return nil, nil
 		}
-		r = artifact.Runestone.Etching.Rune
+		runeOpt = artifact.Runestone.Etching.Rune
 	} else if artifact.Cenotaph != nil {
 		if artifact.Cenotaph.Etching == nil {
-			return
+			return nil, nil
 		}
-		r = artifact.Cenotaph.Etching
+		runeOpt = artifact.Cenotaph.Etching
+	} else {
+		// Not a runestone or cenotaph → not an etching
+		return nil, nil
 	}
 
-	if r == nil {
-		reserved_runes := s.Status.ReservedRunes
-		s.Status.ReservedRunes = reserved_runes + 1
-		r = runestone.Reserved(uint64(s.height), txIndex)
-	} else {
-		if r.Value.Cmp(s.minimumRune.Value) < 0 ||
-			r.IsReserved() ||
-			s.runeToIdTbl.Get(r) != nil ||
-			!s.txCommitsToRune(tx, *r) {
-			r = nil
-			return
+	// 2. If rune was specified, validate it
+	if runeOpt != nil {
+		if runeOpt.Value.Cmp(s.minimumRune.Value) < 0 ||
+			runeOpt.IsReserved() ||
+			s.runeToIdTbl.Get(runeOpt) != nil ||
+			!s.txCommitsToRune(tx, *runeOpt) {
+			return nil, nil
 		}
+		r = runeOpt
+	} else {
+		// 3. No rune specified → allocate a reserved rune
+		s.Status.ReservedRunes++
+		r = runestone.Reserved(uint64(s.height), txIndex)
 	}
+
+	// 4. Produce RuneId
 	runeId = &runestone.RuneId{
 		Block: uint64(s.height),
 		Tx:    txIndex,
@@ -640,71 +665,188 @@ func (s *Indexer) etched(txIndex uint32, tx *common.Transaction, artifact *runes
 	return runeId, r
 }
 
-func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runestone.Rune) bool {
+/*
+来自某个输入
+这个输入必须花费的是 P2TR 输出
+tapscript 中 push 出了 rune commitment
+并且该 P2TR 输出已经确认 ≥ 6
+*/
+func (s *Indexer) txCommitsToRune(tx *common.Transaction, rune runestone.Rune) bool {
 	commitment := rune.Commitment()
-	for _, input := range transaction.Inputs {
-		// extracting a tapscript does not indicate that the input being spent
-		// was actually a taproot output. this is checked below, when we load the
-		// output's entry from the database
-		tapscript := ordCommon.GetTapscriptBytes(input.Witness)
+
+	for _, in := range tx.Inputs {
+		// 1) extract tapscript from witness
+		tapscript := extractUnversionedLeafScriptFromWitness(in.Witness)
 		if tapscript == nil {
 			continue
 		}
 
-		instructions := parseTapscriptLegacyInstructions(tapscript, commitment)
-		for _, instruction := range instructions {
-			// ignore errors, since the extracted script may not be valid
-			if !bytes.Equal(instruction, commitment) {
-				continue
-			}
+		// 2) scan tapscript for commitment
+		if !tapscriptContainsCommitment(tapscript, commitment) {
+			continue
+		}
 
-			var err error
-			var resp any
-			for {
-				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.TxId)
-				if err == nil {
-					break
-				} else {
-					time.Sleep(1 * time.Second)
-					common.Log.Infof("RuneIndexer.txCommitsToRune-> bitcoin_rpc.GetRawTransaction failed, try again ...")
-					continue
-				}
-			}
+		// 3) load spent output
+		prevTxId, prevTxVout, err := common.ParseUtxo(in.OutPointStr)
+		if err != nil {
+			continue
+		}
 
-			txInfo, _ := resp.(*bitcoind.RawTransaction)
-			hexStr := txInfo.Vout[input.TxOutIndex].ScriptPubKey.Hex
-			// is_p2tr
-			taproot := false
-			hexBytes, err := hex.DecodeString(hexStr)
-			if err != nil {
-				common.Log.Panicf("RuneIndexer.txCommitsToRune-> hex.DecodeString(%s) err:%v", hexStr, err)
-			}
-			if len(hexBytes) == 34 && hexBytes[1] == txscript.OP_DATA_32 {
-				verOpcode := int(hexBytes[0])
-				if verOpcode == 0 {
-					taproot = false
-				} else {
-					if verOpcode >= txscript.OP_1 && verOpcode <= txscript.OP_16 {
-						verOpcode = verOpcode - txscript.OP_1 + 1
-					}
-					if verOpcode == 1 {
-						taproot = true
-					}
-				}
-			}
-			if !taproot {
-				continue
-			}
-			blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(txInfo.BlockHash)
-			if err != nil {
-				return false
-			}
-			commitTxHeight := int(blockHeader.Height)
-			confirmations := s.height - commitTxHeight + 1
-			if confirmations >= 6 {
+		prevTx, err := bitcoin_rpc.ShareBitconRpc.GetTx(prevTxId)
+		if err != nil {
+			//panic(err) // ord panics here
+			continue
+		}
+
+		vout := prevTx.Vout[prevTxVout]
+		spk, err := hex.DecodeString(vout.ScriptPubKey.Hex)
+		if err != nil {
+			//panic(err)
+			continue
+		}
+
+		// 4) must be P2TR
+		if !isP2TRScriptPubKey(spk) {
+			continue
+		}
+
+		// 5) confirmations
+		header, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(prevTx.BlockHash)
+		if err != nil {
+			return false
+		}
+
+		confirmations := s.height - int(header.Height) + 1
+		if confirmations >= int(runestone.COMMIT_CONFIRMATIONS) {
+			return true
+		}
+	}
+
+	return false
+}
+
+
+func extractUnversionedLeafScriptFromWitness(witness [][]byte) []byte {
+	// Taproot script path spend:
+	// stack = [ ... , script, control_block ]
+	if len(witness) < 2 {
+		return nil
+	}
+
+	control := witness[len(witness)-1]
+	script := witness[len(witness)-2]
+
+	// control block:
+	// byte 0 = leaf version + parity
+	// must be even for v0 leaf (0xc0 or 0x00 masked)
+	if len(control) < 33 {
+		return nil
+	}
+
+	leafVersion := control[0] & 0xfe
+	if leafVersion != 0xc0 {
+		// ord: only accept unversioned (v0) leaf
+		return nil
+	}
+
+	return script
+}
+
+func isP2TRScriptPubKey(script []byte) bool {
+	// P2TR = OP_1 OP_PUSH32 <32-byte>
+	return len(script) == 34 &&
+		script[0] == txscript.OP_1 &&
+		script[1] == txscript.OP_DATA_32
+}
+
+func tapscriptContainsCommitment(script []byte, commitment []byte) bool {
+	tokenizer := txscript.MakeScriptTokenizer(0, script)
+
+	for tokenizer.Next() {
+		if tokenizer.Err() != nil {
+			return false // ord: break on script error
+		}
+
+		if tokenizer.Opcode() > txscript.OP_16 {
+			continue
+		}
+
+		if data := tokenizer.Data(); data != nil {
+			if bytes.Equal(data, commitment) {
 				return true
 			}
 		}
 	}
+
 	return false
 }
+
+
+// func (s *Indexer) txCommitsToRune(transaction *common.Transaction, rune runestone.Rune) bool {
+// 	commitment := rune.Commitment()
+// 	for _, input := range transaction.Inputs {
+// 		// extracting a tapscript does not indicate that the input being spent
+// 		// was actually a taproot output. this is checked below, when we load the
+// 		// output's entry from the database
+// 		tapscript := ordCommon.GetTapscriptBytes(input.Witness)
+// 		if tapscript == nil {
+// 			continue
+// 		}
+
+// 		instructions := parseTapscriptLegacyInstructions(tapscript, commitment)
+// 		for _, instruction := range instructions {
+// 			// ignore errors, since the extracted script may not be valid
+// 			if !bytes.Equal(instruction, commitment) {
+// 				continue
+// 			}
+
+// 			var err error
+// 			var resp any
+// 			for {
+// 				resp, err = bitcoin_rpc.ShareBitconRpc.GetTx(input.TxId)
+// 				if err == nil {
+// 					break
+// 				} else {
+// 					time.Sleep(1 * time.Second)
+// 					common.Log.Infof("RuneIndexer.txCommitsToRune-> bitcoin_rpc.GetRawTransaction failed, try again ...")
+// 					continue
+// 				}
+// 			}
+
+// 			txInfo, _ := resp.(*bitcoind.RawTransaction)
+// 			hexStr := txInfo.Vout[input.TxOutIndex].ScriptPubKey.Hex
+// 			// is_p2tr
+// 			taproot := false
+// 			hexBytes, err := hex.DecodeString(hexStr)
+// 			if err != nil {
+// 				common.Log.Panicf("RuneIndexer.txCommitsToRune-> hex.DecodeString(%s) err:%v", hexStr, err)
+// 			}
+// 			if len(hexBytes) == 34 && hexBytes[1] == txscript.OP_DATA_32 {
+// 				verOpcode := int(hexBytes[0])
+// 				if verOpcode == 0 {
+// 					taproot = false
+// 				} else {
+// 					if verOpcode >= txscript.OP_1 && verOpcode <= txscript.OP_16 {
+// 						verOpcode = verOpcode - txscript.OP_1 + 1
+// 					}
+// 					if verOpcode == 1 {
+// 						taproot = true
+// 					}
+// 				}
+// 			}
+// 			if !taproot {
+// 				continue
+// 			}
+// 			blockHeader, err := bitcoin_rpc.ShareBitconRpc.GetBlockHeader(txInfo.BlockHash)
+// 			if err != nil {
+// 				return false
+// 			}
+// 			commitTxHeight := int(blockHeader.Height)
+// 			confirmations := s.height - commitTxHeight + 1
+// 			if confirmations >= 6 {
+// 				return true
+// 			}
+// 		}
+// 	}
+// 	return false
+// }

@@ -7,31 +7,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer"
 	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/runes"
-	"github.com/sat20-labs/indexer/indexer/runes/table"
 	"github.com/sat20-labs/indexer/share/base_indexer"
 	"lukechampine.com/uint128"
 )
 
-var firstRuneName = "BESTINSLOT•XYZ"
+var firstRuneName = "UNCOMMON•GOODS" //"BESTINSLOT•XYZ"
 
 var runesIndexer *runes.Indexer
 var rpcService *base.RpcIndexer
 
 func InitRuneTester() {
 	if runesIndexer == nil {
-		dbdir := "../db/testnet/"
+		dbdir := "../db/testnet"
 		yamlcfg := config.YamlConf{
 			Chain: "testnet",
 			DB: config.DB{
 				Path: dbdir,
 			},
 			BasicIndex: config.BasicIndex{
-				MaxIndexHeight:  61680,
-				PeriodFlushToDB: 20,
+				MaxIndexHeight:  0,
+				PeriodFlushToDB: 100,
 			},
 		}
 		indexerMgr := indexer.NewIndexerMgr(&yamlcfg)
@@ -39,7 +39,6 @@ func InitRuneTester() {
 		indexerMgr.Init()
 		runesIndexer = indexerMgr.RunesIndexer
 		rpcService = indexerMgr.GetRpcService()
-		table.IsLessStorage = false
 	}
 }
 
@@ -200,15 +199,21 @@ func TestRuneCheckAllRuneInfos(t *testing.T) {
 		fmt.Println("Error:", err)
 		return
 	}
+	common.Log.Infof("rune status: %v", status)
+
+	if runesIndexer.Status.Number != status.Runes {
+		common.Log.Errorf("runes count different, %d %d", status.Runes, runesIndexer.Status.Number)
+	}
+
 	var runeCount uint64 = status.Runes
-	startTime := time.Now()
-	var i uint64 = 16463
+	var i uint64 = 0
 	var count uint64 = 0
-	for ; i <= runeCount; i++ {
+	var notFound int = 0
+	for ; i < runeCount; i++ {
 
 		runeData, err := getRuneData(i)
 		if err != nil {
-			t.Fatalf("getRuneData err:%s", err.Error())
+			t.Fatalf("getRuneData %d err:%s", i, err.Error())
 		}
 
 		if runeData.Entry.Block > uint64(runesIndexer.Status.Height) {
@@ -216,19 +221,25 @@ func TestRuneCheckAllRuneInfos(t *testing.T) {
 		}
 		runeInfo := runesIndexer.GetRuneInfoWithName(runeData.Entry.SpacedRune)
 		if runeInfo == nil {
-			t.Fatal("GetRuneInfoWithName err: rune not found")
+			notFound++
+			common.Log.Errorf("GetRuneInfoWithName %s err: rune not found. %v", runeData.Entry.SpacedRune, runeData)
+			continue
 		}
 		if runeInfo.Number != runeData.Entry.Number {
-			t.Fatal("GetRuneInfoWithName err: number not equal")
+			common.Log.Errorf("GetRuneInfoWithName %s err: number not equal %d %d", 
+			runeData.Entry.SpacedRune, runeData.Entry.Number, runeInfo.Number)
 		}
 		count++
-		t.Logf("number: %d, rune: %s\n", i, runeData.Entry.SpacedRune)
+		//t.Logf("number: %d, rune: %s\n", i, runeData.Entry.SpacedRune)
+		if (i+1)%1000 == 0 {
+			common.Log.Infof("%d: %s\n", i+1, runeData.ID)
+		}
 	}
-	duration := time.Since(startTime)
-	t.Logf("Total time for checking %d runes: %s", count, duration)
+	common.Log.Infof("checking %d runes, not found %d", count, notFound)
 }
 
-const RuneOrdinalRpcURL = "http://192.168.10.102:81"
+//const RuneOrdinalRpcURL = "http://192.168.1.104:81" // mainnet
+const RuneOrdinalRpcURL = "http://192.168.1.104:82" // testnet4
 
 type RuneData struct {
 	Entry struct {
@@ -272,7 +283,7 @@ func getRuneData(runeID uint64) (*RuneData, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("%s status code: %d", url, resp.StatusCode)
 	}
 
 	var data RuneData

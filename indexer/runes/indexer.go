@@ -46,7 +46,6 @@ type Indexer struct {
 func NewIndexer(db common.KVDB, param *chaincfg.Params, bCheckValidateFile bool) *Indexer {
 	logs := cmap.New[*store.DbLog]()
 	dbWrite := store.NewDbWrite(db, &logs)
-	table.IsLessStorage = true
 	enableHeight := 840000
 	if !common.IsMainnet() {
 		enableHeight = 30562
@@ -119,13 +118,15 @@ func (s *Indexer) Init(baseIndexer *base.BaseIndexer) {
 
 	s.height = s.Status.Height
 
-	id := &runestone.RuneId{Block: 1, Tx: 0}
-	rune := s.idToEntryTbl.Get(id)
-	if rune == nil {
-		s.setDefaultRune()
-		rune = s.idToEntryTbl.Get(id)
+	if s.chaincfgParam.Net == wire.MainNet {
+		id := &runestone.RuneId{Block: 1, Tx: 0}
+		rune := s.idToEntryTbl.Get(id)
 		if rune == nil {
-			common.Log.Panicf("rune %s is not existing", id.String())
+			s.setDefaultRune()
+			rune = s.idToEntryTbl.Get(id)
+			if rune == nil {
+				common.Log.Panicf("rune %s is not existing", id.String())
+			}
 		}
 	}
 }
