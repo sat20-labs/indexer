@@ -388,16 +388,7 @@ func (s *BRC20Indexer) GetHolderAbbrInfo(addressId uint64, tickerName string) *c
 
 // transfer，需要加写锁
 func (s *BRC20Indexer) getHolderAbbrInfo(addressId uint64, tickerName string) *common.BRC20TickAbbrInfo {
-
-	holder := s.loadHolderInfo(addressId, tickerName)
-	if holder == nil {
-		return nil
-	}
-
-	tickAbbrInfo := holder.Tickers[tickerName]
-	if tickAbbrInfo == nil {
-		return nil
-	}
+	_, tickAbbrInfo := s.loadHolderInfo(addressId, tickerName)
 	return tickAbbrInfo
 }
 

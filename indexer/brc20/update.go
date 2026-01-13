@@ -279,18 +279,12 @@ func (s *BRC20Indexer) updateInscribeTransfer(input *common.TxInput, transfer *c
 	}
 	transfer.Amt = *amt
 
-	
-	addressId := transfer.Nft.OwnerAddressId
-	holder := s.loadHolderInfo(addressId, tickerName)
-
 	// if transfer.Nft.Base.InscriptionId == "68d47b73d41efc180dec3e2368f373ebe7c52bb48689dcbc8972211a867210f9i0" {
 	// 	common.Log.Infof("nftId = %d, utxoId = %d", transfer.Nft.Base.Id, transfer.Nft.UtxoId)
 	// }//3804104075771904
-
-	tickAbbrInfo := holder.Tickers[tickerName]
-	if tickAbbrInfo == nil {
-		return
-	}
+	
+	addressId := transfer.Nft.OwnerAddressId
+	holder, tickAbbrInfo := s.loadHolderInfo(addressId, tickerName)
 	if transfer.Amt.Cmp(tickAbbrInfo.AvailableBalance) > 0 {
 		// 同一个区块先send出去的资产数量要扣除： e616b84d9917f81de1177e10eaa78617f4b66c0d65c89e6ccebe03b544570e1fi0，前面有4个send
 		return
@@ -371,17 +365,8 @@ func (s *BRC20Indexer) addHolderBalance(transfer *TransferNftInfo, address uint6
 	tickerName := transfer.Ticker
 	amt := &transfer.TransferNft.Amount
 
-	info, ok := s.holderMap[address]
-	if !ok {
-		info = NewHolderInfo(0)
-		s.holderMap[address] = info
-	}
+	info, tickAbbrInfo := s.loadHolderInfo(address, tickerName)
 	info.Updated()
-	tickAbbrInfo, ok := info.Tickers[tickerName]
-	if !ok {
-		tickAbbrInfo = common.NewBRC20TickAbbrInfo(nil, nil)
-		info.Tickers[tickerName] = tickAbbrInfo
-	}
 	tickAbbrInfo.AvailableBalance = tickAbbrInfo.AvailableBalance.Add(amt)
 
 	if tickAbbrInfo.AssetAmt().Cmp(amt) == 0 {
@@ -411,18 +396,7 @@ func (s *BRC20Indexer) subHolderBalance(transfer *TransferNftInfo, address uint6
 	tickerName := transfer.Ticker
 	amt := &transfer.TransferNft.Amount
 
-	holdInfo, ok := s.holderMap[address]
-	if !ok {
-		common.Log.Errorf("%d subHolderBalance can't find holder %x", transfer.TransferNft.NftId, address)
-		s.printHistoryWithAddress(tickerName, address)
-		common.Log.Panic("")
-	}
-	tickAbbrInfo, ok := holdInfo.Tickers[tickerName]
-	if !ok {
-		common.Log.Errorf("%d subHolderBalance %x can't find ticker %s", transfer.TransferNft.NftId, address, tickerName)
-		s.printHistoryWithAddress(tickerName, address)
-		common.Log.Panic("")
-	}
+	holdInfo, tickAbbrInfo := s.loadHolderInfo(address, tickerName)
 	if tickAbbrInfo.TransferableBalance.Cmp(amt) < 0 {
 		common.Log.Errorf("%d subHolderBalance %x %s not enough transfer amt, require %s but only %s",
 			transfer.TransferNft.NftId, address, tickerName, amt.String(), tickAbbrInfo.TransferableBalance.String())
@@ -541,18 +515,8 @@ func (s *BRC20Indexer) addTransferNft(nft *TransferNftInfo) {
 		s.transferNftMap[nft.UtxoId] = curr
 	}
 
-	holder, ok := s.holderMap[nft.AddressId]
-	if !ok {
-		// 这个nft是一个已经使用过的铭文，但为了继续记录在数据库，还是要保留在holdermap中
-		holder = NewHolderInfo(0)
-		s.holderMap[nft.AddressId] = holder
-	}
+	holder, tickAbbrInfo := s.loadHolderInfo(nft.AddressId, nft.Ticker)
 	holder.Updated()
-	tickAbbrInfo, ok := holder.Tickers[nft.Ticker]
-	if !ok {
-		tickAbbrInfo = common.NewBRC20TickAbbrInfo(nil, nil)
-		holder.Tickers[nft.Ticker] = tickAbbrInfo
-	}
 	tickAbbrInfo.TransferableData[nft.UtxoId] = curr.TransferNft
 }
 

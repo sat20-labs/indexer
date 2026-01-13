@@ -1041,22 +1041,23 @@ func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 }
 
 // 仅加载需要的ticker数据，需要加写锁
-func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) *HolderInfo {
+func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) (*HolderInfo, *common.BRC20TickAbbrInfo) {
 	holder := s.holderMap[addressId]
 	if holder == nil {
 		holder = NewHolderInfo(0)
 		s.holderMap[addressId] = holder
 	}
 
-	_, ok := holder.Tickers[name]
+	info, ok := holder.Tickers[name]
 	if !ok {
-		info := s.loadTickAbbrInfoFromDB(addressId, name)
-		if info != nil {
-			holder.Tickers[name] = info
+		info = s.loadTickAbbrInfoFromDB(addressId, name) // 虽然预加载过，但可能中间有问题，多加载一次，确保数据跟数据库一致
+		if info == nil {
+			info = common.NewBRC20TickAbbrInfo(nil, nil)
 		}
+		holder.Tickers[name] = info
 	}
 
-	return holder
+	return holder, info
 }
 
 func (s *BRC20Indexer) loadTransferNft(utxoId uint64) *TransferNftInfo {
