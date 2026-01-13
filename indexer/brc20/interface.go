@@ -143,24 +143,6 @@ func (s *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*commo
 	return result
 }
 
-// 获取某个地址下的资产 return: ticker->amount
-func (s *BRC20Indexer) hasAssetInAddress(addrId uint64) bool {
-
-	info, ok := s.holderMap[addrId]
-	if ok {
-		for _, v := range info.Tickers {
-			if v.AvailableBalance.Sign() != 0 {
-				return true
-			}
-			if v.TransferableBalance.Sign() != 0 {
-				return true
-			}
-		}
-	}
-
-	return s.checkHolderAssetFromDB(addrId)
-}
-
 // return: 按铸造时间排序的铸造历史
 func (s *BRC20Indexer) GetMintHistory(tick string, start, limit int) []*common.BRC20MintAbbrInfo {
 	s.mutex.RLock()
@@ -416,7 +398,7 @@ func (s *BRC20Indexer) CheckEmptyAddress(wantToDelete map[string]uint64) {
 	}
 
 	if len(needCheckInDB) > 0 {
-		existingList := s.CheckHolderExistingFromDB(needCheckInDB)
+		existingList := s.CheckHolderExisting(needCheckInDB)
 		for _, addressId := range existingList {
 			existingAddress[idToStr[addressId]] = addressId
 		}

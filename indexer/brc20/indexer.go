@@ -1040,7 +1040,7 @@ func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 	return info
 }
 
-// 仅加载需要的ticker数据，需要加写锁
+// 仅加载需要的ticker数据，需要加写锁，确保返回值都非nil
 func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) (*HolderInfo, *common.BRC20TickAbbrInfo) {
 	holder := s.holderMap[addressId]
 	if holder == nil {
@@ -1100,4 +1100,24 @@ func (s *BRC20Indexer) loadTickerHistoryWithHeight(name string, height int) []*c
 		}
 	}
 	return history
+}
+
+func (s *BRC20Indexer) CheckHolderExisting(addrs []uint64) []uint64 {
+	sort.Slice(addrs, func(i, j int) bool {
+		return addrs[i] < addrs[j]
+	})
+
+	existingAddress := make([]uint64, 0)
+	for _, addressId := range addrs {
+		_, ok := s.holderMap[addressId]
+		if ok {
+			existingAddress = append(existingAddress, addressId)
+			continue
+		}
+		if s.checkHolderExistingFromDB(addressId) {
+			existingAddress = append(existingAddress, addressId)
+			continue
+		}
+	}
+	return existingAddress
 }

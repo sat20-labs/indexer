@@ -190,21 +190,6 @@ func (s *BRC20Indexer) checkHolderExistingFromDB(addressId uint64) bool {
 	return existing
 }
 
-// 仅用于写入数据库后马上做地址检查，所以直接读数据库，不需要读缓存
-func (s *BRC20Indexer) CheckHolderExistingFromDB(addrs []uint64) []uint64 {
-	sort.Slice(addrs, func(i, j int) bool {
-		return addrs[i] < addrs[j]
-	})
-
-	hasAssetAddress := make([]uint64, 0)
-	for _, addressId := range addrs {
-		if s.checkHolderExistingFromDB(addressId) {
-			hasAssetAddress = append(hasAssetAddress, addressId)
-		}
-	}
-	return hasAssetAddress
-}
-
 func (s *BRC20Indexer) loadTickAbbrInfoFromDB(addressId uint64, ticker string) *common.BRC20TickAbbrInfo {
 	var result common.BRC20TickAbbrInfo
 

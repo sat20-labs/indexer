@@ -480,28 +480,17 @@ func (s *BRC20Indexer) removeTransferNft(nft *TransferNftInfo) {
 
 	delete(s.transferNftMap, nft.UtxoId)
 
-	holder, ok := s.holderMap[nft.AddressId]
-	if ok {
-		tickInfo, ok := holder.Tickers[nft.Ticker]
-		if ok {
-			holder.Updated()
-			delete(tickInfo.TransferableData, nft.UtxoId)
-			// if tickInfo.AssetAmt().Sign() == 0 &&
-			// 	len(tickInfo.TransferableData) == 0 {
-			// 	delete(holder.Tickers, nft.Ticker) // 不能删除，删除会导致 loadHolderInfo 重新加载老的数据
-			// }
-			// 不能删除，如果删除，就无法删除数据库中对应数据 updateHolderToDB
-			// if len(holder.Tickers) == 0 {
-			// 	delete(s.holderMap, nft.AddressId)
-			// }
-		} else {
-			// 已经转移过的transfer nft不一定能找到
-			// common.Log.Panicf("can't find ticker info %s %d", nft.Ticker, nft.UtxoId)
-		}
-	} else {
-		// 已经转移过的transfer nft不一定能找到
-		// common.Log.Panic("can't find ticker info")
-	}
+	holder, tickInfo := s.loadHolderInfo(nft.AddressId, nft.Ticker)
+	holder.Updated()
+	delete(tickInfo.TransferableData, nft.UtxoId)
+	// if tickInfo.AssetAmt().Sign() == 0 &&
+	// 	len(tickInfo.TransferableData) == 0 {
+	// 	delete(holder.Tickers, nft.Ticker) // 不能删除，删除会导致 loadHolderInfo 重新加载老的数据
+	// }
+	// 不能删除，如果删除，就无法删除数据库中对应数据 updateHolderToDB
+	// if len(holder.Tickers) == 0 {
+	// 	delete(s.holderMap, nft.AddressId)
+	// }
 }
 
 // 需要先加载holderInfo
