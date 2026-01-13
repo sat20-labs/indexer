@@ -157,13 +157,10 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	860000: {
-		TickerCount: 82163,
+		TickerCount: 102944,
 		Tickers: map[string]*TickerStatus{
-			"BLOCKS•OF•BITCOIN": {
-				Number: 	 82135,
-			},
-			"OCTOGLYPH•RARAMIPA": {
-				Number: 	 82162,
+			"RLOUHTLQATLL": {
+				Number: 	 102943,
 			},
 		},
 	},
