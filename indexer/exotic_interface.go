@@ -36,6 +36,15 @@ func (b *IndexerMgr) getExoticUtxos(utxos map[uint64]int64) map[string][]uint64 
 	// 	}
 	// }
 
+	for utxo := range utxos {
+		assets := b.getExoticsWithUtxo(utxo)
+		if len(assets) != 0 {
+			for name := range assets {
+				result[name] = append(result[name], utxo)
+			}
+		}
+	}
+
 	return result
 }
 
@@ -43,22 +52,17 @@ func (b *IndexerMgr) getExoticUtxos(utxos map[uint64]int64) map[string][]uint64 
 func (b *IndexerMgr) getExoticSummaryByAddress(utxos map[uint64]int64) (map[string]int64, []uint64) {
 	result := make(map[string]int64, 0)
 	var plainUtxo []uint64
-	// for utxoId := range utxos {
-	// 	_, rng, err := b.GetOrdinalsWithUtxoId(utxoId)
-	// 	if err != nil {
-	// 		common.Log.Errorf("GetOrdinalsWithUtxoId failed, %d", utxoId)
-	// 		continue
-	// 	}
 
-	// 	sr := b.exotic.GetExoticsWithRanges2(rng)
-	// 	for t, rngs := range sr {
-	// 		result[t] += common.GetOrdinalsSize(rngs)
-	// 	}
-
-	// 	if len(sr) == 0 {
-	// 		plainUtxo = append(plainUtxo, utxoId)
-	// 	}
-	// }
+	for utxo := range utxos {
+		assets := b.getExoticsWithUtxo(utxo)
+		if len(assets) != 0 {
+			for name, offsets := range assets {
+				result[name] += offsets.Size()
+			}
+		} else {
+			plainUtxo = append(plainUtxo, utxo)
+		}
+	}
 
 	return result, plainUtxo
 }

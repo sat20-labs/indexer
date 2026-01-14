@@ -52,46 +52,46 @@ func (s *BRC20Indexer) getTickersWithRange(start, limit int) ([]string, int) {
 	return ret, s.status.TickerCount
 }
 
-func (s *BRC20Indexer) GetTickers(start, limit uint64, order Brc20TickerOrder) (ret []*BRC20TickInfo, total uint64) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+// func (s *BRC20Indexer) GetTickers(start, limit uint64, order Brc20TickerOrder) (ret []*BRC20TickInfo, total uint64) {
+// 	s.mutex.RLock()
+// 	defer s.mutex.RUnlock()
 
-	for _, ticker := range s.tickerMap {
-		ret = append(ret, ticker)
-	}
+// 	for _, ticker := range s.tickerMap {
+// 		ret = append(ret, ticker)
+// 	}
 
-	switch order {
-	case BRC20_TICKER_ORDER_DEPLOYTIME_DESC:
-		sort.Slice(ret, func(i, j int) bool {
-			return ret[i].Ticker.DeployTime > ret[j].Ticker.DeployTime
-		})
-	case BRC20_TICKER_ORDER_HOLDER_DESC:
-		sort.Slice(ret, func(i, j int) bool {
-			return ret[i].Ticker.HolderCount > ret[j].Ticker.HolderCount
-		})
-	case BRC20_TICKER_ORDER_TRANSACTION_DESC:
-		sort.Slice(ret, func(i, j int) bool {
-			return ret[i].Ticker.TransactionCount > ret[j].Ticker.TransactionCount
-		})
-	}
+// 	switch order {
+// 	case BRC20_TICKER_ORDER_DEPLOYTIME_DESC:
+// 		sort.Slice(ret, func(i, j int) bool {
+// 			return ret[i].Ticker.DeployTime > ret[j].Ticker.DeployTime
+// 		})
+// 	case BRC20_TICKER_ORDER_HOLDER_DESC:
+// 		sort.Slice(ret, func(i, j int) bool {
+// 			return ret[i].Ticker.HolderCount > ret[j].Ticker.HolderCount
+// 		})
+// 	case BRC20_TICKER_ORDER_TRANSACTION_DESC:
+// 		sort.Slice(ret, func(i, j int) bool {
+// 			return ret[i].Ticker.TransactionCount > ret[j].Ticker.TransactionCount
+// 		})
+// 	}
 
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i].Name < ret[j].Name
-	})
-	total = uint64(len(ret))
-	end := total
-	if start >= end {
-		return nil, 0
-	}
-	if start+limit < end {
-		end = start + limit
-	}
-	return ret[start:end], total
-}
+// 	sort.Slice(ret, func(i, j int) bool {
+// 		return ret[i].Name < ret[j].Name
+// 	})
+// 	total = uint64(len(ret))
+// 	end := total
+// 	if start >= end {
+// 		return nil, 0
+// 	}
+// 	if start+limit < end {
+// 		end = start + limit
+// 	}
+// 	return ret[start:end], total
+// }
 
 func (s *BRC20Indexer) GetTicker(tickerName string) *common.BRC20Ticker {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	info := s.loadTickInfo(strings.ToLower(tickerName))
 	if info == nil {
@@ -143,6 +143,7 @@ func (s *BRC20Indexer) GetAssetSummaryByAddress(addrId uint64) map[string]*commo
 	return result
 }
 
+// TODO 未完成
 // return: 按铸造时间排序的铸造历史
 func (s *BRC20Indexer) GetMintHistory(tick string, start, limit int) []*common.BRC20MintAbbrInfo {
 	s.mutex.RLock()
@@ -173,6 +174,7 @@ func (s *BRC20Indexer) GetMintHistory(tick string, start, limit int) []*common.B
 	return result[start:end]
 }
 
+// TODO 未完成
 // return: 按铸造时间排序的铸造历史
 func (s *BRC20Indexer) GetMintHistoryWithAddress(addressId uint64, tick string, start, limit int) ([]*common.MintAbbrInfo, int) {
 	s.mutex.RLock()
@@ -217,8 +219,8 @@ func (s *BRC20Indexer) GetMintHistoryWithAddressV2(addressId uint64, tick string
 
 // return: mint的总量和次数
 func (s *BRC20Indexer) GetMintAmount(tick string) (*common.Decimal, int64) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	ticker := s.loadTickInfo(strings.ToLower(tick))
 	if ticker == nil {
@@ -284,72 +286,6 @@ func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) *common.BRC20TransferInfo {
 	}
 
 	return nil
-
-	// 检查是否可能是mint的结果
-	// nfts := s.nftIndexer.GetNftsWithUtxo(utxoId)
-	// for _, nft := range nfts {
-	// 	txid, index, err := common.ParseOrdInscriptionID(nft.Base.InscriptionId)
-	// 	if err != nil {
-	// 		continue
-	// 	}
-	// 	if index != 0 {
-	// 		continue
-	// 	}
-
-	// 	switch string(nft.Base.ContentType) {
-	// 	case "application/json":
-	// 		fallthrough
-	// 	case "text/plain;charset=utf-8":
-	// 		fallthrough
-	// 	case "text/plain":
-	// 	default:
-	// 		continue
-	// 	}
-	// 	if s.nftIndexer.GetBaseIndexer().IsMainnet() && s.IsExistCursorInscriptionInDB(nft.Base.InscriptionId) {
-	// 		continue
-	// 	}
-	// 	content := common.ParseBBRC20AmtContent(string(nft.Base.Content))
-	// 	if content == nil {
-	// 		continue
-	// 	}
-	// 	tickerName := strings.ToLower(content.Ticker)
-	// 	switch content.Op {
-	// 	case "mint":
-	// 		// 对于mint的结果，只有在mint的输出还没有被使用时，才返回资产数据，否则就当作一个完全的白聪
-	// 		utxo := base_indexer.ShareBaseIndexer.GetUtxoById(utxoId)
-	// 		// common.Log.Info("GetUtxoAssets", " utxoId ", utxoId, " testUtxo ", utxo)
-	// 		if !strings.Contains(utxo, txid) {
-	// 			continue
-	// 		}
-	// 		ticker := s.tickerMap[tickerName]
-	// 		if ticker != nil {
-	// 			for _, v := range ticker.MintAdded {
-	// 				if v.Nft.Base.InscriptionId == nft.Base.InscriptionId {
-	// 					ret = &common.BRC20TransferInfo{
-	// 						NftId:   nft.Base.Id,
-	// 						Name:    content.Ticker,
-	// 						Amt:     v.Amt.Clone(),
-	// 						Invalid: true,
-	// 					}
-	// 					return
-	// 				}
-	// 			}
-	// 		}
-	// 		mint := s.loadMintFromDB(tickerName, nft.Base.Id)
-	// 		if mint != nil {
-	// 			ret = &common.BRC20TransferInfo{
-	// 				NftId:   nft.Base.Id,
-	// 				Name:    content.Ticker,
-	// 				Amt:     mint.Amt.Clone(),
-	// 				Invalid: true,
-	// 			}
-	// 			return
-	// 		}
-
-	// 	}
-	// }
-
-	//return
 }
 
 func (s *BRC20Indexer) IsExistAsset(utxoId uint64) bool {
