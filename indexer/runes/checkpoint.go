@@ -213,14 +213,14 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	930003: {
-		TickerCount: 208203,
+		TickerCount: 209257,
 		Tickers: map[string]*TickerStatus{
-			"VIKING•ID•CSZH•ODIN": {
-				Number: 	 208202,
+			"UNIFI•BITCOIN•RUNE•ORD•AIK": {
+				Number: 	 209256,
 			},
 		},
 	},
-	931977: {
+	931938: {
 		TickerCount: 209424,
 		Tickers: map[string]*TickerStatus{
 			"LUNAR•RECORDS•FUND": {
