@@ -196,7 +196,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			},
 		},
 	},
-	910000: {
+	910001: {
 		TickerCount: 181633,
 		Tickers: map[string]*TickerStatus{
 			"AAAAAAAAAAAAAAABBRWCDRDAGNG": {

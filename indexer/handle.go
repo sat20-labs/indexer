@@ -616,7 +616,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		if ticker.SelfMint {
 			max = common.NewDecimalMaxUint64(int(ticker.Decimal))
 		} else {
-			common.Log.Warnf("deploy, but max invalid (0)")
+			common.Log.Warnf("deploy, but max invalid (0), %s", content.Ticker)
 			return nil
 		}
 	} 
@@ -645,7 +645,11 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		}
 	}
 	if lim.Sign() == 0 {
-		common.Log.Warnf("deploy, but lim invalid (0)")
+		common.Log.Warnf("deploy, but lim invalid (0), %s", content.Ticker)
+		return nil
+	}
+	if lim.Cmp(max) > 0 {
+		common.Log.Warnf("deploy, lim too large, %s", content.Ticker)
 		return nil
 	}
 	ticker.Limit = *lim

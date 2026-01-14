@@ -967,30 +967,30 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 
-	908337: {
-		TickerCount: 365011,
-		Tickers: map[string]*TickerStatus{
-			"pxrx": {
-				StartInscription: 102369679,
-			},
-		},
-	},
-	930269: {
-		TickerCount: 367104,
-		Tickers: map[string]*TickerStatus{
-			"兀+": {
-				StartInscription: 115170032,
-			},
-		},
-	},
-	930741: {
-		TickerCount: 367127,
-		Tickers: map[string]*TickerStatus{
-			"$︎": {
-				StartInscription: 115794191,
-			},
-		},
-	},
+	// 908337: {
+	// 	TickerCount: 365011,
+	// 	Tickers: map[string]*TickerStatus{
+	// 		"pxrx": {
+	// 			StartInscription: 102369679,
+	// 		},
+	// 	},
+	// },
+	// 930269: {
+	// 	TickerCount: 367104,
+	// 	Tickers: map[string]*TickerStatus{
+	// 		"兀+": {
+	// 			StartInscription: 115170032,
+	// 		},
+	// 	},
+	// },
+	// 930741: {
+	// 	TickerCount: 367127,
+	// 	Tickers: map[string]*TickerStatus{
+	// 		"$︎": {
+	// 			StartInscription: 115794191,
+	// 		},
+	// 	},
+	// },
 }
 
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
