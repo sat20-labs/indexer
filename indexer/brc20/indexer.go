@@ -33,18 +33,34 @@ type HolderInfo struct {
 	Tickers map[string]*common.BRC20TickAbbrInfo // key: ticker, 小写
 }
 
-func NewHolderInfo(t int64) *HolderInfo {
-	if t == 0 {
-		t = time.Now().UnixMicro()
-	}
+func NewHolderInfo() *HolderInfo {
 	return &HolderInfo{
-		FreshTime: t,
+		FreshTime: 0,
 		Tickers: make(map[string]*common.BRC20TickAbbrInfo),
 	}
 }
 
+func (p *HolderInfo) Clone() *HolderInfo {
+	n := &HolderInfo{
+		FreshTime: p.FreshTime,
+		Tickers: make(map[string]*common.BRC20TickAbbrInfo),
+	}
+	for name, info := range p.Tickers {
+		newInfo := &common.BRC20TickAbbrInfo{
+			AvailableBalance:    info.AvailableBalance.Clone(),
+			TransferableBalance: info.TransferableBalance.Clone(),
+			TransferableData:    make(map[uint64]*common.TransferNFT),
+		}
+		for k, v := range info.TransferableData {
+			newInfo.TransferableData[k] = v.Clone()
+		}
+		n.Tickers[name] = newInfo
+	}
+	return n
+}
+
 func (p *HolderInfo) Updated() {
-	p.FreshTime = time.Now().UnixMicro()
+	p.FreshTime++
 }
 
 type TransferNftInfo struct {
@@ -173,20 +189,7 @@ func (s *BRC20Indexer) Clone(nftIndexer *nft.NftIndexer) *BRC20Indexer {
 
 	newInst.holderMap = make(map[uint64]*HolderInfo)
 	for addressId, holder := range s.holderMap {
-		newHolder := NewHolderInfo(holder.FreshTime)
-		for name, info := range holder.Tickers {
-			newInfo := &common.BRC20TickAbbrInfo{
-				AvailableBalance:    info.AvailableBalance.Clone(),
-				TransferableBalance: info.TransferableBalance.Clone(),
-				TransferableData:    make(map[uint64]*common.TransferNFT),
-			}
-			for k, v := range info.TransferableData {
-				newInfo.TransferableData[k] = v.Clone()
-			}
-			newHolder.Tickers[name] = newInfo
-		}
-
-		newInst.holderMap[addressId] = newHolder
+		newInst.holderMap[addressId] = holder.Clone()
 	}
 
 	newInst.transferNftMap = make(map[uint64]*TransferNftInfo)
@@ -278,6 +281,9 @@ func (s *BRC20Indexer) Init(nftIndexer *nft.NftIndexer) {
 	//s.printTickerHistoryWithHeight("mask", 885497)
 	//s.printLatestTickerHistory("𝛑", 100)
 	//common.Log.Panicf("")
+	// s.printHistoryWithAddress("benz", 0x6a0acc6b)
+	// info := s.getHolderAbbrInfo(0x6a0acc6b, "benz")
+	// common.Log.Infof("%v", info)
 
 	common.Log.Infof("height = %d, total tickers %d", nftIndexer.GetBaseIndexer().GetSyncHeight(), s.status.TickerCount)
 }
@@ -1044,7 +1050,7 @@ func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) (*HolderInfo, *common.BRC20TickAbbrInfo) {
 	holder := s.holderMap[addressId]
 	if holder == nil {
-		holder = NewHolderInfo(0)
+		holder = NewHolderInfo()
 		s.holderMap[addressId] = holder
 	}
 
@@ -1052,7 +1058,7 @@ func (s *BRC20Indexer) loadHolderInfo(addressId uint64, name string) (*HolderInf
 	if !ok {
 		info = s.loadTickAbbrInfoFromDB(addressId, name) // 虽然预加载过，但可能中间有问题，多加载一次，确保数据跟数据库一致
 		if info == nil {
-			info = common.NewBRC20TickAbbrInfo(nil, nil)
+			info = common.NewBRC20TickAbbrInfo()
 		}
 		holder.Tickers[name] = info
 	}

@@ -180,7 +180,6 @@ func (s *BRC20Indexer) updateInscribeMint(tx *common.Transaction, input *common.
 	ticker.MintCount++
 	tickerInfo.MintAdded = append(tickerInfo.MintAdded, mint)
 
-	s.loadHolderInfo(mint.Nft.OwnerAddressId, name)
 
 	// 作为invalid的output
 	nft := common.TransferNFT{
@@ -892,13 +891,16 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 		utxoToLoad := make([]*pair, 0)
 		transferTxMap := make(map[*common.Transaction]map[string]bool) // 该交易影响哪些ticker
 		for _, tx := range block.Transactions[1:] {
+			// TODO 先识别哪些nft携带资产并转移到哪个地址，避免对transferTxMap的所有输出地址做加载
 			for _, input := range tx.Inputs {
 				// if tx.TxId == "228e74cf8cfef4be045380f60457b2472fc5a671715beea91e4b954b7b27f022" {
 				// 	common.Log.Infof("utxoId = %d", input.UtxoId)
 				// }
-				nft, ok := s.transferNftMap[input.UtxoId] // 本区块生成的transfer没有在这里面
+
+				nft, ok := s.transferNftMap[input.UtxoId] // 本区块生成的transfer没有在这里面; mempool也可能加载某个utxo
 				if ok {
 					if !nft.TransferNft.IsInvalid {
+						// mempool可能加载某个utxo
 						tickers, ok := transferTxMap[tx]
 						if !ok {
 							tickers = make(map[string]bool)
@@ -906,15 +908,16 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 						}
 						tickers[nft.Ticker] = true // 影响输出的结果
 
-						tickers, ok = addressToLoad[nft.AddressId]
+						tickers2, ok := addressToLoad[nft.AddressId]
 						if !ok {
-							tickers = make(map[string]bool)
-							addressToLoad[nft.AddressId] = tickers
+							tickers2 = make(map[string]bool)
+							addressToLoad[nft.AddressId] = tickers2
 						}
-						tickers[nft.Ticker] = true
+						tickers2[nft.Ticker] = true
 					}
 					continue
 				}
+
 				ticker, ok := addingTransfer[input.UtxoId]
 				if ok {
 					tickers, ok := transferTxMap[tx]
@@ -925,6 +928,7 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 					tickers[ticker] = true // 影响输出的结果
 					continue
 				}
+				
 				utxoToLoad = append(utxoToLoad, &pair{
 					utxoId:    input.UtxoId,
 					addressId: input.AddressId,
@@ -1004,29 +1008,13 @@ func (s *BRC20Indexer) PrepareUpdateTransfer(block *common.Block, coinbase []*co
 			}
 		}
 		sort.Slice(addressToLoadVector, func(i, j int) bool {
+			if addressToLoadVector[i].addressId == addressToLoadVector[j].addressId {
+				return encodeTickerName(addressToLoadVector[i].ticker) < encodeTickerName(addressToLoadVector[j].ticker)
+			}
 			return addressToLoadVector[i].addressId < addressToLoadVector[j].addressId
 		})
 		for _, v := range addressToLoadVector {
-			holder, ok := s.holderMap[v.addressId]
-			if !ok {
-				holder = NewHolderInfo(0)
-				s.holderMap[v.addressId] = holder
-			}
-			_, ok = holder.Tickers[v.ticker]
-			if ok {
-				continue
-			}
-			var value common.BRC20TickAbbrInfo
-			key := GetHolderInfoKey(v.addressId, v.ticker)
-			err := db.GetValueFromTxn([]byte(key), &value, txn)
-			if err != nil {
-				continue
-			}
-			// 有很多没有资产的数据，这些也加入ticker中
-			if value.AssetAmt().Sign() == 0 && len(value.TransferableData) == 0 {
-				continue
-			}
-			holder.Tickers[v.ticker] = &value
+			s.loadHolderInfo(v.addressId, v.ticker)
 		}
 
 		tickerKeys := make([]string, 0, len(tickerToLoad))

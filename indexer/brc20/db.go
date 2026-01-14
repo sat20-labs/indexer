@@ -76,7 +76,7 @@ func (s *BRC20Indexer) loadHoldersInTickerFromDB(name string) map[uint64]*common
 
 // 加载holder下的所有资产信息
 func (s *BRC20Indexer) loadHolderInfoFromDB(addressId uint64) *HolderInfo {
-	result := NewHolderInfo(0)
+	result := NewHolderInfo()
 
 	common.Log.Debug("BRC20Indexer loadHolderInfoFromDB ...")
 	count := 0

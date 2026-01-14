@@ -1474,7 +1474,7 @@ func compareDecimal(amt *common.Decimal, str string) bool {
 		str = d.String()
 	}
 
-	return indexerCommon.CompareDecimal(amt, str)
+	return indexerCommon.CompareDecimal(amt.Clone(), str)
 }
 
 // 找出T1中key不在T2的元素

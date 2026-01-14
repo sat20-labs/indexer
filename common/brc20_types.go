@@ -253,12 +253,11 @@ func (p *BRC20TickAbbrInfo) Equal(that *BRC20TickAbbrInfo) bool {
 	return true
 }
 
-func NewBRC20TickAbbrInfo(availableAmt, transferableAmt *Decimal) *BRC20TickAbbrInfo {
+func NewBRC20TickAbbrInfo() *BRC20TickAbbrInfo {
 	return &BRC20TickAbbrInfo{
-		AvailableBalance:    availableAmt.Clone(),
-		TransferableBalance: transferableAmt.Clone(),
+		AvailableBalance:    nil,
+		TransferableBalance: nil,
 		TransferableData:    make(map[uint64]*TransferNFT),
-		// InvalidTransferableData: make(map[uint64]*TransferNFT),
 	}
 }
 
