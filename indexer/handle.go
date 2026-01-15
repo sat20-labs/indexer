@@ -628,9 +628,10 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	ticker.Max = *max
 	
 
-	// lim
+	// lim 可以不设置，但如果设置，就不能为空字符串 (在UnmarshalBRC2DeployContentStrict中检查)
 	var lim *common.Decimal
 	if content.Lim == "" {
+		// 没有设置lim
 		lim = max.Clone()
 	} else {
 		lim, err = brc20.ParseBrc20Amount(content.Lim, int(ticker.Decimal))

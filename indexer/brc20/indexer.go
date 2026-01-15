@@ -8,6 +8,7 @@ import (
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
+	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/share/base_indexer"
@@ -139,7 +140,7 @@ func (s *BRC20Indexer) GetDBVersion() string {
 	return string(value)
 }
 
-func (s *BRC20Indexer) Repair() bool {
+func (s *BRC20Indexer) Repair() map[string]string {
 
 	// tickers := s.loadTickListFromDBv2()
 	// wb := s.db.NewWriteBatch()
@@ -157,11 +158,30 @@ func (s *BRC20Indexer) Repair() bool {
 	// if err != nil {
 	// 	common.Log.Panicf("Error ordxwb flushing writes to db %v", err)
 	// }
-
 	// common.Log.Infof("BRC20Indexer repair done, write items %d", len(tickers))
-
 	// return true
-	return false
+
+
+	tickerAll, err := validate.ReadBRC20TickersCSV("./indexer/brc20/validate/ticker_all.csv")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20TickersCSV failed, %v", err)
+	}
+
+	result := make(map[string]string)
+	tickersInDB := s.loadTickListFromDBv2()
+	for id, ticker := range tickerAll {
+		_, ok := tickersInDB[id]
+		if !ok {
+			if ticker.DeployHeight > 931900 {
+				continue
+			}
+			result[id] = ticker.Ticker
+			common.Log.Infof("ticker %s is missing, %v", ticker.Ticker, ticker)
+		}
+	}
+	return result
+
+	//return false
 }
 
 // 只保存UpdateDB需要用的数据
@@ -989,42 +1009,6 @@ func (s *BRC20Indexer) CheckSelf() bool {
 	return true
 }
 
-// func (s *BRC20Indexer) initCursorInscriptionsDB() {
-// 	// first brc inscriptin_number = 348020, cursor end block height = 837090 / last inescription number = 66799147
-// 	inputPath := filepath.Join("", "brc20_curse.txt")
-// 	input, err := brc20Fs.ReadFile(inputPath)
-// 	if err != nil {
-// 		common.Log.Panicf("Error reading brc20_curse: %v", err)
-// 	}
-// 	reader := strings.NewReader(string(input))
-// 	regex := regexp.MustCompile(`id:([a-z0-9]+)`)
-// 	scanner := bufio.NewScanner(reader)
-
-// 	wb := s.db.NewWriteBatch()
-// 	defer wb.Close()
-
-// 	for scanner.Scan() {
-// 		line := scanner.Text()
-// 		submatches := regex.FindStringSubmatch(line)
-// 		if len(submatches) != 2 {
-// 			common.Log.Panicf("Error parsing brc20_curse: %s", line)
-// 		}
-// 		id := submatches[1]
-
-// 		key := GetCurseInscriptionKey(id)
-// 		err := wb.Put([]byte(key), nil)
-// 		if err != nil {
-// 			common.Log.Panicf("Error setting %s in db %v", key, err)
-// 		}
-// 	}
-// 	wb.Flush()
-// }
-
-// func (s *BRC20Indexer) IsExistCursorInscriptionInDB(inscriptionId string) bool {
-// 	key := GetCurseInscriptionKey(inscriptionId)
-// 	_, err := s.db.Read([]byte(key))
-// 	return err == nil
-// }
 
 func (s *BRC20Indexer) loadTickInfo(name string) *BRC20TickInfo {
 	ret := s.tickerMap[name]

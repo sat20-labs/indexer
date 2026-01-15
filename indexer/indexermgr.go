@@ -1,10 +1,7 @@
 package indexer
 
 import (
-	"encoding/json"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -590,119 +587,144 @@ func (p *IndexerMgr) repair() bool {
 	//p.compiling.Repair()
 
 	//p.nft.Repair()
-	//return p.brc20Indexer.Repair()
-	allTickers := p.brc20Indexer.GetAllTickers()
-	tickerMap := make(map[string]bool)
-	for _, t := range allTickers {
-		tickerMap[t] = true
-	}
-	allTickers = nil
 
-	count := 0
-	missing := 0
-	p.nftDB.BatchRead([]byte(nft.DB_PREFIX_NFT), false, func(k, v []byte) error {
-		count++
-		var value common.InscribeBaseContent
-		err := db.DecodeBytesWithProto3(v, &value)
-		if err != nil {
-			common.Log.Panicf("item.Value error: %v", err)
-		}
-		if value.CurseType != 0 || value.Reinscription != 0 {
-			return nil
-		}
+	// 检查丢失的ticker
+	// missingInDB := p.brc20Indexer.Repair()
+	// allTickers := p.brc20Indexer.GetAllTickers()
+	// tickerMap := make(map[string]bool)
+	// for _, t := range allTickers {
+	// 	tickerMap[t] = true
+	// }
+	// allTickers = nil
 
-		var deploy common.BRC20DeployContent
-		err = json.Unmarshal(value.Content, &deploy)
-		if err != nil {
-			return nil
-		}
-		if strings.ToLower(deploy.P) != "brc-20" || 
-		strings.ToLower(deploy.Op) != "deploy" {
-			return nil
-		}
+	// count := 0
+	// missing := 0
+	// p.nftDB.BatchRead([]byte(nft.DB_PREFIX_NFT), false, func(k, v []byte) error {
+	// 	count++
+	// 	var value common.InscribeBaseContent
+	// 	err := db.DecodeBytesWithProto3(v, &value)
+	// 	if err != nil {
+	// 		common.Log.Panicf("item.Value error: %v", err)
+	// 	}
+	// 	if value.CurseType != 0 || value.Reinscription != 0 {
+	// 		return nil
+	// 	}
 
-		ticker := strings.ToLower(deploy.Ticker)
-		_, ok := tickerMap[ticker]
-		if !ok {
+	// 	var deploy common.BRC20DeployContent
+	// 	err = json.Unmarshal(value.Content, &deploy)
+	// 	if err != nil {
+	// 		return nil
+	// 	}
+	// 	if strings.ToLower(deploy.P) != "brc-20" || 
+	// 	strings.ToLower(deploy.Op) != "deploy" {
+	// 		return nil
+	// 	}
+
+	// 	ticker := strings.ToLower(deploy.Ticker)
+	// 	_, ok := tickerMap[ticker]
+	// 	if !ok {
 		
-			if len(ticker) != 4 && len(ticker) != 5 {
-				return nil
-			}
-			if len(ticker) == 5 && value.BlockHeight < 837090 {
-				return nil
-			}
-			dec := 18
-			if deploy.Decimal != "" {
-				d, err := strconv.ParseUint(deploy.Decimal, 10, 64)
-				if err != nil || d > 18 {
-					common.Log.Infof("%s is invalid for decimal, %v, %s", deploy.Ticker, deploy, value.InscriptionId)
-					return nil
-				}
-				dec = int(d)
-			}
-			max, err := brc20.ParseBrc20Amount(deploy.Max, dec)
-			if err != nil {
-				common.Log.Infof("%s is invalid for max, %v %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
-				return nil
-			}
-			if max.Sign() == 0 && len(ticker) == 5 {
-				max = common.NewDecimalMaxUint64(dec)
-			}
-			if deploy.Lim != "" {
-				lim, err := brc20.ParseBrc20Amount(deploy.Lim, dec)
-				if err != nil {
-					common.Log.Infof("%s is invalid for lim, %v %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
-					return nil
-				}
-				if lim.Cmp(max) > 0 {
-					common.Log.Infof("%s is invalid for lim > max, %v %s", deploy.Ticker, deploy, value.InscriptionId)
-					return nil
-				}
-				if lim.Sign() == 0 {
-					common.Log.Infof("%s is invalid for lim == 0, %v %s", deploy.Ticker, deploy, value.InscriptionId)
-					return nil
-				}
-			}
+	// 		if len(ticker) != 4 && len(ticker) != 5 {
+	// 			return nil
+	// 		}
+	// 		if len(ticker) == 5 {
+	// 			if int(value.BlockHeight) < common.SELFMINT_ENABLE_HEIGHT {
+	// 				common.Log.Infof("%s is invalid for not enable self_mint, %v, %s", deploy.Ticker, deploy, value.InscriptionId)
+	// 				return nil
+	// 			}
+	// 			if deploy.SelfMint != "true" {
+	// 				common.Log.Infof("%s is invalid for not set self_mint, %v, %s", deploy.Ticker, deploy, value.InscriptionId)
+	// 				return nil
+	// 			}
+	// 		}
+	// 		dec := 18
+	// 		if deploy.Decimal != "" {
+	// 			d, err := strconv.ParseUint(deploy.Decimal, 10, 64)
+	// 			if err != nil || d > 18 {
+	// 				common.Log.Infof("%s is invalid for decimal, %v, %s", deploy.Ticker, deploy, value.InscriptionId)
+	// 				return nil
+	// 			}
+	// 			dec = int(d)
+	// 		}
+	// 		max, err := brc20.ParseBrc20Amount(deploy.Max, dec)
+	// 		if err != nil {
+	// 			common.Log.Infof("%s is invalid for max, %v %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
+	// 			return nil
+	// 		}
+	// 		if max.Sign() == 0 && len(ticker) == 5 {
+	// 			max = common.NewDecimalMaxUint64(dec)
+	// 		}
+	// 		if deploy.Lim != "" {
+	// 			lim, err := brc20.ParseBrc20Amount(deploy.Lim, dec)
+	// 			if err != nil {
+	// 				common.Log.Infof("%s is invalid for lim, %v %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
+	// 				return nil
+	// 			}
+	// 			// 不需要比较
+	// 			// if lim.Cmp(max) > 0 {
+	// 			// 	common.Log.Infof("%s is invalid for lim > max, %v %s", deploy.Ticker, deploy, value.InscriptionId)
+	// 			// 	return nil
+	// 			// }
+	// 			if lim.Sign() == 0 {
+	// 				common.Log.Infof("%s is invalid for lim == 0, %v %s", deploy.Ticker, deploy, value.InscriptionId)
+	// 				return nil
+	// 			}
+	// 		} else {
+	// 			common.Log.Infof("%s is invalid for lim == , %v %s", deploy.Ticker, deploy, value.InscriptionId)
+	// 			return nil
+	// 		}
 
-			if deploy.SelfMint == "true" {
-				if int(value.BlockHeight) >= common.SELFMINT_ENABLE_HEIGHT {
-					if len(deploy.Ticker) != 5 {
-						common.Log.Infof("%s is invalid for no self_mint, %v %s", deploy.Ticker, deploy, value.InscriptionId)
-						return nil
-					}
-				}
-			}
+	// 		err = deploy.Validate()
+	// 		if err != nil {
+	// 			common.Log.Infof("%s is invalid for validate: %v, %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
+	// 			return nil
+	// 		}
 
-			err = deploy.Validate()
-			if err != nil {
-				common.Log.Infof("%s is invalid for validate: %v, %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
-				return nil
-			}
+	// 		n, err := strconv.ParseInt(string(value.ContentType), 10, 32)
+	// 		if err != nil {
+	// 			return nil
+	// 		}
+	// 		ty := p.nft.GetContentTye(int(n))
+	// 		parts := strings.Split(ty, ";")
+	// 		if parts[0] != "text/plain" && parts[0] != "application/json" {
+	// 			common.Log.Infof("%s is invalid for content type: %s, %v, %s", deploy.Ticker, ty, deploy, value.InscriptionId)
+	// 			return nil
+	// 		}
 
-			n, err := strconv.ParseInt(string(value.ContentType), 10, 32)
-			if err != nil {
-				return nil
-			}
-			ty := p.nft.GetContentTye(int(n))
-			parts := strings.Split(ty, ";")
-			if parts[0] != "text/plain" && parts[0] != "application/json" {
-				common.Log.Infof("%s is invalid for content type: %s, %v, %s", deploy.Ticker, ty, deploy, value.InscriptionId)
-				return nil
-			}
+	// 		_, ok = missingInDB[value.InscriptionId]
+	// 		if ok {
+	// 			delete(missingInDB, value.InscriptionId)
+	// 			// already known
+	// 			common.Log.Infof("%s already know missing in DB %s", deploy.Ticker, value.InscriptionId)
+	// 			return nil
+	// 		}
 			
-			missing++
-			common.Log.Infof("missing ticker %s in %s, %v", deploy.Ticker, value.InscriptionId, deploy)
-		}
+	// 		missing++
+	// 		common.Log.Infof("missing ticker(%d) %s in %s, %v, %s, %s", len(deploy.Ticker), deploy.Ticker, value.InscriptionId, deploy, value.Content, ty)
+	// 	}
 
-		return nil
-	})
+	// 	return nil
+	// })
 
-	common.Log.Infof("checking completed, total nft %d, missing ticker %d", count, missing)
-	expected := 367186
-	common.Log.Infof("height %d, expected tickers %d, acturally %d, missing %d", 
-		p.base.GetSyncHeight(), expected, len(tickerMap), expected-len(tickerMap))
+	// common.Log.Infof("checking completed, total nft %d, missing ticker %d", count, missing)
 
-	return true
+	// common.Log.Infof("those are missing in DB, but expected to be a good tickers: %d", len(missingInDB))
+	// for id, name := range missingInDB {
+	// 	common.Log.Infof("%s %s", name, id)
+	// 	nft := p.nft.GetNftWithInscriptionId(id)
+	// 	if nft == nil {
+	// 		common.Log.Infof("GetNftWithInscriptionId %s failed", id)
+	// 		continue
+	// 	}
+	// 	common.Log.Infof("%v", nft.Base)
+	// }
+
+	// expected := 367186
+	// common.Log.Infof("height %d, expected tickers %d, acturally %d, missing %d", 
+	// 	p.base.GetSyncHeight(), expected, len(tickerMap), expected-len(tickerMap))
+
+	// return true
+	return false
 }
 
 func (p *IndexerMgr) dbStatistic() bool {

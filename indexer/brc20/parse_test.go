@@ -413,3 +413,12 @@ func TestCompareValidateFile(t *testing.T) {
 	}
 
 }
+
+func TestParseValidateData_tickers(t *testing.T) {
+	tickerAll, err := validate.ReadBRC20TickersCSV("./validate/ticker_all.csv")
+	if err != nil {
+		common.Log.Panicf("ReadBRC20TickersCSV failed, %v", err)
+	}
+
+	fmt.Printf("tickers %d", len(tickerAll))
+}

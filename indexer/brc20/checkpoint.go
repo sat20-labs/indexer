@@ -36,6 +36,7 @@ type TickerStatus struct {
 	Minted      string
 	MintCount   int
 	StartInscription int64
+	StartInscriptionId string
 	EndInscription int64
 	EndInscriptionId string
 	HolderCount int
@@ -694,6 +695,14 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	837586: {
+		Tickers: map[string]*TickerStatus{
+			"cca1": {
+				StartInscription: 67218040,
+				EndInscription: 63572866, 
+			},
+		},
+	},
 	846620: {
 		Tickers: map[string]*TickerStatus{
 			"pizza": {
@@ -967,30 +976,61 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 
-	// 908337: {
-	// 	TickerCount: 365011,
-	// 	Tickers: map[string]*TickerStatus{
-	// 		"pxrx": {
-	// 			StartInscription: 102369679,
-	// 		},
-	// 	},
-	// },
-	// 930269: {
-	// 	TickerCount: 367104,
-	// 	Tickers: map[string]*TickerStatus{
-	// 		"兀+": {
-	// 			StartInscription: 115170032,
-	// 		},
-	// 	},
-	// },
-	// 930741: {
-	// 	TickerCount: 367127,
-	// 	Tickers: map[string]*TickerStatus{
-	// 		"$︎": {
-	// 			StartInscription: 115794191,
-	// 		},
-	// 	},
-	// },
+	837052: {
+		//TickerCount: 365011,
+		Tickers: map[string]*TickerStatus{
+			"utas": {
+				StartInscription: 66755582,
+				StartInscriptionId: "2117d494e712004d7d7fba04414f04dd98d9ec001cdf3d9570f40ce2fd93b3efi0",
+			},
+			"utbs": {
+				StartInscription: 66755583,
+				StartInscriptionId: "239807a2ccfc09377819ae23436b5e0208bab1d0d9bb822d4b3d4c0a6c9f68f0i0",
+			},
+		},
+	},
+	875252: {
+		//TickerCount: 365011,
+		Tickers: map[string]*TickerStatus{
+			"𓍭": {
+				StartInscription: 80407224,
+				StartInscriptionId: "702981a54d1a60b175bcdbc47141c52e30017c9618ccb5be69ef2e8d195007cai0",
+			},
+		},
+	},
+
+	908337: {
+		TickerCount: 365011,
+		Tickers: map[string]*TickerStatus{
+			"pxrx": {
+				StartInscription: 102369679,
+			},
+		},
+	},
+	930269: {
+		TickerCount: 367104,
+		Tickers: map[string]*TickerStatus{
+			"兀+": {
+				StartInscription: 115170032,
+			},
+		},
+	},
+	930741: {
+		TickerCount: 367127,
+		Tickers: map[string]*TickerStatus{
+			"$︎": {
+				StartInscription: 115794191,
+			},
+		},
+	},
+	931900: {
+		TickerCount: 367186,
+		Tickers: map[string]*TickerStatus{
+			"zbc]": {
+				StartInscription: 116733139,
+			},
+		},
+	},
 }
 
 func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
@@ -1061,7 +1101,7 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 		if tickerStatus.MintCount != 0 && ticker.MintCount != uint64(tickerStatus.MintCount) {
 			common.Log.Panicf("%s MinteMintCount different, %d %d", name, ticker.MintCount, tickerStatus.MintCount)
 		}
-		if tickerStatus.StartInscription != 0{
+		if tickerStatus.StartInscription != 0 {
 			nft := p.nftIndexer.GetNftWithInscriptionId(ticker.StartInscriptionId)
 			if nft == nil {
 				p.printTicker(name)
@@ -1071,8 +1111,12 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 				common.Log.Panicf("%s start inscription different %d <> %d %s",
 				name, tickerStatus.StartInscription, nft.Base.Id, nft.Base.InscriptionId)
 			}
+			if tickerStatus.StartInscriptionId != "" && tickerStatus.StartInscriptionId != nft.Base.InscriptionId {
+				common.Log.Panicf("%s start inscriptionId different %d %s <> %s",
+				name, tickerStatus.StartInscription, tickerStatus.StartInscriptionId, nft.Base.InscriptionId,)
+			}
 		}
-		if tickerStatus.EndInscription != 0{
+		if tickerStatus.EndInscription != 0 {
 			nft := p.nftIndexer.GetNftWithInscriptionId(ticker.EndInscriptionId)
 			if nft == nil {
 				p.printTicker(name)
@@ -1082,6 +1126,10 @@ func (p *BRC20Indexer) CheckPointWithBlockHeight(height int) {
 				//p.printTickerHistoryWithHeight(name, height)
 				common.Log.Panicf("%s end inscription different %d %s <> %d %s", 
 					name, tickerStatus.EndInscription, tickerStatus.EndInscriptionId, nft.Base.Id, nft.Base.InscriptionId)
+			}
+			if tickerStatus.EndInscriptionId != "" && tickerStatus.EndInscriptionId != nft.Base.InscriptionId {
+				common.Log.Panicf("%s end inscriptionId different %d %s <> %s",
+				name, tickerStatus.EndInscription, tickerStatus.EndInscriptionId, nft.Base.InscriptionId)
 			}
 		}
 		if tickerStatus.HolderCount != 0 && ticker.HolderCount != uint64(tickerStatus.HolderCount) {

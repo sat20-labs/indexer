@@ -363,11 +363,17 @@ func UnmarshalBRC2DeployContentStrict(data string, content *BRC20DeployContent) 
 		if err := json.Unmarshal(v, &content.Lim); err != nil {
 			return err
 		}
+		if len(content.Lim) == 0 {
+			return fmt.Errorf("lim is empty")
+		}
 	}
 
 	if v, ok := raw["max"]; ok {
 		if err := json.Unmarshal(v, &content.Max); err != nil {
 			return err
+		}
+		if len(content.Max) == 0 {
+			return fmt.Errorf("max is empty")
 		}
 	}
 
