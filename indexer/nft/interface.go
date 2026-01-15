@@ -351,3 +351,7 @@ func (p *NftIndexer) loadNftBaseConentFromDB(nftId int64, value *common.Inscribe
 func (p *NftIndexer) IsEnabled() bool {
 	return p.baseIndexer.GetHeight() >= p.enableHeight
 }
+
+func (p *NftIndexer) GetContentTye(t int) string {
+	return p.contentTypeMap[t]
+}

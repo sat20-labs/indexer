@@ -1,7 +1,10 @@
 package indexer
 
 import (
+	"encoding/json"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -585,9 +588,92 @@ func (p *IndexerMgr) repair() bool {
 	//p.compiling.Repair()
 
 	//p.nft.Repair()
-	return p.brc20Indexer.Repair()
+	//return p.brc20Indexer.Repair()
+	allTickers := p.brc20Indexer.GetAllTickers()
+	tickerMap := make(map[string]bool)
+	for _, t := range allTickers {
+		tickerMap[t] = true
+	}
+	allTickers = nil
 
-	return false
+	p.nftDB.BatchRead([]byte(nft.DB_PREFIX_NFT), false, func(k, v []byte) error {
+		//defer wg.Done()
+
+		var value common.InscribeBaseContent
+		err := db.DecodeBytesWithProto3(v, &value)
+		if err != nil {
+			common.Log.Panicf("item.Value error: %v", err)
+		}
+		if value.CurseType != 0 {
+			return nil
+		}
+
+		var deploy common.BRC20DeployContent
+		err = json.Unmarshal(value.Content, &deploy)
+		if err != nil {
+			return nil
+		}
+		if strings.ToLower(deploy.P) != "brc-20" || 
+		strings.ToLower(deploy.Op) != "deploy" {
+			return nil
+		}
+
+		n, err := strconv.ParseInt(string(value.ContentType), 10, 32)
+		if err != nil {
+			return nil
+		}
+		ty := p.nft.GetContentTye(int(n))
+		parts := strings.Split(ty, ";")
+		if parts[0] != "text/plain" && parts[0] != "application/json" {
+			return nil
+		}
+		
+		ticker := strings.ToLower(deploy.Ticker)
+		_, ok := tickerMap[ticker]
+		if !ok {
+			if len(ticker) != 4 && len(ticker) != 5 {
+				return nil
+			}
+			if len(ticker) == 5 && value.BlockHeight < 837090 {
+				return nil
+			}
+			dec := 18
+			if deploy.Decimal != "" {
+				d, err := strconv.ParseUint(deploy.Decimal, 10, 64)
+				if err != nil || d > 18 {
+					return nil
+				}
+				dec = int(d)
+			}
+			max, err := brc20.ParseBrc20Amount(deploy.Max, dec)
+			if err != nil {
+				common.Log.Infof("%s is invalid with max, %v %v", deploy.Ticker, err, deploy)
+				return nil
+			}
+			if max.Sign() == 0 && len(ticker) == 5 {
+				max = common.NewDecimalMaxUint64(dec)
+			}
+			if deploy.Lim != "" {
+				lim, err := brc20.ParseBrc20Amount(deploy.Lim, dec)
+				if err != nil {
+					common.Log.Infof("%s is invalid with lim, %v %v", deploy.Ticker, err, deploy)
+					return nil
+				}
+				if lim.Cmp(max) > 0 {
+					common.Log.Infof("%s is invalid with lim > max, %v", deploy.Ticker, deploy)
+					return nil
+				}
+			}
+			
+			common.Log.Infof("missing ticker %s in %s, %v", deploy.Ticker, value.InscriptionId, deploy)
+		}
+
+		return nil
+	})
+
+	common.Log.Infof("checking completed")
+
+	return true
 }
 
 func (p *IndexerMgr) dbStatistic() bool {
