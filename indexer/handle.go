@@ -580,10 +580,13 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		TransactionCount:   0,
 	}
 
-	if content.SelfMint == "true" {
-		ticker.SelfMint = true
-		if len(content.Ticker) != 5 {
-			common.Log.Warnf("deploy, but not support self_mint. ticker: %s", content.Ticker)
+	if len(content.Ticker) == 5 {
+		if nft.Base.BlockHeight < int32(common.SELFMINT_ENABLE_HEIGHT) {
+			common.Log.Errorf("deploy %s %s, but not enabled", content.Ticker, nft.Base.InscriptionId)
+			return nil
+		}
+		if content.SelfMint != "true" {
+			common.Log.Errorf("deploy %s %s, but not set self_mint", content.Ticker, nft.Base.InscriptionId)
 			return nil
 		}
 	}
@@ -598,6 +601,8 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		}
 		ticker.Decimal = uint8(dec)
 	}
+	// minted
+	ticker.Minted = *common.NewDecimal(0, int(ticker.Decimal))
 
 	// max
 	max, err := brc20.ParseBrc20Amount(content.Max, int(ticker.Decimal))
@@ -623,15 +628,6 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	ticker.Max = *max
 	
 
-	// minted
-	minted, err := common.NewDecimalFromString("0", int(ticker.Decimal))
-	if err != nil {
-		// minted invalid
-		common.Log.Warnf("deploy, but minted invalid. ticker: %s, minted: '%s'", content.Ticker, minted.String())
-		return nil
-	}
-	ticker.Minted = *minted
-
 	// lim
 	var lim *common.Decimal
 	if content.Lim == "" {
@@ -648,10 +644,11 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		common.Log.Warnf("deploy, but lim invalid (0), %s", content.Ticker)
 		return nil
 	}
-	if lim.Cmp(max) > 0 {
-		common.Log.Warnf("deploy, lim too large, %s", content.Ticker)
-		return nil
-	}
+	// 不需要比较
+	// if lim.Cmp(max) > 0 {
+	// 	common.Log.Warnf("deploy, lim too large, %s", content.Ticker)
+	// 	return nil
+	// }
 	ticker.Limit = *lim
 	
 
@@ -913,11 +910,6 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 		return
 	}
 
-	if out.OutValue.Value == 0 {
-		common.Log.Debugf("invalid brc20 inscription %s", nft.Base.InscriptionId)
-		return
-	}
-
 	// 必须要有MIME类型，并且是“text/plain”或“application/json”
 	if len(insc.Inscription.ContentType) == 0 {
 		common.Log.Debugf("invalid brc20 inscription %s, should provide content type", nft.Base.InscriptionId)
@@ -934,17 +926,6 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 		deployInfo := common.ParseBrc20DeployContent(content)
 		if deployInfo == nil {
 			return
-		}
-		if len(deployInfo.Ticker) == 5 {
-			if deployInfo.SelfMint != "true" {
-				common.Log.Errorf("deploy, tick length 5, but not self_mint")
-				return
-			}
-
-			if s.IsMainnet() && nft.Base.BlockHeight < 837090 {
-				common.Log.Errorf("deploy, tick length 5, but not enabled")
-				return
-			}
 		}
 
 		ticker := s.handleBrc20DeployTicker(out, deployInfo, nft)

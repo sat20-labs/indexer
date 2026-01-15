@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+var SELFMINT_ENABLE_HEIGHT = 837090
+
 type BRC20Status struct {
 	Version     string
 	TickerCount int

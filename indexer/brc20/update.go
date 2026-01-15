@@ -59,7 +59,7 @@ func (s *BRC20Indexer) updateInscribeDeploy(input *common.TxInput, ticker *commo
 	name := strings.ToLower(ticker.Name)
 	tickerInfo := s.loadTickInfo(name)
 	if tickerInfo != nil {
-		common.Log.Warnf("%s exists", ticker.Name)
+		common.Log.Debugf("%s exists", ticker.Name)
 		return
 	}
 
@@ -581,76 +581,45 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 	}
 }
 
-func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, writeToDB bool,
-	updateTickerAddr bool, wb common.WriteBatch) {
+func (s *BRC20Indexer) updateHolderToDB(address uint64, ticker string, wb common.WriteBatch) {
 	addressTickerKey := GetHolderInfoKey(address, ticker)
 	tickerAddressKey := GetTickerToHolderKey(ticker, address)
 	holder, ok := s.holderMap[address]
 	if ok {
 		value, ok := holder.Tickers[ticker]
 		if ok {
-			amt := value.AssetAmt()
-			if writeToDB {
-				if amt.Sign() == 0 && len(value.TransferableData) == 0 {
-					// 我们保留一个空记录，以便维持该addressId不被删除
-					// err := wb.Delete([]byte(addressTickerKey))
-					err := db.SetDB([]byte(addressTickerKey), value, wb)
-					if err != nil {
-						common.Log.Panicf("Error deleting db %s: %v\n", addressTickerKey, err)
-					}
-				} else {
-					err := db.SetDB([]byte(addressTickerKey), value, wb)
-					if err != nil {
-						common.Log.Panicf("Error setting %s in db %v", addressTickerKey, err)
-					}
-				}
-			}
-			if updateTickerAddr {
-				if amt.Sign() > 0 {
-					if writeToDB {
-						err := db.SetDB([]byte(tickerAddressKey), amt, wb)
-						if err != nil {
-							common.Log.Panicf("Error setting %s in db %v", tickerAddressKey, err)
-						}
-					}
-				} else {
-					err := wb.Delete([]byte(tickerAddressKey))
-					if err != nil {
-						common.Log.Panicf("Error deleting db %s: %v\n", tickerAddressKey, err)
-					}
-				}
-			}
-		} else {
 			// 我们保留一个空记录，以便维持该addressId不被删除
-			value = &common.BRC20TickAbbrInfo{
-				AvailableBalance:    nil,
-				TransferableBalance: nil,
-				TransferableData:    nil,
-			}
+			// err := wb.Delete([]byte(addressTickerKey))
 			err := db.SetDB([]byte(addressTickerKey), value, wb)
-			//err := wb.Delete([]byte(addressTickerKey))
 			if err != nil {
 				common.Log.Panicf("Error deleting db %s: %v\n", addressTickerKey, err)
 			}
-			//delete(holder.Tickers, ticker) // 防止多次删除
-
-			if updateTickerAddr {
-				err = wb.Delete([]byte(tickerAddressKey))
+			
+			amt := value.AssetAmt()
+			if amt.Sign() > 0 {
+				err := db.SetDB([]byte(tickerAddressKey), amt, wb)
+				if err != nil {
+					common.Log.Panicf("Error setting %s in db %v", tickerAddressKey, err)
+				}
+			} else {
+				err := wb.Delete([]byte(tickerAddressKey))
 				if err != nil {
 					common.Log.Panicf("Error deleting db %s: %v\n", tickerAddressKey, err)
 				}
 			}
+		} else {
+			common.Log.Panicf("not preload %x %s", address, ticker)
 		}
 	} else {
-		// 可能重入
+		common.Log.Panicf("not preload %x %s", address, ticker)
 	}
 }
 
-func (s *BRC20Indexer) updateUtxoToDB(utxoId uint64, writeToDB bool, wb common.WriteBatch) {
+func (s *BRC20Indexer) updateUtxoToDB(utxoId uint64, onlyForDel bool, wb common.WriteBatch) {
 	transferKey := GetUtxoToTransferKey(utxoId)
 	transferNft, ok := s.transferNftMap[utxoId]
 	if ok {
-		if writeToDB {
+		if !onlyForDel {
 			err := db.SetDB([]byte(transferKey), transferNft, wb)
 			if err != nil {
 				common.Log.Panicf("Error setting %s in db %v", transferKey, err)
@@ -721,23 +690,23 @@ func (s *BRC20Indexer) UpdateDB() {
 	for _, action := range s.holderActionList {
 		switch action.Action {
 		case common.BRC20_Action_InScribe_Mint:
-			s.updateHolderToDB(action.ToAddr, action.Ticker, false, true, wb)
-			s.updateUtxoToDB(action.ToUtxoId, false, wb)
+			//s.updateHolderToDB(action.ToAddr, action.Ticker, false, true, wb)
+			s.updateUtxoToDB(action.ToUtxoId, true, wb)
 
 		case common.BRC20_Action_InScribe_Transfer:
-			s.updateHolderToDB(action.ToAddr, action.Ticker, false, false, wb)
-			s.updateUtxoToDB(action.ToUtxoId, false, wb)
+			//s.updateHolderToDB(action.ToAddr, action.Ticker, false, false, wb)
+			s.updateUtxoToDB(action.ToUtxoId, true, wb)
 
 		case common.BRC20_Action_Transfer:
-			s.updateHolderToDB(action.FromAddr, action.Ticker, false, true, wb)
-			s.updateUtxoToDB(action.FromUtxoId, false, wb)
+			//s.updateHolderToDB(action.FromAddr, action.Ticker, false, true, wb)
+			s.updateUtxoToDB(action.FromUtxoId, true, wb)
 
-			s.updateHolderToDB(action.ToAddr, action.Ticker, false, true, wb)
-			s.updateUtxoToDB(action.ToUtxoId, false, wb)
+			//s.updateHolderToDB(action.ToAddr, action.Ticker, false, true, wb)
+			s.updateUtxoToDB(action.ToUtxoId, true, wb)
 
 		case common.BRC20_Action_Transfer_Spent:
-			s.updateHolderToDB(action.FromAddr, action.Ticker, false, true, wb)
-			s.updateUtxoToDB(action.FromUtxoId, false, wb)
+			//s.updateHolderToDB(action.FromAddr, action.Ticker, false, true, wb)
+			s.updateUtxoToDB(action.FromUtxoId, true, wb)
 		}
 
 		// 保存历史记录
@@ -796,11 +765,11 @@ func (s *BRC20Indexer) UpdateDB() {
 	// 写入最终结果
 	for addressId, holder := range s.holderMap {
 		for name := range holder.Tickers {
-			s.updateHolderToDB(addressId, name, true, true, wb)
+			s.updateHolderToDB(addressId, name, wb)
 		}
 	}
 	for utxoId := range s.transferNftMap {
-		s.updateUtxoToDB(utxoId, true, wb)
+		s.updateUtxoToDB(utxoId, false, wb)
 	}
 
 	err := db.SetDB([]byte(BRC20_DB_STATUS_KEY), s.status, wb)

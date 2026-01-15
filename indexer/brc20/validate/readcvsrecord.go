@@ -656,3 +656,75 @@ func FilterCSVFile(
 	closeCurrent()
 	return nil
 }
+
+
+type BRC20TickerCSVRecord struct {
+	Ticker   				string
+	InscriptionNumber       int64
+	InscriptionId 			string
+	InscriptionNumberStart 	int64
+	inscriptionNumberEnd 	int64
+	DeployHeight            int
+	CompleteHeight          int
+}
+
+
+func ReadBRC20TickersCSV(path string) (map[string]*BRC20TickerCSVRecord, error) {
+
+	if strings.HasSuffix(path, ".gz") {
+		csvPath, cleanup, err := DecompressToTempCSV(path)
+		if err != nil {
+			panic(err)
+		}
+		defer cleanup()
+		path = csvPath
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.FieldsPerRecord = -1
+	r.LazyQuotes = true
+	r.TrimLeadingSpace = true
+
+	// 读取 header
+	header, err := r.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	col := make(map[string]int)
+	for i, h := range header {
+		h = strings.TrimPrefix(h, "\ufeff")
+		col[h] = i
+	}
+
+	result := make(map[string]*BRC20TickerCSVRecord, 0)
+	for {
+		row, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		rec := &BRC20TickerCSVRecord{
+			Ticker:                 row[col["ticker"]],
+			InscriptionNumber:      parseI64(row[col["inscriptionNumber"]]),
+			InscriptionId :         row[col["inscriptionId"]],
+			InscriptionNumberStart: parseI64(row[col["inscriptionNumberStart"]]),
+			inscriptionNumberEnd:   parseI64(row[col["inscriptionNumberEnd"]]),
+			DeployHeight:           parseInt32(row[col["deployHeight"]]),
+			CompleteHeight:         parseInt32(row[col["completeHeight"]]),
+		}
+
+		result[rec.InscriptionId] = rec
+	}
+
+	return result, nil
+}

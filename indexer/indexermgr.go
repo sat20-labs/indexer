@@ -134,10 +134,12 @@ func NewIndexerMgr(
 		instance.ordFirstHeight = 2413343
 		instance.ordxFirstHeight = 2570589
 		common.Jubilee_Height = 0
+		common.SELFMINT_ENABLE_HEIGHT = 0
 	default: // testnet4
 		instance.ordFirstHeight = 0
 		instance.ordxFirstHeight = 0
 		common.Jubilee_Height = 0
+		common.SELFMINT_ENABLE_HEIGHT = 0
 	}
 
 	return instance
@@ -596,15 +598,16 @@ func (p *IndexerMgr) repair() bool {
 	}
 	allTickers = nil
 
+	count := 0
+	missing := 0
 	p.nftDB.BatchRead([]byte(nft.DB_PREFIX_NFT), false, func(k, v []byte) error {
-		//defer wg.Done()
-
+		count++
 		var value common.InscribeBaseContent
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
 			common.Log.Panicf("item.Value error: %v", err)
 		}
-		if value.CurseType != 0 {
+		if value.CurseType != 0 || value.Reinscription != 0 {
 			return nil
 		}
 
@@ -618,19 +621,10 @@ func (p *IndexerMgr) repair() bool {
 			return nil
 		}
 
-		n, err := strconv.ParseInt(string(value.ContentType), 10, 32)
-		if err != nil {
-			return nil
-		}
-		ty := p.nft.GetContentTye(int(n))
-		parts := strings.Split(ty, ";")
-		if parts[0] != "text/plain" && parts[0] != "application/json" {
-			return nil
-		}
-		
 		ticker := strings.ToLower(deploy.Ticker)
 		_, ok := tickerMap[ticker]
 		if !ok {
+		
 			if len(ticker) != 4 && len(ticker) != 5 {
 				return nil
 			}
@@ -641,13 +635,14 @@ func (p *IndexerMgr) repair() bool {
 			if deploy.Decimal != "" {
 				d, err := strconv.ParseUint(deploy.Decimal, 10, 64)
 				if err != nil || d > 18 {
+					common.Log.Infof("%s is invalid for decimal, %v, %s", deploy.Ticker, deploy, value.InscriptionId)
 					return nil
 				}
 				dec = int(d)
 			}
 			max, err := brc20.ParseBrc20Amount(deploy.Max, dec)
 			if err != nil {
-				common.Log.Infof("%s is invalid with max, %v %v", deploy.Ticker, err, deploy)
+				common.Log.Infof("%s is invalid for max, %v %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
 				return nil
 			}
 			if max.Sign() == 0 && len(ticker) == 5 {
@@ -656,22 +651,56 @@ func (p *IndexerMgr) repair() bool {
 			if deploy.Lim != "" {
 				lim, err := brc20.ParseBrc20Amount(deploy.Lim, dec)
 				if err != nil {
-					common.Log.Infof("%s is invalid with lim, %v %v", deploy.Ticker, err, deploy)
+					common.Log.Infof("%s is invalid for lim, %v %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
 					return nil
 				}
 				if lim.Cmp(max) > 0 {
-					common.Log.Infof("%s is invalid with lim > max, %v", deploy.Ticker, deploy)
+					common.Log.Infof("%s is invalid for lim > max, %v %s", deploy.Ticker, deploy, value.InscriptionId)
+					return nil
+				}
+				if lim.Sign() == 0 {
+					common.Log.Infof("%s is invalid for lim == 0, %v %s", deploy.Ticker, deploy, value.InscriptionId)
 					return nil
 				}
 			}
+
+			if deploy.SelfMint == "true" {
+				if int(value.BlockHeight) >= common.SELFMINT_ENABLE_HEIGHT {
+					if len(deploy.Ticker) != 5 {
+						common.Log.Infof("%s is invalid for no self_mint, %v %s", deploy.Ticker, deploy, value.InscriptionId)
+						return nil
+					}
+				}
+			}
+
+			err = deploy.Validate()
+			if err != nil {
+				common.Log.Infof("%s is invalid for validate: %v, %v %s", deploy.Ticker, err, deploy, value.InscriptionId)
+				return nil
+			}
+
+			n, err := strconv.ParseInt(string(value.ContentType), 10, 32)
+			if err != nil {
+				return nil
+			}
+			ty := p.nft.GetContentTye(int(n))
+			parts := strings.Split(ty, ";")
+			if parts[0] != "text/plain" && parts[0] != "application/json" {
+				common.Log.Infof("%s is invalid for content type: %s, %v, %s", deploy.Ticker, ty, deploy, value.InscriptionId)
+				return nil
+			}
 			
+			missing++
 			common.Log.Infof("missing ticker %s in %s, %v", deploy.Ticker, value.InscriptionId, deploy)
 		}
 
 		return nil
 	})
 
-	common.Log.Infof("checking completed")
+	common.Log.Infof("checking completed, total nft %d, missing ticker %d", count, missing)
+	expected := 367186
+	common.Log.Infof("height %d, expected tickers %d, acturally %d, missing %d", 
+		p.base.GetSyncHeight(), expected, len(tickerMap), expected-len(tickerMap))
 
 	return true
 }

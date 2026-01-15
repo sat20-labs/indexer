@@ -257,13 +257,13 @@ func (s *BRC20Indexer) loadTickListFromDB() []string {
 }
 
 
-func (s *BRC20Indexer) loadTickListFromDBv2() map[int64]string {
+func (s *BRC20Indexer) loadTickListFromDBv2() map[string]string {
 	count := 0
 	startTime := time.Now()
 	common.Log.Debug("BRC20Indexer loadTickListFromDB ...")
 
 
-	tickers := make(map[int64]string )
+	tickers := make(map[string]string )
 	err := s.db.BatchRead([]byte(DB_PREFIX_TICKER), false, func(k, v []byte) error {
 
 		//key := string(k)
@@ -272,7 +272,7 @@ func (s *BRC20Indexer) loadTickListFromDBv2() map[int64]string {
 		var ticker common.BRC20Ticker
 		err := db.DecodeBytes(v, &ticker)
 		if err == nil {
-			tickers[ticker.Id] = strings.ToLower(ticker.Name)
+			tickers[ticker.StartInscriptionId] = strings.ToLower(ticker.Name)
 		} else {
 			common.Log.Panicln("DecodeBytes " + err.Error())
 		}

@@ -50,14 +50,16 @@ func getNftsWithAddressFromDB(addressId uint64, db common.KVDB) []int64 {
 	return result
 }
 
-func getContentTypesFromDB(db common.KVDB) map[int]string {
+func getContentTypesFromDB(ldb common.KVDB) map[int]string {
 	result := make(map[int]string, 0)
-	err := db.BatchRead([]byte(DB_PREFIX_IT), false, func(k, v []byte) error {
+	err := ldb.BatchRead([]byte(DB_PREFIX_IT), false, func(k, v []byte) error {
 
 		key := string(k)
 		id, err := ParseContTypeKey(key)
 		if err == nil {
-			result[id] = string(v)
+			var ct string
+			err = db.DecodeBytes(v, &ct)
+			result[id] = ct
 		}
 
 		return nil
