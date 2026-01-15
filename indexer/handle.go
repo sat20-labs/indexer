@@ -589,6 +589,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 			common.Log.Errorf("deploy %s %s, but not set self_mint", content.Ticker, nft.Base.InscriptionId)
 			return nil
 		}
+		ticker.SelfMint = true
 	}
 
 	// dec
