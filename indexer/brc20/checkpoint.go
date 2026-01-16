@@ -699,7 +699,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		Tickers: map[string]*TickerStatus{
 			"cca1": {
 				StartInscription: 67218040,
-				EndInscription: 63572866, 
+				StartInscriptionId: "3d7086f4e878d6e942189a9d9e1826c266737d05bf752b29ae9c470fe3e82bd2i0",
 			},
 		},
 	},
