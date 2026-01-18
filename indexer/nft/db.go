@@ -85,9 +85,9 @@ func loadNftsInSatFromTxn(sat int64, value *common.NftsInSat, txn common.ReadBat
 }
 
 func loadNftFromDB(nftId int64, value *common.InscribeBaseContent, ldb common.KVDB) error {
-	return ldb.View(func(rb common.ReadBatch) error {
-		return loadNftFromTxn(nftId, value, rb)
-	})
+	key := GetNftKey(nftId)
+	// return db.GetValueFromDB([]byte(key), txn, value)
+	return db.GetValueFromDBWithProto3([]byte(key), ldb, value)
 }
 
 func loadNftFromTxn(nftId int64, value *common.InscribeBaseContent, txn common.ReadBatch) error {

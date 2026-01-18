@@ -23,8 +23,8 @@ import (
 // 一个简化的内存池数据同步线程，启动时先从节点拉取所有mempool数据，然后通过p2p协议实时同步TX
 
 type UserUtxoInMempool struct {
-    SpentUtxo           map[string]bool  // 被花费的UTXO，作为tx的输入
-    UnconfirmedUtxoMap  map[string]bool  // 新生成的UTXO，作为tx的输出
+    SpentUtxo           map[string]*common.TxOutput  // 被花费的UTXO，作为tx的输入
+    UnconfirmedUtxoMap  map[string]*common.TxOutput  // 新生成的UTXO，作为tx的输出
 }
 
 type MiniMemPool struct {
@@ -284,12 +284,12 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
-                SpentUtxo: make(map[string]bool),
-                UnconfirmedUtxoMap: make(map[string]bool),
+                SpentUtxo: make(map[string]*common.TxOutput),
+                UnconfirmedUtxoMap: make(map[string]*common.TxOutput),
             }
             p.addrUtxoMap[addr] = user
         }
-        user.SpentUtxo[info.OutPointStr] = true
+        user.SpentUtxo[info.OutPointStr] = info
     }
 
     for _, txOut := range outpus {
@@ -307,12 +307,12 @@ func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
         user, ok := p.addrUtxoMap[addr]
         if !ok {
             user = &UserUtxoInMempool{
-                SpentUtxo: make(map[string]bool),
-                UnconfirmedUtxoMap: make(map[string]bool),
+                SpentUtxo: make(map[string]*common.TxOutput),
+                UnconfirmedUtxoMap: make(map[string]*common.TxOutput),
             }
             p.addrUtxoMap[addr] = user
         }
-        user.UnconfirmedUtxoMap[unconfirmedUtxo] = true
+        user.UnconfirmedUtxoMap[unconfirmedUtxo] = txOut
     }
     p.mutex.Unlock()
 }
@@ -625,11 +625,8 @@ func (p *MiniMemPool) GetUnconfirmedNewUtxoByAddress(address string) map[string]
     }
 
     result := make(map[string]*common.TxOutput)
-    for utxo := range addrUtxo.UnconfirmedUtxoMap {
-        output, ok := p.unConfirmedUtxoMap[utxo]
-        if ok {
-            result[utxo] = output
-        }
+    for k, v := range addrUtxo.UnconfirmedUtxoMap {
+        result[k] = v
     }
     return result
 }
@@ -649,16 +646,13 @@ func (p *MiniMemPool) GetUnconfirmedSpentUtxoByAddress(address string) map[uint6
     invalidId := uint64(common.INVALID_ID)
 
     result := make(map[uint64]*common.TxOutput, 0)
-    for utxo := range addrUtxo.SpentUtxo {
-        output, ok := p.spentUtxoMap[utxo]
-        if ok {
-            id := output.UtxoId
-            if id == common.INVALID_ID {
-                id = invalidId
-                invalidId--
-            }
-            result[id] = output
+    for _, v := range addrUtxo.SpentUtxo { 
+        id := v.UtxoId
+        if id == common.INVALID_ID {
+            id = invalidId
+            invalidId--
         }
+        result[id] = v
     }
     return result
 }

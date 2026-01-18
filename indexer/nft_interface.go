@@ -66,11 +66,7 @@ func (b *IndexerMgr) initAddressToNftMap(address string) []*common.Nft {
 		return nil
 	}
 
-	nftIds := make([]*common.Nft, 0)
-	for utxoId := range utxoMap {
-		ids := b.nft.GetNftsWithUtxo(utxoId)
-		nftIds = append(nftIds, ids...)
-	}
+	nftIds := b.nft.GetNftsWithAddress(utxoMap)
 
 	sort.Slice(nftIds, func(i, j int) bool {
 		return nftIds[i].Base.Id > nftIds[j].Base.Id

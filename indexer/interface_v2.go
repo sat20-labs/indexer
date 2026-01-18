@@ -218,19 +218,26 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 	return result
 }
 
+// 钱包调用的一个核心接口，尽可能优化，让调用时间降低3s内返回
 // 不包含未确认的输入，也不包含已经广播的但未确认的输出
 // TODO，需要将已经广播的但未确认的输入加上，才不会导致新的tx无法构造
 func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.TickerName]*common.Decimal {
 	b.rpcEnter()
 	defer b.rpcLeft()
 
-	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
+	//start := time.Now()
+
+	utxos, err := b.GetUTXOsWithAddress(address) // 已经过滤广播的utxo
 	if err != nil {
 		return nil
 	}
+	//common.Log.Infof("GetUTXOsWithAddress takes %v", time.Since(start))
+	//start = time.Now()
 
 	// 过滤已经花费的资产
 	unconfirmedSpents := b.miniMempool.GetUnconfirmedSpentUtxoByAddress(address)
+	//common.Log.Infof("GetUnconfirmedSpentUtxoByAddress takes %v", time.Since(start))
+	//start = time.Now()
 
 	result := make(map[common.TickerName]*common.Decimal)
 	nsAsset := b.getSubNameSummaryWithAddress(address, unconfirmedSpents)
@@ -238,6 +245,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
 	}
+	//common.Log.Infof("getSubNameSummaryWithAddress takes %v", time.Since(start))
+	//start = time.Now()
+	//
 
 	// 合集
 	nftAsset := b.getNftAmountWithAddress(address, unconfirmedSpents)
@@ -245,12 +255,16 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
 	}
+	//common.Log.Infof("getNftAmountWithAddress takes %v", time.Since(start))
+	//start = time.Now()
 
 	ftAsset := b.ftIndexer.GetAssetSummaryByAddress(utxos)
 	for k, v := range ftAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
 	}
+	//common.Log.Infof("GetAssetSummaryByAddress takes %v", time.Since(start))
+	//start = time.Now()
 
 	brc20Asset := b.brc20Indexer.GetAssetSummaryByAddress(b.rpcService.GetAddressId(address))
 	for _, output := range unconfirmedSpents {
@@ -274,12 +288,16 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
 	}
+	//common.Log.Infof("GetAssetSummaryByAddress takes %v", time.Since(start))
+	//start = time.Now()
 
 	runesAsset := b.RunesIndexer.GetAddressAssets(b.rpcService.GetAddressId(address), utxos)
 	for _, v := range runesAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_RUNES, Type: common.ASSET_TYPE_FT, Ticker: v.Rune}
 		result[tickName] = common.NewDecimalFromUint128(v.Balance, int(v.Divisibility))
 	}
+	//common.Log.Infof("GetAddressAssets takes %v", time.Since(start))
+	//start = time.Now()
 
 	totalSats := int64(0)
 	plainUtxoMap := make(map[uint64]int64)
@@ -291,6 +309,8 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		plainUtxoMap[utxoId] = v
 	}
 	result[common.ASSET_ALL_SAT] = common.NewDefaultDecimal(totalSats)
+	//common.Log.Infof("HasAssetInUtxoId takes %v", time.Since(start))
+	//start = time.Now()
 
 	exAssets, plainUtxos := b.getExoticSummaryByAddress(plainUtxoMap)
 	for k, v := range exAssets {
@@ -298,6 +318,8 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_EXOTIC, Ticker: k}
 		result[tickName] = common.NewDefaultDecimal(v)
 	}
+	//common.Log.Infof("getExoticSummaryByAddress takes %v", time.Since(start))
+	//start = time.Now()
 
 	var value int64
 	for _, u := range plainUtxos {

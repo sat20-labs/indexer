@@ -1,6 +1,7 @@
 package nft
 
 import (
+	"sort"
 	"strconv"
 
 	"github.com/sat20-labs/indexer/common"
@@ -102,6 +103,58 @@ func (p *NftIndexer) getSatsWithUtxo(utxoId uint64) map[int64]int64 {
 	}
 
 	return sats
+}
+
+func (p *NftIndexer) GetNftsWithAddress(utxoMap map[uint64]int64) []*common.Nft {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	// 因为数据库的原因，先统一读出sat，再读出nft
+	utxos := make([]uint64, 0, len(utxoMap))
+	for utxoId := range utxoMap {
+		utxos = append(utxos, utxoId)
+	}
+	sort.Slice(utxos, func(i, j int) bool {
+		return utxos[i] < utxos[j]
+	})
+
+	sats := make([]int64, 0, len(utxos))
+	for _, utxoId := range utxos {
+		satsmap := p.getSatsWithUtxo(utxoId)
+		for sat := range satsmap {
+			sats = append(sats, sat)
+		}
+	}
+	sort.Slice(sats, func(i, j int) bool {
+		return sats[i] < sats[j]
+	})
+
+	nftmap := make(map[int64]*common.Nft)
+	nfts := make([]int64, 0, len(sats))
+	for _, sat := range sats {
+		info := p.getNftsWithSat(sat)
+		for _, id := range info.Nfts {
+			nfts = append(nfts, id)
+			nftmap[id] = &common.Nft{Base: nil,
+			OwnerAddressId: info.OwnerAddressId, UtxoId: info.UtxoId, Offset: info.Offset}
+		}
+	}
+	sort.Slice(nfts, func(i, j int) bool {
+		return nfts[i] < nfts[j]
+	})
+
+	result := make([]*common.Nft, 0, len(nftmap))
+	for _, nftId := range nfts {
+		base := p.getNftBaseWithId(nftId)
+		if base == nil {
+			continue
+		}
+		nft := nftmap[nftId]
+		nft.Base = base
+		result = append(result, nft)
+	}
+
+	return result
 }
 
 func (p *NftIndexer) GetNftsWithUtxo(utxoId uint64) []*common.Nft {
