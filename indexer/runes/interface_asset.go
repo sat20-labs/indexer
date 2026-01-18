@@ -253,8 +253,8 @@ desc: 根据utxo获取ticker名字和资产数量
 func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 	outpoint := table.OutPointFromUtxoId(utxoId)
 	outpointToBalancesValue := s.outpointToBalancesTbl.Get(outpoint)
-	ret := make([]*UtxoAsset, len(outpointToBalancesValue.RuneIdLots))
-	for i, runeIdLot := range outpointToBalancesValue.RuneIdLots {
+	ret := make([]*UtxoAsset, 0, len(outpointToBalancesValue.RuneIdLots))
+	for _, runeIdLot := range outpointToBalancesValue.RuneIdLots {
 		r := s.idToEntryTbl.Get(&runeIdLot.RuneId)
 		if r == nil {
 			continue
@@ -263,13 +263,13 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) []*UtxoAsset {
 		if r.Symbol != nil {
 			symbol = *r.Symbol
 		}
-		ret[i] = &UtxoAsset{
+		ret = append(ret, &UtxoAsset{
 			Rune:         r.SpacedRune.String(),
 			RuneId:       r.RuneId.String(),
 			Balance:      runeIdLot.Lot.Value,
 			Divisibility: r.Divisibility,
 			Symbol:       symbol,
-		}
+		})
 	}
 	return ret
 }
