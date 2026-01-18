@@ -977,7 +977,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 
 	837052: {
-		//TickerCount: 365011,
 		Tickers: map[string]*TickerStatus{
 			"utas": {
 				StartInscription: 66755582,
@@ -990,7 +989,6 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	875252: {
-		//TickerCount: 365011,
 		Tickers: map[string]*TickerStatus{
 			"𓍭": {
 				StartInscription: 80407224,
@@ -1000,7 +998,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 	},
 
 	908337: {
-		TickerCount: 365011,
+		//TickerCount: 365011,
 		Tickers: map[string]*TickerStatus{
 			"pxrx": {
 				StartInscription: 102369679,
@@ -1008,7 +1006,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	930269: {
-		TickerCount: 367104,
+		//TickerCount: 367104,
 		Tickers: map[string]*TickerStatus{
 			"兀+": {
 				StartInscription: 115170032,
@@ -1016,7 +1014,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	930741: {
-		TickerCount: 367127,
+		//TickerCount: 367127,
 		Tickers: map[string]*TickerStatus{
 			"$︎": {
 				StartInscription: 115794191,
@@ -1024,7 +1022,7 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 		},
 	},
 	931900: {
-		TickerCount: 367186,
+		//TickerCount: 367186,
 		Tickers: map[string]*TickerStatus{
 			"zbc]": {
 				StartInscription: 116733139,
