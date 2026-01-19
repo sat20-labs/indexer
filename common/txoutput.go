@@ -1068,10 +1068,11 @@ func (p *TxOutput) RemoveAsset(name *AssetName) {
 		return
 	}
 
-	if invalid, ok := p.Invalids[*name]; ok && invalid {
-		Log.Errorf("can't remove an invalid asset")
-		return
-	}
+	// brc20的资产在这个时候都是invalid，但是为了维持通道资产数量，提供Remove操作
+	// if invalid, ok := p.Invalids[*name]; ok && invalid {
+	// 	Log.Errorf("can't remove an invalid asset")
+	// 	return
+	// }
 
 	if len(p.Assets) == 0 {
 		return
@@ -1093,15 +1094,16 @@ func (p *TxOutput) RemoveAsset(name *AssetName) {
 	delete(p.Offsets, *name)
 }
 
-// 将output中的某一类资产减去对应数量，只适合非绑定聪的资产
+// 将output中的某一类资产减去对应数量，只适合非绑定聪的资产，返回剩下未减去的数量
 func (p *TxOutput) RemoveAssetWithAmt(name *AssetName, amt *Decimal) (*Decimal, error) {
 	if name == nil || *name == ASSET_PLAIN_SAT {
 		return amt, fmt.Errorf("not support")
 	}
 
-	if invalid, ok := p.Invalids[*name]; ok && invalid {
-		return nil, fmt.Errorf("can't remove an invalid asset")
-	}
+	// brc20的资产在这个时候都是invalid，但是为了维持通道资产数量，提供Remove操作
+	// if invalid, ok := p.Invalids[*name]; ok && invalid {
+	// 	return nil, fmt.Errorf("can't remove an invalid asset")
+	// }
 
 	if len(p.Assets) == 0 {
 		return amt, nil
