@@ -328,7 +328,7 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]comm
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
 		for k, v := range nfts {
-			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORD, Type: common.ASSET_TYPE_NFT, Ticker: k}
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
 			result[tickName] = v
 		}
 	}

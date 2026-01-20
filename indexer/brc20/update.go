@@ -148,7 +148,7 @@ func (s *BRC20Indexer) updateInscribeMint(tx *common.Transaction, input *common.
 
 		// 2. 必须spent 部署ticker的铭文
 		assetName := common.AssetName{
-			Protocol: common.PROTOCOL_NAME_ORD,
+			Protocol: common.PROTOCOL_NAME_ORDX,
 			Type: common.ASSET_TYPE_NFT,
 			Ticker: fmt.Sprintf("%d", ticker.Nft.Base.Sat),
 		}
@@ -519,7 +519,7 @@ func (s *BRC20Indexer) innerUpdateTransfer(index int, txId string, output *commo
 	//for _, nft := range ids {
 
 	for _, asset := range output.Assets {
-		if asset.Name.Protocol != common.PROTOCOL_NAME_ORD ||
+		if asset.Name.Protocol != common.PROTOCOL_NAME_ORDX ||
 			asset.Name.Type != common.ASSET_TYPE_NFT {
 			continue
 		}

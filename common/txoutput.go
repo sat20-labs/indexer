@@ -1250,8 +1250,7 @@ func IsBindingSat(name *AssetName) bool {
 	if name == nil {
 		return true // ordx asset
 	}
-	if name.Protocol == PROTOCOL_NAME_ORD ||
-		name.Protocol == PROTOCOL_NAME_ORDX ||
+	if name.Protocol == PROTOCOL_NAME_ORDX ||
 		name.Protocol == "" {
 		return true
 	}

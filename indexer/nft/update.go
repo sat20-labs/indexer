@@ -474,7 +474,7 @@ func (p *NftIndexer) addSatToUtxoMap(sat, offset int64, utxoId uint64) {
 func addSatInfoToOutput(output *common.TxOutput, sat, offset int64, builder *common.TxAssetsBuilder) {
 	asset := common.AssetInfo{
 		Name: common.AssetName{
-			Protocol: common.PROTOCOL_NAME_ORD,
+			Protocol: common.PROTOCOL_NAME_ORDX,
 			Type:     common.ASSET_TYPE_NFT,
 			Ticker:   fmt.Sprintf("%d", sat), // 绑定了资产的聪
 		},
@@ -509,7 +509,7 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 			//common.Log.Infof("%s assets %d", txOut.OutPointStr, len(newOut.Assets))
 			builder := common.NewTxAssetsBuilder(len(newOut.Assets))
 			for _, asset := range newOut.Assets {
-				if asset.Name.Protocol == common.PROTOCOL_NAME_ORD &&
+				if asset.Name.Protocol == common.PROTOCOL_NAME_ORDX &&
 					asset.Name.Type == common.ASSET_TYPE_NFT {
 					sat, err := strconv.ParseInt(asset.Name.Ticker, 10, 64)
 					if err != nil {

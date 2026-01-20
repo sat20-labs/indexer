@@ -391,7 +391,7 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
 		for k, v := range nfts {
-			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORD, Type: common.ASSET_TYPE_NFT, Ticker: k}
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NFT, Ticker: k}
 			result[tickName] = common.NewDefaultDecimal(v.Size())
 		}
 	}
