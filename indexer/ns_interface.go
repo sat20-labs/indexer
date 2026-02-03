@@ -188,7 +188,7 @@ func (b *IndexerMgr) GetSubNamesWithAddress(address, sub string, start, limit in
 
 	subSet := make([]*common.Nft, 0)
 	for _, nft := range nfts {
-		name := string(nft.Base.UserData)
+		name := string(nft.Base.Content)
 		_, subName := getSubName(name)
 		if subName == sub {
 			subSet = append(subSet, nft)
@@ -226,7 +226,7 @@ func (b *IndexerMgr) GetSubNamesWithFilters(address, sub, filters string, start,
 
 	subSet := make([]*common.Nft, 0)
 	for _, nft := range nfts {
-		name := string(nft.Base.UserData)
+		name := string(nft.Base.Content)
 		prefix, subName := getSubName(name)
 		if subName == sub && filterName(prefix, filterv) {
 			subSet = append(subSet, nft)
@@ -297,7 +297,7 @@ func (b *IndexerMgr) GetSubNameAmountWithAddress(address, sub string) int {
 
 	subSet := make([]*common.Nft, 0)
 	for _, nft := range nfts {
-		name := string(nft.Base.UserData)
+		name := string(nft.Base.Content)
 		_, subName := getSubName(name)
 		if subName == sub {
 			subSet = append(subSet, nft)
@@ -321,7 +321,7 @@ func (b *IndexerMgr) getSubNameSummaryWithAddress(address string, unconfirmedSpe
 		if _, ok := unconfirmedSpents[nft.UtxoId]; ok {
 			continue
 		}
-		name := string(nft.Base.UserData)
+		name := string(nft.Base.Content)
 		_, subName := getSubName(name)
 		result[subName] += 1
 	}

@@ -235,20 +235,7 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 			return nil
 		}
 	}
-
-	// 名字不跟ticker挂钩
-	var reg *ns.NameRegister
-	if !common.TickerSeparatedFromName {
-		addressId := nft.OwnerAddressId
-		reg = s.ns.GetNameRegisterInfo(content.Ticker)
-		if reg != nil && s.isSat20Actived(int(height)) {
-			if reg.Nft.OwnerAddressId != addressId {
-				common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s has owner %d",
-					nft.Base.InscriptionId, content.Ticker, reg.Nft.OwnerAddressId)
-				return nil
-			}
-		}
-	}
+	
 
 	var err error
 	lim := int64(1)
@@ -410,7 +397,8 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 		return nil
 	}
 
-	nft.Base.UserData = []byte(content.Ticker)
+	nft.Base.TypeName = common.ASSET_TYPE_FT 
+	nft.Base.UserData = []byte(common.PROTOCOL_NAME_ORDX)
 	ticker := &common.Ticker{
 		Base:       nft.Base,
 		Name:       content.Ticker,
@@ -423,18 +411,6 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 		BlockStart: blockStart,
 		BlockEnd:   blockEnd,
 		Attr:       attr,
-	}
-
-	if !common.TickerSeparatedFromName {
-		if reg == nil {
-			nft.Base.TypeName = common.ASSET_TYPE_NS
-			reg = &ns.NameRegister{
-				Nft:  nft,
-				Name: strings.ToLower(ticker.Name),
-			}
-
-			s.ns.NameRegister(reg)
-		}
 	}
 
 	return ticker
@@ -551,6 +527,7 @@ func (s *IndexerMgr) handleMintTicker(in *common.TxInput, inOffset int64, out *c
 	// }
 
 	nft.Base.TypeName = common.ASSET_TYPE_FT
+	nft.Base.UserData = []byte(common.PROTOCOL_NAME_ORDX)
 	mint := &common.Mint{
 		Base:    nft.Base,
 		Name:    strings.ToLower(content.Ticker),
@@ -579,6 +556,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		HolderCount:        0,
 		TransactionCount:   0,
 	}
+	nft.Base.UserData = []byte(common.PROTOCOL_NAME_BRC20)
 
 	if len(content.Ticker) == 5 {
 		if nft.Base.BlockHeight < int32(common.SELFMINT_ENABLE_HEIGHT) {
@@ -675,6 +653,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 		Nft: nft,
 		AmtStr: content.Amt,
 	}
+	nft.Base.UserData = []byte(common.PROTOCOL_NAME_BRC20)
 
 	// check mint amount
 	// amt, err := ParseBrc20Amount(content.Amt, int(ticker.Decimal))
@@ -737,7 +716,7 @@ func (s *IndexerMgr) handleNameRegister(content *common.OrdxRegContent, nft *com
 		Name: name,
 	}
 	nft.Base.TypeName = common.ASSET_TYPE_NS
-	nft.Base.UserData = []byte(name)
+	nft.Base.UserData = []byte(common.PROTOCOL_NAME_ORDX)
 
 	s.ns.NameRegister(reg)
 

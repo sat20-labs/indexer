@@ -10,8 +10,6 @@ const (
 	TICKER_STATUS_MINT_COMPLETED int = 3
 )
 
-const TickerSeparatedFromName = true
-
 // amt / n == sizeof(ordinals)
 type Mint struct {
 	Base *InscribeBaseContent

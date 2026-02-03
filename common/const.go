@@ -5,10 +5,12 @@ import "math"
 const (
 
 	// 暂时将所有nft当做一类ticker来管理，以后扩展时，使用合集名称来区分
-	ASSET_TYPE_NFT    = "o"
+	ASSET_TYPE_NFT    = "o"  // 原始的铭文类型，一般作为还没有被识别为其他资产的类型，也就是基本都是垃圾。
 	ASSET_TYPE_FT     = "f"
 	ASSET_TYPE_EXOTIC = "e"
 	ASSET_TYPE_NS     = "n"
+
+	ASSET_TYPE_COLLECTION = "c" // 某种ordinals的集合，其ticker名字是集合名称+id
 )
 
 const INVALID_INSCRIPTION_NUM = int64(math.MaxInt64) // 9223372036854775807

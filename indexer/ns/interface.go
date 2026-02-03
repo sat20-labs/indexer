@@ -13,7 +13,7 @@ func (p *NameService) HasNamesInUtxo(utxoId uint64) bool {
 	for _, nft := range nfts {
 		switch nft.Base.TypeName {
 		case common.ASSET_TYPE_NS:
-			name := string(nft.Base.UserData)
+			name := string(nft.Base.Content)
 			reg := p.GetNameRegisterInfo(name)
 			if reg != nil {
 				return true
@@ -30,7 +30,7 @@ func (p *NameService) GetNamesWithUtxo(utxoId uint64) []*NameRegister {
 	for _, nft := range nfts {
 		switch nft.Base.TypeName {
 		case common.ASSET_TYPE_NS:
-			name := string(nft.Base.UserData)
+			name := string(nft.Base.Content)
 			reg := p.GetNameRegisterInfo(name)
 			if reg != nil {
 				result = append(result, reg)
@@ -54,7 +54,7 @@ func (p *NameService) GetNameRegisterInfoWithInscriptionId(inscId string) *NameR
 	if nft == nil || nft.Base.TypeName != common.ASSET_TYPE_NS {
 		return nil
 	}
-	name := string(nft.Base.UserData)
+	name := string(nft.Base.Content)
 
 	return p.GetNameRegisterInfo(name)
 }
