@@ -552,7 +552,10 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 			err = fmt.Errorf("existing")
 		}
 	case common.PROTOCOL_NAME_BRC20:
-		if len(tickerName.Ticker) != 4 || !common.IsValidName(tickerName.Ticker) {
+		if len(tickerName.Ticker) != 4 && len(tickerName.Ticker) != 5 {
+			return fmt.Errorf("only support ticker length = 4 or 5 bytes")
+		}
+		if !common.IsValidName(tickerName.Ticker) {
 			return fmt.Errorf("invalid brc20 ticker name")
 		}
 		if b.brc20Indexer.TickExisted(tickerName.Ticker) {
