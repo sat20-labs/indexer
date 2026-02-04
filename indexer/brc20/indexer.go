@@ -616,6 +616,7 @@ func (s *BRC20Indexer) CheckSelf() bool {
 	// 下面这个方式遍历所有ticker极慢，需要参考nft模块的方案 TODO
 	startTime := time.Now()
 	allTickers := s.GetAllTickers()
+	allHolders := make(map[uint64]bool)
 	for _, name := range allTickers {
 	//for _, name := range names {
 		//common.Log.Infof("checking ticker %s", name)
@@ -625,8 +626,9 @@ func (s *BRC20Indexer) CheckSelf() bool {
 
 		holdermap := s.GetHoldersWithTick(name)
 		var holderAmount *common.Decimal
-		for _, amt := range holdermap {
+		for u, amt := range holdermap {
 			holderAmount = holderAmount.Add(amt)
+			allHolders[u] = true
 		}
 
 		// if name == "benz" {
@@ -658,6 +660,8 @@ func (s *BRC20Indexer) CheckSelf() bool {
 		//common.Log.Info("")
 	}
 	common.Log.Infof("total tickers %d", len(allTickers))
+	common.Log.Infof("brc20 has %d holders", len(allHolders))
+	allHolders = nil
 
 	// 需要高度到达一定高度才需要检查
 	if (isMainnet && height >= 828800) ||

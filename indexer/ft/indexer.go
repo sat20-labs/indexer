@@ -213,12 +213,15 @@ func (s *FTIndexer) CheckSelf() bool {
 
 	//common.Log.Infof("OrdxIndexer->CheckSelf ...")
 	startTime := time.Now()
-	for _, name := range s.GetAllTickers() {
+	allHolders := make(map[uint64]bool)
+	allTickers := s.GetAllTickers()
+	for _, name := range allTickers {
 		//common.Log.Infof("checking ticker %s", name)
 		holdermap := s.GetHolderAndAmountWithTick(name)
 		holderAmount := int64(0)
-		for _, amt := range holdermap {
+		for u, amt := range holdermap {
 			holderAmount += amt
+			allHolders[u] = true
 		}
 
 		mintAmount, _ := s.GetMintAmount(name)
@@ -259,6 +262,8 @@ func (s *FTIndexer) CheckSelf() bool {
 			}
 		}
 	}
+	common.Log.Infof("ordx has %d holders", len(allHolders))
+	allHolders = nil
 
 	// 需要高度到达一定高度才需要检查
 	if s.nftIndexer.GetBaseIndexer().IsMainnet() && height > 828800 {

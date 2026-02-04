@@ -1,6 +1,7 @@
 package runes
 
 import (
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
@@ -197,15 +198,15 @@ func (s *Indexer) CheckSelf() bool {
 		return false
 	}
 
+	allHolders := make(map[uint64]bool)
 	checkHolders := func(name string) bool {
-
 		rune := s.GetRuneInfo(name)
-
 		holdermap := s.GetHoldersWithTick(rune.Id)
 		//common.Log.Infof("GetHoldersWithTick %s took %v.", rune.Id, time.Since(startTime2))
 		var holderAmount *common.Decimal
-		for _, amt := range holdermap {
+		for u, amt := range holdermap {
 			holderAmount = holderAmount.Add(amt)
+			allHolders[u] = true
 		}
 		if rune.HolderCount != uint64(len(holdermap)) {
 			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, len(holdermap))
@@ -675,14 +676,16 @@ func (s *Indexer) CheckSelf() bool {
 	// check all runes minted amount
 	allRunes := s.GetAllRuneInfos()
 	common.Log.Infof("total runes: %d", len(allRunes))
-	// startTime := time.Now()
-	// for _, rune := range allRunes {
-	// 	if !checkHolders(rune.Name) {
-	// 		common.Log.Errorf("rune %s checkHolders failed", rune.Name)
-	// 		return false
-	// 	}
-	// }
-	// common.Log.Infof("rune check amount took %v.", time.Since(startTime))
+	startTime := time.Now()
+	for _, rune := range allRunes {
+		if !checkHolders(rune.Name) {
+			common.Log.Errorf("rune %s checkHolders failed", rune.Name)
+			return false
+		}
+	}
+	common.Log.Infof("rune check amount took %v.", time.Since(startTime))
+	common.Log.Infof("runes has %d holders", len(allHolders))
+	allHolders = nil
 
 	common.Log.Infof("runes checked.")
 	return true
