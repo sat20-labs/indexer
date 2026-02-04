@@ -40,7 +40,7 @@ func NewDbWrite(db common.KVDB, logs *cmap.ConcurrentMap[string, *DbLog]) *DbWri
 	}
 }
 
-func (s *DbWrite) clearLogs() {
+func (s *DbWrite) ClearLogs() {
 	s.logs.Clear()
 }
 
@@ -78,7 +78,7 @@ func (s *DbWrite) FlushToDB() {
 		if err != nil {
 			common.Log.Panicf("DbWrite.FlushToDB-> WriteBatch.Flush err:%s", err.Error())
 		}
-		s.clearLogs()
+		s.ClearLogs()
 	}
 	
 
@@ -235,13 +235,16 @@ func (s *Cache[T]) IsExist(keyPrefix []byte, cb func(key []byte, value *T) bool)
 	return
 }
 
+// TODO cache中数据很多的时候，每次遍历cache效率很低
 func (s *Cache[T]) GetList(keyPrefix []byte, isNeedValue bool) (ret map[string]*T) {
 	ret = s.GetListFromDB(keyPrefix, isNeedValue)
 	if len(ret) == 0 {
 		ret = make(map[string]*T)
 	}
 	keyPrefixStr := string(keyPrefix)
-	for log := range s.dbWrite.logs.IterBuffered() {
+	cache := s.dbWrite.logs.IterBuffered()
+	//common.Log.Infof("cache size %d", s.dbWrite.logs.Count())
+	for log := range cache {
 		if strings.HasPrefix(log.Key, keyPrefixStr) {
 			if log.Val.Type == DEL {
 				delete(ret, log.Key)

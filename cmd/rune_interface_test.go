@@ -168,7 +168,7 @@ func TestRuneCheckRunesSummary(t *testing.T) {
 	t.Logf("rune: %s\n", firstRuneName)
 
 	runeInfo := runesIndexer.GetRuneInfoWithId(runeId.String())
-	_, total := runesIndexer.GetAllAddressBalances(runeId.String(), 0, 1)
+	_, total := runesIndexer.GetAllAddressBalances(runeId.String(), 0, 0)
 	addressBalances, _ := runesIndexer.GetAllAddressBalances(runeId.String(), 0, total)
 	var addressBalance uint128.Uint128
 	for _, v := range addressBalances {

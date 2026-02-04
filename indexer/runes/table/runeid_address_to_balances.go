@@ -80,26 +80,9 @@ func (s *RuneIdAddressToBalanceTable) Get(v *RuneIdAddressToBalance) (ret *RuneI
 	return
 }
 
-func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *runestone.RuneId) (ret []*RuneIdAddressToBalance, err error) {
+func (s *RuneIdAddressToBalanceTable) GetBalances(runeId *runestone.RuneId) map[string]*pb.RuneIdAddressToBalance {
 	tblKey := []byte(store.RUNEID_ADDRESS_TO_BALANCE + runeId.Hex() + "-")
-	pbVal := s.Cache.GetList(tblKey, true)
-	if pbVal != nil {
-		ret = make([]*RuneIdAddressToBalance, len(pbVal))
-		var i = 0
-		for k, v := range pbVal {
-			var err error
-			runeIdAddressOutpointToBalance, err := RuneIdAddressToBalanceFromString(string(k))
-			if err != nil {
-				return nil, err
-			}
-			ret[i] = runeIdAddressOutpointToBalance
-			ret[i].AddressId = (v.AddressId)
-			ret[i].Balance = runestone.Lot{
-				Value: uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}}
-			i++
-		}
-	}
-	return
+	return s.Cache.GetList(tblKey, true)
 }
 
 func (s *RuneIdAddressToBalanceTable) Insert(v *RuneIdAddressToBalance) {

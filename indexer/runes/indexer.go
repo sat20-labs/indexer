@@ -25,6 +25,7 @@ type Indexer struct {
 	Status                     *table.RunesStatus
 	minimumRune                *runestone.Rune
 	
+	// TODO 不要共用cache，会导致检索效率下降
 	idToEntryTbl               *table.RuneIdToEntryTable           // RuneId->RuneEntry
 	runeToIdTbl                *table.RuneToIdTable                // Rune->RuneId
 	outpointToBalancesTbl      *table.OutpointToBalancesTable      // utxoId->该utxo包含的所有符文资产数据
@@ -177,7 +178,7 @@ func (s *Indexer) CheckSelf() bool {
 	common.Log.Debugf("rune: %s\n", firstRuneName)
 
 	runeInfo := s.GetRuneInfoWithId(runeId.String())
-	_, total := s.GetAllAddressBalances(runeId.String(), 0, 1)
+	_, total := s.GetAllAddressBalances(runeId.String(), 0, 0)
 	addressBalances, _ := s.GetAllAddressBalances(runeId.String(), 0, total)
 	var addressBalance uint128.Uint128
 	for _, v := range addressBalances {
@@ -684,6 +685,7 @@ func (s *Indexer) CheckSelf() bool {
 			common.Log.Errorf("rune %s checkHolders failed", rune.Name)
 			return false
 		}
+		s.dbWrite.ClearLogs() // 清除cache
 	}
 	common.Log.Infof("rune check amount took %v.", time.Since(startTime))
 	common.Log.Infof("runes has %d holders", len(allHolders))

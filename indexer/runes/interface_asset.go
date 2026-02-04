@@ -31,34 +31,12 @@ func (s *Indexer) GetHoldersWithTick(runeId string) (ret map[uint64]*common.Deci
 		common.Log.Infof("RuneIndexer.GetHoldersWithTick-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
 		return nil
 	}
-	// r := s.idToEntryTbl.Get(rid)
-	// if r == nil {
-	// 	common.Log.Errorf("RuneIndexer.GetHoldersWithTick-> idToEntryTbl.Get(%s) rune not found, runeId: %s", rid.Hex(), runeId)
-	// 	return nil
-	// }
-	balances, err := s.runeIdAddressToBalanceTbl.GetBalances(rid)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetHoldersWithTick-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())
-	}
-
-	addressIdToAddressLotMap := make(AddressIdToAddressLotMap)
-	for _, balance := range balances {
-		if addressIdToAddressLotMap[balance.AddressId] == nil {
-			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
-				AddressId: balance.AddressId,
-				Amount:  &uint128.Uint128{Lo: 0, Hi: 0},
-			}
-		}
-		v128 := addressIdToAddressLotMap[balance.AddressId].Amount.Add(balance.Balance.Value)
-		addressIdToAddressLotMap[balance.AddressId].Amount = &v128
-	}
-
-	total := uint64(len(addressIdToAddressLotMap))
-	ret = make(map[uint64]*common.Decimal, total)
-
-	for addressId, addressLot := range addressIdToAddressLotMap {
-		decimal := common.NewDecimalFromUint128(*addressLot.Amount, int(runeInfo.Divisibility))
-		ret[addressId] = decimal
+	
+	balances := s.runeIdAddressToBalanceTbl.GetBalances(rid)
+	ret = make(map[uint64]*common.Decimal, len(balances))
+	for _, v := range balances {
+		v128 := uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo}
+		ret[v.AddressId] = common.NewDecimalFromUint128(v128, int(runeInfo.Divisibility))
 	}
 
 	return
@@ -80,6 +58,10 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 		common.Log.Errorf("%s not found", runeId)
 		return nil, 0
 	}
+	if limit == 0 {
+		return nil, runeInfo.HolderCount
+	}
+
 	rid, err := runestone.RuneIdFromString(runeInfo.Id)
 	if err != nil {
 		common.Log.Infof("RuneIndexer.GetAllAddressBalances-> runestone.RuneIdFromString(%s) err:%v", runeId, err.Error())
@@ -92,35 +74,27 @@ func (s *Indexer) GetAllAddressBalances(runeId string, start, limit uint64) ([]*
 		return nil, 0
 	}
 
-	balances, err := s.runeIdAddressToBalanceTbl.GetBalances(rid)
-	if err != nil {
-		common.Log.Panicf("RuneIndexer.GetAllAddressBalances-> runeIdAddressToBalanceTbl.GetBalances(%s) err:%v", rid.Hex(), err.Error())
-	}
+	balances := s.runeIdAddressToBalanceTbl.GetBalances(rid)
 
-	addressIdToAddressLotMap := make(AddressIdToAddressLotMap)
-	for _, balance := range balances {
-		if addressIdToAddressLotMap[balance.AddressId] == nil {
-			addressIdToAddressLotMap[balance.AddressId] = &AddressLot{
-				AddressId: balance.AddressId,
-				Amount:  &uint128.Uint128{Lo: 0, Hi: 0},
-			}
-		}
-		v128 := addressIdToAddressLotMap[balance.AddressId].Amount.Add(balance.Balance.Value)
-		addressIdToAddressLotMap[balance.AddressId].Amount = &v128
-	}
-
-	total := uint64(len(addressIdToAddressLotMap))
+	total := uint64(len(balances))
 	ret := make([]*AddressBalance, total)
 	var i = 0
-	for addressId, addressLot := range addressIdToAddressLotMap {
+	for _, v := range balances {
 		addressLot := &AddressBalance{
-			AddressId:    addressId,
-			Balance:      *addressLot.Amount,
+			AddressId:    v.AddressId,
+			Balance:      uint128.Uint128{Hi: v.Balance.Value.Hi, Lo: v.Balance.Value.Lo},
 			Divisibility: r.Divisibility,
 		}
 		ret[i] = addressLot
 		i++
 	}
+	sort.Slice(ret, func(i, j int) bool {
+		r := ret[i].Balance.Cmp(ret[j].Balance)
+		if r == 0 {
+			return ret[i].AddressId < ret[j].AddressId
+		}
+		return r < 0
+	})
 
 	end := total
 	if start >= end {
