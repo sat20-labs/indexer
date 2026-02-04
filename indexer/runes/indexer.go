@@ -199,7 +199,7 @@ func (s *Indexer) CheckSelf() bool {
 	}
 
 	allHolders := make(map[uint64]bool)
-	checkHolders := func(name string) bool {
+	checkHolders := func(name string, checkUtxo bool) bool {
 		rune := s.GetRuneInfo(name)
 		holdermap := s.GetHoldersWithTick(rune.Id)
 		//common.Log.Infof("GetHoldersWithTick %s took %v.", rune.Id, time.Since(startTime2))
@@ -221,27 +221,29 @@ func (s *Indexer) CheckSelf() bool {
 			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
 		} 
 
-		//startTime2 = time.Now()
-		_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
-		//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
-		if total == 0 {
-			if holderAmount.Sign() != 0 {
-				common.Log.Errorf("rune ticker %s GetAllUtxoBalances failed", rune.Name)
-				return false
-			}
-		} else {
+		if checkUtxo {
 			//startTime2 = time.Now()
-			utxos, _ := s.GetAllUtxoBalances(rune.Id, 0, total)
+			_, total := s.GetAllUtxoBalances(rune.Id, 0, 0)
 			//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
-			var amontInUtxos uint128.Uint128
-			for _, balance := range utxos.Balances {
-				amontInUtxos = amontInUtxos.Add(balance.Balance)
-			}
-			amt := common.NewDecimalFromUint128(amontInUtxos, int(rune.Divisibility))
+			if total == 0 {
+				if holderAmount.Sign() != 0 {
+					common.Log.Errorf("rune ticker %s GetAllUtxoBalances failed", rune.Name)
+					return false
+				}
+			} else {
+				//startTime2 = time.Now()
+				utxos, _ := s.GetAllUtxoBalances(rune.Id, 0, total)
+				//common.Log.Infof("GetAllUtxoBalances %s took %v.", rune.Id, time.Since(startTime2))
+				var amontInUtxos uint128.Uint128
+				for _, balance := range utxos.Balances {
+					amontInUtxos = amontInUtxos.Add(balance.Balance)
+				}
+				amt := common.NewDecimalFromUint128(amontInUtxos, int(rune.Divisibility))
 
-			if amt.Cmp(holderAmount) != 0 {
-				common.Log.Errorf("rune ticker %s amount in utoxs incorrect. %s %s", rune.Name, holderAmount.String(), amt.String())
-				return false
+				if amt.Cmp(holderAmount) != 0 {
+					common.Log.Errorf("rune ticker %s amount in utoxs incorrect. %s %s", rune.Name, holderAmount.String(), amt.String())
+					return false
+				}
 			}
 		}
 		return true
@@ -267,7 +269,7 @@ func (s *Indexer) CheckSelf() bool {
 				return false
 			}
 
-			if !checkHolders(r) {
+			if !checkHolders(r, true) {
 				common.Log.Errorf("rune %s checkHolders failed", r)
 				return false
 			}
@@ -678,7 +680,7 @@ func (s *Indexer) CheckSelf() bool {
 	common.Log.Infof("total runes: %d", len(allRunes))
 	startTime := time.Now()
 	for _, rune := range allRunes {
-		if !checkHolders(rune.Name) {
+		if !checkHolders(rune.Name, false) {
 			common.Log.Errorf("rune %s checkHolders failed", rune.Name)
 			return false
 		}
