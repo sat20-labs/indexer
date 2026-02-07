@@ -15,6 +15,6 @@ basic_index:
   max_index_height: 767429 # default 0, set ord 767429 and backup db, then 839999 and backup, then 0
   period_flush_to_db: 100 # default 100
 rpc_service:
-  addr: 0.0.0.0:8005
+  addr: 0.0.0.0:8009
   proxy: mainnet
   log_path: ./log/mainnet
