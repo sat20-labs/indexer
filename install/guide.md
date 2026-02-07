@@ -32,7 +32,7 @@ cp -r mainnet mainnet_xxxxx
 xxxx一般填入高度。
 备份好了后，继续修改 max_index_height ，继续运行上面的命令跑数据。
 
-建议最后一次备份的数据的区块高度，比现在的高度少12个区块。最后将 max_index_height 设置为0，将 period_flush_to_db 设置为20，再次运行上面的命令，索引器同步到最新高度后，就进入服务状态。同样在浏览器输入 http://127.0.0.1:8005/mainnet/bestheight 查看最新高度。
+建议最后一次备份的数据的区块高度，比现在的高度少12个区块。最后将 max_index_height 设置为0，将 period_flush_to_db 设置为20，再次运行上面的命令，索引器同步到最新高度后，就进入服务状态。同样在浏览器输入 http://127.0.0.1:8009/mainnet/bestheight 查看最新高度。
 
 关闭索引器
 先查找索引器的pid，比如 ps -A | grep indexer
