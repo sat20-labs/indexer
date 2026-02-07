@@ -17,5 +17,5 @@ basic_index:
   period_flush_to_db: 100 # default 100
 rpc_service:
   addr: 0.0.0.0:8019
-  proxy: testnet
+  proxy: btc/testnet
   log_path: ./log/testnet
