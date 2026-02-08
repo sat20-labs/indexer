@@ -18,3 +18,5 @@ rpc_service:
   addr: 0.0.0.0:8009
   proxy: btc/mainnet
   log_path: ./log/mainnet
+# 将pubkey修改为 miningpubkey
+pubkey: 

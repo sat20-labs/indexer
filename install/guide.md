@@ -1,17 +1,12 @@
 索引器安装说明
 ====
+自己拉取代码，并且本地编译，得到 indexer-mainnet 和 indexer-testnet
 
-
-尽可能自己拉取代码，并且本地编译。
-这里提供的版本，仅用于 Ubuntu 22.04.4 LTS
 
 在自己的数据区创建一个目录，比如 /data/indexer
-将这indexer_1.0.2和两个conf.yaml文件拷贝到这个目录下
-如果想同时跑主网数据和测试网数据，可以将indexer这个执行文件再复制一份，改名为
-indexer_mainnet
-indexer_testnet
+将编译好的indexer和两个conf.yaml文件拷贝到这个目录下
 
-修改conf.yaml，主要修改btc的用户名和密码.
+修改conf.yaml，主要修改btc的用户名和密码，还有pubkey，将satsnet.conf中的miningpubkey复制过来就行。
 
 最后，执行下面命令，开始跑主网数据。
 nohup ./indexer_mainnet -env ./conf_mainnet.yaml > ./nohup_mainnet.log 2>&1 &
