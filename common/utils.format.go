@@ -350,3 +350,53 @@ func DeleteFromVector_uint64(arr []uint64, id uint64) []uint64 {
 
 	return arr
 }
+
+
+// 二分查找函数，返回插入位置的索引
+func binarySearch_string(arr []string, id string) int {
+	left := 0
+	right := len(arr)
+
+	for left < right {
+		mid := left + (right-left)/2
+
+		if arr[mid] == id {
+			return mid
+		} else if arr[mid] < id {
+			left = mid + 1
+		} else {
+			right = mid
+		}
+	}
+
+	return left
+}
+
+// 快速插入函数
+func InsertVector_string(arr []string, id string) []string {
+	index := binarySearch_string(arr, id)
+	if index < len(arr) && arr[index] == id {
+		// 有同样的存在
+		return arr
+	}
+
+	// 在 index 位置插入新元素
+	arr = append(arr, "")
+	copy(arr[index+1:], arr[index:])
+	arr[index] = id
+
+	return arr
+}
+
+// 快速删除函数
+func DeleteFromVector_string(arr []string, id string) []string {
+	index := binarySearch_string(arr, id)
+
+	// 如果找到匹配的 id， 则从数组中删除对应元素
+	if index < len(arr) && arr[index] == id {
+		copy(arr[index:], arr[index+1:])
+		arr = arr[:len(arr)-1]
+	}
+
+	return arr
+}
