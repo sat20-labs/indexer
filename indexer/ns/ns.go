@@ -218,6 +218,13 @@ func (p *NameService) CheckSelf() bool {
 	})
 	common.Log.Infof("%s table takes %v", DB_PREFIX_NAME, time.Since(startTime2))
 
+	allHolders := make(map[uint64]bool)
+	for sat := range satsInT1 {
+		info := p.nftIndexer.GetNftsWithSat(sat)
+		allHolders[info.OwnerAddressId] = true
+	}
+	common.Log.Infof("names has %d holders", len(allHolders))
+
 	bs := NewBuckStore(p.db)
 	lastkey := bs.GetLastKey()
 	var buckmap map[int]*BuckValue
