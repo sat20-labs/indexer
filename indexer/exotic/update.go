@@ -41,18 +41,20 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 
 		change := p.TxInputProcess(i+1, tx, block, coinbase)
 		// 处理testnet4中fee聪丢失的情况
-		if newSize + change.Value() <= coinbaseSize {
-			coinbaseInput.Append(change)
-			newSize += change.Value()
-		} else {
-			size := coinbaseSize - newSize
-			if size > 0 {
-				change2, _, err := change.Cut(size)
-				if err != nil {
-					common.Log.Panicf("ExoticIndexer.UpdateTransfer cut %s failed, %v", tx.TxId, err)
+		if change != nil {
+			if newSize + change.Value() <= coinbaseSize {
+				coinbaseInput.Append(change)
+				newSize += change.Value()
+			} else {
+				size := coinbaseSize - newSize
+				if size > 0 {
+					change2, _, err := change.Cut(size)
+					if err != nil {
+						common.Log.Panicf("ExoticIndexer.UpdateTransfer cut %s failed, %v", tx.TxId, err)
+					}
+					coinbaseInput.Append(change2)
+					newSize += change2.Value()
 				}
-				coinbaseInput.Append(change2)
-				newSize += change2.Value()
 			}
 		}
 	}

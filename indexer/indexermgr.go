@@ -46,6 +46,7 @@ type IndexerMgr struct {
 	ordFirstHeight  int
 	maxIndexHeight  int
 	periodFlushToDB int
+	notCheckSelf    bool
 
 	//mpn         *mpn.MemPoolNode
 	miniMempool *MiniMemPool
@@ -118,6 +119,7 @@ func NewIndexerMgr(
 		dbDir:           dbDir,
 		chaincfgParam:   chainParam,
 		maxIndexHeight:  int(yamlcfg.BasicIndex.MaxIndexHeight),
+		notCheckSelf:    yamlcfg.BasicIndex.NotCheckSelf,
 		periodFlushToDB: yamlcfg.BasicIndex.PeriodFlushToDB,
 		miniMempool:     NewMiniMemPool(),
 	}
@@ -240,7 +242,9 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						if b.maxIndexHeight > 0 {
 							if b.maxIndexHeight <= b.base.GetHeight() {
 								b.updateDB()
-								b.checkSelf()
+								if !b.notCheckSelf {
+									b.checkSelf()
+								}
 								common.Log.Infof("reach expected height, set exit flag")
 								bWantExit = true
 							}
@@ -311,10 +315,12 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 
 	ticker.Stop()
 
+	b.miniMempool.Stop()
+	// mpn.StopMPN(mpnode)
+
 	// close all
 	b.closeDB()
 
-	// mpn.StopMPN(mpnode)
 
 	common.Log.Info("IndexerMgr exited.")
 }

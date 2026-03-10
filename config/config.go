@@ -45,6 +45,7 @@ type Log struct {
 
 type BasicIndex struct {
 	MaxIndexHeight  int64 `yaml:"max_index_height"`
+	NotCheckSelf    bool  `yaml:"not_checkself"`
 	PeriodFlushToDB int   `yaml:"period_flush_to_db"`
 }
 
