@@ -31,6 +31,8 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 	p.generateRarityAssetWithBlock(block, coinbaseInput)
 
 	// 执行转移
+	coinbaseSize := common.GetOrdinalsSize(coinbase)
+	newSize := coinbaseInput.OutValue.Value
 	for i, tx := range block.Transactions[1:] {
 
 		// if tx.TxId == "475ff67b2f2631c6b443635951d81127dcf21898f697d5f7c31e88df836ee756" {
@@ -38,7 +40,21 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 		// }
 
 		change := p.TxInputProcess(i+1, tx, block, coinbase)
-		coinbaseInput.Append(change)
+		// 处理testnet4中fee聪丢失的情况
+		if newSize + change.Value() <= coinbaseSize {
+			coinbaseInput.Append(change)
+			newSize += change.Value()
+		} else {
+			size := coinbaseSize - newSize
+			if size > 0 {
+				change2, _, err := change.Cut(size)
+				if err != nil {
+					common.Log.Panicf("ExoticIndexer.UpdateTransfer cut %s failed, %v", tx.TxId, err)
+				}
+				coinbaseInput.Append(change2)
+				newSize += change2.Value()
+			}
+		}
 	}
 
 	if len(coinbaseInput.Assets) != 0 {
@@ -102,7 +118,7 @@ func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
 		}
 		newOut, newChange, err := change.Cut(txOut.OutValue.Value)
 		if err != nil {
-			common.Log.Panicf("innerUpdateTransfer Cut failed, %v", err)
+			common.Log.Panicf("innerUpdateTransfer Cut %s failed, %v", txOut.OutPointStr, err)
 		}
 		change = newChange
 

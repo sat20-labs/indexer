@@ -85,7 +85,7 @@ type BlockValueInDB struct {
 	OutputUtxo int
 	InputSats  int64
 	OutputSats int64
-	Ordinals   Range
+	Ordinals   Range // 奖励聪的编号范围
 }
 
 type BlockInfo struct {

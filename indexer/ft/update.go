@@ -136,6 +136,8 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 	startTime := time.Now()
 
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	coinbaseSize := common.GetOrdinalsSize(coinbase)
+	newSize := coinbaseInput.OutValue.Value
 	for _, tx := range block.Transactions[1:] {
 
 		// if tx.TxId == "cbaabeb030644cd83462b5befb497d84015140acaf5eacf9f797684e0730beb9" {
@@ -219,7 +221,21 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 		}
 
 		change := p.innerUpdateTransfer(tx, allInput)
-		coinbaseInput.Append(change)
+		// 处理testnet4中fee聪丢失的情况
+		if newSize + change.Value() <= coinbaseSize {
+			coinbaseInput.Append(change)
+			newSize += change.Value()
+		} else {
+			size := coinbaseSize - newSize
+			if size > 0 {
+				change2, _, err := change.Cut(size)
+				if err != nil {
+					common.Log.Panicf("ExoticIndexer.UpdateTransfer cut %s failed, %v", tx.TxId, err)
+				}
+				coinbaseInput.Append(change2)
+				newSize += change2.Value()
+			}
+		}
 	}
 
 	if len(coinbaseInput.Assets) != 0 {

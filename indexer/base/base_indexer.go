@@ -765,8 +765,7 @@ func appendRanges(rngs1, rngs2 []*common.Range) []*common.Range {
 }
 
 func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range {
-	first := b.lastSats
-	coinbaseOrdinals := []*common.Range{{Start: first, Size: 0}}
+	coinbaseOrdinals := []*common.Range{{Start: 0, Size: 0}}
 	blockValue := &common.BlockValueInDB{Height: block.Height,
 		Timestamp: block.Timestamp.Unix(),
 		TxAmount:  len(block.Transactions),
@@ -826,27 +825,53 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 		}
 	}
 
+	feeAmt := common.GetOrdinalsSize(coinbaseOrdinals)
+
+	var coinbaseSize int64
 	for _, output := range block.Transactions[0].Outputs {
 		u := common.GetUtxo(block.Height, block.Transactions[0].TxId, int(output.TxOutIndex))
 		b.utxoIndex.Index[u] = output
 		addedUtxoCount++
 		satsOutput += output.OutValue.Value
+		coinbaseSize += output.OutValue.Value
 		b.outputUtxo(output)
 	}
 
 	// sat20 跟ordinals协议唯一不同的地方：实际奖励了多少聪，就编码多少聪在coinbase交易的前面，后面跟着每一笔交易的网络费
 	// adjust the coinbaseOrdinals[0]
-	size := satsOutput - satsInput
-	coinbaseOrdinals[0].Size = size
-	b.lastSats += size
-
-	blockValue.Ordinals.Start = first
-	blockValue.Ordinals.Size = satsOutput - satsInput
+	newSatAmt := satsOutput - satsInput 
+	if newSatAmt < 0 {
+		// 测试环境下，有时不仅不要奖励的聪，连作为fee的聪都不要了，比如 testnet4 000000002e1ce0c58732877a4abfca4149c9fcce2adee47763dd8a4b00f1a11d
+		// 所以这里做一个简单兼容，主网不会有这种情况
+		newSatAmt = 0
+	}
+	if coinbaseSize < feeAmt {
+		// 只保留一部分fee聪，其他烧掉了
+		var newOrdinals []*common.Range
+		var newSize int64
+		for i := 1; i < len(coinbaseOrdinals); i++ {
+			rng := coinbaseOrdinals[i]
+			if newSize + rng.Size < coinbaseSize {
+				newOrdinals = append(newOrdinals, rng)
+				newSize += rng.Size
+			} else {
+				newOrdinals = append(newOrdinals, &common.Range{Start: 0, Size: coinbaseSize-newSize})
+				break
+			}
+		}
+		coinbaseOrdinals = newOrdinals
+	} else {
+		coinbaseOrdinals[0].Size = newSatAmt
+	}
+	
+	blockValue.Ordinals.Start = b.lastSats
+	blockValue.Ordinals.Size = newSatAmt
 	blockValue.InputUtxo = deledUtxoCount
 	blockValue.OutputUtxo = addedUtxoCount
 	blockValue.InputSats = satsInput
 	blockValue.OutputSats = satsOutput
 	b.blockVector = append(b.blockVector, blockValue)
+	b.lastSats += newSatAmt
 	return coinbaseOrdinals
 }
 

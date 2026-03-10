@@ -301,6 +301,8 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 
 	// prepare 2: calc inscription number
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
+	coinbaseSize := common.GetOrdinalsSize(coinbase)
+	newSize := coinbaseInput.OutValue.Value
 	for _, tx := range block.Transactions[1:] {
 		var allInput *common.TxOutput
 		//t2 := time.Now()
@@ -399,7 +401,21 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		//t2 = time.Now()
 		change := p.innerUpdateTransfer(tx, allInput)
 		//common.Log.Infof("process %s outputs takes %v", tx.TxId, time.Since(t2))
-		coinbaseInput.Append(change)
+		// 处理testnet4中fee聪丢失的情况
+		if newSize + change.Value() <= coinbaseSize {
+			coinbaseInput.Append(change)
+			newSize += change.Value()
+		} else {
+			size := coinbaseSize - newSize
+			if size > 0 {
+				change2, _, err := change.Cut(size)
+				if err != nil {
+					common.Log.Panicf("ExoticIndexer.UpdateTransfer cut %s failed, %v", tx.TxId, err)
+				}
+				coinbaseInput.Append(change2)
+				newSize += change2.Value()
+			}
+		}
 	}
 	// 处理哪些直接输出到奖励聪的铸造结果
 	//t2 := time.Now()
