@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/db"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 type AddressStatus struct {
@@ -337,7 +339,11 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 		if err != nil {
 			common.Log.Panicf("Error setting in db %v", err)
 		}
-		totalSubsidySats += value.OutputSats - value.InputSats
+		subsidy := value.OutputSats - value.InputSats
+		if subsidy < 0 {
+			subsidy = 0
+		}
+		totalSubsidySats += subsidy
 		AllUtxoAdded += uint64(value.OutputUtxo)
 	}
 
@@ -841,25 +847,55 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 	// adjust the coinbaseOrdinals[0]
 	newSatAmt := satsOutput - satsInput 
 	if newSatAmt < 0 {
-		// 测试环境下，有时不仅不要奖励的聪，连作为fee的聪都不要了，比如 testnet4 000000002e1ce0c58732877a4abfca4149c9fcce2adee47763dd8a4b00f1a11d
+		// 测试环境下，有时不仅不要奖励的聪，连作为fee的聪都不要了，
+		// 比如 testnet4 125423 000000002e1ce0c58732877a4abfca4149c9fcce2adee47763dd8a4b00f1a11d
 		// 所以这里做一个简单兼容，主网不会有这种情况
 		newSatAmt = 0
 	}
 	if coinbaseSize < feeAmt {
 		// 只保留一部分fee聪，其他烧掉了
-		var newOrdinals []*common.Range
-		var newSize int64
-		for i := 1; i < len(coinbaseOrdinals); i++ {
-			rng := coinbaseOrdinals[i]
-			if newSize + rng.Size < coinbaseSize {
-				newOrdinals = append(newOrdinals, rng)
-				newSize += rng.Size
-			} else {
-				newOrdinals = append(newOrdinals, &common.Range{Start: 0, Size: coinbaseSize-newSize})
-				break
-			}
+		b.stats.BurnedSats += feeAmt - coinbaseSize
+
+		// 处理方法1: 直接抛弃烧掉的聪
+		// var newOrdinals []*common.Range
+		// var newSize int64
+		// for i := 1; i < len(coinbaseOrdinals); i++ {
+		// 	rng := coinbaseOrdinals[i]
+		// 	if newSize + rng.Size < coinbaseSize {
+		// 		newOrdinals = append(newOrdinals, rng)
+		// 		newSize += rng.Size
+		// 	} else {
+		// 		newOrdinals = append(newOrdinals, &common.Range{Start: 0, Size: coinbaseSize-newSize})
+		// 		break
+		// 	}
+		// }
+		// coinbaseOrdinals = newOrdinals
+
+		// 处理方法2: 这些烧掉的聪，可能包含了各种资产，为了资产统计准确，这些烧掉的聪，放到一个假的op_return中
+		burned := feeAmt - coinbaseSize
+		coinbaseSize = feeAmt
+		
+		vout := len(block.Transactions[0].Outputs)
+		opreturn := &common.TxOutputV2{
+			TxOutput:    common.TxOutput{
+				UtxoId:        common.ToUtxoId(block.Height, 0, vout),
+				OutPointStr:   block.Transactions[0].TxId + ":" + strconv.Itoa(vout),
+				OutValue:      wire.TxOut{
+					Value: burned,
+					PkScript: []byte{txscript.OP_RETURN},
+				},
+				Offsets:       make(map[common.AssetName]common.AssetOffsets),
+				SatBindingMap: make(map[int64]*common.AssetInfo),
+			},
+			OutTxIndex:  0,
+			TxOutIndex:  vout,
+			OutHeight:   block.Height,
+			AddressType: int(txscript.NullDataTy),
 		}
-		coinbaseOrdinals = newOrdinals
+		block.Transactions[0].Outputs = append(block.Transactions[0].Outputs, opreturn)
+
+		b.utxoIndex.Index[opreturn.OutPointStr] = opreturn
+		b.outputUtxo(opreturn)
 	} else {
 		coinbaseOrdinals[0].Size = newSatAmt
 	}
