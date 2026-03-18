@@ -756,6 +756,8 @@ func TestParser_ord23(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Printf("title: %s\n", decodedData.Attributes.Title)
+	fmt.Printf("Desc: %s\n", decodedData.Attributes.Traits["description"])
 
 	for _, item := range decodedData.Items {
 		id := common.ParseInscriptionId(item.InscriptionId)
@@ -781,6 +783,7 @@ func TestParser_ord24(t *testing.T) {
 
 		// parent
 		rawData, err := GetRawData("177cc6aad697a6ae782ace1093925f60dd6dd63082da5eba22493d5f558ae9e0", "mainnet")
+		//rawData, err := GetRawData("f97328d4b87e21a59fdbfe09c05ec897262bde74445b19ab3584707ddb93362c", "mainnet")
 		if err != nil {
 			fmt.Printf("%v\n", err)
 			t.Fatal(err)

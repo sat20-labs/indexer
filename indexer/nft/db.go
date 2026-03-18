@@ -269,18 +269,18 @@ func ParseCollectionKey(input string) (int64, error) {
 	return parent, nil
 }
 
-func loadCollectionFromDB(parent int64, ldb common.KVDB) ([]int64, error) {
+func loadCollectionFromDB(parent int64, ldb common.KVDB) (*CollectionInfo, error) {
 	key := GetCollectionKey(parent)
-	var value []int64
+	var value CollectionInfo
 	err := db.GetValueFromDB([]byte(key), &value, ldb)
-	return value, err
+	return &value, err
 }
 
-func loadGalleryFromDB(parent int64, ldb common.KVDB) ([]int64, error) {
+func loadGalleryFromDB(parent int64, ldb common.KVDB) (*GalleryInfo, error) {
 	key := GetGalleryKey(parent)
-	var value []int64
+	var value GalleryInfo
 	err := db.GetValueFromDB([]byte(key), &value, ldb)
-	return value, err
+	return &value, err
 }
 
 func saveDisabledSatToDB(sat int64, value []byte, ldb common.KVDB) error {

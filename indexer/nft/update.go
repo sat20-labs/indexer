@@ -680,8 +680,8 @@ func (p *NftIndexer) UpdateDB() {
 	p.contentToIdMap = make(map[string]uint64)
 	p.inscriptionToNftIdMap = make(map[string]*common.Nft)
 	p.nftIdToinscriptionMap = make(map[int64]*common.Nft)
-	p.collectionMap = make(map[int64][]int64)
-	p.galleryMap = make(map[int64][]int64)
+	p.collectionMap = make(map[int64]*CollectionInfo)
+	p.galleryMap = make(map[int64]*GalleryInfo)
 	p.addedContentIdMap = make(map[uint64]bool)
 	p.lastContentTypeId = p.status.ContentTypeCount
 
@@ -822,8 +822,26 @@ func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
 		}
 
 		// 有效的collection关系
-		collection, _ := p.getCollection(parent.Base.Id)
-		p.collectionMap[parent.Base.Id] = append(collection, nft.Base.Id)
+		collection, err := p.getCollection(parent.Base.Id)
+		if err != nil {
+			var title string
+			if len(parent.Base.MetaData) > 0 && len(parent.Base.MetaData) < 128 {
+				var t any
+				err = cbor.Unmarshal(parent.Base.MetaData, &t)
+				if err == nil {
+					title = t.(string)
+				}
+			}
+
+			collection = &CollectionInfo{
+				Id: parent.Base.Id,
+				InscriptionId: parent.Base.InscriptionId,
+				Title: title,
+			}
+			p.collectionMap[parent.Base.Id] = collection 
+		}
+		collection.Items = append(collection.Items, nft.Base.Id)
+		
 		i++
 	}
 }
@@ -871,14 +889,28 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 			return
 		}
 
-		children, _ := p.getGallery(nft.Base.Id)
+		gallery, err := p.getGallery(nft.Base.Id)
+		if err != nil {
+			var desc string 
+			d, ok := decodedData.Attributes.Traits["description"]
+			if ok {
+				desc = d.(string)
+			}
+
+			gallery = &GalleryInfo{
+				Id: nft.Base.Id,
+				InscriptionId: nft.Base.InscriptionId,
+				Title: decodedData.Attributes.Title,
+				Description: desc,
+			}
+			p.galleryMap[nft.Base.Id] = gallery 
+		}
 		for _, item := range decodedData.Items {
 			id := common.ParseInscriptionId(item.InscriptionId)
 			child := p.getNftWithInscriptionId(id)
 			if child != nil {
-				children = append(children, child.Base.Id)
+				gallery.Items = append(gallery.Items, child.Base.Id)
 			}
 		}
-		p.galleryMap[nft.Base.Id] = children
 	}
 }

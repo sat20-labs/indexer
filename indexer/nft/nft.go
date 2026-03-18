@@ -27,6 +27,31 @@ type SatInfo struct {
 	Nfts       map[*common.Nft]bool
 }
 
+type GalleryInfo struct {
+	Id 		int64
+	InscriptionId string
+	Title   string
+	Description string
+	Items   []int64 // child id list
+}
+
+func (p *GalleryInfo) Clone() *GalleryInfo {
+	if p == nil {
+		return nil
+	}
+	n := &CollectionInfo{
+		Id: p.Id,
+		InscriptionId: p.InscriptionId,
+		Title: p.Title,
+		Description: p.Description,
+		Items: make([]int64, len(p.Items)),
+	}
+	copy(n.Items, p.Items)
+	return n
+}
+
+type CollectionInfo = GalleryInfo
+
 func (p *SatInfo) ToNftsInSat(sat int64) *common.NftsInSat {
 	nfts := &common.NftsInSat{
 		Sat:            sat,
@@ -65,8 +90,8 @@ type NftIndexer struct {
 	inscriptionToNftIdMap map[string]*common.Nft // inscriptionId->nftId
 	nftIdToinscriptionMap map[int64]*common.Nft  // nftId->inscriptionId
 
-	collectionMap         map[int64][]int64 // parent id -> child id list
-	galleryMap            map[int64][]int64 // gallery id -> nft id list
+	collectionMap         map[int64]*CollectionInfo // parent id 
+	galleryMap            map[int64]*GalleryInfo // gallery id
 
 	// 暂时不需要清理
 	contentTypeMap     map[int]string // ctId -> content type
@@ -115,8 +140,8 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer,
 	p.inscriptionToNftIdMap = make(map[string]*common.Nft)
 	p.nftIdToinscriptionMap = make(map[int64]*common.Nft)
 
-	p.collectionMap = make(map[int64][]int64)
-	p.galleryMap = make(map[int64][]int64)
+	p.collectionMap = make(map[int64]*CollectionInfo)
+	p.galleryMap = make(map[int64]*GalleryInfo)
 
 	p.contentTypeMap = getContentTypesFromDB(p.db)
 	p.contentTypeToIdMap = make(map[string]int)
@@ -182,18 +207,14 @@ func (p *NftIndexer) Clone(baseIndexer *base.BaseIndexer) *NftIndexer {
 		newInst.nftIdToinscriptionMap[k] = v
 	}
 
-	newInst.collectionMap = make(map[int64][]int64)
+	newInst.collectionMap = make(map[int64]*CollectionInfo)
 	for k, v := range p.collectionMap {
-		nv := make([]int64, len(v))
-		copy(nv, v)
-		newInst.collectionMap[k] = nv
+		newInst.collectionMap[k] = v.Clone()
 	}
 
-	newInst.galleryMap = make(map[int64][]int64)
+	newInst.galleryMap = make(map[int64]*GalleryInfo)
 	for k, v := range p.galleryMap {
-		nv := make([]int64, len(v))
-		copy(nv, v)
-		newInst.galleryMap[k] = nv
+		newInst.galleryMap[k] = v.Clone()
 	}
 
 	newInst.contentTypeMap = make(map[int]string)
@@ -378,7 +399,7 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 	return nft.Base.InscriptionId, err
 }
 
-func (b *NftIndexer) getCollection(parent int64) ([]int64, error) {
+func (b *NftIndexer) getCollection(parent int64) (*CollectionInfo, error) {
 	ids, ok := b.collectionMap[parent]
 	if ok {
 		return ids, nil
@@ -393,7 +414,7 @@ func (b *NftIndexer) getCollection(parent int64) ([]int64, error) {
 	return ids, err
 }
 
-func (b *NftIndexer) getGallery(parent int64) ([]int64, error) {
+func (b *NftIndexer) getGallery(parent int64) (*GalleryInfo, error) {
 	ids, ok := b.galleryMap[parent]
 	if ok {
 		return ids, nil
