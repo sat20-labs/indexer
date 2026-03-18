@@ -200,7 +200,7 @@ type NftInfo struct {
 	Content      []byte `json:"content"`
 	MetaProtocol []byte `json:"metaprotocol"`
 	MetaData     []byte `json:"metadata"`
-	Parent       string `json:"parent"`
+	Parents      []string `json:"parents"`
 	Delegate     string `json:"delegate"`
 }
 

@@ -1140,6 +1140,13 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		outpoint = 0
 	}
 
+	var parents []string
+	if len(insc.Inscription.Parents) != 0 {
+		for _, p := range insc.Inscription.Parents {
+			parents = append(parents, common.ParseInscriptionId(p))
+		}
+	}
+
 	nft := common.Nft{
 		Base: &common.InscribeBaseContent{
 			InscriptionId:      tx.TxId + "i" + strconv.Itoa(inscriptionId),
@@ -1151,7 +1158,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 			ContentEncoding:    insc.Inscription.ContentEncoding,
 			MetaProtocol:       insc.Inscription.Metaprotocol,
 			MetaData:           insc.Inscription.Metadata,
-			Parent:             common.ParseInscriptionId(insc.Inscription.Parent),
+			Parents:            parents,
 			Delegate:           common.ParseInscriptionId(insc.Inscription.Delegate),
 			Sat:                sat,
 			Output:             utxoId,
@@ -1163,7 +1170,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		UtxoId:         utxoId,
 		Offset:         outOffset,
 	}
-	s.nft.NftMint(input, inOffset, &nft)
+	s.nft.NftMint(input, inOffset, &nft, tx)
 	if !insc.IsCursed && nft.Base.CurseType != 0 {
 		// reinscription
 		insc.IsCursed = true

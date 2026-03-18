@@ -387,12 +387,14 @@ func (p *NftIndexer) loadNftBaseConentFromDB(nftId int64, value *common.Inscribe
 				}
 			}
 		}
-		if len(value.Parent) != 0 && len(value.Parent) < 16 {
-			id, err := strconv.ParseInt(value.Parent, 16, 64)
-			if err == nil {
-				inscriptionId, err := p.getInscriptionIdByNftId(id)
+		if len(value.Parents) != 0 && len(value.Parents[0]) < 16 {
+			for i, str := range value.Parents {
+				id, err := strconv.ParseInt(str, 16, 64)
 				if err == nil {
-					value.Parent = inscriptionId
+					inscriptionId, err := p.getInscriptionIdByNftId(id)
+					if err == nil {
+						value.Parents[i] = inscriptionId
+					}
 				}
 			}
 		}

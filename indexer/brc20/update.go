@@ -142,7 +142,8 @@ func (s *BRC20Indexer) updateInscribeMint(tx *common.Transaction, input *common.
 
 	if ticker.SelfMint {
 		// 1. parent
-		if mint.Nft.Base.Parent != ticker.Nft.Base.InscriptionId {
+		if len(mint.Nft.Base.Parents) != 1 ||
+		 mint.Nft.Base.Parents[0] != ticker.Nft.Base.InscriptionId {
 			return
 		}
 

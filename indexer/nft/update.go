@@ -1,13 +1,18 @@
 package nft
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strconv"
 	"time"
 
+	"github.com/andybalholm/brotli"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+
 	//inCommon "github.com/sat20-labs/indexer/indexer/common"
 
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
@@ -16,7 +21,8 @@ import (
 var _enable_compress_nft = false
 
 // 每个NFT Mint都调用
-func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.Nft) {
+func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, 
+	nft *common.Nft, tx *common.Transaction) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -39,6 +45,7 @@ func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, nft *common.
 		InOffset: inOffset,
 		UtxoId:   nft.UtxoId,
 		Nft:      nft,
+		Tx:       tx,
 	}
 
 	txMap, ok := p.actionBufferMap[input.InTxIndex]
@@ -142,6 +149,11 @@ func (p *NftIndexer) nftMint(info *InscribeInfo) {
 
 	common.Log.Debugf("nftMint add nft #%d %s", nft.Base.Id, nft.Base.InscriptionId)
 
+	// 处理collection
+	p.handleCollection(nft, info.Tx)
+	// 处理gallery
+	p.handleGallery(nft)
+
 	// 为节省空间作准备
 	p.inscriptionToNftIdMap[nft.Base.InscriptionId] = nft
 	p.nftIdToinscriptionMap[nft.Base.Id] = nft
@@ -181,11 +193,13 @@ func (p *NftIndexer) nftMint(info *InscribeInfo) {
 			}
 		}
 
-		if nft.Base.Parent != "" {
-			parent := p.getNftWithInscriptionId(nft.Base.Parent)
-			if parent != nil {
-				p.inscriptionToNftIdMap[parent.Base.InscriptionId] = parent
-				p.nftIdToinscriptionMap[parent.Base.Id] = parent
+		if len(nft.Base.Parents) != 0 {
+			for _, pp := range nft.Base.Parents {
+				parent := p.getNftWithInscriptionId(pp)
+				if parent != nil {
+					p.inscriptionToNftIdMap[parent.Base.InscriptionId] = parent
+					p.nftIdToinscriptionMap[parent.Base.Id] = parent
+				}
 			}
 		}
 	}
@@ -198,106 +212,8 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		return
 	}
 
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	// if block.Height == 30689 {
-	// 	common.Log.Infof("")
-	// }
-
-	// prepare 1: 预加载
+	p.PrepareUpdateTransfer(block, coinbase)
 	startTime := time.Now()
-	p.db.View(func(txn common.ReadBatch) error {
-		type pair struct {
-			key    string
-			utxoId uint64 // utxoId
-		}
-		// 预加载utxomap
-		inputsToLoad := make([]*pair, 0)
-		for _, tx := range block.Transactions[1:] {
-			for _, input := range tx.Inputs {
-				_, ok := p.utxoMap[input.UtxoId]
-				if ok {
-					continue
-				}
-				inputsToLoad = append(inputsToLoad, &pair{
-					key:    GetUtxoKey(input.UtxoId),
-					utxoId: input.UtxoId,
-				})
-			}
-		}
-		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
-		sort.Slice(inputsToLoad, func(i, j int) bool {
-			return inputsToLoad[i].key < inputsToLoad[j].key
-		})
-		satsToLoad := make(map[int64]bool)
-		for _, v := range inputsToLoad {
-			value := NftsInUtxo{}
-			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &value)
-			if err != nil {
-				continue
-			}
-			satoffsetMap := make(map[int64]int64)
-			for _, item := range value.Sats {
-				if item.Sat == 0 { // TODO 检查下为何老数据中有很多sat=0的值在里面
-					continue
-				}
-				satoffsetMap[item.Sat] = item.Offset
-				satsToLoad[item.Sat] = true
-			}
-			p.utxoMap[v.utxoId] = satoffsetMap
-		}
-
-		// 预加载satmap
-		satLoadingVector := make([]*pair, 0, len(satsToLoad))
-		for k := range satsToLoad {
-			satLoadingVector = append(satLoadingVector, &pair{
-				key: GetSatKey(k),
-				utxoId: uint64(k),
-			})
-		}
-		sort.Slice(satLoadingVector, func(i, j int) bool {
-			return satLoadingVector[i].key < satLoadingVector[j].key
-		})
-		for _, v := range satLoadingVector {
-			sat := int64(v.utxoId)
-			_, ok := p.satMap[sat]
-			if ok {
-				continue
-			}
-			value := common.NftsInSat{}
-			err := loadNftsInSatFromTxn(sat, &value, txn)
-			if err != nil {
-				common.Log.Panicf("block %d loadNftsInSatFromTxn sat %d failed, %v", block.Height, v, err)
-			}
-
-			info := &SatInfo{
-				AddressId:  value.OwnerAddressId,
-				UtxoId:     value.UtxoId,
-				Offset:     value.Offset,
-				CurseCount: int(value.CurseCount),
-				Nfts:       make(map[*common.Nft]bool),
-			}
-			for _, nftId := range value.Nfts {
-				// 不需要加载数据，只是生成一个临时对象
-				nft := &common.Nft{
-					Base: &common.InscribeBaseContent{
-						Id:  nftId,
-						Sat: sat,
-					},
-					Offset:         value.Offset,
-					OwnerAddressId: value.OwnerAddressId,
-					UtxoId:         value.UtxoId,
-				}
-				info.Nfts[nft] = true
-			}
-			p.satMap[sat] = info
-		}
-
-		return nil
-	})
-	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
-	//startTime = time.Now()
 
 	// prepare 2: calc inscription number
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
@@ -606,10 +522,12 @@ func (p *NftIndexer) UpdateDB() {
 					nft.Base.Delegate = fmt.Sprintf("%x", d.Base.Id)
 				}
 			}
-			if nft.Base.Parent != "" {
-				d, ok := p.inscriptionToNftIdMap[nft.Base.Parent]
-				if ok {
-					nft.Base.Parent = fmt.Sprintf("%x", d.Base.Id)
+			if len(nft.Base.Parents) != 0 {
+				for i, pp := range nft.Base.Parents {
+					d, ok := p.inscriptionToNftIdMap[pp]
+					if ok {
+						nft.Base.Parents[i] = fmt.Sprintf("%x", d.Base.Id)
+					}
 				}
 			}
 		}
@@ -692,6 +610,22 @@ func (p *NftIndexer) UpdateDB() {
 	//common.Log.Debugf("NftIndexer->UpdateDB write %d utxo takes %v", len(p.utxoMap), time.Since(startTime))
 	//startTime = time.Now()
 
+	for parent, value := range p.collectionMap {
+		key := GetCollectionKey(parent)
+		err := db.SetDB([]byte(key), value, wb)
+		if err != nil {
+			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
+		}
+	}
+
+	for parent, value := range p.galleryMap {
+		key := GetGalleryKey(parent)
+		err := db.SetDB([]byte(key), value, wb)
+		if err != nil {
+			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
+		}
+	}
+
 	//common.Log.Debugf("add %d content id...", len(p.addedContentIdMap))
 	for contentId := range p.addedContentIdMap {
 		key := GetContentIdKey(contentId)
@@ -746,8 +680,205 @@ func (p *NftIndexer) UpdateDB() {
 	p.contentToIdMap = make(map[string]uint64)
 	p.inscriptionToNftIdMap = make(map[string]*common.Nft)
 	p.nftIdToinscriptionMap = make(map[int64]*common.Nft)
+	p.collectionMap = make(map[int64][]int64)
+	p.galleryMap = make(map[int64][]int64)
 	p.addedContentIdMap = make(map[uint64]bool)
 	p.lastContentTypeId = p.status.ContentTypeCount
 
 	common.Log.Infof("NftIndexer->UpdateDB takes %v", time.Since(startTime))
+}
+
+
+func (p *NftIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*common.Range) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// if block.Height == 30689 {
+	// 	common.Log.Infof("")
+	// }
+
+	// prepare 1: 预加载
+	startTime := time.Now()
+	p.db.View(func(txn common.ReadBatch) error {
+		type pair struct {
+			key    string
+			utxoId uint64 // utxoId
+		}
+		// 预加载utxomap
+		inputsToLoad := make([]*pair, 0)
+		for _, tx := range block.Transactions[1:] {
+			for _, input := range tx.Inputs {
+				_, ok := p.utxoMap[input.UtxoId]
+				if ok {
+					continue
+				}
+				inputsToLoad = append(inputsToLoad, &pair{
+					key:    GetUtxoKey(input.UtxoId),
+					utxoId: input.UtxoId,
+				})
+			}
+		}
+		// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
+		sort.Slice(inputsToLoad, func(i, j int) bool {
+			return inputsToLoad[i].key < inputsToLoad[j].key
+		})
+		satsToLoad := make(map[int64]bool)
+		for _, v := range inputsToLoad {
+			value := NftsInUtxo{}
+			err := db.GetValueFromTxnWithProto3([]byte(v.key), txn, &value)
+			if err != nil {
+				continue
+			}
+			satoffsetMap := make(map[int64]int64)
+			for _, item := range value.Sats {
+				if item.Sat == 0 { // TODO 检查下为何老数据中有很多sat=0的值在里面
+					continue
+				}
+				satoffsetMap[item.Sat] = item.Offset
+				satsToLoad[item.Sat] = true
+			}
+			p.utxoMap[v.utxoId] = satoffsetMap
+		}
+
+		// 预加载satmap
+		satLoadingVector := make([]*pair, 0, len(satsToLoad))
+		for k := range satsToLoad {
+			satLoadingVector = append(satLoadingVector, &pair{
+				key: GetSatKey(k),
+				utxoId: uint64(k),
+			})
+		}
+		sort.Slice(satLoadingVector, func(i, j int) bool {
+			return satLoadingVector[i].key < satLoadingVector[j].key
+		})
+		for _, v := range satLoadingVector {
+			sat := int64(v.utxoId)
+			_, ok := p.satMap[sat]
+			if ok {
+				continue
+			}
+			value := common.NftsInSat{}
+			err := loadNftsInSatFromTxn(sat, &value, txn)
+			if err != nil {
+				common.Log.Panicf("block %d loadNftsInSatFromTxn sat %d failed, %v", block.Height, v, err)
+			}
+
+			info := &SatInfo{
+				AddressId:  value.OwnerAddressId,
+				UtxoId:     value.UtxoId,
+				Offset:     value.Offset,
+				CurseCount: int(value.CurseCount),
+				Nfts:       make(map[*common.Nft]bool),
+			}
+			for _, nftId := range value.Nfts {
+				// 不需要加载数据，只是生成一个临时对象
+				nft := &common.Nft{
+					Base: &common.InscribeBaseContent{
+						Id:  nftId,
+						Sat: sat,
+					},
+					Offset:         value.Offset,
+					OwnerAddressId: value.OwnerAddressId,
+					UtxoId:         value.UtxoId,
+				}
+				info.Nfts[nft] = true
+			}
+			p.satMap[sat] = info
+		}
+
+		return nil
+	})
+	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
+}
+
+// 需要tx所有输入已经加载资产信息
+func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
+	i := 0
+	for i < len(nft.Base.Parents) {
+		id := nft.Base.Parents[i]
+		parent := p.getNftWithInscriptionId(id)
+		if parent == nil {
+			nft.Base.Parents = common.RemoveIndex(nft.Base.Parents, i)
+			continue
+		}
+
+		// 检查输入是否有parent
+		assetName := common.AssetName{
+			Protocol: common.PROTOCOL_NAME_ORDX,
+			Type: common.ASSET_TYPE_NFT,
+			Ticker: fmt.Sprintf("%d", parent.Base.Sat),
+		}
+		found := false
+		for _, txIn := range tx.Inputs {
+			d := txIn.GetAsset(&assetName)
+			if d.Sign() > 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			nft.Base.Parents = common.RemoveIndex(nft.Base.Parents, i)
+			continue
+		}
+
+		// 有效的collection关系
+		collection, _ := p.getCollection(parent.Base.Id)
+		p.collectionMap[parent.Base.Id] = append(collection, nft.Base.Id)
+		i++
+	}
+}
+
+
+func BrotliDecompress(data []byte) ([]byte, error) {
+	reader := brotli.NewReader(bytes.NewReader(data))
+
+	var out bytes.Buffer
+	_, err := io.Copy(&out, reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
+}
+
+func ParseProperties(data []byte) (*common.Properties, error) {
+    var p common.Properties
+
+    err := cbor.Unmarshal(data, &p)
+    if err != nil {
+        return nil, err
+    }
+
+    return &p, nil
+}
+
+// 需要tx所有输入已经加载资产信息
+func (p *NftIndexer) handleGallery(nft *common.Nft) {
+	if len(nft.Base.Properties) > 0 {
+		data := nft.Base.Properties
+		if string(nft.Base.PropertyEncoding) == "br" {
+			var err error
+			data, err = BrotliDecompress(data)
+			if err != nil {
+				common.Log.Errorf("BrotliDecompress %s failed, %v", nft.Base.InscriptionId, err)
+				return
+			}
+		}
+
+		decodedData, err := ParseProperties(data)
+		if err != nil {
+			common.Log.Errorf("ParseProperties %s failed, %v", nft.Base.InscriptionId, err)
+			return
+		}
+
+		children, _ := p.getGallery(nft.Base.Id)
+		for _, item := range decodedData.Items {
+			id := common.ParseInscriptionId(item.InscriptionId)
+			child := p.getNftWithInscriptionId(id)
+			if child != nil {
+				children = append(children, child.Base.Id)
+			}
+		}
+		p.galleryMap[nft.Base.Id] = children
+	}
 }

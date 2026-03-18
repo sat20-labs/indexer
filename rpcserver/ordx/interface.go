@@ -875,7 +875,7 @@ func (s *Model) GetNftInfo(id int64) (*rpcwire.NftInfo, error) {
 		Content:      info.Base.Content,
 		MetaProtocol: info.Base.MetaProtocol,
 		MetaData:     info.Base.MetaData,
-		Parent:       info.Base.Parent,
+		Parents:      info.Base.Parents,
 		Delegate:     info.Base.Delegate,
 	}
 
@@ -935,7 +935,7 @@ func (s *Model) GetNftInfoWithInscriptionId(inscriptionId string) (*rpcwire.NftI
 		Content:      info.Base.Content,
 		MetaProtocol: info.Base.MetaProtocol,
 		MetaData:     info.Base.MetaData,
-		Parent:       info.Base.Parent,
+		Parents:      info.Base.Parents,
 		Delegate:     info.Base.Delegate,
 	}
 

@@ -39,3 +39,20 @@ func (p *NftStatus) Clone() *NftStatus {
 	c := *p
 	return &c
 }
+
+type Properties struct {
+    Items      []Item      `cbor:"0,keyasint,omitempty"`
+    Attributes *Attributes `cbor:"1,keyasint,omitempty"`
+    GalleryTx  []byte      `cbor:"2,keyasint,omitempty"`
+}
+
+type Item struct {
+    InscriptionId []byte      `cbor:"0,keyasint,omitempty"`
+    Attributes    *Attributes `cbor:"1,keyasint,omitempty"`
+    Index         uint64      `cbor:"2,keyasint,omitempty"`
+}
+
+type Attributes struct {
+    Title  string            `cbor:"0,keyasint,omitempty"`
+    Traits map[string]any    `cbor:"1,keyasint,omitempty"`
+}

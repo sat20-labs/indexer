@@ -1,6 +1,7 @@
 package ord
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/andybalholm/brotli"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 	"github.com/stretchr/testify/assert"
@@ -696,3 +699,153 @@ func TestParser_ord22(t *testing.T) {
 		assert.True(t, false)
 	}
 }
+
+func BrotliDecompress(data []byte) ([]byte, error) {
+	reader := brotli.NewReader(bytes.NewReader(data))
+
+	var out bytes.Buffer
+	_, err := io.Copy(&out, reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
+}
+
+func ParseProperties(data []byte) (*common.Properties, error) {
+    var p common.Properties
+
+    err := cbor.Unmarshal(data, &p)
+    if err != nil {
+        return nil, err
+    }
+
+    return &p, nil
+}
+
+func TestParser_ord23(t *testing.T) {
+	// on-chain gallery
+	rawData, err := GetRawData("cbe6cdb89f01ae5961e61678914550e8ef94d4bdb91255ef961b5f8a69182205", "mainnet")
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		t.Fatal(err)
+	}
+	fields, _, err := ParseInscription(rawData)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		t.Fatal(err)
+	}
+
+	if len(fields) != 1 {
+		t.Fatal()
+	}
+	if string(fields[0].Inscription.PropertyEncoding) != "br" {
+		t.Fatal()
+	}
+	if len(fields[0].Inscription.Properties) != 293815 {
+		t.Fatal()
+	}
+
+	data, err := BrotliDecompress(fields[0].Inscription.Properties)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//fmt.Printf("%s", data)
+
+	decodedData, err := ParseProperties(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, item := range decodedData.Items {
+		id := common.ParseInscriptionId(item.InscriptionId)
+		fmt.Printf("%s\n", id)
+	}
+
+}
+
+func TestParser_ord24(t *testing.T) {
+	/* on-chain collection
+	To create a child inscription C with parent inscription P:
+		1. Create an inscribe transaction T as usual for C.
+		2. Spend the parent P in one of the inputs of T.
+		3. Include tag 3, i.e. OP_PUSH 3, in C, with the value of the serialized 
+			binary inscription ID of P, serialized as the 32-byte TXID, followed by 
+			the four-byte little-endian INDEX, with trailing zeroes omitted.
+	A collection can be closed by burning the collection's parent inscription, 
+	which guarantees that no more items in the collection can be issued.
+	meta data: parent的meta data是collection的名称，child的Meta data是该nft的名称 （惯例，非协议）
+	*/	
+
+	{
+
+		// parent
+		rawData, err := GetRawData("177cc6aad697a6ae782ace1093925f60dd6dd63082da5eba22493d5f558ae9e0", "mainnet")
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+		fields, _, err := ParseInscription(rawData)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+
+		if len(fields) != 1 {
+			t.Fatal()
+		}
+		var result any
+		err = cbor.Unmarshal(fields[0].Inscription.Metadata, &result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("type %v\n", result)
+		// 默认类型，但很多不一定会这样设置
+		// var decodedData map[string]any
+		// err = cbor.Unmarshal(fields[0].Inscription.Metadata, &decodedData)
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
+		if result.(string) != "Bitcoin Magazine The Inscription Issue" {
+			t.Fatal()
+		}
+	}
+
+	{
+	
+		// child 1: 
+		rawData, err := GetRawData("f7ae2453bde443c3b89b076435a6378806d438b6b6012e33ea8418eaa804f0f6", "mainnet")
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+		fields, _, err := ParseInscription(rawData)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+
+		if len(fields) != 1 {
+			t.Fatal()
+		}
+		// var childMetadata map[string]any
+		// err = cbor.Unmarshal(fields2[0].Inscription.Metadata, &childMetadata)
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
+		// fmt.Printf("%v", childMetadata)
+		var result any
+		err = cbor.Unmarshal(fields[0].Inscription.Metadata, &result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.(string) != "SPAM Can #1" {
+			t.Fatal()
+		}
+		if common.ParseInscriptionId(fields[0].Inscription.Parents[0]) != "177cc6aad697a6ae782ace1093925f60dd6dd63082da5eba22493d5f558ae9e0i0" {
+			t.Fatal()
+		}
+	}
+
+}
+

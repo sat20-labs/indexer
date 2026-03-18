@@ -11,10 +11,10 @@ func (t Tag) Bytes() []byte {
 }
 
 func (t Tag) IsChunked() bool {
-	return bytes.Equal(t.Value, METADATA_TAG.Bytes())
+	return bytes.Equal(t.Value, METADATA_TAG.Bytes()) || bytes.Equal(t.Value, PROPERTIES_TAG.Bytes())
 }
 
-func (t Tag) removeField(fields map[string][][]byte) []byte {
+func (t Tag) take(fields map[string][][]byte) []byte {
 	tagStr := string(t.Bytes())
 	values, ok := fields[tagStr]
 	if !ok {
@@ -42,6 +42,18 @@ func (t Tag) removeField(fields map[string][][]byte) []byte {
 	}
 }
 
+
+func (t Tag) takeArray(fields map[string][][]byte) [][]byte {
+	tagStr := string(t.Bytes())
+	values, ok := fields[tagStr]
+	if !ok {
+		return nil
+	}
+	delete(fields, tagStr)	
+	return values
+}
+
+
 var (
 	CONTENT_TYPE_TAG     = Tag{[]byte{0x01}}
 	POINTER_TAG          = Tag{[]byte{0x02}}
@@ -51,4 +63,8 @@ var (
 	CONTENT_ENCODING_TAG = Tag{[]byte{0x09}}
 	DELEGATE_TAG         = Tag{[]byte{0x0B}}
 	RUNE_NAME_TAG        = Tag{[]byte{0x0D}}
+
+	NOTE_TAG              = Tag{[]byte{15}} // 0.26
+    PROPERTIES_TAG        = Tag{[]byte{17}} // 0.26
+    PROPERTY_ENCODING_TAG = Tag{[]byte{19}} // 0.26
 )
