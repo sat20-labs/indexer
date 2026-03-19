@@ -791,6 +791,41 @@ func (p *NftIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*comm
 	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 }
 
+func retrieveFromMetaData(meta []byte) (string, string, string) {
+	var title, author, desc string
+	if len(meta) > 0 {
+		// 可能是string，也可能是map[string]any
+		var t any
+		err := cbor.Unmarshal(meta, &t)
+		if err != nil {
+			return "", "", ""
+		}
+		switch t.(type) {
+		case string:
+			title = t.(string)
+		case map[string]any:
+			tm := t.(map[string]any)
+			tt, ok := tm["title"]
+			if ok {
+				title = tt.(string)
+			}
+			tt, ok = tm["collection"]
+			if ok {
+				title = tt.(string)
+			}
+			tt, ok = tm["author"]
+			if ok {
+				author = tt.(string)
+			}
+			tt, ok = tm["description"]
+			if ok {
+				desc = tt.(string)
+			}
+		}
+	}
+	return title, author, desc
+}
+
 // 需要tx所有输入已经加载资产信息
 func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
 	i := 0
@@ -824,19 +859,13 @@ func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
 		// 有效的collection关系
 		collection, err := p.getCollection(parent.Base.Id)
 		if err != nil {
-			var title string
-			if len(parent.Base.MetaData) > 0 && len(parent.Base.MetaData) < 128 {
-				var t any
-				err = cbor.Unmarshal(parent.Base.MetaData, &t)
-				if err == nil {
-					title = t.(string)
-				}
-			}
-
+			title, author, desc := retrieveFromMetaData(parent.Base.MetaData)
 			collection = &CollectionInfo{
 				Id: parent.Base.Id,
 				InscriptionId: parent.Base.InscriptionId,
 				Title: title,
+				Author: author,
+				Description: desc,
 			}
 			p.collectionMap[parent.Base.Id] = collection 
 		}
@@ -873,6 +902,8 @@ func ParseProperties(data []byte) (*common.Properties, error) {
 // 需要tx所有输入已经加载资产信息
 func (p *NftIndexer) handleGallery(nft *common.Nft) {
 	if len(nft.Base.Properties) > 0 {
+		title, author, desc := retrieveFromMetaData(nft.Base.MetaData)
+
 		data := nft.Base.Properties
 		if string(nft.Base.PropertyEncoding) == "br" {
 			var err error
@@ -891,16 +922,29 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 
 		gallery, err := p.getGallery(nft.Base.Id)
 		if err != nil {
-			var desc string 
-			d, ok := decodedData.Attributes.Traits["description"]
-			if ok {
-				desc = d.(string)
+			if decodedData.Attributes != nil {
+				if title == "" {
+					title = decodedData.Attributes.Title
+				}
+				if author == "" {
+					d, ok := decodedData.Attributes.Traits["author"]
+					if ok {
+						author = d.(string)
+					}
+				}
+				if desc == "" {
+					d, ok := decodedData.Attributes.Traits["description"]
+					if ok {
+						desc = d.(string)
+					}
+				}
 			}
 
 			gallery = &GalleryInfo{
 				Id: nft.Base.Id,
 				InscriptionId: nft.Base.InscriptionId,
-				Title: decodedData.Attributes.Title,
+				Author: author,
+				Title: title,
 				Description: desc,
 			}
 			p.galleryMap[nft.Base.Id] = gallery 

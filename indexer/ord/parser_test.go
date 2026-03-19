@@ -766,6 +766,47 @@ func TestParser_ord23(t *testing.T) {
 
 }
 
+
+func TestParser_ord23_2(t *testing.T) {
+	// the first on-chain gallery: 883390
+	rawData, err := GetRawData("663f3e53321913088d1639575841810514c18170961c74a3786732e99d044e20", "mainnet")
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		t.Fatal(err)
+	}
+	fields, _, err := ParseInscription(rawData)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+		t.Fatal(err)
+	}
+
+	if len(fields) != 1 {
+		t.Fatal()
+	}
+
+	var metadata map[string]any
+	err = cbor.Unmarshal(fields[0].Inscription.Metadata, &metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("metadata %v\n", metadata)
+	// title or collection
+	// author
+	// description
+
+	decodedData, err := ParseProperties(fields[0].Inscription.Properties)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, item := range decodedData.Items {
+		id := common.ParseInscriptionId(item.InscriptionId)
+		fmt.Printf("%s\n", id)
+	}
+
+}
+
+
 func TestParser_ord24(t *testing.T) {
 	/* on-chain collection
 	To create a child inscription C with parent inscription P:
@@ -846,6 +887,52 @@ func TestParser_ord24(t *testing.T) {
 			t.Fatal()
 		}
 		if common.ParseInscriptionId(fields[0].Inscription.Parents[0]) != "177cc6aad697a6ae782ace1093925f60dd6dd63082da5eba22493d5f558ae9e0i0" {
+			t.Fatal()
+		}
+	}
+
+}
+
+
+func TestParser_ord24_2(t *testing.T) {
+
+	{
+		// the first collection: 777777
+		// parent
+		rawData, err := GetRawData("3bab33fbe88824f1c3a8484ea24913b5623085761b8c5b445d1111ddeb1d43f5", "mainnet")
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+		fields, _, err := ParseInscription(rawData)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+
+		if len(fields) != 1 {
+			t.Fatal()
+		}
+	}
+
+	{
+	
+		// child 1: 780813
+		rawData, err := GetRawData("7cfbcd1290d7e7a5c31e8524b40ab606043ff0de1b58915ec7e3726a4991222f", "mainnet")
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+		fields, _, err := ParseInscription(rawData)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			t.Fatal(err)
+		}
+
+		if len(fields) != 1 {
+			t.Fatal()
+		}
+		if common.ParseInscriptionId(fields[0].Inscription.Parents[0]) != "3bab33fbe88824f1c3a8484ea24913b5623085761b8c5b445d1111ddeb1d43f5i0" {
 			t.Fatal()
 		}
 	}

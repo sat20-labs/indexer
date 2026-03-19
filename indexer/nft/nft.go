@@ -31,6 +31,7 @@ type GalleryInfo struct {
 	Id 		int64
 	InscriptionId string
 	Title   string
+	Author  string
 	Description string
 	Items   []int64 // child id list
 }
@@ -43,6 +44,7 @@ func (p *GalleryInfo) Clone() *GalleryInfo {
 		Id: p.Id,
 		InscriptionId: p.InscriptionId,
 		Title: p.Title,
+		Author: p.Author,
 		Description: p.Description,
 		Items: make([]int64, len(p.Items)),
 	}
