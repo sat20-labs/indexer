@@ -33,9 +33,17 @@ const (
 
 	CORENODE_STAKING_ASSET_NAME string = "ordx:f:pearl"
 	CORENODE_STAKING_ASSET_AMOUNT int64 = 1000000
+	CORENODE_STAKING_ASSET_NAME_V2 string = "ordx:f:pearl"
+	CORENODE_STAKING_ASSET_AMOUNT_V2 int64 = 10000000
+	STAKING_ASSET_SWITCH_HEIGHT int = 942000
+	STAKING_ASSET_SWITCH_HEIGHT_L2 int = 38000
 
 	TESTNET_CORENODE_STAKING_ASSET_NAME string = "ordx:f:dogcoin"
 	TESTNET_CORENODE_STAKING_ASSET_AMOUNT int64 = 1000
+	TESTNET_CORENODE_STAKING_ASSET_NAME_V2 string = "ordx:f:rarepizza"
+	TESTNET_CORENODE_STAKING_ASSET_AMOUNT_V2 int64 = 1000
+	TESTNET_STAKING_ASSET_SWITCH_HEIGHT int = 128000
+	TESTNET_STAKING_ASSET_SWITCH_HEIGHT_L2 int = 3400
 
 	NODE_TYPE_NORMAL    int = 0 // 普通聪网节点，只同步数据，不挖矿
 	NODE_TYPE_LIGHT     int = 1 // 轻节点，暂时没有实现
@@ -77,28 +85,95 @@ func GetCoreNodePubKey() string {
 	return _coreNodePubKey
 }
 
-func GetStakeAssetName() string {
+func GetStakeAssetName(height int) string {
 	if ENABLE_TESTING {
-		return TESTNET_CORENODE_STAKING_ASSET_NAME
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME_V2
+		}
 	}
-	switch CHAIN {
-	case "mainnet":
-		return CORENODE_STAKING_ASSET_NAME
-	case "testnet": 
-		return TESTNET_CORENODE_STAKING_ASSET_NAME
+	if CHAIN == "mainnet" {
+		if height < STAKING_ASSET_SWITCH_HEIGHT {
+			return CORENODE_STAKING_ASSET_NAME
+		} else {
+			return CORENODE_STAKING_ASSET_NAME_V2
+		}
+	} else {
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME_V2
+		}
 	}
-	return CORENODE_STAKING_ASSET_NAME
 }
 
-func GetStakeAssetAmt() int64 {
+func GetStakeAssetNameWithHeightL2(height int) string {
 	if ENABLE_TESTING {
-		return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT_L2 {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME_V2
+		}
 	}
-	switch CHAIN {
-	case "mainnet":
-		return CORENODE_STAKING_ASSET_AMOUNT
-	case "testnet": 
-		return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+	if CHAIN == "mainnet" {
+		if height < STAKING_ASSET_SWITCH_HEIGHT_L2 {
+			return CORENODE_STAKING_ASSET_NAME
+		} else {
+			return CORENODE_STAKING_ASSET_NAME_V2
+		}
+	} else {
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT_L2 {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_NAME_V2
+		}
 	}
-	return CORENODE_STAKING_ASSET_AMOUNT
+}
+
+func GetStakeAssetAmt(height int) int64 {
+	if ENABLE_TESTING {
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT_V2
+		}
+	}
+	if CHAIN == "mainnet" {
+		if height < STAKING_ASSET_SWITCH_HEIGHT {
+			return CORENODE_STAKING_ASSET_AMOUNT
+		} else {
+			return CORENODE_STAKING_ASSET_AMOUNT_V2
+		}
+	} else {
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT_V2
+		}
+	}
+}
+
+
+func GetStakeAssetAmtWithHeightL2(height int) int64 {
+	if ENABLE_TESTING {
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT_L2 {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT_V2
+		}
+	}
+	if CHAIN == "mainnet" {
+		if height < STAKING_ASSET_SWITCH_HEIGHT_L2 {
+			return CORENODE_STAKING_ASSET_AMOUNT
+		} else {
+			return CORENODE_STAKING_ASSET_AMOUNT_V2
+		}
+	} else {
+		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT_L2 {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT
+		} else {
+			return TESTNET_CORENODE_STAKING_ASSET_AMOUNT_V2
+		}
+	}
 }

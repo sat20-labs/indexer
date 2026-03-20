@@ -228,8 +228,8 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 			return nil
 		}
 
-		// 目前只允许持有足够的pearl的用户可以部署lpt
-		if !s.isEligibleUser(out.OutValue.PkScript, content.Des) {
+		// 只允许有资格的用户可以部署lpt
+		if !s.isEligibleUser(int(height), out.OutValue.PkScript, content.Des) {
 			common.Log.Warnf("IndexerMgr.handleDeployTicker: inscriptionId: %s, ticker: %s, not eligible user",
 				nft.Base.InscriptionId, content.Ticker)
 			return nil
@@ -1186,9 +1186,9 @@ func (s *IndexerMgr) getMintAmountByAddressId(ticker string, address uint64) int
 }
 
 // 有资格的地址：跟引导节点建立了通道，而且该通道持有足够的资产
-func (s *IndexerMgr) isEligibleUser(pkScript []byte, pubkey string) bool {
-	assetName := common.NewAssetNameFromString(common.GetStakeAssetName())
-	amt := common.GetStakeAssetAmt()
+func (s *IndexerMgr) isEligibleUser(height int, pkScript []byte, pubkey string) bool {
+	assetName := common.NewAssetNameFromString(common.GetStakeAssetName(height))
+	amt := common.GetStakeAssetAmt(height)
 
 	pubkeyBytes, err := hex.DecodeString(pubkey)
 	if err != nil {
