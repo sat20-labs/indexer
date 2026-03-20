@@ -99,10 +99,8 @@ func NewIndexerMgr(
 	chainParam := &chaincfg.MainNetParams
 	switch yamlcfg.Chain {
 	case common.ChainTestnet:
-		common.CHAIN = "testnet"
 		chainParam = &chaincfg.TestNet4Params
 	case common.ChainTestnet4:
-		common.CHAIN = "testnet"
 		chainParam = &chaincfg.TestNet4Params
 	case common.ChainMainnet:
 		chainParam = &chaincfg.MainNetParams
@@ -132,11 +130,13 @@ func NewIndexerMgr(
 	case "testnet3":
 		instance.ordFirstHeight = 2413343
 		instance.ordxFirstHeight = 2570589
+		common.CHAIN = "testnet"
 		common.Jubilee_Height = 0
 		common.SELFMINT_ENABLE_HEIGHT = 0
 	default: // testnet4
 		instance.ordFirstHeight = 0
 		instance.ordxFirstHeight = 0
+		common.CHAIN = "testnet"
 		common.Jubilee_Height = 0
 		common.SELFMINT_ENABLE_HEIGHT = 0
 	}

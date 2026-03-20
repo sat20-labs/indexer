@@ -1187,12 +1187,8 @@ func (s *IndexerMgr) getMintAmountByAddressId(ticker string, address uint64) int
 
 // 有资格的地址：跟引导节点建立了通道，而且该通道持有足够的资产
 func (s *IndexerMgr) isEligibleUser(pkScript []byte, pubkey string) bool {
-	assetName := common.NewAssetNameFromString(common.CORENODE_STAKING_ASSET_NAME)
-	amt := common.CORENODE_STAKING_ASSET_AMOUNT
-	if !s.IsMainnet() {
-		assetName = common.NewAssetNameFromString(common.TESTNET_CORENODE_STAKING_ASSET_NAME)
-		amt = common.TESTNET_CORENODE_STAKING_ASSET_AMOUNT
-	}
+	assetName := common.NewAssetNameFromString(common.GetStakeAssetName())
+	amt := common.GetStakeAssetAmt()
 
 	pubkeyBytes, err := hex.DecodeString(pubkey)
 	if err != nil {
