@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -791,6 +792,51 @@ func (p *NftIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*comm
 	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 }
 
+func retrieveTitle(tm map[string]any) string {
+	for k, v := range tm {
+		lk := strings.ToLower(k)
+		if lk == "title" || 
+		lk == "collection" ||
+		lk == "collection title" {
+			return v.(string)
+		}
+	}
+	return ""
+}
+
+func retrieveAuthor(tm map[string]any) string {
+	for k, v := range tm {
+		lk := strings.ToLower(k)
+		if lk == "author" || 
+		lk == "creator" || 
+		lk == "artist" {
+			return v.(string)
+		}
+	}
+	return ""
+}
+
+func retrieveDescription(tm map[string]any) string {
+	for k, v := range tm {
+		lk := strings.ToLower(k)
+		if lk == "description" {
+			return v.(string)
+		}
+	}
+	return ""
+}
+
+func convertmap(tm map[any]any) map[string]any {
+	result := make(map[string]any)
+	for k, v := range tm {
+		s, ok := k.(string)
+		if ok {
+			result[s] = v
+		}
+	}
+	return result
+}
+
 func retrieveFromMetaData(meta []byte) (string, string, string) {
 	var title, author, desc string
 	if len(meta) > 0 {
@@ -805,22 +851,15 @@ func retrieveFromMetaData(meta []byte) (string, string, string) {
 			title = t.(string)
 		case map[string]any:
 			tm := t.(map[string]any)
-			tt, ok := tm["title"]
-			if ok {
-				title = tt.(string)
-			}
-			tt, ok = tm["collection"]
-			if ok {
-				title = tt.(string)
-			}
-			tt, ok = tm["author"]
-			if ok {
-				author = tt.(string)
-			}
-			tt, ok = tm["description"]
-			if ok {
-				desc = tt.(string)
-			}
+			title = retrieveTitle(tm)
+			author = retrieveAuthor(tm)
+			desc = retrieveDescription(tm)
+		case map[any]any:
+			tm := t.(map[any]any)
+			tm2 := convertmap(tm)
+			title = retrieveTitle(tm2)
+			author = retrieveAuthor(tm2)
+			desc = retrieveDescription(tm2)
 		}
 	}
 	return title, author, desc
