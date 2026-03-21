@@ -423,6 +423,7 @@ func (b *IndexerMgr) GetNftWithInscriptionId(inscriptionId string) *common.Nft {
 	return b.nft.GetNftWithInscriptionId(inscriptionId)
 }
 
+// local collection
 func (b *IndexerMgr) AddCollection(ntype, ticker string, ids []string) error {
 
 	key := getCollectionKey(ntype, ticker)
@@ -443,6 +444,7 @@ func (b *IndexerMgr) AddCollection(ntype, ticker string, ids []string) error {
 	return fmt.Errorf("not support asset type %s", ntype)
 }
 
+// local collection
 func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string, error) {
 
 	key := getCollectionKey(ntype, ticker)
@@ -459,4 +461,14 @@ func (b *IndexerMgr) GetCollection(ntype, ticker string, ids []string) ([]string
 	}
 
 	return nil, fmt.Errorf("not support asset type %s", ntype)
+}
+
+// on-chain gallery
+func (p *IndexerMgr) GetGalleryWithInscriptionId(id string) *common.GalleryInfo {
+	return p.nft.GetGalleryWithInscriptionId(id)
+}
+
+// on-chain collection
+func (p *IndexerMgr) GetCollectionWithInscriptionId(id string) *common.GalleryInfo {
+	return p.nft.GetCollectionWithInscriptionId(id)
 }

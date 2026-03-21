@@ -204,6 +204,29 @@ type NftInfo struct {
 	Delegate     string `json:"delegate"`
 }
 
+type GalleryInfo struct {
+	Id            int64 `json:"id"`
+	InscriptionId string `json:"inscriptionId"`
+	Title 		  string `json:"title"`
+	Author 		  string `json:"author"`
+	Description   string `json:"description"`
+	Total         int `json:"total"`
+	Start         int `json:"start"`
+	Items         []*NftItem `json:"items"`
+}
+
+type GalleryResp struct {
+	BaseResp
+	Data *GalleryInfo `json:"data"`
+}
+
+type CollectionInfo = GalleryInfo
+
+type CollectionResp struct {
+	BaseResp
+	Data *CollectionInfo `json:"data"`
+}
+
 type BestHeightResp struct {
 	BaseResp
 	Data map[string]int `json:"data" example:"height:100"`
@@ -423,10 +446,12 @@ type UnlockOrdinalsResp struct {
 }
 
 type NftStatusData struct {
-	Version string     `json:"version"`
-	Total   uint64     `json:"total"`
-	Start   uint64     `json:"start"`
-	Nfts    []*NftItem `json:"nfts"`
+	Version         string     `json:"version"`
+	GalleyCount     uint64	   `json:"galleyCount"`
+	CollectionCount uint64     `json:"collectionCount"`
+	Total           uint64     `json:"total"`
+	Start           uint64     `json:"start"`
+	Nfts            []*NftItem `json:"nfts"`
 }
 
 type NftStatusResp struct {

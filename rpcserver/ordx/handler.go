@@ -1244,3 +1244,59 @@ func (s *Handle) getNftWithInscriptionId(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+func (s *Handle) getGallery(c *gin.Context) {
+	resp := &rpcwire.GalleryResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+
+	id := c.Param("id")
+	start, err := strconv.Atoi(c.DefaultQuery("start", "0"))
+	if err != nil {
+		start = 0
+	}
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	if err != nil {
+		limit = 0
+	}
+	result, err := s.model.GetGalleryWithId(id, start, limit)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	} else {
+		resp.Data = result
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Handle) getCollection(c *gin.Context) {
+	resp := &rpcwire.CollectionResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+	}
+
+	id := c.Param("id")
+	start, err := strconv.Atoi(c.DefaultQuery("start", "0"))
+	if err != nil {
+		start = 0
+	}
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	if err != nil {
+		limit = 0
+	}
+	result, err := s.model.GetCollectionWithId(id, start, limit)
+	if err != nil {
+		resp.Code = -1
+		resp.Msg = err.Error()
+	} else {
+		resp.Data = result
+	}
+
+	c.JSON(http.StatusOK, resp)
+}

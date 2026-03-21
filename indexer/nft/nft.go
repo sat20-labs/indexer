@@ -27,32 +27,8 @@ type SatInfo struct {
 	Nfts       map[*common.Nft]bool
 }
 
-type GalleryInfo struct {
-	Id 		int64
-	InscriptionId string
-	Title   string
-	Author  string
-	Description string
-	Items   []int64 // child id list
-}
-
-func (p *GalleryInfo) Clone() *GalleryInfo {
-	if p == nil {
-		return nil
-	}
-	n := &CollectionInfo{
-		Id: p.Id,
-		InscriptionId: p.InscriptionId,
-		Title: p.Title,
-		Author: p.Author,
-		Description: p.Description,
-		Items: make([]int64, len(p.Items)),
-	}
-	copy(n.Items, p.Items)
-	return n
-}
-
-type CollectionInfo = GalleryInfo
+type CollectionInfo = common.GalleryInfo
+type GalleryInfo = common.GalleryInfo
 
 func (p *SatInfo) ToNftsInSat(sat int64) *common.NftsInSat {
 	nfts := &common.NftsInSat{

@@ -410,3 +410,63 @@ func (p *NftIndexer) IsEnabled() bool {
 func (p *NftIndexer) GetContentTye(t int) string {
 	return p.contentTypeMap[t]
 }
+
+// key: nft id
+func (p *NftIndexer) GetGalleryWithId(id int64) *GalleryInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	gallery, err := p.getGallery(id)
+	if err != nil {
+		return nil
+	}
+
+	return gallery
+}
+
+func (p *NftIndexer) GetGalleryWithInscriptionId(id string) *GalleryInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	nft := p.getNftWithInscriptionId(id)
+	if nft == nil {
+		return nil
+	}
+
+	gallery, err := p.getGallery(nft.Base.Id)
+	if err != nil {
+		return nil
+	}
+
+	return gallery
+}
+
+// key: nft id
+func (p *NftIndexer) GetCollectionWithId(id int64) *CollectionInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	collection, err := p.getCollection(id)
+	if err != nil {
+		return nil
+	}
+
+	return collection
+}
+
+func (p *NftIndexer) GetCollectionWithInscriptionId(id string) *CollectionInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	nft := p.getNftWithInscriptionId(id)
+	if nft == nil {
+		return nil
+	}
+
+	collection, err := p.getCollection(nft.Base.Id)
+	if err != nil {
+		return nil
+	}
+
+	return collection
+}

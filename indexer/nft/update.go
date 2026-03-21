@@ -898,15 +898,18 @@ func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
 		// 有效的collection关系
 		collection, err := p.getCollection(parent.Base.Id)
 		if err != nil {
+			// new collection
 			title, author, desc := retrieveFromMetaData(parent.Base.MetaData)
 			collection = &CollectionInfo{
-				Id: parent.Base.Id,
+				Id: int64(p.status.CollectionCount),
+				NftId: parent.Base.Id,
 				InscriptionId: parent.Base.InscriptionId,
 				Title: title,
 				Author: author,
 				Description: desc,
 			}
 			p.collectionMap[parent.Base.Id] = collection 
+			p.status.CollectionCount++
 		}
 		collection.Items = append(collection.Items, nft.Base.Id)
 		
@@ -961,6 +964,7 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 
 		gallery, err := p.getGallery(nft.Base.Id)
 		if err != nil {
+			// new gallery
 			if decodedData.Attributes != nil {
 				if title == "" {
 					title = decodedData.Attributes.Title
@@ -980,13 +984,15 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 			}
 
 			gallery = &GalleryInfo{
-				Id: nft.Base.Id,
+				Id: int64(p.status.GalleryCount),
+				NftId: nft.Base.Id,
 				InscriptionId: nft.Base.InscriptionId,
 				Author: author,
 				Title: title,
 				Description: desc,
 			}
 			p.galleryMap[nft.Base.Id] = gallery 
+			p.status.GalleryCount++
 		}
 		for _, item := range decodedData.Items {
 			id := common.ParseInscriptionId(item.InscriptionId)

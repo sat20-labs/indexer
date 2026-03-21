@@ -89,6 +89,8 @@ type Indexer interface {
 	GetNftsWithAddress(address string, start int, limit int) ([]*common.Nft, int)
 	GetNftHistory(start int, limit int) ([]*common.MintAbbrInfo, int)
 	GetNftHistoryWithAddress(addressId uint64, start int, limit int) ([]*common.MintAbbrInfo, int)
+	GetGalleryWithInscriptionId(inscriptionId string) *common.GalleryInfo
+	GetCollectionWithInscriptionId(inscriptionId string) *common.GalleryInfo
 
 	//////////////////////////////////////////////////////////////////////////
 	// new interface

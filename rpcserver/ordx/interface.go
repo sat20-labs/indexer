@@ -850,7 +850,13 @@ func (s *Model) AddCollection(req *rpcwire.AddCollectionReq) error {
 func (s *Model) GetNftStatusList(start, limit int) (*rpcwire.NftStatusData, error) {
 	status := s.indexer.GetNftStatus()
 
-	ret := rpcwire.NftStatusData{Version: status.Version, Total: (status.Count), Start: uint64(start)}
+	ret := rpcwire.NftStatusData{
+		Version: status.Version, 
+		GalleyCount: status.GalleryCount,
+		CollectionCount: status.CollectionCount,
+		Total: (status.Count), 
+		Start: uint64(start),
+	}
 	ids, _ := s.indexer.GetNfts(start, limit)
 	for _, id := range ids {
 		info := s.indexer.GetNftInfo(id)
@@ -897,6 +903,82 @@ func (s *Model) GetNftsWithAddress(address string, start, limit int) (*rpcwire.N
 	ret.Amount = len(ret.Nfts)
 
 	return &ret, total, nil
+}
+
+
+func (s *Model) GetGalleryWithId(id string, start, limit int) (*rpcwire.GalleryInfo, error) {
+	gallery := s.indexer.GetGalleryWithInscriptionId(id)
+	if gallery == nil {
+		return nil, fmt.Errorf("not found")
+	}
+
+	ret := &rpcwire.GalleryInfo{
+		Id: gallery.Id,
+		InscriptionId: gallery.InscriptionId,
+		Title: gallery.Title,
+		Author: gallery.Author,
+		Description: gallery.Description,
+		Total: len(gallery.Items),
+		Start: start,
+	}
+	if ret.Total < start {
+		return ret, nil
+	}
+	if ret.Total < start+limit {
+		limit = ret.Total - start
+	}
+	end := start + limit
+	items := gallery.Items[start:end]
+	
+	for _, nftId := range items {
+		info := s.indexer.GetNftInfo(nftId)
+		if info == nil {
+			continue
+		}
+
+		item := s.nftToItem(info)
+		ret.Items = append(ret.Items, item)
+	}
+	
+	return ret, nil
+}
+
+
+func (s *Model) GetCollectionWithId(id string, start, limit int) (*rpcwire.CollectionInfo, error) {
+	collection := s.indexer.GetCollectionWithInscriptionId(id)
+	if collection == nil {
+		return nil, fmt.Errorf("not found")
+	}
+
+	ret := &rpcwire.CollectionInfo{
+		Id: collection.Id,
+		InscriptionId: collection.InscriptionId,
+		Title: collection.Title,
+		Author: collection.Author,
+		Description: collection.Description,
+		Total: len(collection.Items),
+		Start: start,
+	}
+	if ret.Total < start {
+		return ret, nil
+	}
+	if ret.Total < start+limit {
+		limit = ret.Total - start
+	}
+	end := start + limit
+	items := collection.Items[start:end]
+	
+	for _, nftId := range items {
+		info := s.indexer.GetNftInfo(nftId)
+		if info == nil {
+			continue
+		}
+
+		item := s.nftToItem(info)
+		ret.Items = append(ret.Items, item)
+	}
+	
+	return ret, nil
 }
 
 func (s *Model) GetNftsWithSat(sat int64) (*rpcwire.NftsWithAddressData, error) {
