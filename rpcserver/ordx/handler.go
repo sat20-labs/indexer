@@ -1258,7 +1258,7 @@ func (s *Handle) getGallery(c *gin.Context) {
 	if err != nil {
 		start = 0
 	}
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil {
 		limit = 0
 	}
@@ -1286,7 +1286,7 @@ func (s *Handle) getCollection(c *gin.Context) {
 	if err != nil {
 		start = 0
 	}
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", QueryParamDefaultLimit))
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil {
 		limit = 0
 	}

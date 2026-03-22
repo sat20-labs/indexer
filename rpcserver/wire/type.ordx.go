@@ -212,7 +212,7 @@ type GalleryInfo struct {
 	Description   string `json:"description"`
 	Total         int `json:"total"`
 	Start         int `json:"start"`
-	Items         []*NftItem `json:"items"`
+	Items         []*NftInfo `json:"items"`
 }
 
 type GalleryResp struct {

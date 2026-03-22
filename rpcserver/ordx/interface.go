@@ -931,12 +931,10 @@ func (s *Model) GetGalleryWithId(id string, start, limit int) (*rpcwire.GalleryI
 	items := gallery.Items[start:end]
 	
 	for _, nftId := range items {
-		info := s.indexer.GetNftInfo(nftId)
-		if info == nil {
+		item, err := s.GetNftInfo(nftId)
+		if err != nil {
 			continue
 		}
-
-		item := s.nftToItem(info)
 		ret.Items = append(ret.Items, item)
 	}
 	
@@ -969,12 +967,10 @@ func (s *Model) GetCollectionWithId(id string, start, limit int) (*rpcwire.Colle
 	items := collection.Items[start:end]
 	
 	for _, nftId := range items {
-		info := s.indexer.GetNftInfo(nftId)
-		if info == nil {
+		item, err := s.GetNftInfo(nftId)
+		if err != nil {
 			continue
 		}
-
-		item := s.nftToItem(info)
 		ret.Items = append(ret.Items, item)
 	}
 	

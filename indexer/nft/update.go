@@ -792,13 +792,31 @@ func (p *NftIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*comm
 	common.Log.Infof("NftIndexer.UpdateTransfer preload takes %v", time.Since(startTime))
 }
 
+func retrieveValue(v any) string {
+	r, ok := v.(string)
+	if ok {
+		return r
+	}
+	r2, ok := v.(map[any]any)
+	if ok {
+		r3 := convertmap(r2)
+		for k, v := range r3 {
+			lk := strings.ToLower(k)
+			if lk == "name" {
+				return v.(string)
+			}
+		}
+	}
+	return ""
+}
+
 func retrieveTitle(tm map[string]any) string {
 	for k, v := range tm {
 		lk := strings.ToLower(k)
 		if lk == "title" || 
 		lk == "collection" ||
 		lk == "collection title" {
-			return v.(string)
+			return retrieveValue(v)
 		}
 	}
 	return ""
@@ -810,7 +828,7 @@ func retrieveAuthor(tm map[string]any) string {
 		if lk == "author" || 
 		lk == "creator" || 
 		lk == "artist" {
-			return v.(string)
+			return retrieveValue(v)
 		}
 	}
 	return ""
@@ -820,7 +838,7 @@ func retrieveDescription(tm map[string]any) string {
 	for k, v := range tm {
 		lk := strings.ToLower(k)
 		if lk == "description" {
-			return v.(string)
+			return retrieveValue(v)
 		}
 	}
 	return ""
