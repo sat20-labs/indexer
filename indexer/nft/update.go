@@ -1009,8 +1009,6 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 				Title: title,
 				Description: desc,
 			}
-			p.galleryMap[nft.Base.Id] = gallery 
-			p.status.GalleryCount++
 		}
 		for _, item := range decodedData.Items {
 			id := common.ParseInscriptionId(item.InscriptionId)
@@ -1018,6 +1016,12 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 			if child != nil {
 				gallery.Items = append(gallery.Items, child.Base.Id)
 			}
+		}
+		if len(gallery.Items) > 0 {
+			p.galleryMap[nft.Base.Id] = gallery 
+			p.status.GalleryCount++
+		} else {
+			common.Log.Infof("%s is empty gallery", nft.Base.InscriptionId)
 		}
 	}
 }
