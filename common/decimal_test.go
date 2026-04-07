@@ -18,6 +18,12 @@ func TestDecimal(t *testing.T) {
 		d4 := DecimalMulV2(d2, d1)
 		fmt.Printf("d4  string: %s\n", d4.String())
 
+		d11, _ := NewDecimalFromString("1.123456", 6)
+		d12, _ := NewDecimalFromString("0.0015", 4)
+		d13 := d11.Clone()
+		d11.AddInPlace(d12)
+		fmt.Printf("d1: %s %s\n", d13.String(), d11.String())
+
 		buf, err := json.Marshal(d4)
 		if err != nil {
 			t.Fatal(err)

@@ -413,12 +413,23 @@ func (d *Decimal) AddInPlace(other *Decimal) {
         return
     }
 
+	var bVal *big.Int
     if d.Precision != other.Precision {
-        panic("decimal precision mismatch")
-    }
+        // 对齐 other 到 d 的精度
+		bVal = new(big.Int).Set(other.Value)
+		if d.Precision > other.Precision {
+			factor := precisionFactor[d.Precision-other.Precision]
+			bVal = bVal.Mul(bVal, factor)
+		} else if d.Precision < other.Precision {
+			factor := precisionFactor[other.Precision-d.Precision]
+			bVal = bVal.Div(bVal, factor)
+		}
+    } else {
+		bVal = other.Value
+	}
 
     // big.Int.Add 在 z 已存在时不会分配
-    d.Value.Add(d.Value, other.Value)
+    d.Value.Add(d.Value, bVal)
 }
 
 
