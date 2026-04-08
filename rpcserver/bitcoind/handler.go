@@ -485,7 +485,7 @@ func (s *Service) feeSummary(c *gin.Context) {
 		return
 	}
 	// BTC/kb -> sat/vb
-	resp.Data.List[0].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
+	resp.Data.List[0].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 3, 64)
 
 	ret, err = bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(3, "ECONOMICAL")
 	if err != nil {
@@ -494,7 +494,7 @@ func (s *Service) feeSummary(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	resp.Data.List[1].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
+	resp.Data.List[1].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 3, 64)
 
 	ret, err = bitcoin_rpc.ShareBitconRpc.EstimateSmartFeeWithMode(1, "CONSERVATIVE")
 	if err != nil {
@@ -503,7 +503,7 @@ func (s *Service) feeSummary(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	resp.Data.List[2].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 2, 64)
+	resp.Data.List[2].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 3, 64)
 	c.JSON(http.StatusOK, resp)
 }
 
