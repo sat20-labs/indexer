@@ -9,8 +9,6 @@ const (
 	ASSET_TYPE_FT     = "f"
 	ASSET_TYPE_EXOTIC = "e"
 	ASSET_TYPE_NS     = "n"
-
-	ASSET_TYPE_COLLECTION = "c" // 某种ordinals的集合，其ticker名字是集合名称+id
 )
 
 const INVALID_INSCRIPTION_NUM = int64(math.MaxInt64) // 9223372036854775807
