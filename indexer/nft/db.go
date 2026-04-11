@@ -145,6 +145,14 @@ func GetDisabledSatKey(sat int64) string {
 	return fmt.Sprintf("%s%d", DB_PREFIX_DISABLED_SAT, sat)
 }
 
+func GetCollectionKey(parent int64) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_COLLECTION, parent)
+}
+
+func GetGalleryKey(parent int64) string {
+	return fmt.Sprintf("%s%d", DB_PREFIX_GALLERY, parent)
+}
+
 func ParseSatKey(input string) (int64, error) {
 	if !strings.HasPrefix(input, DB_PREFIX_SAT) {
 		return -1, fmt.Errorf("invalid string format, %s", input)
@@ -244,6 +252,35 @@ func loadAllDisalbedSatsFromDB(ldb common.KVDB) map[int64]bool {
 	})
 
 	return result
+}
+
+func ParseCollectionKey(input string) (int64, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_COLLECTION) {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	parts := strings.Split(input, "-")
+	if len(parts) != 2 {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	parent, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return -1, fmt.Errorf("invalid string format, %s", input)
+	}
+	return parent, nil
+}
+
+func loadCollectionFromDB(parent int64, ldb common.KVDB) (*CollectionInfo, error) {
+	key := GetCollectionKey(parent)
+	var value CollectionInfo
+	err := db.GetValueFromDB([]byte(key), &value, ldb)
+	return &value, err
+}
+
+func loadGalleryFromDB(parent int64, ldb common.KVDB) (*GalleryInfo, error) {
+	key := GetGalleryKey(parent)
+	var value GalleryInfo
+	err := db.GetValueFromDB([]byte(key), &value, ldb)
+	return &value, err
 }
 
 func saveDisabledSatToDB(sat int64, value []byte, ldb common.KVDB) error {

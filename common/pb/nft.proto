@@ -4,6 +4,30 @@ package pb.common;
 
 option go_package = "/common/pb";
 
+message InscribeTag {
+    int32 id = 1;
+    bytes data = 2;
+}
+
+
+message InscribeBaseContentV2 {
+    string inscription_id = 1;
+    uint64 inscription_address = 2;
+    int32 block_height = 3;
+    int64 block_time = 4;
+    uint64 content_id = 7;
+    repeated InscribeTag tags = 8;
+    int64 id = 15;          // nftId
+    int64 sat = 16;         // ordinal
+    uint64 output = 17;     // inscribing output
+    int64 outpoint = 18;    // offset in output when inscribing
+    int32 curse_type = 19;
+    int32 reinscription = 20;
+    string typeName = 21;
+    bytes user_data = 22;
+}
+
+
 message InscribeBaseContent {
     string inscription_id = 1;
     uint64 inscription_address = 2;
@@ -15,16 +39,18 @@ message InscribeBaseContent {
     bytes meta_protocol = 8;
     bytes meta_data = 9;
     bytes content_encoding = 10;
-    string parent = 11;
+    repeated string parents = 11;
     string delegate = 12;
-    int64 id = 13;          // nftId
-    int64 sat = 14;         // ordinal
-    uint64 output = 15;     // inscribing output
-    int64 outpoint = 16;    // offset in output when inscribing
-    int32 curse_type = 17;
-    int32 reinscription = 18;
-    string typeName = 19;
-    bytes user_data = 20;
+    bytes properties = 13;
+    bytes property_encoding = 14;
+    int64 id = 15;          // nftId
+    int64 sat = 16;         // ordinal
+    uint64 output = 17;     // inscribing output
+    int64 outpoint = 18;    // offset in output when inscribing
+    int32 curse_type = 19;
+    int32 reinscription = 20;
+    string typeName = 21;
+    bytes user_data = 22;
 }
 
 message NftsInSat {

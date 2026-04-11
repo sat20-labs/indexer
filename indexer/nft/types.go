@@ -4,23 +4,23 @@ import (
 	"github.com/sat20-labs/indexer/indexer/nft/pb"
 )
 
-const NFT_DB_VERSION = "1.0.0"
+const NFT_DB_VERSION = "1.0.1" // support on-chain collection and gallery
 const NFT_DB_VERSION_KEY = "nsdbver"
 const NFT_STATUS_KEY = "nftstatus"
 
 const (
-	DB_PREFIX_SAT      = "s-"  // sat -> NftsInSat
-	DB_PREFIX_NFT      = "n-"  // nftId -> Nft
-	DB_PREFIX_UTXO     = "u-"  // utxo -> []sat  所有存在资产的utxo
-	DB_PREFIX_BUCK     = "bk-" // buck ->
-	DB_PREFIX_INSC     = "i-"  // inscriptionId -> sat
-	DB_PREFIX_INSCADDR = "a_"  // addressId+nftId -> sat 
-	DB_PREFIX_IT       = "it-" // content type id -> content type
-
-	DB_PREFIX_IC = "ic-" // contentId -> content
-	DB_PREFIX_CI = "ci-" // content -> id
-
-	DB_PREFIX_DISABLED_SAT = "ds-" // disabled sat
+	DB_PREFIX_SAT      		= "a-" // sat -> NftsInSat
+	DB_PREFIX_NFT      		= "b-" // nftId -> Nft
+	DB_PREFIX_UTXO     		= "c-" // utxo -> []sat  所有存在资产的utxo
+	DB_PREFIX_BUCK    		= "d-" // buck ->
+	DB_PREFIX_INSC     		= "e-" // inscriptionId -> sat
+	DB_PREFIX_INSCADDR 		= "f_" // addressId+nftId -> sat 
+	DB_PREFIX_IT       		= "g-" // content type id -> content type
+	DB_PREFIX_IC 	   		= "h-" // contentId -> content
+	DB_PREFIX_CI 	   		= "i-" // content -> id
+	DB_PREFIX_DISABLED_SAT 	= "j-" // disabled sat
+	DB_PREFIX_COLLECTION 	= "k-" // parent->children
+	DB_PREFIX_GALLERY   	= "l-" //
 )
 
 type TransferAction struct {

@@ -59,14 +59,17 @@ func fromRawEnvelope(raw *RawEnvelope) *ParsedEnvelope {
 		}
 	}
 
-	contentEncoding := CONTENT_ENCODING_TAG.removeField(fields)
-	contentType := CONTENT_TYPE_TAG.removeField(fields)
-	delegate := DELEGATE_TAG.removeField(fields)
-	metadata := METADATA_TAG.removeField(fields)
-	metaprotocol := METAPROTOCOL_TAG.removeField(fields)
-	parent := PARENT_TAG.removeField(fields)
-	pointer := POINTER_TAG.removeField(fields)
-	runeName := RUNE_NAME_TAG.removeField(fields)
+	contentEncoding := CONTENT_ENCODING_TAG.take(fields)
+	contentType := CONTENT_TYPE_TAG.take(fields)
+	delegate := DELEGATE_TAG.take(fields)
+	metadata := METADATA_TAG.take(fields)
+	metaprotocol := METAPROTOCOL_TAG.take(fields)
+	parents := PARENT_TAG.takeArray(fields)
+	pointer := POINTER_TAG.take(fields)
+	runeName := RUNE_NAME_TAG.take(fields)
+	properties := PROPERTIES_TAG.take(fields)
+	propertyEncoding := PROPERTY_ENCODING_TAG.take(fields)
+
 
 	unrecognizedEvenField := false
 	for tagStr := range fields {
@@ -95,10 +98,12 @@ func fromRawEnvelope(raw *RawEnvelope) *ParsedEnvelope {
 		IncompleteField:       incompleteField,
 		Metadata:              metadata,
 		Metaprotocol:          metaprotocol,
-		Parent:                parent,
+		Parents:               parents,
 		Pointer:               pointer,
 		RuneName:              runeName,
 		UnrecognizedEvenField: unrecognizedEvenField,
+		Properties:            properties,
+		PropertyEncoding:      propertyEncoding,
 	}
 	return &ParsedEnvelope{
 		Input:   raw.Input,

@@ -31,6 +31,8 @@ type NftStatus struct {
 	Unbound          uint64 // 负数铭文数量，指没有绑定到聪上的铭文。能检索到，但无法转移。
 	ContentCount     uint64 // content count
 	ContentTypeCount int    // content type count
+	GalleryCount     uint64
+	CollectionCount  uint64
 }
 
 type NftsInSat = pb.NftsInSat
@@ -39,3 +41,50 @@ func (p *NftStatus) Clone() *NftStatus {
 	c := *p
 	return &c
 }
+
+type Properties struct {
+    Items      []Item      `cbor:"0,keyasint,omitempty"`
+    Attributes *Attributes `cbor:"1,keyasint,omitempty"`
+    GalleryTx  []byte      `cbor:"2,keyasint,omitempty"`
+}
+
+type Item struct {
+    InscriptionId []byte      `cbor:"0,keyasint,omitempty"`
+    Attributes    *Attributes `cbor:"1,keyasint,omitempty"`
+    Index         uint64      `cbor:"2,keyasint,omitempty"`
+}
+
+type Attributes struct {
+    Title  string            `cbor:"0,keyasint,omitempty"`
+    Traits map[string]any    `cbor:"1,keyasint,omitempty"`
+}
+
+
+type GalleryInfo struct {
+	Id 		int64
+	NftId   int64
+	InscriptionId string
+	Title   string
+	Author  string
+	Description string
+	Items   []int64 // child id list
+}
+
+func (p *GalleryInfo) Clone() *GalleryInfo {
+	if p == nil {
+		return nil
+	}
+	n := &CollectionInfo{
+		Id: p.Id,
+		NftId: p.NftId,
+		InscriptionId: p.InscriptionId,
+		Title: p.Title,
+		Author: p.Author,
+		Description: p.Description,
+		Items: make([]int64, len(p.Items)),
+	}
+	copy(n.Items, p.Items)
+	return n
+}
+
+type CollectionInfo = GalleryInfo

@@ -84,6 +84,8 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.GET(proxy+"/nft/address/:address", s.handle.getNftsWithAddress)
 	r.GET(proxy+"/nft/sat/:sat", s.handle.getNftsWithSat)
 	r.GET(proxy+"/nft/inscription/:id", s.handle.getNftWithInscriptionId)
+	r.GET(proxy+"/nft/gallery/:id", s.handle.getGallery)
+	r.GET(proxy+"/nft/collection/:id", s.handle.getCollection)
 
 	/////////////////////////////////////////
 	// version 2.0 interface for STP

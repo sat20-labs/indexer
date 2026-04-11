@@ -16,6 +16,7 @@ type InscribeInfo struct {
 	InOffset int64
 	UtxoId   uint64
 	Nft      *common.Nft
+	Tx       *common.Transaction
 }
 
 type SatInfo struct {
@@ -25,6 +26,9 @@ type SatInfo struct {
 	CurseCount int // 包括vindicated。 CurseCount+2 <= len(Nfts)，至少有两个非诅咒的铭文，意味着该sat是reinscription
 	Nfts       map[*common.Nft]bool
 }
+
+type CollectionInfo = common.GalleryInfo
+type GalleryInfo = common.GalleryInfo
 
 func (p *SatInfo) ToNftsInSat(sat int64) *common.NftsInSat {
 	nfts := &common.NftsInSat{
@@ -63,6 +67,9 @@ type NftIndexer struct {
 	addedContentIdMap     map[uint64]bool
 	inscriptionToNftIdMap map[string]*common.Nft // inscriptionId->nftId
 	nftIdToinscriptionMap map[int64]*common.Nft  // nftId->inscriptionId
+
+	collectionMap         map[int64]*CollectionInfo // parent id 
+	galleryMap            map[int64]*GalleryInfo // gallery id
 
 	// 暂时不需要清理
 	contentTypeMap     map[int]string // ctId -> content type
@@ -110,6 +117,9 @@ func (p *NftIndexer) Init(baseIndexer *base.BaseIndexer,
 	p.addedContentIdMap = make(map[uint64]bool)
 	p.inscriptionToNftIdMap = make(map[string]*common.Nft)
 	p.nftIdToinscriptionMap = make(map[int64]*common.Nft)
+
+	p.collectionMap = make(map[int64]*CollectionInfo)
+	p.galleryMap = make(map[int64]*GalleryInfo)
 
 	p.contentTypeMap = getContentTypesFromDB(p.db)
 	p.contentTypeToIdMap = make(map[string]int)
@@ -175,6 +185,16 @@ func (p *NftIndexer) Clone(baseIndexer *base.BaseIndexer) *NftIndexer {
 		newInst.nftIdToinscriptionMap[k] = v
 	}
 
+	newInst.collectionMap = make(map[int64]*CollectionInfo)
+	for k, v := range p.collectionMap {
+		newInst.collectionMap[k] = v.Clone()
+	}
+
+	newInst.galleryMap = make(map[int64]*GalleryInfo)
+	for k, v := range p.galleryMap {
+		newInst.galleryMap[k] = v.Clone()
+	}
+
 	newInst.contentTypeMap = make(map[int]string)
 	newInst.contentTypeToIdMap = make(map[string]int)
 	for k, v := range p.contentTypeMap {
@@ -233,6 +253,12 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 	}
 	for k := range another.contentTypeToIdMap {
 		delete(p.contentTypeToIdMap, k)
+	}
+	for k := range another.collectionMap {
+		delete(p.collectionMap, k)
+	}
+	for k := range another.galleryMap {
+		delete(p.galleryMap, k)
 	}
 
 	p.nftAdded = append([]*common.Nft(nil), p.nftAdded[len(another.nftAdded):]...)
@@ -349,6 +375,36 @@ func (b *NftIndexer) getInscriptionIdByNftId(id int64) (string, error) {
 	}
 
 	return nft.Base.InscriptionId, err
+}
+
+func (b *NftIndexer) getCollection(parent int64) (*CollectionInfo, error) {
+	ids, ok := b.collectionMap[parent]
+	if ok {
+		return ids, nil
+	}
+
+	var err error
+	ids, err = loadCollectionFromDB(parent, b.db)
+	if err == nil {
+		b.collectionMap[parent] = ids
+	}
+
+	return ids, err
+}
+
+func (b *NftIndexer) getGallery(parent int64) (*GalleryInfo, error) {
+	ids, ok := b.galleryMap[parent]
+	if ok {
+		return ids, nil
+	}
+
+	var err error
+	ids, err = loadGalleryFromDB(parent, b.db)
+	if err == nil {
+		b.galleryMap[parent] = ids
+	}
+
+	return ids, err
 }
 
 // 注意

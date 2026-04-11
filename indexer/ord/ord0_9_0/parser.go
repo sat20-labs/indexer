@@ -221,7 +221,7 @@ fieldLoop:
 	return &ordCommon.Inscription{
 		Body:                  body,
 		ContentType:           contentType,
-		Parent:                parent,
+		Parents:               [][]byte{parent},
 		UnrecognizedEvenField: unrecognizedEvenField,
 	}, nil
 }

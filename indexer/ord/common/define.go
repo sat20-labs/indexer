@@ -65,14 +65,19 @@ var (
 	PARENT_TAG           = []byte{0x03}
 	METAPROTOCOL_TAG     = []byte{0x05}
 	METADATA_TAG         = []byte{0x07}
-	DELEGATE_TAG         = []byte{0x0B}
 	CONTENT_ENCODING_TAG = []byte{0x09}
+	DELEGATE_TAG         = []byte{0x0B}
+	RUNE_NAME_TAG        = []byte{13}
+
+	NOTE_TAG              = []byte{15} // 0.26
+    PROPERTIES_TAG        = []byte{17} // 0.26
+    PROPERTY_ENCODING_TAG = []byte{19} // 0.26
 )
 
 type Inscription struct {
 	Body                  []byte // 0.9.0+
 	ContentType           []byte // 0.9.0+
-	Parent                []byte // 0.9.0+
+	Parents               [][]byte // 0.9.0+
 	UnrecognizedEvenField bool   // 0.9.0+
 	ContentEncoding       []byte // 0.14.1+
 	Delegate              []byte // 0.14.1+
@@ -82,5 +87,7 @@ type Inscription struct {
 	Metaprotocol          []byte // 0.14.1+
 	Pointer               []byte // 0.14.1+
 	RuneName              []byte // ?
+	Properties            []byte
+	PropertyEncoding      []byte
 }
 

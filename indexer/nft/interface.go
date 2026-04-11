@@ -387,12 +387,14 @@ func (p *NftIndexer) loadNftBaseConentFromDB(nftId int64, value *common.Inscribe
 				}
 			}
 		}
-		if len(value.Parent) != 0 && len(value.Parent) < 16 {
-			id, err := strconv.ParseInt(value.Parent, 16, 64)
-			if err == nil {
-				inscriptionId, err := p.getInscriptionIdByNftId(id)
+		if len(value.Parents) != 0 && len(value.Parents[0]) < 16 {
+			for i, str := range value.Parents {
+				id, err := strconv.ParseInt(str, 16, 64)
 				if err == nil {
-					value.Parent = inscriptionId
+					inscriptionId, err := p.getInscriptionIdByNftId(id)
+					if err == nil {
+						value.Parents[i] = inscriptionId
+					}
 				}
 			}
 		}
@@ -407,4 +409,64 @@ func (p *NftIndexer) IsEnabled() bool {
 
 func (p *NftIndexer) GetContentTye(t int) string {
 	return p.contentTypeMap[t]
+}
+
+// key: nft id
+func (p *NftIndexer) GetGalleryWithId(id int64) *GalleryInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	gallery, err := p.getGallery(id)
+	if err != nil {
+		return nil
+	}
+
+	return gallery
+}
+
+func (p *NftIndexer) GetGalleryWithInscriptionId(id string) *GalleryInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	nft := p.getNftWithInscriptionId(id)
+	if nft == nil {
+		return nil
+	}
+
+	gallery, err := p.getGallery(nft.Base.Id)
+	if err != nil {
+		return nil
+	}
+
+	return gallery
+}
+
+// key: nft id
+func (p *NftIndexer) GetCollectionWithId(id int64) *CollectionInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	collection, err := p.getCollection(id)
+	if err != nil {
+		return nil
+	}
+
+	return collection
+}
+
+func (p *NftIndexer) GetCollectionWithInscriptionId(id string) *CollectionInfo {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	nft := p.getNftWithInscriptionId(id)
+	if nft == nil {
+		return nil
+	}
+
+	collection, err := p.getCollection(nft.Base.Id)
+	if err != nil {
+		return nil
+	}
+
+	return collection
 }

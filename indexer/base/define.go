@@ -11,7 +11,8 @@ type SyncStats struct {
 	AllUtxoCount   uint64
 	AddressCount   uint64
 	UtxoCount      uint64
-	TotalSats      int64
+	TotalSats      int64 // 没有去掉burned的聪
+	BurnedSats     int64 // 测试网可能会出现，指coinbase的输出聪比fee还少的情况
 }
 
 type IrregularSubsidy struct {
