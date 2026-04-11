@@ -530,7 +530,7 @@ func (p *NftIndexer) CheckSelf() bool {
 	common.Log.Infof("2: utxo %d, sats %d", len(utxosInT2), len(satsInT2))
 
 	bs := NewBuckStore(p.db)
-	lastkey := bs.GetLastKey() // 仅仅是正数铭文id
+	lastkey := bs.GetLastKey() // 仅仅是正数铭文id + 1 = blessCount + vindicated
 	var buckmap map[int64]*BuckValue
 	getbuck := func() {
 		//defer wg.Done()
@@ -640,8 +640,8 @@ func (p *NftIndexer) CheckSelf() bool {
 	}
 
 	count := p.status.Count + p.status.CurseCount - uint64(len(p.nftAdded))
-	if count != uint64(len(nftsInT1)) || p.status.Count != uint64(lastkey+1) {
-		common.Log.Errorf("nft count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
+	if count != uint64(len(nftsInT1)) || count != uint64(lastkey+1) + uint64(curseCount) {
+		common.Log.Errorf("nft count different %d %d %d", count, len(nftsInT1), lastkey+1+int64(curseCount))
 		result = false
 	}
 
