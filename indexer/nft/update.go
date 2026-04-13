@@ -214,6 +214,9 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 	}
 
 	p.PrepareUpdateTransfer(block, coinbase)
+
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	startTime := time.Now()
 
 	// prepare 2: calc inscription number
