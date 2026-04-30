@@ -23,7 +23,6 @@ func (s *Handle) getNonce(c *gin.Context) {
 		return
 	}
 
-
 	result, err := s.model.GetNonce(&req)
 	if err != nil {
 		resp.Code = -1
@@ -102,11 +101,10 @@ func (s *Handle) delKVs(c *gin.Context) {
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()
-	} 
+	}
 
 	c.JSON(http.StatusOK, resp)
 }
-
 
 func (s *Handle) registerPubKey(c *gin.Context) {
 	resp := &rpcwire.RegisterPubKeyResp{
@@ -130,6 +128,18 @@ func (s *Handle) registerPubKey(c *gin.Context) {
 		resp.Msg = err.Error()
 	} else {
 		resp.PubKey = result
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (s *Handle) getIndexerPubKey(c *gin.Context) {
+	resp := &rpcwire.IndexerPubKeyResp{
+		BaseResp: rpcwire.BaseResp{
+			Code: 0,
+			Msg:  "ok",
+		},
+		PubKey: s.model.GetIndexerPubKey(),
 	}
 
 	c.JSON(http.StatusOK, resp)

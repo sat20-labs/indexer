@@ -145,26 +145,24 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 
 	pkStr := hex.EncodeToString(pubkey)
 	result := make([]*common.KeyValue, 0)
-	
-		for _, k := range keys {
-			key := getKvKey(pkStr, k)
 
-			item, err := b.kvDB.Read([]byte(key))
-			if err != nil {
-				continue
-			}
-			var value common.KeyValue
-			
-			err = db.DecodeBytes(item, &value)
-			if err != nil {
-				common.Log.Errorf("decoding key %s failed, %v", key, err)
-				continue
-			}
+	for _, k := range keys {
+		key := getKvKey(pkStr, k)
 
-			result = append(result, &value)
+		item, err := b.kvDB.Read([]byte(key))
+		if err != nil {
+			continue
 		}
-		
-	
+		var value common.KeyValue
+
+		err = db.DecodeBytes(item, &value)
+		if err != nil {
+			common.Log.Errorf("decoding key %s failed, %v", key, err)
+			continue
+		}
+
+		result = append(result, &value)
+	}
 
 	return result, nil
 }
@@ -217,4 +215,14 @@ func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
 	}
 
 	return indexerPubkey, nil
+}
+
+func (b *IndexerMgr) GetIndexerPubKey() string {
+	b.rpcEnter()
+	defer b.rpcLeft()
+
+	if b.cfg.PubKey != "" {
+		return b.cfg.PubKey
+	}
+	return common.GetBootstrapPubKey()
 }

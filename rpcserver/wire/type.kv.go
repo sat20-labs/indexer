@@ -14,15 +14,15 @@ type GetNonceResp struct {
 }
 
 type GetValueReq struct {
-	Keys 		[]string `json:"keys"`
-	Nonce 		[]byte `json:"Nonce"`
-	PubKey 		[]byte `json:"pubkey"`
-	Signature 	[]byte `json:"signature"`
+	Keys      []string `json:"keys"`
+	Nonce     []byte   `json:"Nonce"`
+	PubKey    []byte   `json:"pubkey"`
+	Signature []byte   `json:"signature"`
 }
 
 type GetValueResp struct {
 	BaseResp
-	Value  *KeyValue `json:"value"`
+	Value *KeyValue `json:"value"`
 }
 
 type GetValuesResp struct {
@@ -31,10 +31,10 @@ type GetValuesResp struct {
 }
 
 type PutKValueReq struct {
-	Values []*KeyValue `json:"values"`
-	Nonce 		[]byte `json:"Nonce"`
-	PubKey 		[]byte `json:"pubkey"`
-	Signature 	[]byte `json:"signature"`
+	Values    []*KeyValue `json:"values"`
+	Nonce     []byte      `json:"Nonce"`
+	PubKey    []byte      `json:"pubkey"`
+	Signature []byte      `json:"signature"`
 }
 
 type PutKValueResp struct {
@@ -42,22 +42,26 @@ type PutKValueResp struct {
 }
 
 type DelKValueReq struct {
-	Keys 		[]string `json:"keys"`
-	Nonce 		[]byte `json:"Nonce"`
-	PubKey 		[]byte `json:"pubkey"`
-	Signature 	[]byte `json:"signature"`
+	Keys      []string `json:"keys"`
+	Nonce     []byte   `json:"Nonce"`
+	PubKey    []byte   `json:"pubkey"`
+	Signature []byte   `json:"signature"`
 }
 
 type DelKValueResp struct {
 	BaseResp
 }
 
-
 type RegisterPubKeyReq struct {
-	PubKey  string `json:"pubkey"`
+	PubKey string `json:"pubkey"`
 }
 
 type RegisterPubKeyResp struct {
 	BaseResp
-	PubKey  string `json:"pubkey"`
+	PubKey string `json:"pubkey"`
+}
+
+type IndexerPubKeyResp struct {
+	BaseResp
+	PubKey string `json:"pubkey"`
 }

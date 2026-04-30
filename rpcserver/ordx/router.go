@@ -44,7 +44,6 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// for test
 	r.POST(proxy+"/utxos/exist", s.handle.getExistingUtxos)
 
-
 	// inscribe
 	// 检查某个ticker是否可以deploy
 	r.GET(proxy+"/deploy/:ticker", s.handle.isDeployAllowed)
@@ -121,4 +120,5 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	r.POST(proxy+"/kv/del", s.handle.delKVs)
 	// 注册公钥，并返回索引器公钥
 	r.POST(proxy+"/kv/register", s.handle.registerPubKey)
+	r.GET(proxy+"/v3/indexer/pubkey", s.handle.getIndexerPubKey)
 }

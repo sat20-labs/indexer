@@ -30,7 +30,7 @@ func (s *Model) GetNonce(req *rpcwire.GetNonceReq) ([]byte, error) {
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
-		if t > now && t - now + 10 * time.Second.Microseconds() < time.Hour.Microseconds() {
+		if t > now && t-now+10*time.Second.Microseconds() < time.Hour.Microseconds() {
 			return generateNonce(pkHex, t), nil
 		}
 	}
@@ -62,13 +62,13 @@ func (s *Model) GetKVs(keys []string) ([]*rpcwire.KeyValue, error) {
 	return nil, nil
 }
 
-func (s *Model) PutKVs(req *rpcwire.PutKValueReq) (error) {
+func (s *Model) PutKVs(req *rpcwire.PutKValueReq) error {
 
 	now := time.Now().UnixMicro()
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
-		if t - now > time.Hour.Microseconds() {
+		if t-now > time.Hour.Microseconds() {
 			return fmt.Errorf("nonce expired")
 		}
 	}
@@ -89,12 +89,12 @@ func (s *Model) PutKVs(req *rpcwire.PutKValueReq) (error) {
 	return s.indexer.PutKVs(req.Values)
 }
 
-func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
+func (s *Model) DelKVs(req *rpcwire.DelKValueReq) error {
 	now := time.Now().UnixMicro()
 	pkHex := hex.EncodeToString(req.PubKey)
 	t, ok := s.nonceMap[pkHex]
 	if ok {
-		if t - now > time.Hour.Microseconds() {
+		if t-now > time.Hour.Microseconds() {
 			return fmt.Errorf("nonce expired")
 		}
 	}
@@ -115,7 +115,10 @@ func (s *Model) DelKVs(req *rpcwire.DelKValueReq) (error) {
 	return s.indexer.DelKVs(req.PubKey, req.Keys)
 }
 
-
 func (s *Model) RegisterPubKey(req *rpcwire.RegisterPubKeyReq) (string, error) {
 	return s.indexer.RegisterPubKey(req.PubKey)
+}
+
+func (s *Model) GetIndexerPubKey() string {
+	return s.indexer.GetIndexerPubKey()
 }

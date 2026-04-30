@@ -37,7 +37,6 @@ type Indexer interface {
 	HasAssetInUtxo(utxo uint64, excludingExotic bool) bool
 	// return: ticker -> asset info (asset ranges)
 	GetAssetsWithUtxo(utxo uint64) map[common.TickerName]common.AssetOffsets
-	
 
 	GetExotics(utxoId uint64) map[string]common.AssetOffsets
 	GetExoticsWithType(utxoId uint64, typ string) common.AssetOffsets
@@ -123,6 +122,7 @@ type Indexer interface {
 	DelKVs(pubkey []byte, keys []string) error
 	GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error)
 
+	GetIndexerPubKey() string
 	RegisterPubKey(string) (string, error)
 
 	// mempool
