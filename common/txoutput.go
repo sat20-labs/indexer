@@ -650,7 +650,24 @@ func (p *TxOutput) Zero() bool {
 	return p == nil || (p.OutValue.Value == 0 && len(p.Assets) == 0)
 }
 
+func (p *TxOutput) HasAsset() bool {
+	if len(p.Assets) == 0 {
+		return false
+	}
+	for _, asset := range p.Assets {
+		invalid := p.Invalids[asset.Name]
+		if invalid {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func (p *TxOutput) HasPlainSat() bool {
+	if p.OutValue.Value == 0 {
+		return false
+	}
 	if len(p.Assets) == 0 {
 		return true
 	}
@@ -719,6 +736,12 @@ func (p *TxOutput) Append(another *TxOutput) error {
 
 	if p.OutValue.Value+another.OutValue.Value < 0 {
 		return fmt.Errorf("out of bounds")
+	}
+
+	for name, invalid := range p.Invalids {
+		if invalid {
+			p.RemoveAsset(&name)
+		}
 	}
 
 	builder := NewTxAssetsBuilder(len(another.Assets))
@@ -1024,6 +1047,12 @@ func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput,
 func (p *TxOutput) Merge(another *TxOutput) error {
 	if another == nil {
 		return nil
+	}
+
+	for name, invalid := range p.Invalids {
+		if invalid {
+			p.RemoveAsset(&name)
+		}
 	}
 
 	builder := NewTxAssetsBuilder(len(another.Assets))

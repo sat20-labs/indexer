@@ -271,6 +271,8 @@ func (s *BRC20Indexer) GetTransferHistory(tick string, start, limit int) []*comm
 	return result[start:end]
 }
 
+// 该接口返回mint和transfer铭文的相关资产信息，已经转账过的铭文也会返回，只是标记invalid
+// TODO mint铭文没有返回，需要增加
 func (s *BRC20Indexer) GetUtxoAssets(utxoId uint64) *common.BRC20TransferInfo {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
