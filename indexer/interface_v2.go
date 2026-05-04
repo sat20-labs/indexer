@@ -287,6 +287,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 		}
 	}
 	for k, v := range brc20Asset {
+		if v.IsZero() {
+			continue
+		}
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
 	}
