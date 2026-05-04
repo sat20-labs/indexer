@@ -58,8 +58,12 @@ func (s *Handle) getUtxosWithTickerV3(c *gin.Context) {
 	if err != nil {
 		limit = 100
 	}
+	invalid, err := strconv.ParseBool(c.DefaultQuery("invalid", "false"))
+	if err != nil {
+		invalid = false
+	}
 
-	result, total, err := s.model.GetUtxosWithAssetNameV3(address, ticker, int(start), limit)
+	result, total, err := s.model.GetUtxosWithAssetNameV3(address, ticker, int(start), limit, invalid)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

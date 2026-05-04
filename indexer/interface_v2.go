@@ -47,9 +47,11 @@ func (b *IndexerMgr) containAsset(output *common.TxOutput, ticker *common.AssetN
 // 不包含已经广播但未确认的输出，也不包含已经广播但未确认的输入
 // TODO，需要将已经广播的但未确认的输入加上，才不会导致新的tx无法构造
 // return: utxoId->asset
-func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName) ([]*common.AssetsInUtxo, error) {
+func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *common.AssetName, includeInvalid bool) ([]*common.AssetsInUtxo, error) {
 	b.rpcEnter()
 	defer b.rpcLeft()
+
+	excludingInvalid := !includeInvalid
 
 	//t1 := time.Now()
 	utxos, err := b.GetUTXOsWithAddress(address) // 过滤已经广播的utxo
@@ -65,7 +67,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTickV3(address string, ticker *co
 		if err != nil {
 			continue
 		}
-		info := b.GetTxOutputWithUtxoV2(utxo, true)
+		info := b.GetTxOutputWithUtxoV2(utxo, excludingInvalid)
 		if info == nil {
 			continue
 		}

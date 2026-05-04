@@ -167,11 +167,11 @@ func (s *Model) GetLockedUtxoInAddress(address string) ([]*common.AssetsInUtxo, 
 	return s.indexer.GetLockedUTXOsInAddress(address)
 }
 
-func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) ([]*common.AssetsInUtxo, int, error) {
+func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int, invalid bool) ([]*common.AssetsInUtxo, int, error) {
 	result := make([]*common.AssetsInUtxo, 0)
 	assetName := common.NewAssetNameFromString(name)
 	//t1 := time.Now()
-	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV3(address, assetName)
+	outputMap, err := s.indexer.GetAssetUTXOsInAddressWithTickV3(address, assetName, invalid)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -181,11 +181,26 @@ func (s *Model) GetUtxosWithAssetNameV3(address, name string, start, limit int) 
 		if s.indexer.IsUtxoSpent(txOut.OutPoint) {
 			continue
 		}
+		if invalid && !hasInvalidAsset(txOut, assetName) {
+			continue
+		}
 		result = append(result, txOut)
 	}
 	//common.Log.Infof("filtering takes %v", time.Since(t1))
 
 	return result, len(result), nil
+}
+
+func hasInvalidAsset(txOut *common.AssetsInUtxo, assetName *common.AssetName) bool {
+	if txOut == nil || assetName == nil || assetName.Protocol != common.PROTOCOL_NAME_BRC20 {
+		return false
+	}
+	for _, asset := range txOut.Assets {
+		if asset.AssetName == *assetName && asset.Invalid {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Model) GetHolderListV3(tickName string, start, limit uint64) ([]*rpcwire.HolderV3, uint64, error) {
