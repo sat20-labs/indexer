@@ -83,6 +83,7 @@ func GetCoreNodePubKey() string {
 	return _coreNodePubKey
 }
 
+// L1 height
 func GetStakeAssetName(height int) string {
 	if ENABLE_TESTING {
 		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT {
@@ -129,6 +130,7 @@ func GetStakeAssetNameWithHeightL2(height int) string {
 	}
 }
 
+// L1 height
 func GetStakeAssetAmt(height int) int64 {
 	if ENABLE_TESTING {
 		if height < TESTNET_STAKING_ASSET_SWITCH_HEIGHT {
