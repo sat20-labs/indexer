@@ -35,13 +35,13 @@ func TestDecimal(t *testing.T) {
 			t.Fatal(err)
 		}
 		fmt.Printf("d5  string: %s\n", d5.String())
-		
+
 		fmt.Printf("d4  string: %s\n", d4.SetPrecision(2).String())
 		//d3,_ := NewDecimalFromString("-0.49", 10)
-		fmt.Printf("d3  string: %s\n", d3.String())  
-		fmt.Printf("d3  float64: %v\n", d3.Float64())  
-		fmt.Printf("d3  Int64: %v\n", d3.Int64())  
-		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())  
+		fmt.Printf("d3  string: %s\n", d3.String())
+		fmt.Printf("d3  float64: %v\n", d3.Float64())
+		fmt.Printf("d3  Int64: %v\n", d3.Int64())
+		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())
 		fmt.Printf("d3  Floor: %v\n", d3.Floor())
 		fmt.Printf("d3  Round: %v\n", d3.Round())
 		fmt.Printf("d3  Abs: %v\n", d3.Abs())
@@ -58,31 +58,29 @@ func TestDecimal(t *testing.T) {
 		//d3,_ := NewDecimalFromString("-0.49", 10)
 		//d3,_ := NewDecimalFromString("-1.49", 10)
 		//d3,_ := NewDecimalFromString("+1.49", 10)
-		d3,_ := NewDecimalFromString("-100.0049", 10)
-		fmt.Printf("d3  string: %s\n", d3.String())  
-		fmt.Printf("d3  float64: %v\n", d3.Float64())  
-		fmt.Printf("d3  Int64: %v\n", d3.Int64())  
-		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())  
+		d3, _ := NewDecimalFromString("-100.0049", 10)
+		fmt.Printf("d3  string: %s\n", d3.String())
+		fmt.Printf("d3  float64: %v\n", d3.Float64())
+		fmt.Printf("d3  Int64: %v\n", d3.Int64())
+		fmt.Printf("d3  Ceil: %v\n", d3.Ceil())
 		fmt.Printf("d3  Floor: %v\n", d3.Floor())
 		fmt.Printf("d3  Round: %v\n", d3.Round())
 		fmt.Printf("d3  Abs: %v\n", d3.Abs())
 	}
-	
 
 	precision := int(3)
 	d0 := NewDecimal(12345, precision)
 	fmt.Printf("Decimal 1 string: %s\n", d0.String())     // 12.345
 	fmt.Printf("Decimal 1 Int64: %d\n", d0.IntegerPart()) // 12
 	fmt.Printf("Decimal 1 Float64: %f\n", d0.Float64())   // 12.345
-	
+
 	fmt.Printf("%s\n", d0.GetMaxInt64().String())
 	d01 := *d0
 	d02 := d01
 	d01.Value.SetInt64(2)
-	fmt.Printf("Decimal d0 string: %s\n", d0.String())     
-	fmt.Printf("Decimal d01 string: %s\n", d01.String())     
-	fmt.Printf("Decimal d02 string: %s\n", d02.String())     
-
+	fmt.Printf("Decimal d0 string: %s\n", d0.String())
+	fmt.Printf("Decimal d01 string: %s\n", d01.String())
+	fmt.Printf("Decimal d02 string: %s\n", d02.String())
 
 	d1 := NewDecimal(12345000000, 6)
 	fmt.Printf("Decimal 1: %s\n", d1.String()) // 123456
@@ -117,6 +115,49 @@ func TestDecimal(t *testing.T) {
 	// 测试是否溢出
 	isOverflow := d1.IsOverflowInt64()
 	fmt.Printf("Is d1 overflow Uint64: %t\n", isOverflow)
+}
+
+func TestDecimalPreservesOriginalAddBehaviorAndProvidesAlignedAdd(t *testing.T) {
+	low, err := NewDecimalFromFormatString("99.990481:6")
+	if err != nil {
+		t.Fatalf("parse low precision decimal: %v", err)
+	}
+	high, err := NewDecimalFromFormatString("190.907612312199321968:18")
+	if err != nil {
+		t.Fatalf("parse high precision decimal: %v", err)
+	}
+
+	sum := low.Add(high)
+	if got, want := sum.ToFormatString(), "290.898093:6"; got != want {
+		t.Fatalf("unexpected legacy sum: got %s want %s", got, want)
+	}
+
+	acc := low.Clone()
+	acc.AddInPlace(high)
+	if got, want := acc.ToFormatString(), "290.898093:6"; got != want {
+		t.Fatalf("unexpected legacy in-place sum: got %s want %s", got, want)
+	}
+
+	alignedSum := low.AddAlignPrecision(high)
+	if got, want := alignedSum.ToFormatString(), "290.898093312199321968:18"; got != want {
+		t.Fatalf("unexpected aligned sum: got %s want %s", got, want)
+	}
+
+	alignedAcc := low.Clone()
+	alignedAcc.AddInPlaceAlignPrecision(high)
+	if got, want := alignedAcc.ToFormatString(), "290.898093312199321968:18"; got != want {
+		t.Fatalf("unexpected aligned in-place sum: got %s want %s", got, want)
+	}
+
+	diff := alignedSum.Sub(low)
+	if got, want := diff.ToFormatString(), "190.907612312199321968:18"; got != want {
+		t.Fatalf("unexpected legacy diff after aligned sum: got %s want %s", got, want)
+	}
+
+	alignedDiff := high.SubAlignPrecision(low)
+	if got, want := alignedDiff.ToFormatString(), "90.917131312199321968:18"; got != want {
+		t.Fatalf("unexpected aligned diff: got %s want %s", got, want)
+	}
 }
 
 func TestDecimalPrecision(t *testing.T) {
@@ -178,8 +219,7 @@ func TestDecimal_Runes1(t *testing.T) {
 		}
 		fmt.Printf("Decimal 0: %s\n", d0.String())
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
-		
-	
+
 	}
 
 	{
@@ -202,8 +242,7 @@ func TestDecimal_Runes1(t *testing.T) {
 		}
 		fmt.Printf("Decimal 0: %s\n", d0.String())
 		fmt.Printf("Decimal 0: %d\n", d0.IntegerPart())
-		
-		
+
 		shift := 0
 		d := NewDecimal(10, 0)
 		for d0.IsOverflowInt64() {
@@ -282,9 +321,7 @@ func TestDecimal_Runes3(t *testing.T) {
 		fmt.Printf("amt2 %s\n", amt2.String())
 
 	}
-	
 
-	
 	supply, _ := uint128.FromString("10000000")
 	amt, _ := uint128.FromString("60")
 	convertTest(t, supply, amt)

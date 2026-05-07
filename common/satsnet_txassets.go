@@ -26,29 +26,29 @@ func NewAssetNameFromString(name string) *AssetName {
 	if len(parts) == 1 {
 		return &AssetName{
 			Protocol: PROTOCOL_NAME_ORDX,
-			Type: ASSET_TYPE_FT,
-			Ticker: parts[0],
+			Type:     ASSET_TYPE_FT,
+			Ticker:   parts[0],
 		}
 	}
 	if len(parts) == 2 {
 		return &AssetName{
 			Protocol: parts[0],
-			Type: ASSET_TYPE_FT,
-			Ticker: parts[1],
+			Type:     ASSET_TYPE_FT,
+			Ticker:   parts[1],
 		}
 	}
 	if len(parts) == 4 {
 		// runes
 		return &AssetName{
 			Protocol: parts[0],
-			Type: parts[1],
-			Ticker: parts[2]+":"+parts[3],
+			Type:     parts[1],
+			Ticker:   parts[2] + ":" + parts[3],
 		}
 	}
 	return &AssetName{
 		Protocol: parts[0],
-		Type: parts[1],
-		Ticker: parts[2],
+		Type:     parts[1],
+		Ticker:   parts[2],
 	}
 }
 
@@ -58,13 +58,13 @@ func (p *AssetName) String() string {
 
 type AssetInfo struct {
 	Name       AssetName
-	Amount     Decimal  // 资产数量
-	BindingSat uint32 // 非0 -> 每一聪绑定的资产的数量, 0 -> 不绑定聪
+	Amount     Decimal // 资产数量
+	BindingSat uint32  // 非0 -> 每一聪绑定的资产的数量, 0 -> 不绑定聪
 }
 
 func (p *AssetInfo) Add(another *AssetInfo) error {
 	if p.Name == another.Name {
-		p.Amount = *p.Amount.Add(&another.Amount)
+		p.Amount = *p.Amount.AddAlignPrecision(&another.Amount)
 	} else {
 		return fmt.Errorf("not the same asset")
 	}
@@ -76,7 +76,7 @@ func (p *AssetInfo) Subtract(another *AssetInfo) error {
 		if p.Amount.Cmp(&another.Amount) < 0 {
 			return fmt.Errorf("not enough asset to subtract")
 		}
-		p.Amount = *p.Amount.Sub(&another.Amount)
+		p.Amount = *p.Amount.SubAlignPrecision(&another.Amount)
 	} else {
 		return fmt.Errorf("not the same asset")
 	}
@@ -109,7 +109,6 @@ func (p *AssetInfo) GetBindingSatNum() int64 {
 // 有序数组，根据名字排序
 type TxAssets []AssetInfo
 
-
 func (p *TxAssets) Clone() TxAssets {
 	if p == nil || len(*p) == 0 {
 		return nil
@@ -122,6 +121,7 @@ func (p *TxAssets) Clone() TxAssets {
 
 	return newAssets
 }
+
 // Binary search to find the index of an AssetName
 func (p *TxAssets) findIndex(name *AssetName) (int, bool) {
 	index := sort.Search(len(*p), func(i int) bool {
@@ -140,13 +140,13 @@ func (p *TxAssets) findIndex(name *AssetName) (int, bool) {
 }
 
 func (p *TxAssets) Equal(another TxAssets) bool {
-	if p == nil && another == nil{
+	if p == nil && another == nil {
 		return true
 	}
 	if len(*p) != len(another) {
 		return false
 	}
-	
+
 	for i, asset := range *p {
 		if !asset.Equal(&(another)[i]) {
 			return false
@@ -200,7 +200,7 @@ func (p *TxAssets) Add(asset *AssetInfo) error {
 	}
 	index, found := p.findIndex(&asset.Name)
 	if found {
-		(*p)[index].Amount = *(*p)[index].Amount.Add(asset.Amount.Clone())
+		(*p)[index].Amount = *(*p)[index].Amount.AddAlignPrecision(&asset.Amount)
 	} else {
 		*p = append(*p, AssetInfo{}) // Extend slice
 		copy((*p)[index+1:], (*p)[index:])
@@ -225,7 +225,7 @@ func (p *TxAssets) Subtract(asset *AssetInfo) error {
 	if (*p)[index].Amount.Cmp(&asset.Amount) < 0 {
 		return errors.New("insufficient asset amount")
 	}
-	(*p)[index].Amount = *(*p)[index].Amount.Sub(&asset.Amount)
+	(*p)[index].Amount = *(*p)[index].Amount.SubAlignPrecision(&asset.Amount)
 	if (*p)[index].Amount.IsZero() {
 		*p = append((*p)[:index], (*p)[index+1:]...)
 	}
@@ -244,7 +244,7 @@ func (p *TxAssets) PickUp(asset *AssetName, amt *Decimal) (*AssetInfo, error) {
 	if (*p)[index].Amount.Cmp(amt) < 0 {
 		return nil, errors.New("insufficient asset amount")
 	}
-	
+
 	picked := AssetInfo{Name: *asset, Amount: *amt, BindingSat: (*p)[index].BindingSat}
 	return &picked, nil
 }
@@ -280,7 +280,7 @@ func (p *TxAssets) GetUnboundAssetCount() int {
 	c := 0
 	for _, asset := range *p {
 		if asset.BindingSat != 0 &&
-		asset.Amount.Int64()%int64(asset.BindingSat) != 0 {
+			asset.Amount.Int64()%int64(asset.BindingSat) != 0 {
 			c++
 		}
 	}
@@ -301,29 +301,27 @@ func (p *TxAssets) IsZero() bool {
 
 // 应对同时Add多个资产数据的方案
 type TxAssetsBuilder struct {
-    m map[AssetName]*AssetInfo
+	m map[AssetName]*AssetInfo
 }
 
 func NewTxAssetsBuilder(capHint int) *TxAssetsBuilder {
-    return &TxAssetsBuilder{
-        m: make(map[AssetName]*AssetInfo, capHint),
-    }
+	return &TxAssetsBuilder{
+		m: make(map[AssetName]*AssetInfo, capHint),
+	}
 }
 
 // 不分配内存，直接使用asset
 func (b *TxAssetsBuilder) Add(asset *AssetInfo) {
-    if asset == nil {
-        return
-    }
+	if asset == nil {
+		return
+	}
 
-    if exist, ok := b.m[asset.Name]; ok {
-        exist.Amount.AddInPlace(&asset.Amount)
-        return
-    }
+	if exist, ok := b.m[asset.Name]; ok {
+		exist.Amount.AddInPlaceAlignPrecision(&asset.Amount)
+		return
+	}
 
-    // 关键点：
-    // 直接接管 asset，不 Clone，不复制 big.Int
-    b.m[asset.Name] = asset
+	b.m[asset.Name] = asset
 }
 
 // 不分配内存，直接使用asset
@@ -335,43 +333,42 @@ func (b *TxAssetsBuilder) AddSlice(assets TxAssets) {
 
 // 分配内存版本
 func (b *TxAssetsBuilder) AddClone(asset *AssetInfo) {
-    if asset == nil {
-        return
-    }
+	if asset == nil {
+		return
+	}
 
-    if exist, ok := b.m[asset.Name]; ok {
-        exist.Amount.AddInPlace(&asset.Amount)
-        return
-    }
+	if exist, ok := b.m[asset.Name]; ok {
+		exist.Amount.AddInPlaceAlignPrecision(&asset.Amount)
+		return
+	}
 
-    cloned := *asset
-    cloned.Amount = *asset.Amount.Clone()
-    b.m[asset.Name] = &cloned
+	cloned := *asset
+	cloned.Amount = *asset.Amount.Clone()
+	b.m[asset.Name] = &cloned
 }
 
 func (b *TxAssetsBuilder) Build() TxAssets {
-    if len(b.m) == 0 {
-        return nil
-    }
+	if len(b.m) == 0 {
+		return nil
+	}
 
-    res := make(TxAssets, 0, len(b.m))
-    for _, asset := range b.m {
-        res = append(res, *asset)
-    }
+	res := make(TxAssets, 0, len(b.m))
+	for _, asset := range b.m {
+		res = append(res, *asset)
+	}
 
-    sort.Slice(res, func(i, j int) bool {
-        ai := res[i].Name
-        aj := res[j].Name
+	sort.Slice(res, func(i, j int) bool {
+		ai := res[i].Name
+		aj := res[j].Name
 
-        if ai.Protocol != aj.Protocol {
-            return ai.Protocol < aj.Protocol
-        }
-        if ai.Type != aj.Type {
-            return ai.Type < aj.Type
-        }
-        return ai.Ticker < aj.Ticker
-    })
+		if ai.Protocol != aj.Protocol {
+			return ai.Protocol < aj.Protocol
+		}
+		if ai.Type != aj.Type {
+			return ai.Type < aj.Type
+		}
+		return ai.Ticker < aj.Ticker
+	})
 
-    return res
+	return res
 }
-
