@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	// 需要跟 satoshinet/indexer/common/transcend.go 保持一致
 	sat20MagicNumber    = txscript.OP_16
 	contentTypeUnbind   = txscript.OP_DATA_40
 	contentTypeFreeze   = txscript.OP_DATA_43
