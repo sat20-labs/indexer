@@ -1,6 +1,9 @@
 package ft
 
 import (
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -99,6 +102,25 @@ func (s *FTIndexer) loadUtxoMapFromDB() map[string]map[uint64]int64 {
 	elapsed := time.Since(startTime).Milliseconds()
 	common.Log.Infof("loadUtxoMapFromDB loaded %d records in %d ms", count, elapsed)
 
+	return result
+}
+
+func (s *FTIndexer) loadFreezeStateFromDB() map[string]map[uint64]*common.FreezeState {
+	result := make(map[string]map[uint64]*common.FreezeState)
+	_ = s.db.BatchRead([]byte(DB_PREFIX_FREEZE_STATE), false, func(k, v []byte) error {
+		var item common.FreezeState
+		if err := db.DecodeBytes(v, &item); err != nil {
+			return nil
+		}
+		tickerMap, ok := result[item.Ticker]
+		if !ok {
+			tickerMap = make(map[uint64]*common.FreezeState)
+			result[item.Ticker] = tickerMap
+		}
+		state := item
+		tickerMap[item.AddressId] = &state
+		return nil
+	})
 	return result
 }
 
@@ -202,4 +224,63 @@ func (s *FTIndexer) getTickerFromDB(tickerName string) *common.Ticker {
 	}
 
 	return &result
+}
+
+func (s *FTIndexer) getUnbindHistoryFromDB(ticker string, addressId *uint64) []*common.UnbindHistory {
+	result := make([]*common.UnbindHistory, 0)
+	prefix := DB_PREFIX_UNBIND_TICKER + strings.ToLower(ticker) + "-"
+	if addressId != nil {
+		prefix += strconv.FormatUint(*addressId, 10) + "-"
+	}
+
+	_ = s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+		var item common.UnbindHistory
+		if err := db.DecodeBytes(v, &item); err == nil {
+			result = append(result, &item)
+		}
+		return nil
+	})
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].AddressId != result[j].AddressId {
+			return result[i].AddressId < result[j].AddressId
+		}
+		return result[i].UtxoId < result[j].UtxoId
+	})
+
+	return result
+}
+
+func (s *FTIndexer) getFreezeHistoryFromDB(ticker string, addressId *uint64) []*common.FreezeHistory {
+	result := make([]*common.FreezeHistory, 0)
+	prefix := DB_PREFIX_FREEZE_HISTORY + strings.ToLower(ticker) + "-"
+	if addressId != nil {
+		prefix += strconv.FormatUint(*addressId, 10) + "-"
+	}
+
+	_ = s.db.BatchRead([]byte(prefix), false, func(k, v []byte) error {
+		var item common.FreezeHistory
+		if err := db.DecodeBytes(v, &item); err == nil {
+			result = append(result, &item)
+		}
+		return nil
+	})
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].AddressId != result[j].AddressId {
+			return result[i].AddressId < result[j].AddressId
+		}
+		if result[i].ConfirmHeight != result[j].ConfirmHeight {
+			return result[i].ConfirmHeight < result[j].ConfirmHeight
+		}
+		if result[i].FreezeHeight != result[j].FreezeHeight {
+			return result[i].FreezeHeight < result[j].FreezeHeight
+		}
+		if result[i].Action != result[j].Action {
+			return result[i].Action < result[j].Action
+		}
+		return result[i].TxId < result[j].TxId
+	})
+
+	return result
 }

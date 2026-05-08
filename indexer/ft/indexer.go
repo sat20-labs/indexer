@@ -17,7 +17,7 @@ type HolderAction = exotic.HolderAction
 
 type ActionInfo struct {
 	Action int
-	Input *common.TxInput
+	Input  *common.TxInput
 	Info   any
 }
 
@@ -40,10 +40,25 @@ type FTIndexer struct {
 	tickerAdded      map[string]*common.Ticker // key: ticker
 
 	// 一个区块的缓存数据，不需要备份
-	actionBufferMap map[uint64][]*ActionInfo // 一个区块中，增量的mint在哪个输入中 utxoId->mint
+	actionBufferMap map[uint64][]*ActionInfo                  // 当前块内待并入输入UTXO的 deploy/mint 增量
+	unbindHistory   []*common.UnbindHistory                   // 当前块内新增的 unbind 历史，供 UpdateDB 增量落库
+	freezeHistory   []*common.FreezeHistory                   // 当前块内新增的 freeze/unfreeze 历史，供 UpdateDB 增量落库
+	freezeStates    map[string]map[uint64]*common.FreezeState // 当前生效的冻结状态: ticker -> addressId -> state
+	freezeTouched   map[string]*common.FreezeState            // 当前块内新增/更新的冻结状态，供 UpdateDB 增量落库
+	freezeDeleted   map[string]*common.FreezeState            // 当前块内删除的冻结状态，供 UpdateDB 增量删库
 
 	// 校验数据，不需要保存
 	holderMapInPrevBlock map[uint64]int64
+
+	// 冻结相关的临时控制状态：
+	// 1. freezeAuthoritySnapshot 保存“当前正在处理的 freezeHeight-1”时刻谁有权限发起 freeze/unfreeze
+	// 2. pendingHistoricalFreezes/pendingHistoricalKeys 用于历史编译模式下的 2-block lookahead 注入
+	// 3. reloadFreezeDirectives/reloadRequestHeight 仅用于链头实时模式下 lookahead 不足时的非 reorg reload 兜底
+	freezeAuthoritySnapshot  map[string]uint64
+	pendingHistoricalFreezes map[int][]*common.FreezeDirective
+	pendingHistoricalKeys    map[string]bool
+	reloadFreezeDirectives   map[string]*common.FreezeDirective
+	reloadRequestHeight      int
 }
 
 func NewOrdxIndexer(db common.KVDB) *FTIndexer {
@@ -84,6 +99,57 @@ func (s *FTIndexer) Clone(nftIndexer *nft.NftIndexer) *FTIndexer {
 
 	newInst.holderActionList = make([]*HolderAction, len(s.holderActionList))
 	copy(newInst.holderActionList, s.holderActionList)
+
+	newInst.unbindHistory = make([]*common.UnbindHistory, len(s.unbindHistory))
+	for i, item := range s.unbindHistory {
+		newInst.unbindHistory[i] = item.Clone()
+	}
+	newInst.freezeHistory = make([]*common.FreezeHistory, len(s.freezeHistory))
+	for i, item := range s.freezeHistory {
+		newInst.freezeHistory[i] = item.Clone()
+	}
+	newInst.freezeTouched = make(map[string]*common.FreezeState, len(s.freezeTouched))
+	for key, value := range s.freezeTouched {
+		state := *value
+		newInst.freezeTouched[key] = &state
+	}
+	newInst.freezeDeleted = make(map[string]*common.FreezeState, len(s.freezeDeleted))
+	for key, value := range s.freezeDeleted {
+		state := *value
+		newInst.freezeDeleted[key] = &state
+	}
+	newInst.freezeStates = make(map[string]map[uint64]*common.FreezeState, len(s.freezeStates))
+	for ticker, stateMap := range s.freezeStates {
+		cloned := make(map[uint64]*common.FreezeState, len(stateMap))
+		for addressId, value := range stateMap {
+			state := *value
+			cloned[addressId] = &state
+		}
+		newInst.freezeStates[ticker] = cloned
+	}
+	newInst.pendingHistoricalFreezes = make(map[int][]*common.FreezeDirective, len(s.pendingHistoricalFreezes))
+	for height, directives := range s.pendingHistoricalFreezes {
+		cloned := make([]*common.FreezeDirective, len(directives))
+		for i, item := range directives {
+			d := *item
+			cloned[i] = &d
+		}
+		newInst.pendingHistoricalFreezes[height] = cloned
+	}
+	newInst.pendingHistoricalKeys = make(map[string]bool, len(s.pendingHistoricalKeys))
+	for key, value := range s.pendingHistoricalKeys {
+		newInst.pendingHistoricalKeys[key] = value
+	}
+	newInst.reloadFreezeDirectives = make(map[string]*common.FreezeDirective, len(s.reloadFreezeDirectives))
+	for key, value := range s.reloadFreezeDirectives {
+		d := *value
+		newInst.reloadFreezeDirectives[key] = &d
+	}
+	newInst.freezeAuthoritySnapshot = make(map[string]uint64, len(s.freezeAuthoritySnapshot))
+	for key, value := range s.freezeAuthoritySnapshot {
+		newInst.freezeAuthoritySnapshot[key] = value
+	}
+	newInst.reloadRequestHeight = s.reloadRequestHeight
 
 	newInst.tickerAdded = make(map[string]*common.Ticker, 0)
 	for key, value := range s.tickerAdded {
@@ -169,6 +235,14 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 		}
 	}
 
+	s.unbindHistory = append([]*common.UnbindHistory(nil), s.unbindHistory[len(another.unbindHistory):]...)
+	s.freezeHistory = append([]*common.FreezeHistory(nil), s.freezeHistory[len(another.freezeHistory):]...)
+	s.freezeTouched = make(map[string]*common.FreezeState)
+	s.freezeDeleted = make(map[string]*common.FreezeState)
+	s.reloadFreezeDirectives = make(map[string]*common.FreezeDirective)
+	s.freezeAuthoritySnapshot = make(map[string]uint64)
+	s.reloadRequestHeight = 0
+
 	// 不需要更新 holderInfo 和 utxoMap
 }
 
@@ -192,10 +266,20 @@ func (s *FTIndexer) Init(nftIndexer *nft.NftIndexer) {
 
 		s.holderInfo = s.loadHolderInfoFromDB()
 		s.utxoMap = s.loadUtxoMapFromDB()
+		s.freezeStates = s.loadFreezeStateFromDB()
 		// TODO utxoMap 可以从 holderInfo 中构建出来
 
 		s.holderActionList = make([]*HolderAction, 0)
 		s.tickerAdded = make(map[string]*common.Ticker, 0)
+		s.unbindHistory = make([]*common.UnbindHistory, 0)
+		s.freezeHistory = make([]*common.FreezeHistory, 0)
+		s.freezeTouched = make(map[string]*common.FreezeState)
+		s.freezeDeleted = make(map[string]*common.FreezeState)
+		s.freezeAuthoritySnapshot = make(map[string]uint64)
+		s.pendingHistoricalFreezes = make(map[int][]*common.FreezeDirective)
+		s.pendingHistoricalKeys = make(map[string]bool)
+		s.reloadFreezeDirectives = make(map[string]*common.FreezeDirective)
+		s.reloadRequestHeight = 0
 
 		s.mutex.Unlock()
 	}

@@ -8,7 +8,8 @@ package common
 // 1.2.0  2026.01.11   released
 // 1.2.2  2026.01.16   对齐ticker的数量，包括brc20和runes
 // 1.3.0  2026.03.12   support on-chain collection and gallery
-const ORDX_INDEXER_VERSION = "1.3.0"
+// 1.5.0  2026.05.08   support FT unbind/freeze via OP_RETURN
+const ORDX_INDEXER_VERSION = "1.5.0"
 
 // 1.1.0  2024.07.01-
 // 1.2.0  2024.07.20    multi-address

@@ -77,8 +77,10 @@ type IndexerMgr struct {
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
 	// 本地缓存，在区块更新时清空
-	addressToNftMap  map[string][]*common.Nft
-	addressToNameMap map[string][]*common.Nft
+	addressToNftMap      map[string][]*common.Nft
+	addressToNameMap     map[string][]*common.Nft
+	pendingFreezeReplay  []*common.FreezeDirective
+	freezeLookaheadCache map[int]*common.Block
 	/////////////////////////////////
 }
 
@@ -175,6 +177,9 @@ func (b *IndexerMgr) Init() {
 	b.nft.Init(b.base, b)
 	b.ftIndexer = ft.NewOrdxIndexer(b.ftDB)
 	b.ftIndexer.Init(b.nft)
+	if len(b.pendingFreezeReplay) > 0 {
+		b.ftIndexer.SetPendingHistoricalFreezeReplay(b.pendingFreezeReplay)
+	}
 	b.ns = ns.NewNameService(b.nsDB)
 	b.ns.Init(b.nft)
 	b.brc20Indexer = brc20.NewIndexer(b.brc20DB, b.cfg.CheckValidateFiles)
@@ -193,6 +198,7 @@ func (b *IndexerMgr) Init() {
 
 	b.addressToNftMap = nil
 	b.addressToNameMap = nil
+	b.freezeLookaheadCache = make(map[int]*common.Block)
 }
 
 func (b *IndexerMgr) GetBaseDB() common.KVDB {
@@ -229,6 +235,15 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 				for !bWantExit {
 					ret := b.base.SyncToChainTip(stopIndexerChan)
 					if ret == 0 {
+						if reloadHeight, directives := b.ftIndexer.ConsumeReloadRequest(); reloadHeight > 0 {
+							b.pendingFreezeReplay = directives
+							b.handleHistoricalReload(reloadHeight)
+							b.base.SyncToChainTip(stopIndexerChan)
+							continue
+						}
+						if len(b.pendingFreezeReplay) > 0 {
+							b.pendingFreezeReplay = nil
+						}
 						if !bWantExit && b.base.GetHeight() == b.base.GetChainTip() {
 							// IndexerMgr.updateDB 被调用后，已经进入实际运行状态，
 							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
@@ -321,7 +336,6 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	// close all
 	b.closeDB()
 
-
 	common.Log.Info("IndexerMgr exited.")
 }
 
@@ -413,7 +427,7 @@ func (b *IndexerMgr) checkSelf() {
 		}
 		b.nsDB.Close()
 		b.nsDB = nil
-		
+
 		ok = b.nft.CheckSelf()
 		if !ok {
 			break
@@ -434,7 +448,7 @@ func (b *IndexerMgr) checkSelf() {
 		}
 		b.baseDB.Close()
 		b.baseDB = nil
-		
+
 		break
 	}
 
@@ -479,6 +493,23 @@ func (b *IndexerMgr) handleReorg(height int) {
 	b.base.SetReorgHeight(height)
 
 	common.Log.Infof("IndexerMgr handleReorg completed.")
+}
+
+func (b *IndexerMgr) handleHistoricalReload(height int) {
+	common.Log.Infof("IndexerMgr handleHistoricalReload enter from height %d...", height)
+	atomic.AddInt32(&b.reloading, 1)
+	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	atomic.AddInt32(&b.reloading, 1)
+	defer func() {
+		atomic.AddInt32(&b.reloading, -2)
+	}()
+
+	b.closeDB()
+	b.Init()
+
+	common.Log.Infof("IndexerMgr handleHistoricalReload completed.")
 }
 
 func (b *IndexerMgr) rpcEnter() {
@@ -621,7 +652,7 @@ func (p *IndexerMgr) repair() bool {
 	// 	if err != nil {
 	// 		return nil
 	// 	}
-	// 	if strings.ToLower(deploy.P) != "brc-20" || 
+	// 	if strings.ToLower(deploy.P) != "brc-20" ||
 	// 	strings.ToLower(deploy.Op) != "deploy" {
 	// 		return nil
 	// 	}
@@ -629,7 +660,7 @@ func (p *IndexerMgr) repair() bool {
 	// 	ticker := strings.ToLower(deploy.Ticker)
 	// 	_, ok := tickerMap[ticker]
 	// 	if !ok {
-		
+
 	// 		if len(ticker) != 4 && len(ticker) != 5 {
 	// 			return nil
 	// 		}
@@ -704,7 +735,7 @@ func (p *IndexerMgr) repair() bool {
 	// 			common.Log.Infof("%s already know missing in DB %s", deploy.Ticker, value.InscriptionId)
 	// 			return nil
 	// 		}
-			
+
 	// 		missing++
 	// 		common.Log.Infof("missing ticker(%d) %s in %s, %v, %s, %s", len(deploy.Ticker), deploy.Ticker, value.InscriptionId, deploy, value.Content, ty)
 	// 	}
@@ -726,7 +757,7 @@ func (p *IndexerMgr) repair() bool {
 	// }
 
 	// expected := 367186
-	// common.Log.Infof("height %d, expected tickers %d, acturally %d, missing %d", 
+	// common.Log.Infof("height %d, expected tickers %d, acturally %d, missing %d",
 	// 	p.base.GetSyncHeight(), expected, len(tickerMap), expected-len(tickerMap))
 
 	// return true

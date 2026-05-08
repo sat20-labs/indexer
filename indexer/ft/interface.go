@@ -17,15 +17,13 @@ func (p *FTIndexer) TickExisted(ticker string) bool {
 func (p *FTIndexer) GetAllTickers() []string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	
+
 	return p.getAllTickers()
 }
 
 func (p *FTIndexer) GetTickersWithRange(start, limit int) ([]string, int) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-
-	
 
 	tickers := p.getAllTickers()
 	total := len(tickers)
@@ -46,22 +44,22 @@ func (p *FTIndexer) GetTickersWithRange(start, limit int) ([]string, int) {
 }
 
 func (p *FTIndexer) getAllTickers() []string {
-	
+
 	type pair struct {
-		id int64
+		id   int64
 		name string
 	}
 	mid := make([]*pair, 0)
 	for name, v := range p.tickerMap {
 		mid = append(mid, &pair{
-			id: v.Ticker.Id,
+			id:   v.Ticker.Id,
 			name: name,
 		})
 	}
 	sort.Slice(mid, func(i, j int) bool {
 		return mid[i].id < mid[j].id
 	})
-	
+
 	ret := make([]string, 0)
 	for _, item := range mid {
 		ret = append(ret, item.name)
@@ -238,7 +236,6 @@ func (p *FTIndexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]
 
 	return result
 }
-
 
 // 获取某个地址下的资产 return: ticker->amount
 func (p *FTIndexer) getAssetAmtByAddress(address uint64, tickerName string) int64 {
@@ -476,6 +473,140 @@ func (p *FTIndexer) GetMintHistoryWithAddressV2(addressId uint64, tick string, s
 	}
 
 	return result[start:end], total
+}
+
+func (p *FTIndexer) GetUnbindHistory(tick string, start, limit int) ([]*common.UnbindHistory, int) {
+	p.mutex.RLock()
+	buffer := make([]*common.UnbindHistory, 0)
+	tick = strings.ToLower(tick)
+	for _, item := range p.unbindHistory {
+		if item.Ticker == tick {
+			buffer = append(buffer, item.Clone())
+		}
+	}
+	p.mutex.RUnlock()
+
+	result := p.getUnbindHistoryFromDB(tick, nil)
+	result = append(result, buffer...)
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].AddressId != result[j].AddressId {
+			return result[i].AddressId < result[j].AddressId
+		}
+		return result[i].UtxoId < result[j].UtxoId
+	})
+
+	total := len(result)
+	if start >= total {
+		return nil, 0
+	}
+	if limit <= 0 || start+limit > total {
+		limit = total - start
+	}
+	return result[start : start+limit], total
+}
+
+func (p *FTIndexer) GetUnbindHistoryWithAddress(addressId uint64, tick string,
+	start, limit int) ([]*common.UnbindHistory, int) {
+	p.mutex.RLock()
+	buffer := make([]*common.UnbindHistory, 0)
+	tick = strings.ToLower(tick)
+	for _, item := range p.unbindHistory {
+		if item.Ticker == tick && item.AddressId == addressId {
+			buffer = append(buffer, item.Clone())
+		}
+	}
+	p.mutex.RUnlock()
+
+	result := p.getUnbindHistoryFromDB(tick, &addressId)
+	result = append(result, buffer...)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].UtxoId < result[j].UtxoId
+	})
+
+	total := len(result)
+	if start >= total {
+		return nil, 0
+	}
+	if limit <= 0 || start+limit > total {
+		limit = total - start
+	}
+	return result[start : start+limit], total
+}
+
+func (p *FTIndexer) GetFreezeHistory(tick string, start, limit int) ([]*common.FreezeHistory, int) {
+	p.mutex.RLock()
+	buffer := make([]*common.FreezeHistory, 0)
+	tick = strings.ToLower(tick)
+	for _, item := range p.freezeHistory {
+		if item.Ticker == tick {
+			buffer = append(buffer, item.Clone())
+		}
+	}
+	p.mutex.RUnlock()
+
+	result := p.getFreezeHistoryFromDB(tick, nil)
+	result = append(result, buffer...)
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].AddressId != result[j].AddressId {
+			return result[i].AddressId < result[j].AddressId
+		}
+		if result[i].ConfirmHeight != result[j].ConfirmHeight {
+			return result[i].ConfirmHeight < result[j].ConfirmHeight
+		}
+		if result[i].FreezeHeight != result[j].FreezeHeight {
+			return result[i].FreezeHeight < result[j].FreezeHeight
+		}
+		if result[i].Action != result[j].Action {
+			return result[i].Action < result[j].Action
+		}
+		return result[i].TxId < result[j].TxId
+	})
+
+	total := len(result)
+	if start >= total {
+		return nil, 0
+	}
+	if limit <= 0 || start+limit > total {
+		limit = total - start
+	}
+	return result[start : start+limit], total
+}
+
+func (p *FTIndexer) GetFreezeHistoryWithAddress(addressId uint64, tick string,
+	start, limit int) ([]*common.FreezeHistory, int) {
+	p.mutex.RLock()
+	buffer := make([]*common.FreezeHistory, 0)
+	tick = strings.ToLower(tick)
+	for _, item := range p.freezeHistory {
+		if item.Ticker == tick && item.AddressId == addressId {
+			buffer = append(buffer, item.Clone())
+		}
+	}
+	p.mutex.RUnlock()
+
+	result := p.getFreezeHistoryFromDB(tick, &addressId)
+	result = append(result, buffer...)
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].ConfirmHeight != result[j].ConfirmHeight {
+			return result[i].ConfirmHeight < result[j].ConfirmHeight
+		}
+		if result[i].FreezeHeight != result[j].FreezeHeight {
+			return result[i].FreezeHeight < result[j].FreezeHeight
+		}
+		if result[i].Action != result[j].Action {
+			return result[i].Action < result[j].Action
+		}
+		return result[i].TxId < result[j].TxId
+	})
+
+	total := len(result)
+	if start >= total {
+		return nil, 0
+	}
+	if limit <= 0 || start+limit > total {
+		limit = total - start
+	}
+	return result[start : start+limit], total
 }
 
 // return: mint的总量

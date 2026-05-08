@@ -2,17 +2,21 @@ package indexer
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
+	base_indexer "github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/brc20"
 	indexer "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/ft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/ord"
 	ordCommon "github.com/sat20-labs/indexer/indexer/ord/common"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
+	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
 func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.Range) {
@@ -55,17 +59,134 @@ func (s *IndexerMgr) processOrdProtocol(block *common.Block, coinbase []*common.
 	common.Log.Infof("processOrdProtocol loop %d finished. cost: %v", count, time.Since(measureStartTime))
 	common.Log.Infof("height: %d, total cursed: %d", block.Height, s.nft.GetStatus().CurseCount)
 
+	freezeAuthority := s.ftIndexer.BuildFreezeAuthoritySnapshot()
+	s.ftIndexer.SetFreezeAuthoritySnapshot(freezeAuthority)
+	s.prepareFreezeLookahead(block.Height, freezeAuthority)
+
 	//time2 := time.Now()
 	s.nft.UpdateTransfer(block, coinbase)
 	s.ns.UpdateTransfer(block)
 	s.brc20Indexer.UpdateTransfer(block, coinbase) // 由nftindexer内部调用过去
 	s.RunesIndexer.UpdateTransfer(block)
-
 	s.ftIndexer.UpdateTransfer(block, coinbase) // 依赖前面生成的稀有资产
 
 	//common.Log.Infof("processOrdProtocol UpdateTransfer finished. cost: %v", time.Since(time2))
 
 	common.Log.Infof("processOrdProtocol %d is done, cost: %v", block.Height, time.Since(measureStartTime))
+}
+
+func (s *IndexerMgr) prepareFreezeLookahead(height int, freezeAuthority map[string]uint64) {
+	if s.base == nil || s.ftIndexer == nil {
+		return
+	}
+	chainTip := s.base.GetChainTip()
+	if height+2 > chainTip {
+		return
+	}
+
+	for h := height + 1; h <= height+2; h++ {
+		if _, ok := s.freezeLookaheadCache[h]; !ok {
+			s.freezeLookaheadCache[h] = base_indexer.FetchBlock(h, s.GetChainParam())
+		}
+	}
+	delete(s.freezeLookaheadCache, height-1)
+
+	directives := s.collectLookaheadFreezeDirectives(height, freezeAuthority)
+	if len(directives) > 0 {
+		s.ftIndexer.SetPendingHistoricalFreezeReplay(directives)
+	}
+}
+
+func (s *IndexerMgr) collectLookaheadFreezeDirectives(freezeHeight int, freezeAuthority map[string]uint64) []*common.FreezeDirective {
+	result := make([]*common.FreezeDirective, 0)
+
+	for h := freezeHeight + 1; h <= freezeHeight+2; h++ {
+		block := s.freezeLookaheadCache[h]
+		if block == nil {
+			continue
+		}
+		for _, tx := range block.Transactions[1:] {
+			candidates := make([]*common.FreezeDirective, 0)
+			for _, output := range tx.Outputs {
+				ticker, address, height, matched, err := ft.ParseFreezeScript(output.OutValue.PkScript)
+				if err != nil || !matched || height != freezeHeight {
+					continue
+				}
+				addressId := s.base.GetAddressIdFromDB(address)
+				if _, ok := freezeAuthority[strings.ToLower(ticker)]; !ok || addressId == common.INVALID_ID {
+					continue
+				}
+				candidates = append(candidates, &common.FreezeDirective{
+					Ticker:        strings.ToLower(ticker),
+					Address:       address,
+					AddressId:     addressId,
+					FreezeHeight:  freezeHeight,
+					ConfirmHeight: h,
+					TxId:          tx.TxId,
+				})
+			}
+			if len(candidates) == 0 {
+				continue
+			}
+
+			initiatorAddressId := uint64(common.INVALID_ID)
+			if len(tx.Inputs) > 0 {
+				var err error
+				initiatorAddressId, err = s.resolveLookaheadInputAddressId(tx.Inputs[len(tx.Inputs)-1].OutPointStr)
+				if err != nil {
+					initiatorAddressId = common.INVALID_ID
+				}
+			}
+
+			for _, directive := range candidates {
+				ownerAddressId, ok := freezeAuthority[directive.Ticker]
+				if !ok {
+					continue
+				}
+				if initiatorAddressId == ownerAddressId {
+					result = append(result, directive)
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+func (s *IndexerMgr) resolveLookaheadInputAddressId(outPoint string) (uint64, error) {
+	address, err := s.base.GetAddressByUtxo(outPoint)
+	if err == nil {
+		addressId := s.base.GetAddressIdFromDB(address)
+		if addressId != common.INVALID_ID {
+			return addressId, nil
+		}
+	}
+
+	txHash, vout, err := common.ParseUtxo(outPoint)
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txHash)
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	msgTx, err := bitcoin_rpc.DecodeMsgTx(txHex)
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	if vout < 0 || vout >= len(msgTx.TxOut) {
+		return common.INVALID_ID, fmt.Errorf("outpoint %s has invalid vout %d", outPoint, vout)
+	}
+
+	address, err = common.PkScriptToAddr(msgTx.TxOut[vout].PkScript, s.GetChainParam())
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	addressId := s.base.GetAddressIdFromDB(address)
+	if addressId == common.INVALID_ID {
+		return common.INVALID_ID, fmt.Errorf("address id not found for %s", address)
+	}
+	return addressId, nil
 }
 
 // satpointer 是聪在输入端所有TxIn中的位置
@@ -77,7 +198,7 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 	// 看看聪在哪一个输入中
 	var inOffset int64
 	var input *common.TxInput
-	
+
 	// 带pointer的铭文，需要从reveal tx的所有输入开始定位聪
 	var outValue int64
 	for _, txOut := range tx.Outputs {
@@ -102,14 +223,14 @@ func findOutputWithSatPoint(block *common.Block, coinbase []*common.Range,
 		}
 		outValue += txOut.OutValue.Value
 	}
-	
+
 	if satpointer > 0 {
 		// 可能pointer太大，超出output的范畴，默认使用第一个非零输出
 		// testnet4: bb5bf322a4cd7117f8b46156705748ba485477a5f9bc306559943ec98147017bi0
 		// e9099189d9755bc537ff4cdf2c6ea0b5f200005eeac8d85f8490d1cbd45f9c59i0
 		satpointer = 0
 		outValue = 0
-		
+
 		for _, txOut := range tx.Outputs {
 			if txOut.OutValue.Value != 0 {
 				for _, txIn := range tx.Inputs {
@@ -235,7 +356,6 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 			return nil
 		}
 	}
-	
 
 	var err error
 	lim := int64(1)
@@ -397,7 +517,7 @@ func (s *IndexerMgr) handleDeployTicker(in *common.TxInput, out *common.TxOutput
 		return nil
 	}
 
-	nft.Base.TypeName = common.ASSET_TYPE_FT 
+	nft.Base.TypeName = common.ASSET_TYPE_FT
 	nft.Base.UserData = []byte(common.PROTOCOL_NAME_ORDX)
 	ticker := &common.Ticker{
 		Base:       nft.Base,
@@ -475,9 +595,9 @@ func (s *IndexerMgr) handleMintTicker(in *common.TxInput, inOffset int64, out *c
 
 	satsNum := int64(amt) / int64(deployTicker.N)
 	// 确保在输入的聪内部
-	if in.OutValue.Value < inOffset + satsNum {
+	if in.OutValue.Value < inOffset+satsNum {
 		common.Log.Warnf("IndexerMgr.handleMintTicker: inscriptionId: %s, ticker: %s, %d not in input range: %d",
-			inscriptionId, content.Ticker, inOffset + satsNum, in.OutValue.Value)
+			inscriptionId, content.Ticker, inOffset+satsNum, in.OutValue.Value)
 		return nil
 	}
 
@@ -591,9 +711,9 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 		return nil
 	}
 	/*
-	1. Maximum supply cannot exceed uint64_max
-	2. When max=0, there is an unlimited maximum issuance for self_mint deployments. 
-	For BRC-20, the meaning of max is the total upper limit of all mints (max_uint64 (2 ** 64-1) * (10 ** decimals))
+		1. Maximum supply cannot exceed uint64_max
+		2. When max=0, there is an unlimited maximum issuance for self_mint deployments.
+		For BRC-20, the meaning of max is the total upper limit of all mints (max_uint64 (2 ** 64-1) * (10 ** decimals))
 	*/
 	// 允许，比如 testnet4: limit 6b7a06ac09bbef76d64c14db8f2b4d7891a0f26b5e5b7b8215fc8082b07fae39i0
 	if max.Sign() == 0 {
@@ -603,9 +723,8 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 			common.Log.Warnf("deploy, but max invalid (0), %s", content.Ticker)
 			return nil
 		}
-	} 
+	}
 	ticker.Max = *max
-	
 
 	// lim 可以不设置，但如果设置，就不能为空字符串 (在UnmarshalBRC2DeployContentStrict中检查)
 	var lim *common.Decimal
@@ -630,7 +749,6 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 	// 	return nil
 	// }
 	ticker.Limit = *lim
-	
 
 	return ticker
 }
@@ -638,7 +756,7 @@ func (s *IndexerMgr) handleBrc20DeployTicker(out *common.TxOutputV2,
 func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 	content *common.BRC20MintContent, nft *common.Nft) *common.BRC20Mint {
 	// ticker有可能是同一个区块部署的，这里可能就获取不到，导致失败，所以这里不要做任何检查
-	// ticker := s.brc20Indexer.GetTicker(content.Ticker) 
+	// ticker := s.brc20Indexer.GetTicker(content.Ticker)
 	// if ticker == nil {
 	// 	common.Log.Warnf("IndexerMgr.handleBrc20MintTicker: inscriptionId: %s, ticker: %s, no deploy ticker",
 	// 		nft.Base.InscriptionId, content.Ticker)
@@ -650,7 +768,7 @@ func (s *IndexerMgr) handleBrc20MintTicker(out *common.TxOutputV2,
 			NftId: nft.Base.Id,
 			Name:  strings.ToLower(content.Ticker),
 		},
-		Nft: nft,
+		Nft:    nft,
 		AmtStr: content.Amt,
 	}
 	nft.Base.UserData = []byte(common.PROTOCOL_NAME_BRC20)
@@ -687,7 +805,7 @@ func (s *IndexerMgr) handleBrc20TransferTicker(out *common.TxOutputV2,
 			NftId: nft.Base.Id,
 			Name:  strings.ToLower(content.Ticker),
 		},
-		Nft: nft,
+		Nft:    nft,
 		AmtStr: content.Amt,
 	}
 
@@ -894,7 +1012,7 @@ func (s *IndexerMgr) handleBrc20(input *common.TxInput, out *common.TxOutputV2,
 	// 必须要有MIME类型，并且是“text/plain”或“application/json”
 	if len(insc.Inscription.ContentType) == 0 {
 		common.Log.Debugf("invalid brc20 inscription %s, should provide content type", nft.Base.InscriptionId)
-		return 
+		return
 	}
 	parts := strings.Split(string(insc.Inscription.ContentType), ";")
 	if parts[0] != "text/plain" && parts[0] != "application/json" {
@@ -977,7 +1095,7 @@ func (s *IndexerMgr) handleOrd(input *common.TxInput,
 	} else {
 		if input.OutValue.Value != 0 {
 			output, outOffset = findOutput(block, coinbase, index, txIndex, tx)
-		} 
+		}
 		// else unbound
 	}
 
@@ -1129,7 +1247,7 @@ func (s *IndexerMgr) handleNft(input *common.TxInput, output *common.TxOutputV2,
 		} else {
 			sat = int64(common.ToUtxoId(output.OutHeight, output.OutTxIndex, inscriptionId))
 		}
-		
+
 		addressId = output.AddressId
 		utxoId = output.UtxoId
 		outpoint = outOffset

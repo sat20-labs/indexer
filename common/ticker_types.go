@@ -1,6 +1,10 @@
 package common
 
-import "github.com/btcsuite/btcd/wire"
+import (
+	"fmt"
+
+	"github.com/btcsuite/btcd/wire"
+)
 
 const (
 	TICKER_STATUS_INVALID        int = -1
@@ -28,16 +32,20 @@ type Ticker struct {
 	Name string // 保持原型
 	Desc string `json:"desc,omitempty"`
 
-	Type        string  `json:"type,omitempty"` // 默认是FT，留待以后扩展
-	Limit       int64   `json:"limit,omitempty"`
-	N           int     `json:"n,omitempty"`        // bindingSat
-	SelfMint    int     `json:"selfmint,omitempty"` // 0-100
-	Max         int64   `json:"max,omitempty"`
-	BlockStart  int     `json:"blockStart,omitempty"`
-	BlockEnd    int     `json:"blockEnd,omitempty"`
-	Attr        SatAttr `json:"attr,omitempty"`
-	TotalMinted int64   `json:"totalMinted,omitempty"`
-	Status      int     `json:"status"` // -1: not ready; 0 minting; 1 finished.
+	Type          string  `json:"type,omitempty"` // 默认是FT，留待以后扩展
+	Limit         int64   `json:"limit,omitempty"`
+	N             int     `json:"n,omitempty"`        // bindingSat
+	SelfMint      int     `json:"selfmint,omitempty"` // 0-100
+	Max           int64   `json:"max,omitempty"`
+	BlockStart    int     `json:"blockStart,omitempty"`
+	BlockEnd      int     `json:"blockEnd,omitempty"`
+	Attr          SatAttr `json:"attr,omitempty"`
+	TotalMinted   int64   `json:"totalMinted,omitempty"`
+	TotalUnbound  int64   `json:"totalUnbound,omitempty"`
+	TotalFrozen   int64   `json:"totalFrozen,omitempty"`
+	TotalUnfrozen int64   `json:"totalUnfrozen,omitempty"`
+	TotalBurned   int64   `json:"totalBurned,omitempty"`
+	Status        int     `json:"status"` // -1: not ready; 0 minting; 1 finished.
 }
 
 func (p *Ticker) Clone() *Ticker {
@@ -64,6 +72,7 @@ type MintAbbrInfo struct {
 type AssetAbbrInfo struct {
 	BindingSat int
 	Offsets    AssetOffsets
+	Frozen     bool
 }
 
 func (p *AssetAbbrInfo) AssetAmt() int64 {
@@ -73,7 +82,8 @@ func (p *AssetAbbrInfo) AssetAmt() int64 {
 func (p *AssetAbbrInfo) Clone() *AssetAbbrInfo {
 	return &AssetAbbrInfo{
 		BindingSat: p.BindingSat,
-		Offsets: p.Offsets.Clone(),
+		Offsets:    p.Offsets.Clone(),
+		Frozen:     p.Frozen,
 	}
 }
 
@@ -245,4 +255,79 @@ func (p *AssetsInUtxo) ToTxOutput() *TxOutput {
 		SatBindingMap: satBindingMap,
 		Invalids:      invalids,
 	}
+}
+
+type UnbindHistory struct {
+	Ticker    string
+	AddressId uint64
+	UtxoId    uint64
+	Amount    int64
+	Offsets   AssetOffsets
+}
+
+func (u *UnbindHistory) Clone() *UnbindHistory {
+	if u == nil {
+		return nil
+	}
+	return &UnbindHistory{
+		Ticker:    u.Ticker,
+		AddressId: u.AddressId,
+		UtxoId:    u.UtxoId,
+		Amount:    u.Amount,
+		Offsets:   u.Offsets.Clone(),
+	}
+}
+
+type FreezeHistory struct {
+	Ticker        string
+	AddressId     uint64
+	TxId          string
+	Action        string
+	Amount        int64
+	FreezeHeight  int
+	ConfirmHeight int
+}
+
+func (f *FreezeHistory) Clone() *FreezeHistory {
+	if f == nil {
+		return nil
+	}
+	return &FreezeHistory{
+		Ticker:        f.Ticker,
+		AddressId:     f.AddressId,
+		TxId:          f.TxId,
+		Action:        f.Action,
+		Amount:        f.Amount,
+		FreezeHeight:  f.FreezeHeight,
+		ConfirmHeight: f.ConfirmHeight,
+	}
+}
+
+type FreezeState struct {
+	Ticker       string
+	AddressId    uint64
+	FreezeHeight int
+	TxId         string
+}
+
+type FreezeDirective struct {
+	Ticker        string
+	Address       string
+	AddressId     uint64
+	FreezeHeight  int
+	ConfirmHeight int
+	TxId          string
+}
+
+const (
+	FreezeActionFreeze   = "freeze"
+	FreezeActionUnfreeze = "unfreeze"
+)
+
+func FreezeStateMapKey(ticker string, addressId uint64) string {
+	return fmt.Sprintf("%s:%d", ticker, addressId)
+}
+
+func FreezeDirectiveKey(txid, ticker string, addressId uint64, freezeHeight int) string {
+	return fmt.Sprintf("%s:%s:%d:%d", txid, ticker, addressId, freezeHeight)
 }

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/db"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 // 每个deploy都调用，也可以用于更新
@@ -20,8 +20,8 @@ func (p *FTIndexer) UpdateTick(in *common.TxInput, ticker *common.Ticker) {
 
 	action := &ActionInfo{
 		Action: common.BRC20_Action_InScribe_Deploy,
-		Input: in,
-		Info: ticker,
+		Input:  in,
+		Info:   ticker,
 	}
 
 	p.actionBufferMap[in.UtxoId] = append(p.actionBufferMap[in.UtxoId], action)
@@ -56,8 +56,8 @@ func (p *FTIndexer) UpdateMint(in *common.TxInput, mint *common.Mint) {
 
 	action := &ActionInfo{
 		Action: common.BRC20_Action_InScribe_Mint,
-		Input: in,
-		Info: mint,
+		Input:  in,
+		Info:   mint,
 	}
 
 	p.actionBufferMap[in.UtxoId] = append(p.actionBufferMap[in.UtxoId], action)
@@ -80,8 +80,8 @@ func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 	mint.Id = int64(len(ticker.InscriptionMap))
 
 	assetInfo := &common.AssetAbbrInfo{
-		BindingSat: ticker.Ticker.N, 
-		Offsets: mint.Offsets.Clone(),
+		BindingSat: ticker.Ticker.N,
+		Offsets:    mint.Offsets.Clone(),
 	}
 	p.addHolder(&in.TxOutputV2, name, assetInfo) // 加入input的utxoId中，后面在transfer中转移到output
 
@@ -92,7 +92,6 @@ func (p *FTIndexer) updateMint(in *common.TxInput, mint *common.Mint) {
 	ticker.InscriptionMap[mint.Base.InscriptionId] = common.NewMintAbbrInfo(mint)
 	common.Log.Debugf("FTIndexer.updateMint %s mint ticker %s %d -> %d", mint.Base.InscriptionId, mint.Name, mint.Amt, ticker.Ticker.TotalMinted)
 }
-
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
 func (p *FTIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
@@ -121,6 +120,276 @@ func (p *FTIndexer) deleteUtxoMap(ticker string, utxo uint64) {
 	}
 }
 
+func (p *FTIndexer) getTickerRecord(ticker string) *common.Ticker {
+	tickInfo := p.tickerMap[strings.ToLower(ticker)]
+	if tickInfo == nil {
+		return nil
+	}
+	return tickInfo.Ticker
+}
+
+func (p *FTIndexer) addTickerUnboundAmount(ticker string, amount int64) {
+	tick := p.getTickerRecord(ticker)
+	if tick == nil || amount == 0 {
+		return
+	}
+	tick.TotalUnbound += amount
+	p.tickerAdded[strings.ToLower(ticker)] = tick
+}
+
+func (p *FTIndexer) addTickerFrozenAmount(ticker string, amount int64) {
+	tick := p.getTickerRecord(ticker)
+	if tick == nil || amount == 0 {
+		return
+	}
+	tick.TotalFrozen += amount
+	p.tickerAdded[strings.ToLower(ticker)] = tick
+}
+
+func (p *FTIndexer) addTickerUnfrozenAmount(ticker string, amount int64) {
+	tick := p.getTickerRecord(ticker)
+	if tick == nil || amount == 0 {
+		return
+	}
+	tick.TotalUnfrozen += amount
+	p.tickerAdded[strings.ToLower(ticker)] = tick
+}
+
+func (p *FTIndexer) addTickerBurnedAmount(ticker string, amount int64) {
+	tick := p.getTickerRecord(ticker)
+	if tick == nil || amount == 0 {
+		return
+	}
+	tick.TotalBurned += amount
+	p.tickerAdded[strings.ToLower(ticker)] = tick
+}
+
+func (p *FTIndexer) getAddressTickerAmount(addressId uint64, ticker string) int64 {
+	utxos := p.utxoMap[strings.ToLower(ticker)]
+	if len(utxos) == 0 {
+		return 0
+	}
+	var total int64
+	for utxoId := range utxos {
+		holder := p.holderInfo[utxoId]
+		if holder == nil || holder.AddressId != addressId {
+			continue
+		}
+		assetInfo := holder.Tickers[strings.ToLower(ticker)]
+		if assetInfo == nil {
+			continue
+		}
+		total += assetInfo.AssetAmt()
+	}
+	return total
+}
+
+func (p *FTIndexer) appendHolderAssetsToInput(input *common.TxOutput, holder *HolderInfo) map[string]bool {
+	tickers := make(map[string]bool)
+	builder := common.NewTxAssetsBuilder(len(holder.Tickers))
+	for ticker, assetInfo := range holder.Tickers {
+		amount := assetInfo.AssetAmt()
+		if assetInfo.Frozen || p.isAddressFrozen(ticker, holder.AddressId) {
+			p.addTickerBurnedAmount(ticker, amount)
+			continue
+		}
+		tickerInfo := p.tickerMap[ticker]
+		assetName := common.AssetName{
+			Protocol: common.PROTOCOL_NAME_ORDX,
+			Type:     common.ASSET_TYPE_FT,
+			Ticker:   ticker,
+		}
+		asset := common.AssetInfo{
+			Name:       assetName,
+			Amount:     *common.NewDecimal(amount, 0),
+			BindingSat: uint32(tickerInfo.Ticker.N),
+		}
+		builder.Add(&asset)
+		input.Offsets[asset.Name] = assetInfo.Offsets.Clone()
+		tickers[ticker] = true
+	}
+	builder.AddSlice(input.Assets)
+	input.Assets = builder.Build()
+	return tickers
+}
+
+func (p *FTIndexer) canUnbindTicker(inputOwners map[uint64]bool, ticker string, holder *HolderInfo) bool {
+	if holder == nil {
+		return false
+	}
+	return inputOwners[holder.AddressId]
+}
+
+func (p *FTIndexer) handleTxUnbind(tx *common.Transaction) {
+	inputOwners := make(map[uint64]bool, len(tx.Inputs))
+	for _, input := range tx.Inputs {
+		inputOwners[input.AddressId] = true
+	}
+
+	for _, output := range tx.Outputs {
+		ticker, vout, matched, err := ParseUnbindScript(output.OutValue.PkScript)
+		if err != nil {
+			common.Log.Errorf("FTIndexer.handleTxUnbind parse %s failed, %v", tx.TxId, err)
+			continue
+		}
+		if !matched {
+			continue
+		}
+		ticker = strings.ToLower(ticker)
+		tickInfo := p.tickerMap[ticker]
+		if tickInfo == nil || tickInfo.Ticker == nil {
+			common.Log.Warningf("FTIndexer.handleTxUnbind ignore unknown ticker %s in %s", ticker, tx.TxId)
+			continue
+		}
+		if vout < 0 || vout >= len(tx.Outputs) {
+			common.Log.Warningf("FTIndexer.handleTxUnbind ignore invalid vout %d in %s", vout, tx.TxId)
+			continue
+		}
+		target := tx.Outputs[vout]
+		holder, ok := p.holderInfo[target.UtxoId]
+		if !ok {
+			continue
+		}
+		assetInfo, ok := holder.Tickers[ticker]
+		if !ok {
+			continue
+		}
+		if !p.canUnbindTicker(inputOwners, ticker, holder) {
+			common.Log.Warningf("FTIndexer.handleTxUnbind ignore unauthorized %s in utxo %d, tx %s", ticker, target.UtxoId, tx.TxId)
+			continue
+		}
+
+		p.unbindHistory = append(p.unbindHistory, &common.UnbindHistory{
+			Ticker:    ticker,
+			AddressId: holder.AddressId,
+			UtxoId:    target.UtxoId,
+			Amount:    assetInfo.AssetAmt(),
+			Offsets:   assetInfo.Offsets.Clone(),
+		})
+		p.addTickerUnboundAmount(ticker, assetInfo.AssetAmt())
+
+		holder.RemoveTickerAsset(ticker, assetInfo)
+		p.deleteUtxoMap(ticker, target.UtxoId)
+
+		action := &HolderAction{
+			UtxoId:    target.UtxoId,
+			AddressId: holder.AddressId,
+			Tickers:   map[string]bool{ticker: true},
+			Action:    1,
+		}
+		if len(holder.Tickers) == 0 {
+			delete(p.holderInfo, target.UtxoId)
+			action.Action = -1
+		}
+		p.holderActionList = append(p.holderActionList, action)
+	}
+}
+
+func (p *FTIndexer) collectSameBlockFreezeDirectives(block *common.Block) []*common.FreezeDirective {
+	result := make([]*common.FreezeDirective, 0)
+	for _, tx := range block.Transactions[1:] {
+		initiatorAddressId := p.getFreezeInitiatorAddressId(tx)
+		for _, output := range tx.Outputs {
+			ticker, address, freezeHeight, matched, err := ParseFreezeScript(output.OutValue.PkScript)
+			if err != nil {
+				common.Log.Errorf("FTIndexer.collectSameBlockFreezeDirectives parse %s failed, %v", tx.TxId, err)
+				continue
+			}
+			if !matched {
+				continue
+			}
+			ticker = strings.ToLower(ticker)
+			addressId := p.getAddressId(address)
+			if addressId == common.INVALID_ID || !p.canFreezeTicker(initiatorAddressId, ticker) {
+				continue
+			}
+			if freezeHeight != block.Height {
+				continue
+			}
+			result = append(result, &common.FreezeDirective{
+				Ticker:        ticker,
+				Address:       address,
+				AddressId:     addressId,
+				FreezeHeight:  freezeHeight,
+				ConfirmHeight: block.Height,
+				TxId:          tx.TxId,
+			})
+		}
+	}
+	return result
+}
+
+func (p *FTIndexer) handleTxFreeze(tx *common.Transaction, confirmHeight int) {
+	initiatorAddressId := p.getFreezeInitiatorAddressId(tx)
+
+	for _, output := range tx.Outputs {
+		ticker, address, freezeHeight, matched, err := ParseFreezeScript(output.OutValue.PkScript)
+		if err != nil {
+			common.Log.Errorf("FTIndexer.handleTxFreeze parse %s failed, %v", tx.TxId, err)
+		} else if matched {
+			ticker = strings.ToLower(ticker)
+			addressId := p.getAddressId(address)
+			if addressId == common.INVALID_ID {
+				continue
+			}
+			if freezeHeight > confirmHeight || confirmHeight-freezeHeight > 2 {
+				common.Log.Warningf("FTIndexer.handleTxFreeze ignore invalid freeze height %d in %s", freezeHeight, tx.TxId)
+				continue
+			}
+			directive := &common.FreezeDirective{
+				Ticker:        ticker,
+				Address:       address,
+				AddressId:     addressId,
+				FreezeHeight:  freezeHeight,
+				ConfirmHeight: confirmHeight,
+				TxId:          tx.TxId,
+			}
+			if p.pendingHistoricalKeys[common.FreezeDirectiveKey(tx.TxId, ticker, addressId, freezeHeight)] {
+				continue
+			}
+			if freezeHeight < confirmHeight {
+				p.registerReloadDirective(directive)
+				continue
+			}
+			if !p.canFreezeTicker(initiatorAddressId, ticker) {
+				continue
+			}
+			p.applyFreezeDirective(directive)
+			continue
+		}
+
+		ticker, address, matched, err = ParseUnfreezeScript(output.OutValue.PkScript)
+		if err != nil {
+			common.Log.Errorf("FTIndexer.handleTxFreeze parse unfreeze %s failed, %v", tx.TxId, err)
+			continue
+		}
+		if !matched {
+			continue
+		}
+		ticker = strings.ToLower(ticker)
+		addressId := p.getAddressId(address)
+		if addressId == common.INVALID_ID || !p.canFreezeTicker(initiatorAddressId, ticker) {
+			continue
+		}
+		if !p.isAddressFrozen(ticker, addressId) {
+			continue
+		}
+		amount := p.getAddressTickerAmount(addressId, ticker)
+		p.addTickerUnfrozenAmount(ticker, amount)
+		p.freezeHistory = append(p.freezeHistory, &common.FreezeHistory{
+			Ticker:        ticker,
+			AddressId:     addressId,
+			TxId:          tx.TxId,
+			Action:        common.FreezeActionUnfreeze,
+			Amount:        amount,
+			FreezeHeight:  confirmHeight,
+			ConfirmHeight: confirmHeight,
+		})
+		p.clearFreezeState(ticker, addressId)
+		p.markAddressTickerFrozen(ticker, addressId, false)
+	}
+}
+
 func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
 
 	if block.Height < p.enableHeight {
@@ -134,12 +403,15 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 	p.mutex.Lock()
 
 	startTime := time.Now()
+	p.activatePendingFreezesAtHeight(block.Height)
+	for _, directive := range p.collectSameBlockFreezeDirectives(block) {
+		p.applyFreezeDirective(directive)
+	}
 
 	coinbaseInput := common.NewTxOutput(coinbase[0].Size)
 	coinbaseSize := common.GetOrdinalsSize(coinbase)
 	newSize := coinbaseInput.OutValue.Value
 	for _, tx := range block.Transactions[1:] {
-
 		// if tx.TxId == "cbaabeb030644cd83462b5befb497d84015140acaf5eacf9f797684e0730beb9" {
 		// 	common.Log.Infof("")
 		// }
@@ -168,7 +440,7 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 								mintingAssetOffsets := mint.Offsets
 								inter := common.IntersectAssetOffsets(mintingAssetOffsets, existingAsset.Offsets)
 								if len(inter) != 0 {
-									common.Log.Infof("%s mint asset %s on some satoshi with the same asset", 
+									common.Log.Infof("%s mint asset %s on some satoshi with the same asset",
 										mint.Base.InscriptionId, mint.Name)
 									// 这次铸造无效
 									continue
@@ -183,27 +455,7 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 			}
 
 			if holder != nil {
-				tickers := make(map[string]bool)
-				builder := common.NewTxAssetsBuilder(len(holder.Tickers))
-				for ticker, assetInfo := range holder.Tickers {
-					tickerInfo := p.tickerMap[ticker]
-					assetName := common.AssetName{
-						Protocol: common.PROTOCOL_NAME_ORDX,
-						Type:     common.ASSET_TYPE_FT,
-						Ticker:   ticker,
-					}
-					asset := common.AssetInfo{
-						Name:       assetName,
-						Amount:     *common.NewDecimal(assetInfo.AssetAmt(), 0),
-						BindingSat: uint32(tickerInfo.Ticker.N),
-					}
-					builder.Add(&asset)
-					//input.Assets.Add(&asset)
-					input.Offsets[asset.Name] = assetInfo.Offsets.Clone()
-					tickers[ticker] = true
-				}
-				builder.AddSlice(input.Assets)
-				input.Assets = builder.Build()
+				tickers := p.appendHolderAssetsToInput(input, holder)
 
 				action := HolderAction{UtxoId: utxo, AddressId: 0, Tickers: tickers, Action: -1}
 				p.holderActionList = append(p.holderActionList, &action)
@@ -221,9 +473,11 @@ func (p *FTIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range
 		}
 
 		change := p.innerUpdateTransfer(tx, allInput)
+		p.handleTxUnbind(tx)
+		p.handleTxFreeze(tx, block.Height)
 		if change != nil {
 			// 处理testnet4中fee聪丢失的情况
-			if newSize + change.Value() <= coinbaseSize {
+			if newSize+change.Value() <= coinbaseSize {
 				coinbaseInput.Append(change)
 				newSize += change.Value()
 			} else {
@@ -286,10 +540,16 @@ func (p *FTIndexer) innerUpdateTransfer(tx *common.Transaction,
 				if asset.Name.Protocol == common.PROTOCOL_NAME_ORDX &&
 					asset.Name.Type == common.ASSET_TYPE_FT {
 					offsets := newOut.Offsets[asset.Name]
+					frozen := p.isAddressFrozen(asset.Name.Ticker, txOut.AddressId)
 					assetInfo := &common.AssetAbbrInfo{
-						BindingSat: int(asset.BindingSat), 
-						Offsets: offsets.Clone()}
+						BindingSat: int(asset.BindingSat),
+						Offsets:    offsets.Clone(),
+						Frozen:     frozen,
+					}
 					p.addHolder(txOut, asset.Name.Ticker, assetInfo)
+					if frozen {
+						p.addTickerFrozenAmount(asset.Name.Ticker, assetInfo.AssetAmt())
+					}
 
 					tickers[asset.Name.Ticker] = true
 				}
@@ -369,24 +629,52 @@ func (p *FTIndexer) UpdateDB() {
 					common.Log.Infof("Error deleting db %s: %v\n", key, err)
 				}
 			} else if action.Action > 0 {
-				amount := int64(0)
 				value, ok := p.utxoMap[tickerName]
 				if ok {
-					amount, ok = value[action.UtxoId]
+					amount, ok := value[action.UtxoId]
 					if ok {
 						err := db.SetDB([]byte(key), &amount, wb)
 						if err != nil {
 							common.Log.Panicf("Error setting %s in db %v", key, err)
 						}
-					} //else {
-					// 已经被删除
-					// common.Log.Panicf("can't find %s in map of utxo", action.Utxo)
-					//}
-				} //else {
-				// 已经被删除
-				// common.Log.Panicf("can't find %s in map of utxo", tickerName)
-				//}
+					} else {
+						err := wb.Delete([]byte(key))
+						if err != nil {
+							common.Log.Infof("Error deleting db %s: %v\n", key, err)
+						}
+					}
+				} else {
+					err := wb.Delete([]byte(key))
+					if err != nil {
+						common.Log.Infof("Error deleting db %s: %v\n", key, err)
+					}
+				}
 			}
+		}
+	}
+
+	for _, item := range p.unbindHistory {
+		key := GetUnbindHistoryKey(item.Ticker, item.AddressId, item.UtxoId)
+		err := db.SetDB([]byte(key), item, wb)
+		if err != nil {
+			common.Log.Panicf("Error setting %s in db %v", key, err)
+		}
+	}
+	for _, item := range p.freezeHistory {
+		key := GetFreezeHistoryKey(item.Ticker, item.AddressId, item.Action, item.TxId)
+		if err := db.SetDB([]byte(key), item, wb); err != nil {
+			common.Log.Panicf("Error setting %s in db %v", key, err)
+		}
+	}
+
+	for _, state := range p.freezeTouched {
+		if err := db.SetDB([]byte(GetFreezeStateKey(state.Ticker, state.AddressId)), state, wb); err != nil {
+			common.Log.Panicf("Error setting freeze state %s in db %v", state.Ticker, err)
+		}
+	}
+	for _, state := range p.freezeDeleted {
+		if err := wb.Delete([]byte(GetFreezeStateKey(state.Ticker, state.AddressId))); err != nil {
+			common.Log.Infof("Error deleting freeze state %s: %v\n", state.Ticker, err)
 		}
 	}
 	//common.Log.Infof("OrdxIndexer->UpdateDB->SetDB(ticker.HolderActionList(%d), cost: %v",len(p.holderActionList), time.Since(startTime))
@@ -399,6 +687,10 @@ func (p *FTIndexer) UpdateDB() {
 	// reset memory buffer
 	p.holderActionList = make([]*HolderAction, 0)
 	p.tickerAdded = make(map[string]*common.Ticker)
+	p.unbindHistory = make([]*common.UnbindHistory, 0)
+	p.freezeHistory = make([]*common.FreezeHistory, 0)
+	p.freezeTouched = make(map[string]*common.FreezeState)
+	p.freezeDeleted = make(map[string]*common.FreezeState)
 	for _, info := range p.tickerMap {
 		info.MintAdded = make([]*common.Mint, 0)
 	}
