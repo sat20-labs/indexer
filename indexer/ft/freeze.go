@@ -233,7 +233,7 @@ func (p *FTIndexer) getAddressId(address string) uint64 {
 	return p.nftIndexer.GetBaseIndexer().GetAddressIdFromDB(address)
 }
 
-func (p *FTIndexer) getFreezeInitiatorAddressId(tx *common.Transaction) uint64 {
+func getInitiatorAddressId(tx *common.Transaction) uint64 {
 	if tx == nil || len(tx.Inputs) == 0 {
 		return common.INVALID_ID
 	}

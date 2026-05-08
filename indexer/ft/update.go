@@ -213,19 +213,9 @@ func (p *FTIndexer) appendHolderAssetsToInput(input *common.TxOutput, holder *Ho
 	return tickers
 }
 
-func (p *FTIndexer) canUnbindTicker(inputOwners map[uint64]bool, ticker string, holder *HolderInfo) bool {
-	if holder == nil {
-		return false
-	}
-	return inputOwners[holder.AddressId]
-}
-
 func (p *FTIndexer) handleTxUnbind(tx *common.Transaction) {
-	inputOwners := make(map[uint64]bool, len(tx.Inputs))
-	for _, input := range tx.Inputs {
-		inputOwners[input.AddressId] = true
-	}
-
+	// 最后一个输入的地址和输出地址一致，才能unbind
+	addressId := getInitiatorAddressId(tx)
 	for _, output := range tx.Outputs {
 		ticker, vout, matched, err := ParseUnbindScript(output.OutValue.PkScript)
 		if err != nil {
@@ -254,8 +244,7 @@ func (p *FTIndexer) handleTxUnbind(tx *common.Transaction) {
 		if !ok {
 			continue
 		}
-		if !p.canUnbindTicker(inputOwners, ticker, holder) {
-			common.Log.Warningf("FTIndexer.handleTxUnbind ignore unauthorized %s in utxo %d, tx %s", ticker, target.UtxoId, tx.TxId)
+		if addressId != target.AddressId {
 			continue
 		}
 
@@ -288,7 +277,7 @@ func (p *FTIndexer) handleTxUnbind(tx *common.Transaction) {
 func (p *FTIndexer) collectSameBlockFreezeDirectives(block *common.Block) []*common.FreezeDirective {
 	result := make([]*common.FreezeDirective, 0)
 	for _, tx := range block.Transactions[1:] {
-		initiatorAddressId := p.getFreezeInitiatorAddressId(tx)
+		initiatorAddressId := getInitiatorAddressId(tx)
 		for _, output := range tx.Outputs {
 			ticker, address, freezeHeight, matched, err := ParseFreezeScript(output.OutValue.PkScript)
 			if err != nil {
@@ -320,7 +309,7 @@ func (p *FTIndexer) collectSameBlockFreezeDirectives(block *common.Block) []*com
 }
 
 func (p *FTIndexer) handleTxFreeze(tx *common.Transaction, confirmHeight int) {
-	initiatorAddressId := p.getFreezeInitiatorAddressId(tx)
+	initiatorAddressId := getInitiatorAddressId(tx)
 
 	for _, output := range tx.Outputs {
 		ticker, address, freezeHeight, matched, err := ParseFreezeScript(output.OutValue.PkScript)
