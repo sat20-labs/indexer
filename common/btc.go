@@ -250,6 +250,11 @@ func GetBootstrapAddress(chainParams *chaincfg.Params) (string, error) {
 	return GetP2TRAddressFromPubkey(bootstrappubkey, chainParams)
 }
 
+func GetAgentAddress(chainParams *chaincfg.Params) (string, error) {
+	agentPubKey, _ := hex.DecodeString(GetCoreNodePubKey())
+	return GetP2TRAddressFromPubkey(agentPubKey, chainParams)
+}
+
 func GetCoreNodeChannelAddress(pubkey []byte, chainParams *chaincfg.Params) (string, error) {
 	// 生成P2WSH地址
 	bootstrappubkey, _ := hex.DecodeString(GetBootstrapPubKey())
