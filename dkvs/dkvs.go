@@ -560,7 +560,7 @@ func (d *Dkvs) readRecordFromDhtNet(key string) (*pb.DkvsRecord, error) {
 	}
 	e := new(pb.DkvsRecord)
 	if err := proto.Unmarshal(val, e); err != nil {
-		Logger.Errorf("readRecordFromDhtNet--> found an invalid dkvs entry: v%", err)
+		Logger.Errorf("readRecordFromDhtNet--> found an invalid dkvs entry: %v", err)
 		return nil, err
 	}
 	go saveKeyToLocal(d, key, val) //执行异步操作, 如果本地没有这个key,在本地也保留一份
@@ -583,7 +583,7 @@ func (d *Dkvs) readRecordFromLocal(key string) (*pb.DkvsRecord, error) {
 	val = libp2pRec.GetValue()
 	e := new(pb.DkvsRecord)
 	if err := proto.Unmarshal(val, e); err != nil {
-		Logger.Errorf("readRecordFromLocal--> found an invalid dkvs entry: v%", err)
+		Logger.Errorf("readRecordFromLocal--> found an invalid dkvs entry: %v", err)
 		return nil, err
 	}
 	return e, nil
@@ -757,7 +757,7 @@ func delBadRecFromLocal(d *Dkvs, key string) {
 	if recordIsBad {
 		err := d.dhtDatastore.Delete(ctx, dskey)
 		if err != nil {
-			Logger.Error("delBadRecFromLocal--->Failed to delete bad record from datastore: {key: %s, error: %s}", key, err.Error())
+			Logger.Errorf("delBadRecFromLocal--->Failed to delete bad record from datastore: {key: %s, error: %s}", key, err.Error())
 		}
 		Logger.Infof("delBadRecFromLocal---Successfully delete bad record from datastore {key: %s}", key)
 	}

@@ -75,7 +75,7 @@ func (d *Dkvs) putKeyToLocalNode(ctx context.Context, key string, value []byte, 
 	// ctx, span := d.startSpan(ctx, "IpfsDHT.PutValue", trace.WithAttributes(attribute.String("Key", key)))
 	// defer span.End()
 
-	Logger.Infof("putting value", "key", kaddht.LoggableRecordKeyString(key))
+	//Logger.Infof("putting value", "key", kaddht.LoggableRecordKeyString(key))
 	Logger.Debugf("putting value {dskey: %v}", d.mkDsKey(key))
 
 	// don't even allow local users to put bad values.
@@ -111,7 +111,7 @@ func (d *Dkvs) putKeyToLocalNode(ctx context.Context, key string, value []byte, 
 }
 
 func (d *Dkvs) getLocal(ctx context.Context, key string) (*recpb.Record, error) {
-	Logger.Infof("finding value in datastore", "key", kaddht.LoggableRecordKeyString(key))
+	//Logger.Infof("finding value in datastore", "key", kaddht.LoggableRecordKeyString(key))
 
 	rec, err := d.getRecordFromDatastore(ctx, key)
 	if err != nil {
@@ -152,7 +152,7 @@ func (d *Dkvs) getRecordFromDatastore(ctx context.Context, key string) (*recpb.R
 	if err != nil {
 		// Invalid record in datastore, probably expired but don't return an error,
 		// we'll just overwrite it
-		Logger.Infof("local record verify failed", "key", rec.GetKey(), "error", err)
+		//Logger.Infof("local record verify failed", "key", rec.GetKey(), "error", err)
 		return nil, nil
 	}
 
@@ -380,7 +380,7 @@ func (d *Dkvs) enableProvider(ctx context.Context, key string) {
 	keyCid := ConvertKeyToCid(key)
 	err := d.idht.Provide(ctx, keyCid, true)
 	if err != nil {
-		Logger.Warnf("failed to set key to node  provider list {key: %s, cid: %s}", key, keyCid, err)
+		//Logger.Warnf("failed to set key to node  provider list {key: %s, cid: %s}", key, keyCid, err)
 		return
 	}
 	Logger.Debugf("success to set key to node  provider list: {key: %s, cid: %s}", key, keyCid)
@@ -453,7 +453,7 @@ func (d *Dkvs) periodicallyProcessUnsyncKey() {
 			Logger.Debug("periodicallyProcessUnsyncKey()--->the current node is connected to the network and call putAllUnsyncKeyToNetwork()")
 			err := d.putAllUnsyncKeyToNetwork(d.idht.PeerID())
 			if err != nil {
-				Logger.Debugf("periodicallyProcessUnsyncKey()--->call putAllUnsyncKeyToNetwork() failed {err: s%}", err.Error())
+				Logger.Debugf("periodicallyProcessUnsyncKey()--->call putAllUnsyncKeyToNetwork() failed {err: %v}", err.Error())
 			}
 		}
 	}()
