@@ -81,6 +81,16 @@ var precisionFactor [64]*big.Int = [64]*big.Int{
 	new(big.Int).Exp(big.NewInt(10), big.NewInt(63), nil),
 }
 
+func DecimalScale(precision int) *big.Int {
+	if precision < 0 {
+		return big.NewInt(1)
+	}
+	if precision > MAX_PRECISION {
+		return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(precision)), nil)
+	}
+	return precisionFactor[precision]
+}
+
 // Decimal represents a fixed-point decimal number with 18 decimal places
 type Decimal struct {
 	Precision int
@@ -732,6 +742,18 @@ func (d *Decimal) Int64() int64 {
 	return d.IntegerPart()
 }
 
+// 等同于Floor
+func (d *Decimal) UInt64() uint64 {
+	if d == nil {
+		return 0
+	}
+	if d.Precision == 0 {
+		return d.Value.Uint64()
+	}
+
+	return d.UIntegerPart()
+}
+
 // 向上取整
 func (d *Decimal) Ceil() int64 {
 	if d == nil {
@@ -775,6 +797,15 @@ func (d *Decimal) IntegerPart() int64 {
 	value := new(big.Int).Set(d.Value)
 	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
 	return quotient.Int64()
+}
+
+func (d *Decimal) UIntegerPart() uint64 {
+	if d == nil {
+		return 0
+	}
+	value := new(big.Int).Set(d.Value)
+	quotient, _ := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
+	return quotient.Uint64()
 }
 
 func NewDecimalFromUint128(n uint128.Uint128, precision int) *Decimal {
