@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/sat20-labs/indexer/common"
+	atomidx "github.com/sat20-labs/indexer/indexer/atom"
 )
 
 func (b *IndexerMgr) containAsset(output *common.TxOutput, ticker *common.AssetName) bool {
@@ -126,7 +127,7 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	//common.Log.Infof("GetAssetsWithUtxo takes %v", time.Since(t1))
 	//t1 = time.Now()
-	builder := common.NewTxAssetsBuilder(len(assetmap)+len(assetmap2))
+	builder := common.NewTxAssetsBuilder(len(assetmap) + len(assetmap2))
 	for k, v := range assetmap {
 		offsets := v
 		value := v.Size()
@@ -210,6 +211,8 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 		return b.GetBRC20TickerV2(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesTickerV2(tickerName.Ticker)
+	case common.PROTOCOL_NAME_ATOM:
+		return b.GetAtomTickerV2(tickerName.Ticker)
 	case "":
 		if tickerName.Ticker == "" {
 			result = genBTCTicker()
@@ -304,6 +307,12 @@ func (b *IndexerMgr) GetAssetSummaryInAddressV3(address string) map[common.Ticke
 	//common.Log.Infof("GetAddressAssets takes %v", time.Since(start))
 	//start = time.Now()
 
+	atomAsset := b.atomIndexer.GetAssetSummaryByAddress(utxos)
+	for k, v := range atomAsset {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ATOM, Type: common.ASSET_TYPE_FT, Ticker: k}
+		result[tickName] = common.NewDefaultDecimal(v)
+	}
+
 	totalSats := int64(0)
 	plainUtxoMap := make(map[uint64]int64)
 	for utxoId, v := range utxos {
@@ -363,6 +372,8 @@ func (b *IndexerMgr) GetMintHistoryWithAddressV2(address string,
 		return b.brc20Indexer.GetMintHistoryWithAddressV2(addressId, tick.Ticker, start, limit)
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
+	case common.PROTOCOL_NAME_ATOM:
+		return b.GetAtomMintHistoryWithAddress(addressId, tick.Ticker, start, limit)
 	}
 
 	return nil, 0
@@ -392,6 +403,11 @@ func (b *IndexerMgr) GetAssetsWithUtxoV2(utxoId uint64) map[common.TickerName]*c
 	if brc20Asset != nil && !brc20Asset.Invalid {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_BRC20, Type: common.ASSET_TYPE_FT, Ticker: brc20Asset.Name}
 		result[tickName] = brc20Asset.Amt
+	}
+	atomAssets := b.atomIndexer.GetUtxoAssets(utxoId)
+	for ticker, amount := range atomAssets {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ATOM, Type: common.ASSET_TYPE_FT, Ticker: ticker}
+		result[tickName] = common.NewDefaultDecimal(amount)
 	}
 	nfts := b.getNftsWithUtxo(utxoId)
 	if len(nfts) > 0 {
@@ -437,6 +453,8 @@ func (b *IndexerMgr) GetTickerMapV2(protocol string, start, limit int) ([]string
 		return b.GetBRC20TickerMapV2(start, limit)
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesTickerMapV2(start, limit)
+	case common.PROTOCOL_NAME_ATOM:
+		return b.GetAtomTickerMapV2(start, limit)
 	}
 	return nil, 0
 }
@@ -457,6 +475,8 @@ func (b *IndexerMgr) GetHoldersWithTickV2(tickerName *common.TickerName) map[uin
 		result = b.brc20Indexer.GetHoldersWithTick(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
 		result = b.RunesIndexer.GetHoldersWithTick(tickerName.Ticker)
+	case common.PROTOCOL_NAME_ATOM:
+		result = b.atomIndexer.GetHoldersWithTick(tickerName.Ticker)
 	}
 
 	return result
@@ -475,6 +495,8 @@ func (b *IndexerMgr) GetMintAmountV2(tickerName *common.TickerName) (*common.Dec
 		return b.brc20Indexer.GetMintAmount(tickerName.Ticker)
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesMintAmount(tickerName.Ticker)
+	case common.PROTOCOL_NAME_ATOM:
+		return b.atomIndexer.GetMintAmount(tickerName.Ticker)
 	}
 	return nil, 0
 }
@@ -513,6 +535,8 @@ func (b *IndexerMgr) GetMintHistoryV2(tickerName *common.TickerName, start,
 		}
 	case common.PROTOCOL_NAME_RUNES:
 		result, _ = b.GetRunesMintHistory(tickerName.Ticker, start, limit)
+	case common.PROTOCOL_NAME_ATOM:
+		result = b.atomIndexer.GetMintHistory(tickerName.Ticker, start, limit)
 	}
 	return result
 }
@@ -533,6 +557,8 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 			return 1
 		}
 	} else if tickerName.Protocol == "" {
+		return 1
+	} else if tickerName.Protocol == common.PROTOCOL_NAME_ATOM {
 		return 1
 	}
 
@@ -568,6 +594,15 @@ func (b *IndexerMgr) IsAllowDeploy(tickerName *common.TickerName) error {
 		}
 	case common.PROTOCOL_NAME_RUNES:
 		err = b.RunesIndexer.IsAllowEtching(tickerName.Ticker)
+	case common.PROTOCOL_NAME_ATOM:
+		if !atomidx.IsValidTicker(tickerName.Ticker) {
+			return fmt.Errorf("invalid atom ticker name")
+		}
+		if !b.atomIndexer.TickExisted(tickerName.Ticker) {
+			err = nil
+		} else {
+			err = fmt.Errorf("existing")
+		}
 	}
 	return err
 }
@@ -661,10 +696,13 @@ func (b *IndexerMgr) GetLockedUTXOsInAddress(address string) ([]*common.AssetsIn
 		if b.brc20Indexer.IsExistAsset(utxoId) {
 			continue
 		}
+		if b.atomIndexer.HasAssetInUtxo(utxoId) {
+			continue
+		}
 		if b.exotic.HasExoticInUtxo(utxoId) {
 			continue
 		}
-		
+
 		// 只剩下铭文的可能性
 		if !b.nft.HasNftInUtxo(utxoId) {
 			continue

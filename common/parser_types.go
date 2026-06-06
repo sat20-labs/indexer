@@ -2,9 +2,10 @@ package common
 
 const (
 	//PROTOCOL_NAME_ORD = "ord"
-	PROTOCOL_NAME_ORDX = "ordx" // 包含ord，通过资产类型区分
+	PROTOCOL_NAME_ORDX  = "ordx" // 包含ord，通过资产类型区分
 	PROTOCOL_NAME_BRC20 = "brc20"
 	PROTOCOL_NAME_RUNES = "runes"
+	PROTOCOL_NAME_ATOM  = "atom"
 )
 
 const (
@@ -69,8 +70,8 @@ type OrdxUpdateContentV1 struct {
 }
 
 type OrdxUpdateContentV2 struct {
-	P  string      
-    Op string     
-	Name  string   
-	KVs   map[string]string
+	P    string
+	Op   string
+	Name string
+	KVs  map[string]string
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/sat20-labs/indexer/common"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 )
 
 type AddressStatus struct {
@@ -37,10 +39,11 @@ type BaseIndexer struct {
 	addressValueMap map[string]*common.AddressValueV2
 	idToAddressMap  map[uint64]string
 
-	lastHeight       int // 内存数据同步区块
-	lastHash         string
-	prevBlockHashMap map[int]string // 记录过去6个区块hash，判断哪个区块分叉
-	lastSats         int64
+	lastHeight        int // 内存数据同步区块
+	lastHash          string
+	prevBlockHashMap  map[int]string // 记录过去6个区块hash，判断哪个区块分叉
+	lastSats          int64
+	nullDataAddressId uint64
 	////////////
 
 	blocksChan chan *common.Block
@@ -64,13 +67,14 @@ func NewBaseIndexer(
 	periodFlushToDB int,
 ) *BaseIndexer {
 	indexer := &BaseIndexer{
-		db:               basicDB,
-		stats:            &SyncStats{},
-		periodFlushToDB:  periodFlushToDB,
-		keepBlockHistory: 6,
-		blocksChan:       make(chan *common.Block, BLOCK_PREFETCH),
-		chaincfgParam:    chaincfgParam,
-		maxIndexHeight:   maxIndexHeight,
+		db:                basicDB,
+		stats:             &SyncStats{},
+		periodFlushToDB:   periodFlushToDB,
+		keepBlockHistory:  6,
+		blocksChan:        make(chan *common.Block, BLOCK_PREFETCH),
+		chaincfgParam:     chaincfgParam,
+		maxIndexHeight:    maxIndexHeight,
+		nullDataAddressId: common.INVALID_ID,
 	}
 
 	if chaincfgParam.Name != "mainnet" {
@@ -150,6 +154,7 @@ func (b *BaseIndexer) Clone(setStoredFlag bool) *BaseIndexer {
 	newInst.lastHash = b.lastHash
 	newInst.lastHeight = b.lastHeight
 	newInst.lastSats = b.lastSats
+	newInst.nullDataAddressId = b.nullDataAddressId
 	newInst.stats = b.stats.Clone()
 	newInst.blockprocCB = b.blockprocCB
 	newInst.updateDBCB = b.updateDBCB
@@ -235,7 +240,7 @@ func (b *BaseIndexer) forceUpdateDB() {
 			org[k] = v
 		}
 		// address := "bc1p8eayus9djtwn6gatwppdyrsgm95d3kdwvu337xlqpahauc0jtvjqt6lq5p"
-		// id, ok := wantToDelete[address] 
+		// id, ok := wantToDelete[address]
 		// if ok {
 		// 	common.Log.Infof("%s %x", address, id )
 		// }
@@ -244,7 +249,7 @@ func (b *BaseIndexer) forceUpdateDB() {
 		b.updateDBCB(wantToDelete)
 		// common.Log.Infof("BaseIndexer.updateOrdxDB: cost: %v", time.Since(startTime))
 
-		// _, ok = wantToDelete[address] 
+		// _, ok = wantToDelete[address]
 		// if ok {
 		// 	common.Log.Infof("want to delete %s", address)
 		// }
@@ -444,6 +449,28 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	wantToDeleteMap := make(map[string]uint64)
 	for k, v := range b.addressValueMap {
 		key := db.GetAddressDBKeyV2(k)
+		if v.AddressType == int(txscript.NullDataTy) {
+			if len(v.Utxos) > 0 {
+				if err := b.appendAddressUtxosToDBV2(key, v, wb); err != nil {
+					common.Log.Panicf("Error appending op_return address utxos in db %v", err)
+				}
+			} else if v.Op == 1 {
+				empty := &common.AddressValueInDBV2{
+					AddressId:   v.AddressId,
+					AddressType: int32(v.AddressType),
+				}
+				if err := db.SetDBWithProto3(key, empty, wb); err != nil {
+					common.Log.Panicf("Error setting in db %v", err)
+				}
+			}
+			if v.Op == 1 {
+				if err := wb.Put(db.GetAddressIdKey(v.AddressId), []byte(k)); err != nil {
+					common.Log.Panicf("Error setting in db %v", err)
+				}
+			}
+			continue
+		}
+
 		value := v.ToAddressValueInDBV2()
 		if len(value.Utxos) > 0 {
 			err := db.SetDBWithProto3(key, value, wb)
@@ -845,7 +872,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 
 	// sat20 跟ordinals协议唯一不同的地方：实际奖励了多少聪，就编码多少聪在coinbase交易的前面，后面跟着每一笔交易的网络费
 	// adjust the coinbaseOrdinals[0]
-	newSatAmt := satsOutput - satsInput 
+	newSatAmt := satsOutput - satsInput
 	if newSatAmt < 0 {
 		// 测试环境下，有时不仅不要奖励的聪，连作为fee的聪都不要了，
 		// 比如 testnet4 125423 000000002e1ce0c58732877a4abfca4149c9fcce2adee47763dd8a4b00f1a11d
@@ -874,14 +901,14 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 		// 处理方法2: 这些烧掉的聪，可能包含了各种资产，为了资产统计准确，这些烧掉的聪，放到一个假的op_return中
 		burned := feeAmt - coinbaseSize
 		coinbaseSize = feeAmt
-		
+
 		vout := len(block.Transactions[0].Outputs)
 		opreturn := &common.TxOutputV2{
-			TxOutput:    common.TxOutput{
-				UtxoId:        common.ToUtxoId(block.Height, 0, vout),
-				OutPointStr:   block.Transactions[0].TxId + ":" + strconv.Itoa(vout),
-				OutValue:      wire.TxOut{
-					Value: burned,
+			TxOutput: common.TxOutput{
+				UtxoId:      common.ToUtxoId(block.Height, 0, vout),
+				OutPointStr: block.Transactions[0].TxId + ":" + strconv.Itoa(vout),
+				OutValue: wire.TxOut{
+					Value:    burned,
 					PkScript: []byte{txscript.OP_RETURN},
 				},
 				Offsets:       make(map[common.AssetName]common.AssetOffsets),
@@ -899,7 +926,7 @@ func (b *BaseIndexer) assignOrdinals_sat20(block *common.Block) []*common.Range 
 	} else {
 		coinbaseOrdinals[0].Size = newSatAmt
 	}
-	
+
 	blockValue.Ordinals.Start = b.lastSats
 	blockValue.Ordinals.Size = newSatAmt
 	blockValue.InputUtxo = deledUtxoCount
@@ -924,7 +951,6 @@ func (b *BaseIndexer) inputUtxo(input *common.TxInput) {
 }
 
 func (b *BaseIndexer) outputUtxo(output *common.TxOutputV2) {
-
 	utxoId := output.UtxoId
 	address := output.GetAddress()
 	addrValue, ok := b.addressValueMap[address]
@@ -952,7 +978,7 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	if count == uint64(b.lastHeight) {
 		return 0
 	}
-	
+
 	if inCommon.STEP_RUN_MODE {
 		count = uint64(b.lastHeight) + 1
 	}
@@ -1023,7 +1049,6 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			}
 		}
 	}
-
 	// pebble数据库的优化手段: 尽可能将随机读变成按照key的顺序读
 	sort.Slice(inputsToLoad, func(i, j int) bool {
 		return bytes.Compare(inputsToLoad[i].key, inputsToLoad[j].key) < 0
@@ -1106,6 +1131,11 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 				b.addressValueMap[address] = s
 			}
 			if s.AddressId == common.INVALID_ID {
+				if s.AddressType == int(txscript.NullDataTy) {
+					b.prefetchNullDataAddress(txn, address, s)
+					b.idToAddressMap[s.AddressId] = address
+					continue
+				}
 				data, err := db.GetAddressDataFromDBTxnV2(txn, address)
 				if err != nil {
 					addressId := b.generateAddressId()
@@ -1159,6 +1189,91 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		return nil
 	})
 
+}
+
+func (b *BaseIndexer) prefetchNullDataAddress(txn common.ReadBatch, address string, value *common.AddressValueV2) {
+	if b.nullDataAddressId != common.INVALID_ID {
+		value.AddressId = b.nullDataAddressId
+		value.AddressType = int(txscript.NullDataTy)
+		value.Op = 0
+		value.Utxos = make(map[uint64]int64)
+		return
+	}
+
+	addrId, err := getAddressIdOnlyFromTxnV2(txn, address)
+	if err != nil {
+		addrId, err = db.GetAddressIdFromTxn(txn, address)
+		if err != nil {
+			addrId = b.generateAddressId()
+			value.Op = 1
+		} else {
+			value.Op = 0
+		}
+	} else {
+		value.Op = 0
+	}
+	b.nullDataAddressId = addrId
+	value.AddressId = addrId
+	value.AddressType = int(txscript.NullDataTy)
+	value.Utxos = make(map[uint64]int64)
+}
+
+func getAddressIdOnlyFromTxnV2(txn common.ReadBatch, address string) (uint64, error) {
+	data, err := txn.Get(db.GetAddressDBKeyV2(address))
+	if err != nil {
+		return common.INVALID_ID, err
+	}
+	for len(data) > 0 {
+		num, typ, n := protowire.ConsumeTag(data)
+		if n < 0 {
+			return common.INVALID_ID, protowire.ParseError(n)
+		}
+		data = data[n:]
+		if num == 1 && typ == protowire.VarintType {
+			value, n := protowire.ConsumeVarint(data)
+			if n < 0 {
+				return common.INVALID_ID, protowire.ParseError(n)
+			}
+			return value, nil
+		}
+		n = protowire.ConsumeFieldValue(num, typ, data)
+		if n < 0 {
+			return common.INVALID_ID, protowire.ParseError(n)
+		}
+		data = data[n:]
+	}
+	return common.INVALID_ID, common.ErrKeyNotFound
+}
+
+func (b *BaseIndexer) appendAddressUtxosToDBV2(key []byte, value *common.AddressValueV2, wb common.WriteBatch) error {
+	existing, err := b.db.Read(key)
+	if err != nil {
+		if err != common.ErrKeyNotFound {
+			return err
+		}
+		return db.SetDBWithProto3(key, value.ToAddressValueInDBV2(), wb)
+	}
+	updated, err := appendAddressUtxosToBytes(existing, value.Utxos)
+	if err != nil {
+		return err
+	}
+	return wb.Put(key, updated)
+}
+
+func appendAddressUtxosToBytes(existing []byte, utxos map[uint64]int64) ([]byte, error) {
+	updated := append([]byte(nil), existing...)
+	for utxoId, utxoValue := range utxos {
+		item, err := proto.Marshal(&common.UtxoIdInDB{
+			UtxoId: utxoId,
+			Value:  utxoValue,
+		})
+		if err != nil {
+			return nil, err
+		}
+		updated = protowire.AppendTag(updated, 3, protowire.BytesType)
+		updated = protowire.AppendBytes(updated, item)
+	}
+	return updated, nil
 }
 
 func (b *BaseIndexer) loadSyncStatsFromDB() {
@@ -1622,7 +1737,6 @@ func (p *BaseIndexer) getAddressById(addressId uint64) string {
 	return value
 }
 
-
 // only for api access
 func (b *BaseIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValueV2 {
 	value, ok := b.addressValueMap[address]
@@ -1639,7 +1753,7 @@ func (b *BaseIndexer) getAddressValue2(address string, ldb common.KVDB) *common.
 }
 
 // key: utxoId, value: btc value
-func (b *BaseIndexer) GetUTXOs(addressId uint64) (map[uint64]int64) {
+func (b *BaseIndexer) GetUTXOs(addressId uint64) map[uint64]int64 {
 	address, err := b.GetAddressByID(addressId)
 	if err != nil {
 		return nil
@@ -1651,7 +1765,6 @@ func (b *BaseIndexer) GetUTXOs(addressId uint64) (map[uint64]int64) {
 	return addrValue.Utxos
 }
 
-
 // key: utxoId, value: btc value
 func (b *BaseIndexer) GetUTXOsWithAddress(address string) (uint64, map[uint64]int64) {
 	addrValue := b.getAddressValue2(address, b.db)
@@ -1660,7 +1773,6 @@ func (b *BaseIndexer) GetUTXOsWithAddress(address string) (uint64, map[uint64]in
 	}
 	return addrValue.AddressId, addrValue.Utxos
 }
-
 
 func (b *BaseIndexer) GetUtxoAddress(utxoId uint64) (uint64, error) {
 	// 有可能还没有写入数据库，所以读缓存

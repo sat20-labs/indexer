@@ -11,9 +11,8 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-
 func InitBitconRpc(host string, port int, user, passwd string, useSSL bool) error {
-	
+
 	if strings.Contains(host, "blockstream") {
 
 	} else {
@@ -44,7 +43,6 @@ func InitBitconRpc(host string, port int, user, passwd string, useSSL bool) erro
 type BitcoindRPC struct {
 	bitcoind *bitcoind.Bitcoind
 }
-
 
 func (p *BitcoindRPC) TestTx(signedTxs []string) ([]bitcoind.TransactionTestResult, error) {
 	resp, err := p.bitcoind.TestMempoolAccept(signedTxs)
@@ -136,6 +134,9 @@ func (p *BitcoindRPC) GetRawTx(txid string) (string, error) {
 }
 
 func (p *BitcoindRPC) GetBlockCount() (uint64, error) {
+	if height, ok, err := debugBlockCount(); ok {
+		return height, err
+	}
 	return p.bitcoind.GetBlockCount()
 }
 
@@ -165,7 +166,7 @@ func (p *BitcoindRPC) GetMemPool() ([]string, error) {
 	return p.bitcoind.GetRawMempool()
 }
 
-func (p *BitcoindRPC) GetMemPoolEntry(txId string)  (*bitcoind.MemPoolEntry, error) {
+func (p *BitcoindRPC) GetMemPoolEntry(txId string) (*bitcoind.MemPoolEntry, error) {
 	return p.bitcoind.GetMemPoolEntry(txId)
 }
 
@@ -176,7 +177,6 @@ func (p *BitcoindRPC) EstimateSmartFeeWithMode(minconf int, mode string) (*bitco
 	}
 	return &ret, nil
 }
-
 
 // 提供一些接口，可以快速同步mempool中的数据，并将数据保存在本地kv数据库
 // 1. 启动一个线程，或者一个被动的监听接口，监控内存池的新增tx的信息，

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/bloom"
@@ -13,10 +14,11 @@ import (
 )
 
 const (
-	maxBatchSize = 1280 << 20 // 1280MB，安全
-	maxItemSize  = 64 << 20  // 单条数据兜底
+	maxBatchSize                = 1280 << 20 // 1280MB，安全
+	maxItemSize                 = 64 << 20   // 单条数据兜底
+	defaultBuildPebbleCacheMB   = 2048
+	defaultServicePebbleCacheMB = 32768
 )
-
 
 type pebbleDB struct {
 	path string
@@ -52,80 +54,111 @@ prefix scan + limit=1000	50–300 ms
 // 更大的 memtable
 // 更精准的 bloom
 // 8KB block size
-func buildOptions() *pebble.Options {
-    cache := pebble.NewCache(32 << 30) // 32GB：显著提升随机读
+func buildOptions(cacheSizeMB int) *pebble.Options {
+	if cacheSizeMB <= 0 {
+		cacheSizeMB = defaultBuildPebbleCacheMB
+	}
+	cache := newPebbleCache(cacheSizeMB, "build")
 
-    return &pebble.Options{
-        Cache:        cache,
-        MaxOpenFiles: 50000,
+	return &pebble.Options{
+		Cache:        cache,
+		MaxOpenFiles: 50000,
 
-        // —— MemTable：极其关键 ——
-        MemTableSize:                64 << 20, // 64MB（提高热 key 命中）
-        MemTableStopWritesThreshold: 3,        // 最多 ~192MB memtable
+		// —— MemTable：极其关键 ——
+		MemTableSize:                64 << 20, // 64MB（提高热 key 命中）
+		MemTableStopWritesThreshold: 3,        // 最多 ~192MB memtable
 
-        // —— L0 控制 ——
-        L0CompactionThreshold:  6,
-        L0StopWritesThreshold:  12,
+		// —— L0 控制 ——
+		L0CompactionThreshold: 6,
+		L0StopWritesThreshold: 12,
 
-        // —— 防止层级过大 ——
-        LBaseMaxBytes: 1 << 30, // 1GB
+		// —— 防止层级过大 ——
+		LBaseMaxBytes: 1 << 30, // 1GB
 
-        // —— compaction 仍然单线程，防 OOM ——
-        MaxConcurrentCompactions: func() int { return 1 },
+		// —— compaction 仍然单线程，防 OOM ——
+		MaxConcurrentCompactions: func() int { return 1 },
 
-        Levels: func() []pebble.LevelOptions {
-            lvls := make([]pebble.LevelOptions, 7)
-            for i := range lvls {
-                lvls[i] = pebble.LevelOptions{
-                    TargetFileSize: 128 << 20, // 128MB：安全上限
-                    BlockSize:      8 << 10,   // 8KB：point lookup 最优区间
-                    FilterPolicy:   bloom.FilterPolicy(12), // ↑ Bloom 精度
-                    FilterType:     pebble.TableFilter,
-                }
-            }
-            return lvls
-        }(),
-    }
+		Levels: func() []pebble.LevelOptions {
+			lvls := make([]pebble.LevelOptions, 7)
+			for i := range lvls {
+				lvls[i] = pebble.LevelOptions{
+					TargetFileSize: 128 << 20,              // 128MB：安全上限
+					BlockSize:      8 << 10,                // 8KB：point lookup 最优区间
+					FilterPolicy:   bloom.FilterPolicy(12), // ↑ Bloom 精度
+					FilterType:     pebble.TableFilter,
+				}
+			}
+			return lvls
+		}(),
+	}
 }
-
 
 // 索引完成后，重启进程，用下面的参数打开同一个 DB：
 // 索引完成后，重启进程，用下面的参数打开同一个 DB：
 func serveOptions() *pebble.Options {
-    cache := pebble.NewCache(32 << 30) // 32GB
+	cache := newPebbleCache(defaultServicePebbleCacheMB, "service")
 
-    return &pebble.Options{
-        Cache:        cache,
-        MaxOpenFiles: 50000,
+	return &pebble.Options{
+		Cache:        cache,
+		MaxOpenFiles: 50000,
 
-        MemTableSize:                64 << 20,
-        MemTableStopWritesThreshold: 4,
+		MemTableSize:                64 << 20,
+		MemTableStopWritesThreshold: 4,
 
-        // compaction 几乎不会发生
-        MaxConcurrentCompactions: func() int { return 2 },
+		// compaction 几乎不会发生
+		MaxConcurrentCompactions: func() int { return 2 },
 
-        Levels: func() []pebble.LevelOptions {
-            lvls := make([]pebble.LevelOptions, 7)
-            for i := range lvls {
-                lvls[i].TargetFileSize = 256 << 20 // 256MB
-                lvls[i].BlockSize = 16 << 10       // 提高点查效率
-                lvls[i].FilterPolicy = bloom.FilterPolicy(10)
-                lvls[i].FilterType = pebble.TableFilter
-            }
-            return lvls
-        }(),
-    }
+		Levels: func() []pebble.LevelOptions {
+			lvls := make([]pebble.LevelOptions, 7)
+			for i := range lvls {
+				lvls[i].TargetFileSize = 256 << 20 // 256MB
+				lvls[i].BlockSize = 16 << 10       // 提高点查效率
+				lvls[i].FilterPolicy = bloom.FilterPolicy(10)
+				lvls[i].FilterType = pebble.TableFilter
+			}
+			return lvls
+		}(),
+	}
 }
 
+func newPebbleCache(defaultCacheMB int, mode string) *pebble.Cache {
+	cacheMB := defaultCacheMB
+	if raw := os.Getenv("INDEXER_PEBBLE_CACHE_MB"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			common.Log.Warnf("invalid INDEXER_PEBBLE_CACHE_MB=%q, use default %dMB", raw, defaultCacheMB)
+		} else {
+			cacheMB = value
+		}
+	} else {
+		modeKey := "INDEXER_PEBBLE_BUILD_CACHE_MB"
+		if mode == "service" {
+			modeKey = "INDEXER_PEBBLE_SERVICE_CACHE_MB"
+		}
+		if raw := os.Getenv(modeKey); raw != "" {
+			value, err := strconv.Atoi(raw)
+			if err != nil || value <= 0 {
+				common.Log.Warnf("invalid %s=%q, use default %dMB", modeKey, raw, defaultCacheMB)
+			} else {
+				cacheMB = value
+			}
+		}
+	}
+	common.Log.Infof("pebble %s cache capacity: %dMB", mode, cacheMB)
+	return pebble.NewCache(int64(cacheMB) << 20)
+}
 
-func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
+func openPebbleDB(filepath string, o *pebble.Options, cacheSizeMB int) (*pebble.DB, error) {
 	if o == nil {
-		o = buildOptions()
-		
+		if os.Getenv("INDEXER_PEBBLE_MODE") == "service" {
+			o = serveOptions()
+		} else {
+			o = buildOptions(cacheSizeMB)
+		}
+
 		// // 建议：Cache 设为机器内存的 20%~40%
 		// cache := pebble.NewCache(16 << 30) // 16 GiB，可按需调整
 		// // 可选：TableCache 默认够用；需要更高并发可单独配置
-
 
 		// o = &pebble.Options{
 		// 	Cache:         cache,
@@ -155,8 +188,8 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 		// 			// }
 		// 		}
 		// 		// 逐层放大 TargetFileSize（非必须，但对大数据集更友好）
-		// 		for i := 1; i < len(lvls); i++ { 
-		// 			lvls[i].TargetFileSize = lvls[i-1].TargetFileSize << 1 
+		// 		for i := 1; i < len(lvls); i++ {
+		// 			lvls[i].TargetFileSize = lvls[i-1].TargetFileSize << 1
 		// 		}
 		// 		return lvls
 		// 	}(),
@@ -167,7 +200,6 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 		// }
 		// //o.Levels[0].EnsureDefaults()
 
-	
 		// o.TableCache = pebble.NewTableCache()
 		// 压缩算法（可选）：Zstd 压缩比/速度更佳（取决于 Pebble/Go 版本支持）
 		// for i := range opts.Levels {
@@ -177,8 +209,8 @@ func openPebbleDB(filepath string, o *pebble.Options) (*pebble.DB, error) {
 	return pebble.Open(filepath, o)
 }
 
-func NewPebbleDB(path string) common.KVDB {
-	db, err := initPebbleDB(path)
+func NewPebbleDB(path string, cacheSizeMB int) common.KVDB {
+	db, err := initPebbleDB(path, cacheSizeMB)
 	if err != nil {
 		common.Log.Errorf("initPebbleDB failed, %v", err)
 		return nil
@@ -187,11 +219,11 @@ func NewPebbleDB(path string) common.KVDB {
 	return &kvdb
 }
 
-func initPebbleDB(path string) (*pebble.DB, error) {
+func initPebbleDB(path string, cacheSizeMB int) (*pebble.DB, error) {
 	if path == "" {
 		path = "./data/db"
 	}
-	return openPebbleDB(path, nil)
+	return openPebbleDB(path, nil, cacheSizeMB)
 }
 
 func (p *pebbleDB) get(key []byte) ([]byte, error) {
@@ -218,8 +250,8 @@ func (p *pebbleDB) close() error {
 	return p.db.Close()
 }
 
-func (p *pebbleDB) commit() error { 
-	return nil 
+func (p *pebbleDB) commit() error {
+	return nil
 }
 
 func (p *pebbleDB) Read(key []byte) ([]byte, error) {
@@ -372,8 +404,8 @@ func (p *pebbleDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v
 // 慢，尽可能不要用
 func (p *pebbleDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error {
 	var (
-		pageSize = 1000
-		cursor  []byte = nil
+		pageSize        = 1000
+		cursor   []byte = nil
 	)
 
 	for {
@@ -410,102 +442,101 @@ func (p *pebbleDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) er
 // 返回：
 // - nextKey: 下一页的起点（nil 表示已经到末尾）
 func (p *pebbleDB) BatchReadPage(
-    prefix []byte,
-    startKey []byte, // exclusive
-    limit int,
-    reverse bool,
-    fn func(k, v []byte) error,
+	prefix []byte,
+	startKey []byte, // exclusive
+	limit int,
+	reverse bool,
+	fn func(k, v []byte) error,
 ) (nextKey []byte, err error) {
 
-    if limit <= 0 {
-        return nil, nil
-    }
+	if limit <= 0 {
+		return nil, nil
+	}
 
-    var lower, upper []byte
-    if len(prefix) > 0 {
-        lower = prefix
-        upper = nextPrefix(prefix)
-    }
+	var lower, upper []byte
+	if len(prefix) > 0 {
+		lower = prefix
+		upper = nextPrefix(prefix)
+	}
 
-    it, err := p.db.NewIter(&pebble.IterOptions{
-        LowerBound: lower,
-        UpperBound: upper,
-    })
-    if err != nil {
-        return nil, err
-    }
-    defer it.Close()
+	it, err := p.db.NewIter(&pebble.IterOptions{
+		LowerBound: lower,
+		UpperBound: upper,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
 
-    count := 0
-    var ok bool
+	count := 0
+	var ok bool
 
-    if reverse {
-        // -------- 反向扫描 --------
-        if len(startKey) > 0 {
-            // exclusive：从 < startKey 的最大 key 开始
-            ok = it.SeekLT(startKey)
-        } else {
-            // 第一页：直接跳到 prefix 范围内的最后一个
-            ok = it.Last()
-        }
+	if reverse {
+		// -------- 反向扫描 --------
+		if len(startKey) > 0 {
+			// exclusive：从 < startKey 的最大 key 开始
+			ok = it.SeekLT(startKey)
+		} else {
+			// 第一页：直接跳到 prefix 范围内的最后一个
+			ok = it.Last()
+		}
 
-        for ; ok && count < limit; ok = it.Prev() {
-            k := it.Key()
+		for ; ok && count < limit; ok = it.Prev() {
+			k := it.Key()
 
-            if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
-                break
-            }
+			if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
+				break
+			}
 
-            if err := fn(k, it.Value()); err != nil {
-                return nil, err
-            }
+			if err := fn(k, it.Value()); err != nil {
+				return nil, err
+			}
 
-            nextKey = append([]byte{}, k...) // 复制一份作为游标
-            count++
-        }
-    } else {
-        // -------- 正向扫描 --------
-        if len(startKey) > 0 {
-            // exclusive：跳到 > startKey
-            ok = it.SeekGE(startKey)
-            if ok && bytes.Equal(it.Key(), startKey) {
-                ok = it.Next()
-            }
-        } else if len(prefix) > 0 {
-            // 第一页
-            ok = it.SeekGE(prefix)
-        } else {
-            ok = it.First()
-        }
+			nextKey = append([]byte{}, k...) // 复制一份作为游标
+			count++
+		}
+	} else {
+		// -------- 正向扫描 --------
+		if len(startKey) > 0 {
+			// exclusive：跳到 > startKey
+			ok = it.SeekGE(startKey)
+			if ok && bytes.Equal(it.Key(), startKey) {
+				ok = it.Next()
+			}
+		} else if len(prefix) > 0 {
+			// 第一页
+			ok = it.SeekGE(prefix)
+		} else {
+			ok = it.First()
+		}
 
-        for ; ok && count < limit; ok = it.Next() {
-            k := it.Key()
+		for ; ok && count < limit; ok = it.Next() {
+			k := it.Key()
 
-            if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
-                break
-            }
+			if len(prefix) > 0 && upper == nil && !bytes.HasPrefix(k, prefix) {
+				break
+			}
 
-            if err := fn(k, it.Value()); err != nil {
-                return nil, err
-            }
+			if err := fn(k, it.Value()); err != nil {
+				return nil, err
+			}
 
-            nextKey = append([]byte{}, k...)
-            count++
-        }
-    }
+			nextKey = append([]byte{}, k...)
+			count++
+		}
+	}
 
-    // 如果这一页没有读满，说明已经到头了
-    if count < limit {
-        nextKey = nil
-    }
+	// 如果这一页没有读满，说明已经到头了
+	if count < limit {
+		nextKey = nil
+	}
 
-    return nextKey, it.Error()
+	return nextKey, it.Error()
 }
-
 
 type pebbleReadBatch struct {
 	snap *pebble.Snapshot
-	it *pebble.Iterator
+	it   *pebble.Iterator
 }
 
 func (p *pebbleReadBatch) Get(key []byte) ([]byte, error) {
@@ -520,10 +551,9 @@ func (p *pebbleReadBatch) Get(key []byte) ([]byte, error) {
 	// return append([]byte{}, val...), nil
 	if p.it.SeekGE(key) && bytes.Equal(p.it.Key(), key) {
 		return append([]byte{}, p.it.Value()...), nil
-	} 
+	}
 	return nil, common.ErrKeyNotFound
 }
-
 
 func (p *pebbleReadBatch) GetRef(key []byte) ([]byte, error) {
 	// val, closer, err := p.snap.Get(key)
@@ -537,7 +567,7 @@ func (p *pebbleReadBatch) GetRef(key []byte) ([]byte, error) {
 	// return val, nil
 	if p.it.SeekGE(key) && bytes.Equal(p.it.Key(), key) {
 		return p.it.Value(), nil
-	} 
+	}
 	return nil, common.ErrKeyNotFound
 }
 
@@ -553,11 +583,11 @@ func (p *pebbleDB) View(fn func(txn common.ReadBatch) error) error {
 
 	rb := pebbleReadBatch{
 		snap: snap,
-		it: it,
+		it:   it,
 	}
 	return fn(&rb)
 	// rb := &pebbleReadBatchDirect{db: p.db}
-    // return fn(rb)
+	// return fn(rb)
 }
 
 // type pebbleReadBatchDirect struct{ db *pebble.DB }
@@ -629,6 +659,7 @@ type pebbleWriteBatch struct {
 }
 
 var PrintLog = false
+
 func (p *pebbleWriteBatch) Put(key, value []byte) error {
 	if p.closed {
 		return errors.New("writebatch closed")
@@ -699,7 +730,6 @@ func (p *pebbleWriteBatch) ensureCapacity(extra int) error {
 	}
 	return nil
 }
-
 
 func (p *pebbleDB) NewWriteBatch() common.WriteBatch {
 	return &pebbleWriteBatch{db: p.db, batch: p.db.NewBatch()}

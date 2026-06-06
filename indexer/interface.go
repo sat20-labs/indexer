@@ -59,6 +59,9 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 	if b.brc20Indexer.IsExistAsset(utxoId) {
 		return true
 	}
+	if b.atomIndexer.HasAssetInUtxo(utxoId) {
+		return true
+	}
 
 	if !excludingExotic {
 		if b.exotic.HasExoticInUtxo(utxoId) {
@@ -86,6 +89,9 @@ func (b *IndexerMgr) HasAssetInUtxo(utxoId uint64, excludingExotic bool) bool {
 
 	result = b.RunesIndexer.IsExistAsset(utxoId)
 	if result {
+		return true
+	}
+	if b.atomIndexer.HasAssetInUtxo(utxoId) {
 		return true
 	}
 
@@ -213,6 +219,11 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
 		result[tickName] = v
 	}
+	atomAsset := b.atomIndexer.GetAssetSummaryByAddress(utxos)
+	for k, v := range atomAsset {
+		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ATOM, Type: common.ASSET_TYPE_FT, Ticker: k}
+		result[tickName] = v
+	}
 
 	plainUtxoMap := make(map[uint64]int64)
 	for utxoId, v := range utxos {
@@ -278,6 +289,14 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 		result[tickName] = v
 	}
 
+	for utxoId := range utxos {
+		atomAssets := b.atomIndexer.GetUtxoAssets(utxoId)
+		for ticker := range atomAssets {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ATOM, Type: common.ASSET_TYPE_FT, Ticker: ticker}
+			result[tickName] = append(result[tickName], utxoId)
+		}
+	}
+
 	return result
 }
 
@@ -322,6 +341,13 @@ func (b *IndexerMgr) GetAssetsWithUtxo(utxoId uint64) map[common.TickerName]comm
 	if len(ftAssets) > 0 {
 		for k, v := range ftAssets {
 			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_FT, Ticker: k}
+			result[tickName] = v
+		}
+	}
+	atomAssets := b.atomIndexer.GetAssetsWithUtxo(utxoId)
+	if len(atomAssets) > 0 {
+		for k, v := range atomAssets {
+			tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ATOM, Type: common.ASSET_TYPE_FT, Ticker: k}
 			result[tickName] = v
 		}
 	}

@@ -8,9 +8,16 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
-func openDB(filepath string) (common.KVDB, error) {
+const (
+	defaultBuildDBCacheMB = 2048
+	baseBuildDBCacheMB    = 32768
+	nftBuildDBCacheMB     = 16384
+	brc20BuildDBCacheMB   = 8192
+)
 
-	ldb := db.NewKVDB(filepath)
+func openDB(filepath string, cacheSizeMB int) (common.KVDB, error) {
+
+	ldb := db.NewKVDBWithCache(filepath, cacheSizeMB)
 	if ldb == nil {
 		return nil, fmt.Errorf("NewKVDB failed")
 	}
@@ -21,47 +28,52 @@ func openDB(filepath string) (common.KVDB, error) {
 func (p *IndexerMgr) initDB() (err error) {
 	common.Log.Info("InitDB-> start...")
 
-	p.baseDB, err = openDB(p.dbDir + "base")
+	p.baseDB, err = openDB(p.dbDir+"base", baseBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.nftDB, err = openDB(p.dbDir + "nft")
+	p.nftDB, err = openDB(p.dbDir+"nft", nftBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.nsDB, err = openDB(p.dbDir + "ns")
+	p.nsDB, err = openDB(p.dbDir+"ns", defaultBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.exoticDB, err = openDB(p.dbDir + "exotic")
+	p.exoticDB, err = openDB(p.dbDir+"exotic", defaultBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.ftDB, err = openDB(p.dbDir + "ft")
+	p.ftDB, err = openDB(p.dbDir+"ft", defaultBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.brc20DB, err = openDB(p.dbDir + "brc20")
+	p.brc20DB, err = openDB(p.dbDir+"brc20", brc20BuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.runesDB, err = openDB(p.dbDir + "runes")
+	p.runesDB, err = openDB(p.dbDir+"runes", defaultBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.localDB, err = openDB(p.dbDir + "local")
+	p.atomDB, err = openDB(p.dbDir+"atom", defaultBuildDBCacheMB)
 	if err != nil {
 		return err
 	}
 
-	p.kvDB, err = openDB(p.dbDir + "dkvs")
+	p.localDB, err = openDB(p.dbDir+"local", defaultBuildDBCacheMB)
+	if err != nil {
+		return err
+	}
+
+	p.kvDB, err = openDB(p.dbDir+"dkvs", defaultBuildDBCacheMB)
 	if err != nil {
 		return err
 	}

@@ -78,6 +78,7 @@ bitcoind RPC 封装在 `share/bitcoin_rpc`，全局变量 `ShareBitconRpc` 被 `
 - `ftIndexer`: ORDX FT。
 - `brc20Indexer`: BRC-20。
 - `RunesIndexer`: Runes。
+- `atomIndexer`: Atomicals ARC-20 FT。
 - `miniMempool`: 未确认交易小缓存。
 - `rpcService`: 面向 API 的 BaseIndexer 快照。
 
@@ -96,6 +97,7 @@ bitcoind RPC 封装在 `share/bitcoin_rpc`，全局变量 `ShareBitconRpc` 被 `
    - `ns.UpdateTransfer`
    - `brc20Indexer.UpdateTransfer`
    - `RunesIndexer.UpdateTransfer`
+   - `atomIndexer.UpdateTransfer`
    - `ftIndexer.UpdateTransfer`
 
 这个顺序很关键：FT 依赖前面生成的稀有聪和 NFT 信息，BRC-20 也依赖 NFT 铭文解析结果。
@@ -107,6 +109,7 @@ bitcoind RPC 封装在 `share/bitcoin_rpc`，全局变量 `ShareBitconRpc` 被 `
 - `indexer/ft`: ORDX FT，依赖 NFT 和 exotic 稀有聪。维护 ticker、holder、utxo asset map、mint history。
 - `indexer/brc20`: BRC-20，依赖 NFT。维护 ticker、address holder、transfer NFT、action history，并带 CSV checkpoint/validate 支持。
 - `indexer/runes`: Runes，依赖 BaseIndexer 和 runestone parser。表结构分布在 `indexer/runes/table`，写入经 `store.DbWrite` 缓存和日志批量提交。
+- `indexer/atom`: Atomicals ARC-20 FT，解析 Atomicals witness envelope，维护 ticker、holder、UTXO balance、mint history 和 action history；NFT/realm/container 只保留 parser 框架，尚未索引具体状态。实现说明见 `docs/atom-arc20.md`。
 - `indexer/exotic`: 稀有聪/特殊 satribute。它在区块处理早期运行，后续 ORDX FT 会用到。
 
 所有这些模块基本都实现了 `Init`、`Clone`、`Subtract`、`UpdateTransfer`、`UpdateDB`、`CheckSelf` 这一组生命周期。

@@ -1,13 +1,17 @@
 package indexer
 
 import (
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
+	"github.com/sat20-labs/indexer/indexer/atom"
 	base_indexer "github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/brc20"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
@@ -32,6 +36,7 @@ type IndexerMgr struct {
 	nftDB    common.KVDB
 	brc20DB  common.KVDB
 	runesDB  common.KVDB
+	atomDB   common.KVDB
 	// data from market
 	localDB common.KVDB
 	kvDB    common.KVDB
@@ -53,6 +58,7 @@ type IndexerMgr struct {
 
 	brc20Indexer *brc20.BRC20Indexer
 	RunesIndexer *runes.Indexer
+	atomIndexer  *atom.Indexer
 	exotic       *exotic.ExoticIndexer
 	ftIndexer    *ft.FTIndexer
 	ns           *ns.NameService
@@ -66,6 +72,7 @@ type IndexerMgr struct {
 	exoticBackupDB *exotic.ExoticIndexer
 	brc20BackupDB  *brc20.BRC20Indexer
 	runesBackupDB  *runes.Indexer
+	atomBackupDB   *atom.Indexer
 	ftBackupDB     *ft.FTIndexer
 	nsBackupDB     *ns.NameService
 	nftBackupDB    *nft.NftIndexer
@@ -186,6 +193,8 @@ func (b *IndexerMgr) Init() {
 	b.brc20Indexer.Init(b.nft)
 	b.RunesIndexer = runes.NewIndexer(b.runesDB, b.chaincfgParam, b.cfg.CheckValidateFiles)
 	b.RunesIndexer.Init(b.base)
+	b.atomIndexer = atom.NewIndexer(b.atomDB, b.chaincfgParam)
+	b.atomIndexer.Init(b.base)
 	b.miniMempool.init()
 
 	b.baseBackupDB = nil
@@ -193,6 +202,7 @@ func (b *IndexerMgr) Init() {
 	b.ftBackupDB = nil
 	b.brc20BackupDB = nil
 	b.runesBackupDB = nil
+	b.atomBackupDB = nil
 	b.nsBackupDB = nil
 	b.nftBackupDB = nil
 
@@ -207,6 +217,11 @@ func (b *IndexerMgr) GetBaseDB() common.KVDB {
 
 func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	n := 10
+	if value := os.Getenv("ATOM_DEBUG_POLL_SECONDS"); value != "" {
+		if seconds, err := strconv.Atoi(value); err == nil && seconds > 0 {
+			n = seconds
+		}
+	}
 	ticker := time.NewTicker(time.Duration(n) * time.Second)
 
 	stopIndexerChan := make(chan struct{}, 1) // 非阻塞
@@ -250,7 +265,9 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 							b.base.SetUpdateDBCallback(nil)
 							b.updateDB()
 							if b.maxIndexHeight <= 0 {
-								b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
+								if os.Getenv("ATOM_DEBUG_DISABLE_MEMPOOL") != "1" {
+									b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
+								}
 							}
 						}
 
@@ -467,6 +484,7 @@ func (b *IndexerMgr) forceUpdateDB(wantToDelete map[string]uint64) {
 	b.ns.UpdateDB()
 	b.ftIndexer.UpdateDB()
 	b.RunesIndexer.UpdateDB()
+	b.atomIndexer.UpdateDB()
 	b.brc20Indexer.CheckEmptyAddress(wantToDelete)
 	b.brc20Indexer.UpdateDB()
 
@@ -535,6 +553,7 @@ func (b *IndexerMgr) rpcLeft() {
 // 为了保证数据库记录最高到（h-6），我们做一次数据备份，到合适实际再写入数据库
 func (b *IndexerMgr) updateDB() {
 	b.updateServiceInstance()
+	writeAtomSnapshot := b.shouldWriteAtomDebugSnapshot()
 
 	complingHeight := b.base.GetHeight()
 	syncHeight := b.base.GetSyncHeight()
@@ -550,6 +569,9 @@ func (b *IndexerMgr) updateDB() {
 		// 这个区间不备份数据
 		if gap < 2*blocksInHistory {
 			common.Log.Infof("performUpdateDBInBuffer nothing to do at height %d-%d", complingHeight, syncHeight)
+			if writeAtomSnapshot {
+				b.writeAtomDebugSnapshot()
+			}
 			return
 		}
 
@@ -560,6 +582,41 @@ func (b *IndexerMgr) updateDB() {
 		// 备份当前高度的数据
 		b.prepareDBBuffer()
 	}
+	if writeAtomSnapshot {
+		b.writeAtomDebugSnapshot()
+	}
+}
+
+func (b *IndexerMgr) shouldWriteAtomDebugSnapshot() bool {
+	path := os.Getenv("ATOM_DEBUG_ATOM_SNAPSHOT_FILE")
+	if path == "" || b.atomIndexer == nil {
+		return false
+	}
+	if targetPath := os.Getenv("ATOM_DEBUG_HEIGHT_FILE"); targetPath != "" {
+		data, err := os.ReadFile(targetPath)
+		if err == nil {
+			target, err := strconv.Atoi(strings.TrimSpace(string(data)))
+			if err == nil {
+				return b.base.GetHeight() == target
+			}
+		}
+	}
+	if raw := os.Getenv("ATOM_DEBUG_SNAPSHOT_INTERVAL"); raw != "" {
+		interval, err := strconv.Atoi(raw)
+		if err == nil && interval > 0 {
+			return b.base.GetHeight()%interval == 0
+		}
+	}
+	return true
+}
+
+func (b *IndexerMgr) writeAtomDebugSnapshot() {
+	path := os.Getenv("ATOM_DEBUG_ATOM_SNAPSHOT_FILE")
+	if err := b.atomIndexer.WriteCompareSnapshot(path); err != nil {
+		common.Log.Errorf("write atom debug snapshot failed: %v", err)
+		return
+	}
+	common.Log.Infof("atom debug snapshot written to %s at height %d", path, b.base.GetHeight())
 }
 
 func (b *IndexerMgr) performUpdateDBInBuffer() {
@@ -574,6 +631,7 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.nsBackupDB.UpdateDB()
 	b.ftBackupDB.UpdateDB()
 	b.runesBackupDB.UpdateDB()
+	b.atomBackupDB.UpdateDB()
 	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
 	b.brc20BackupDB.UpdateDB()
 	b.baseBackupDB.CleanEmptyAddress(org, wantToDelete)
@@ -585,6 +643,7 @@ func (b *IndexerMgr) prepareDBBuffer() {
 	b.baseBackupDB = b.base.Clone(true)
 	b.exoticBackupDB = b.exotic.Clone(b.baseBackupDB)
 	b.runesBackupDB = b.RunesIndexer.Clone(b.baseBackupDB)
+	b.atomBackupDB = b.atomIndexer.Clone(b.baseBackupDB)
 	b.nftBackupDB = b.nft.Clone(b.baseBackupDB)
 	b.nsBackupDB = b.ns.Clone(b.nftBackupDB)
 	b.ftBackupDB = b.ftIndexer.Clone(b.nftBackupDB)
@@ -600,6 +659,7 @@ func (b *IndexerMgr) cleanDBBuffer() {
 	b.ftIndexer.Subtract(b.ftBackupDB)
 	b.brc20Indexer.Subtract(b.brc20BackupDB)
 	b.RunesIndexer.Subtract(b.runesBackupDB)
+	b.atomIndexer.Subtract(b.atomBackupDB)
 
 	common.Log.Infof("cleanDBBuffer backup instance with %d", b.baseBackupDB.GetHeight())
 }

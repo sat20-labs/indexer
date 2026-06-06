@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/sat20-labs/indexer/common"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestUtxo(t *testing.T) {
@@ -49,6 +50,47 @@ func TestFirstOrdinal(t *testing.T) {
 	for _, test := range tests {
 		if got := common.FirstOrdinalInTheory(test.height); got != test.want {
 			t.Errorf("common.FirstOrdinalInTheory(%d) = %d; want: %d", test.height, got, test.want)
+		}
+	}
+}
+
+func TestAppendAddressUtxosToBytes(t *testing.T) {
+	original := &common.AddressValueInDBV2{
+		AddressId:   42,
+		AddressType: 8,
+		Utxos: []*common.UtxoIdInDB{
+			{UtxoId: 1, Value: 11},
+			{UtxoId: 2, Value: 22},
+		},
+	}
+	existing, err := proto.Marshal(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := appendAddressUtxosToBytes(existing, map[uint64]int64{
+		3: 33,
+		4: 44,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decoded common.AddressValueInDBV2
+	if err := proto.Unmarshal(updated, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.AddressId != original.AddressId || decoded.AddressType != original.AddressType {
+		t.Fatalf("metadata changed: got id=%d type=%d", decoded.AddressId, decoded.AddressType)
+	}
+	got := make(map[uint64]int64)
+	for _, utxo := range decoded.Utxos {
+		got[utxo.UtxoId] = utxo.Value
+	}
+	want := map[uint64]int64{1: 11, 2: 22, 3: 33, 4: 44}
+	for utxoId, value := range want {
+		if got[utxoId] != value {
+			t.Fatalf("utxo %d = %d, want %d; all=%v", utxoId, got[utxoId], value, got)
 		}
 	}
 }
