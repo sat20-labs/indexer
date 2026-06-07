@@ -1,6 +1,7 @@
 package nft
 
 import (
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -68,8 +69,8 @@ type NftIndexer struct {
 	inscriptionToNftIdMap map[string]*common.Nft // inscriptionId->nftId
 	nftIdToinscriptionMap map[int64]*common.Nft  // nftId->inscriptionId
 
-	collectionMap         map[int64]*CollectionInfo // parent id 
-	galleryMap            map[int64]*GalleryInfo // gallery id
+	collectionMap map[int64]*CollectionInfo // parent id
+	galleryMap    map[int64]*GalleryInfo    // gallery id
 
 	// 暂时不需要清理
 	contentTypeMap     map[int]string // ctId -> content type
@@ -219,6 +220,9 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	// Only remove pending data that is still identical to the flushed backup.
+	// Keys may be updated again after prepareDBBuffer; those newer values must
+	// remain pending for the next UpdateDB.
 	for k := range another.utxoMap {
 		delete(p.utxoMap, k)
 	}
@@ -254,15 +258,32 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 	for k := range another.contentTypeToIdMap {
 		delete(p.contentTypeToIdMap, k)
 	}
-	for k := range another.collectionMap {
-		delete(p.collectionMap, k)
+	for k, v := range another.collectionMap {
+		if galleryInfoEqual(p.collectionMap[k], v) {
+			delete(p.collectionMap, k)
+		}
 	}
-	for k := range another.galleryMap {
-		delete(p.galleryMap, k)
+	for k, v := range another.galleryMap {
+		if galleryInfoEqual(p.galleryMap[k], v) {
+			delete(p.galleryMap, k)
+		}
 	}
 
 	p.nftAdded = append([]*common.Nft(nil), p.nftAdded[len(another.nftAdded):]...)
 	p.utxoDeled = append([]uint64(nil), p.utxoDeled[len(another.utxoDeled):]...)
+}
+
+func galleryInfoEqual(a, b *GalleryInfo) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Id == b.Id &&
+		a.NftId == b.NftId &&
+		a.InscriptionId == b.InscriptionId &&
+		a.Title == b.Title &&
+		a.Author == b.Author &&
+		a.Description == b.Description &&
+		slices.Equal(a.Items, b.Items)
 }
 
 // func (p *NftIndexer) IsEnabled() bool {
@@ -455,7 +476,7 @@ func (p *NftIndexer) CheckSelf() bool {
 
 		return nil
 	})
-	common.Log.Infof("blessed %d, cursed %d, vindicated %d, total %d", 
+	common.Log.Infof("blessed %d, cursed %d, vindicated %d, total %d",
 		blessCount, curseCount, vindicated, blessCount+curseCount+vindicated)
 	for i := int64(1); i < int64(p.status.CurseCount); i++ {
 		_, ok := nftMap[-i]

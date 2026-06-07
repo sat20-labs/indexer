@@ -358,6 +358,38 @@ func TestRegularTransferKeepsCleanOutputsAndBurnsRemainder(t *testing.T) {
 	}
 }
 
+func TestSubtractKeepsHolderTouchedChangedAfterBackup(t *testing.T) {
+	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
+	idx.addTicker(&Ticker{Id: 0, Name: "atom", DisplayName: "atom"})
+	idx.addUtxoBalanceInMemory(&UtxoBalance{UtxoId: 1, AddressId: 10, Outpoint: "txa:0", AtomicalId: "atom", Ticker: "atom", Amount: 1000})
+	idx.tickerIdAdded[0] = "atom"
+	idx.mintsAdded = append(idx.mintsAdded, &MintInfo{Id: 1, AtomicalId: "old"})
+	idx.actionsAdded = append(idx.actionsAdded, &ActionHistory{Id: 1, AtomicalId: "old"})
+
+	backup := idx.Clone(nil)
+	idx.removeUtxoBalanceInMemory(&UtxoBalance{UtxoId: 1, AddressId: 10, Outpoint: "txa:0", AtomicalId: "atom", Ticker: "atom", Amount: 1000})
+	idx.addUtxoBalanceInMemory(&UtxoBalance{UtxoId: 2, AddressId: 10, Outpoint: "txb:0", AtomicalId: "atom", Ticker: "atom", Amount: 600})
+	idx.tickerIdAdded[0] = "atom-new"
+	idx.mintsAdded = []*MintInfo{{Id: 2, AtomicalId: "new"}}
+	idx.actionsAdded = []*ActionHistory{{Id: 2, AtomicalId: "new"}}
+
+	idx.Subtract(backup)
+
+	holderKey := GetTickerHolderKey("atom", 10)
+	if got := idx.holderTouched[holderKey]; got != 600 {
+		t.Fatalf("later holder update should remain pending after subtract, got %d", got)
+	}
+	if got := idx.tickerIdAdded[0]; got != "atom-new" {
+		t.Fatalf("later ticker id update should remain pending after subtract, got %s", got)
+	}
+	if len(idx.mintsAdded) != 1 || idx.mintsAdded[0].Id != 2 {
+		t.Fatalf("later mint should remain pending after subtract: %+v", idx.mintsAdded)
+	}
+	if len(idx.actionsAdded) != 1 || idx.actionsAdded[0].Id != 2 {
+		t.Fatalf("later action should remain pending after subtract: %+v", idx.actionsAdded)
+	}
+}
+
 func TestRegularTransferAfterCustomColoringBurnsRemainderWithoutFallback(t *testing.T) {
 	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
 	idx.heights.CustomColoring = 27000

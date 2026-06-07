@@ -11,6 +11,7 @@ import (
 type CheckPoint struct {
 	Height         int
 	TickerCount    int64
+	AssetUtxoCount int
 	Tickers        map[string]*TickerStatus
 	RejectedTicker []string
 }
@@ -23,6 +24,8 @@ type TickerStatus struct {
 	MintedTimes  int64
 	MintedAmount int64
 	MaxMints     int64
+	HolderCount  int
+	Holders      map[string]int64
 }
 
 var mainnetCheckpoint = map[int]*CheckPoint{
@@ -618,6 +621,214 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	860000: {
+		Height:         860000,
+		TickerCount:    642,
+		AssetUtxoCount: 832478,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    12899,
+				UtxoAmount:   19330214,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+			},
+		},
+	},
+	870000: {
+		Height:         870000,
+		TickerCount:    688,
+		AssetUtxoCount: 810850,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    13980,
+				UtxoAmount:   19328439,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+			},
+		},
+	},
+	880000: {
+		Height:         880000,
+		TickerCount:    695,
+		AssetUtxoCount: 786252,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    14045,
+				UtxoAmount:   19328439,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+			},
+		},
+	},
+	890000: {
+		Height:         890000,
+		TickerCount:    702,
+		AssetUtxoCount: 778713,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    13912,
+				UtxoAmount:   19327884,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+			},
+		},
+	},
+	900000: {
+		Height:         900000,
+		TickerCount:    702,
+		AssetUtxoCount: 771371,
+		Tickers: map[string]*TickerStatus{
+			"sophon": {
+				AtomicalId: "360533d31e6f3c535acf7a70686ab42cf477b3f7ceaf12ab1d30be218b1726a9i0",
+				UtxoCount:  194054,
+				UtxoAmount: 23140060735,
+				MaxMints:   420000,
+			},
+			"quark": {
+				AtomicalId: "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:  136522,
+				UtxoAmount: 9372835953,
+				MaxMints:   500000,
+			},
+			"infinity": {
+				AtomicalId: "0d5e64d42e4520e17bc204fe25662b0cf2d2a65c350766d6171facaadccb371bi0",
+				UtxoCount:  87820,
+				UtxoAmount: 2939142398,
+				MaxMints:   3333,
+			},
+			"pepe": {
+				AtomicalId: "9ba68637ba32edb6370bebceaac3df4341180cbf7bac210741b12a679692d716i0",
+				UtxoCount:  20615,
+				UtxoAmount: 59106269,
+				MaxMints:   34500,
+			},
+			"a": {
+				AtomicalId: "66466d0207d9f50b5782678282e08cffb8e315e95da8d91b3d46f290b440a8bdi0",
+				UtxoCount:  15498,
+				UtxoAmount: 20536387,
+				MaxMints:   21000,
+			},
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    13156,
+				UtxoAmount:   19325316,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+				HolderCount:  8213,
+				Holders: map[string]int64{
+					"bc1pu62x0qzqn758srcmm0ctlxgum55a06am3njj3jgatkmyu9plmypsshzp45": 1151992,
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 896192,
+					"bc1p9uwfwtu6xpwynpd82tu04evjcygcgllyg0t3r9hqxm5l9cpyudvsjcc8sq": 252978,
+					"bc1pvesnwzz63l3gru9l309yyppkrswl0u5y4s5mr95hxds3z5chmmls9ssr8q": 241048,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 186893,
+					"bc1pg6r0mdvzcf407vamm9670vtzcywlrcc6naj03r85qr5avvkuk6cql930r4": 141525,
+					"bc1ptuwmztktn3xd9mvxu9xwk7ncdnvmc9nv64heglcp60ymk7aus64qs07z8s": 133985,
+					"bc1py8cgr0vznjz4dvrkp495y5vm74uqh2796lq4uys6ts9rvd0shtqqznpcyu": 118135,
+				},
+			},
+			"dragon": {
+				AtomicalId: "dc0038f5313f5fbbcfc51aaab7370e43507bdc661760f55ba634aefb5ad15c57i0",
+				UtxoCount:  15490,
+				UtxoAmount: 1116007082,
+				MaxMints:   21000,
+			},
+			"atoms": {
+				AtomicalId: "6188a9840691e90b49d6e9a1c927c6a83ac282817a8b639ea0db17817307dea4i0",
+				UtxoCount:  15330,
+				UtxoAmount: 20762370,
+				MaxMints:   21000,
+			},
+			"icals": {
+				AtomicalId: "2679c605df1201f501b9827fa61e1405d19e37c8c9f8ac2dd8a67da2f87e76bfi0",
+				UtxoCount:  15218,
+				UtxoAmount: 18170707,
+				MaxMints:   21000,
+			},
+			"nucleus": {
+				AtomicalId: "9198d994c43d6214c062b9c12317c9740fdb6a73a3d7a7ebd68b962abe802d8bi0",
+				UtxoCount:  14826,
+				UtxoAmount: 20408016,
+				MaxMints:   21000,
+			},
+			"neutron": {
+				AtomicalId: "1d00ffffa6d003a0aaa9af6d03a793adbb7124c8c9ad8d6df5910e9ee2f912abi0",
+				UtxoCount:  14670,
+				UtxoAmount: 1642582776,
+				MaxMints:   21000,
+			},
+			"btc": {
+				AtomicalId: "7296411f89e8e6171966a0b9d11e3fe12e86fdc3b0515b1f7bbb1c29d65f29adi0",
+				UtxoCount:  14637,
+				UtxoAmount: 20297477,
+				MaxMints:   21000,
+			},
+			"fanshood": {
+				AtomicalId: "923d5f127fae7abcbe0d171e3d01d9cb7a4b5c2f2d7e1bf5ebdc8f361744309di0",
+				UtxoCount:  14439,
+				UtxoAmount: 19516133,
+				MaxMints:   21000,
+			},
+			"coloredbitcoin": {
+				AtomicalId: "00002cf05244e8c97f4bdee853ab3fc931a7ca61b79fd02e56507f90327245b7i0",
+				UtxoCount:  12375,
+				UtxoAmount: 20685701,
+				MaxMints:   21000,
+			},
+			"atomical": {
+				AtomicalId: "0000d816b114585b45bf29e2ed0c2fa3c846f01f6ae44ee985d78f2f4acfb18di0",
+				UtxoCount:  13125,
+				UtxoAmount: 20386959,
+				MaxMints:   21000,
+			},
+			"electron": {
+				AtomicalId: "536737aadfaffa17233bca342be2571e14916f6a29003ff4766d515283e68e90i0",
+				UtxoCount:  6802,
+				UtxoAmount: 913877769,
+				MaxMints:   18400,
+			},
+			"quantum": {
+				AtomicalId: "37086fce3b535f1c9033c61fab4f45bf6aed67cf737f2f510803c66ccb00c9a2i0",
+				UtxoCount:  1744,
+				UtxoAmount: 177262574,
+				MaxMints:   2100,
+			},
+			"fishmask": {
+				AtomicalId: "00001bc4b6f1e452fb601a05cb0711a2cf38fb1d0f3ed2d36ac5fd02a2b77710i0",
+				UtxoCount:  9577,
+				UtxoAmount: 172026172,
+				MaxMints:   1000000,
+			},
+			"games": {
+				AtomicalId: "000077a5fb242ae6337c22d99d0519f321063b0025181b6561f5078d9bad6e53i0",
+				UtxoCount:  724,
+				UtxoAmount: 99916721,
+				MaxMints:   1,
+			},
+			"dots": {
+				AtomicalId: "0000040ef0b5cd5d5d63ae82d3a143a8a46a504a5e304eed169ecc260cadcfc8i0",
+				UtxoCount:  2746,
+				UtxoAmount: 36851838,
+				MaxMints:   1,
+			},
+			"uxon": {
+				AtomicalId: "00005542ddb59645a70129e934882ffcb6275234632d60c98c14ec304d63ac5di0",
+				UtxoCount:  1559,
+				UtxoAmount: 24142790,
+				MaxMints:   500,
+			},
+		},
+	},
 }
 
 var testnet4Checkpoint = map[int]*CheckPoint{}
@@ -638,6 +849,12 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 
 	if checkpoint.TickerCount != 0 && s.status.TickerCount != checkpoint.TickerCount {
 		common.Log.Panicf("atom ticker count different at %d: %d %d", height, s.status.TickerCount, checkpoint.TickerCount)
+	}
+	if checkpoint.AssetUtxoCount != 0 {
+		count := s.assetUtxoCountLocked()
+		if count != checkpoint.AssetUtxoCount {
+			common.Log.Panicf("atom asset utxo count different at %d: %d %d", height, count, checkpoint.AssetUtxoCount)
+		}
 	}
 	for _, name := range checkpoint.RejectedTicker {
 		name = strings.ToLower(name)
@@ -666,6 +883,9 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 		if tickerStatus.MaxMints != 0 && ticker.MaxMints != tickerStatus.MaxMints {
 			common.Log.Panicf("atom %s max mints different at %d: %d %d", name, height, ticker.MaxMints, tickerStatus.MaxMints)
 		}
+		if tickerStatus.HolderCount != 0 && ticker.HolderCount != tickerStatus.HolderCount {
+			common.Log.Panicf("atom %s holder count different at %d: %d %d", name, height, ticker.HolderCount, tickerStatus.HolderCount)
+		}
 		if tickerStatus.UtxoCount != 0 || tickerStatus.UtxoAmount != 0 {
 			count, amount := s.tickerUtxoSummaryLocked(name)
 			if tickerStatus.UtxoCount != 0 && count != tickerStatus.UtxoCount {
@@ -673,6 +893,16 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 			}
 			if tickerStatus.UtxoAmount != 0 && amount != tickerStatus.UtxoAmount {
 				common.Log.Panicf("atom %s utxo amount different at %d: %d %d", name, height, amount, tickerStatus.UtxoAmount)
+			}
+		}
+		for address, amount := range tickerStatus.Holders {
+			addressId := s.baseIndexer.GetAddressIdFromDB(address)
+			if addressId == common.INVALID_ID {
+				common.Log.Panicf("atom %s can't find holder address %s at %d", name, address, height)
+			}
+			holderAmount := s.tickerHolders[name][addressId]
+			if holderAmount != amount {
+				common.Log.Panicf("atom %s holder %s amount different at %d: %d %d", name, address, height, holderAmount, amount)
 			}
 		}
 	}
@@ -696,4 +926,16 @@ func (s *Indexer) tickerUtxoSummaryLocked(ticker string) (int, int64) {
 		amount += value
 	}
 	return len(utxos), amount
+}
+
+func (s *Indexer) assetUtxoCountLocked() int {
+	var count int
+	for _, balances := range s.utxoBalances {
+		for _, balance := range balances {
+			if balance.Amount > 0 {
+				count++
+			}
+		}
+	}
+	return count
 }

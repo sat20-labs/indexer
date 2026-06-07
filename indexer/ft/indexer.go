@@ -237,13 +237,32 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 
 	s.unbindHistory = append([]*common.UnbindHistory(nil), s.unbindHistory[len(another.unbindHistory):]...)
 	s.freezeHistory = append([]*common.FreezeHistory(nil), s.freezeHistory[len(another.freezeHistory):]...)
-	s.freezeTouched = make(map[string]*common.FreezeState)
-	s.freezeDeleted = make(map[string]*common.FreezeState)
+
+	// Only remove pending freeze state changes that are still identical to the
+	// flushed backup. A key may be touched or deleted again after prepareDBBuffer;
+	// that newer state must remain pending for the next UpdateDB.
+	for key, value := range another.freezeTouched {
+		if stateEqual(s.freezeTouched[key], value) {
+			delete(s.freezeTouched, key)
+		}
+	}
+	for key, value := range another.freezeDeleted {
+		if stateEqual(s.freezeDeleted[key], value) {
+			delete(s.freezeDeleted, key)
+		}
+	}
 	s.reloadFreezeDirectives = make(map[string]*common.FreezeDirective)
 	s.freezeAuthoritySnapshot = make(map[string]uint64)
 	s.reloadRequestHeight = 0
 
 	// 不需要更新 holderInfo 和 utxoMap
+}
+
+func stateEqual(a, b *common.FreezeState) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // 在系统初始化时调用一次，如果有历史数据的话。一般在NewSatIndex之后调用。

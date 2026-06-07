@@ -116,27 +116,72 @@ func (s *Indexer) Clone(baseIndexer *base.BaseIndexer) *Indexer {
 func (s *Indexer) Subtract(backup *Indexer) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	for k := range backup.tickerTouched {
-		delete(s.tickerTouched, k)
+
+	// Only remove pending data that is still identical to the flushed backup.
+	// A key may be updated again after prepareDBBuffer; that newer value must
+	// remain pending for the next UpdateDB, otherwise persisted helper indexes
+	// such as ticker holders can drift from the UTXO balance state.
+	for k, v := range backup.tickerTouched {
+		if current := s.tickerTouched[k]; current == nil || *current == *v {
+			delete(s.tickerTouched, k)
+		}
 	}
-	for k := range backup.tickerIdAdded {
-		delete(s.tickerIdAdded, k)
+	for k, v := range backup.tickerIdAdded {
+		if s.tickerIdAdded[k] == v {
+			delete(s.tickerIdAdded, k)
+		}
 	}
-	for k := range backup.utxoTouched {
-		delete(s.utxoTouched, k)
+	for k, v := range backup.utxoTouched {
+		if current := s.utxoTouched[k]; current == nil || *current == *v {
+			delete(s.utxoTouched, k)
+		}
 	}
-	for k := range backup.utxoDeleted {
-		delete(s.utxoDeleted, k)
+	for k, v := range backup.utxoDeleted {
+		if current := s.utxoDeleted[k]; current == nil || *current == *v {
+			delete(s.utxoDeleted, k)
+		}
 	}
-	for k := range backup.holderTouched {
-		delete(s.holderTouched, k)
+	for k, v := range backup.holderTouched {
+		if s.holderTouched[k] == v {
+			delete(s.holderTouched, k)
+		}
 	}
-	if len(backup.mintsAdded) <= len(s.mintsAdded) {
-		s.mintsAdded = s.mintsAdded[len(backup.mintsAdded):]
+	s.mintsAdded = filterFlushedMints(s.mintsAdded, backup.mintsAdded)
+	s.actionsAdded = filterFlushedActions(s.actionsAdded, backup.actionsAdded)
+}
+
+func filterFlushedMints(current, flushed []*MintInfo) []*MintInfo {
+	if len(current) == 0 || len(flushed) == 0 {
+		return current
 	}
-	if len(backup.actionsAdded) <= len(s.actionsAdded) {
-		s.actionsAdded = s.actionsAdded[len(backup.actionsAdded):]
+	flushedIds := make(map[int64]bool, len(flushed))
+	for _, item := range flushed {
+		flushedIds[item.Id] = true
 	}
+	result := make([]*MintInfo, 0, len(current))
+	for _, item := range current {
+		if !flushedIds[item.Id] {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func filterFlushedActions(current, flushed []*ActionHistory) []*ActionHistory {
+	if len(current) == 0 || len(flushed) == 0 {
+		return current
+	}
+	flushedIds := make(map[int64]bool, len(flushed))
+	for _, item := range flushed {
+		flushedIds[item.Id] = true
+	}
+	result := make([]*ActionHistory, 0, len(current))
+	for _, item := range current {
+		if !flushedIds[item.Id] {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func (s *Indexer) GetDBVersion() string {

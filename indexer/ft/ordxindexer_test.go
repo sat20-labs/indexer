@@ -667,6 +667,49 @@ func TestHandleTxFreezeProcessesUnfreezeOutput(t *testing.T) {
 	}
 }
 
+func TestSubtractKeepsUpdatedFreezeState(t *testing.T) {
+	p := newTestFTIndexer()
+	touchedKey := common.FreezeStateMapKey("pearl", 88)
+	deletedKey := common.FreezeStateMapKey("ruby", 99)
+	p.freezeTouched[touchedKey] = &common.FreezeState{
+		Ticker:       "pearl",
+		AddressId:    88,
+		FreezeHeight: 100,
+		TxId:         "old-freeze",
+	}
+	p.freezeDeleted[deletedKey] = &common.FreezeState{
+		Ticker:    "ruby",
+		AddressId: 99,
+	}
+
+	backup := p.Clone(nil)
+	p.freezeTouched[touchedKey] = &common.FreezeState{
+		Ticker:       "pearl",
+		AddressId:    88,
+		FreezeHeight: 101,
+		TxId:         "new-freeze",
+	}
+	delete(p.freezeDeleted, deletedKey)
+	p.freezeTouched[deletedKey] = &common.FreezeState{
+		Ticker:       "ruby",
+		AddressId:    99,
+		FreezeHeight: 102,
+		TxId:         "re-freeze",
+	}
+
+	p.Subtract(backup)
+
+	if got := p.freezeTouched[touchedKey]; got == nil || got.TxId != "new-freeze" {
+		t.Fatalf("updated freeze state should remain pending after subtract: %+v", got)
+	}
+	if got := p.freezeTouched[deletedKey]; got == nil || got.TxId != "re-freeze" {
+		t.Fatalf("freeze after backup deletion should remain pending after subtract: %+v", got)
+	}
+	if got := p.freezeDeleted[deletedKey]; got != nil {
+		t.Fatalf("stale deleted state should not remain after newer touch: %+v", got)
+	}
+}
+
 func TestBackdatedFreezeRequestsReload(t *testing.T) {
 	p := newTestFTIndexer()
 	p.tickerMap["pearl"] = &TickInfo{
