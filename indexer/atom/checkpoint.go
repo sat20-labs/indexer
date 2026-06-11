@@ -6,6 +6,7 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
+	atomValidate "github.com/sat20-labs/indexer/indexer/atom/validate"
 )
 
 type CheckPoint struct {
@@ -263,8 +264,8 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 		Height:      810011,
 		TickerCount: 30,
 		Tickers: map[string]*TickerStatus{
-			"gold": {
-				AtomicalId:   "2258c2531df921a591c9b8ee0e78d919fdc2b6a648e390ecd502c610beade96fi0",
+			"vmpx": {
+				AtomicalId:   "4845721f19c82a54ae3a4096248cb14319af182475c2ca61d63ae1773ea5ffd3i0",
 				DeployHeight: 810011,
 			},
 		},
@@ -273,8 +274,8 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 		Height:      810013,
 		TickerCount: 31,
 		Tickers: map[string]*TickerStatus{
-			"vmpx": {
-				AtomicalId:   "4845721f19c82a54ae3a4096248cb14319af182475c2ca61d63ae1773ea5ffd3i0",
+			"gold": {
+				AtomicalId:   "2258c2531df921a591c9b8ee0e78d919fdc2b6a648e390ecd502c610beade96fi0",
 				DeployHeight: 810013,
 			},
 		},
@@ -621,6 +622,181 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	820000: {
+		Height:         820000,
+		TickerCount:    101,
+		AssetUtxoCount: 123281,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    7067,
+				UtxoAmount:   19412302,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+				HolderCount:  1831,
+				Holders: map[string]int64{
+					"bc1pm7he53qa00jx2d04t3c3ehhen6lpkl3f0tltsxflj22687zlwe5sxtryrq": 375000,
+					"bc1plzyj2qfp45v2t6vpccmgrn3a6gz7n3ta6qwdcwtex9c660g8m0eqx78uwe": 300000,
+					"bc1p2dlszcwwhct0elzrrvhntzghg749u4z5wnwkj830we636pag8nsqas9h7f": 200000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1png9dtjgnnqacpx8w4hhrns3l6s23zpeev04wnztzzhlnd8k6qc9q7mu2tq": 185000,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 180000,
+					"bc1pae8s7wkeyqr2pcumzt3nyjka9tmagdattfe4mmpp570ms7jggwksapw9dg": 166520,
+					"bc1pfl5alrk4sed3akfuq57ywa8fwzf6daquydmwp5pm2mrcvqvwn3mq2x0ncj": 150000,
+					"bc1p9ppjyrcpa88kpxljh40tvchkngdnf23awfl6uejt64dka4mt9yss6gkzez": 146000,
+					"bc1p24pvs7cahf08pncvmk602clmqrkf7q23eu5pg3dr5jvepvd7q5hs4ertpg": 143000,
+				},
+			},
+		},
+	},
+	830000: {
+		Height:         830000,
+		TickerCount:    273,
+		AssetUtxoCount: 816424,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    7458,
+				UtxoAmount:   19345214,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+				HolderCount:  2482,
+				Holders: map[string]int64{
+					"bc1pm7he53qa00jx2d04t3c3ehhen6lpkl3f0tltsxflj22687zlwe5sxtryrq": 375000,
+					"bc1pn84jwndjk5zenzjf0kmtytdk7h3rqznxzf7ku4nx4nmmwtygm59qsj2y4e": 366000,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1p2dlszcwwhct0elzrrvhntzghg749u4z5wnwkj830we636pag8nsqas9h7f": 200000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1prqvme4naatxmde3zdkltjqsal0a5sttll5h2hpgf73p4jazv7tgswca9jj": 166520,
+					"bc1p24pvs7cahf08pncvmk602clmqrkf7q23eu5pg3dr5jvepvd7q5hs4ertpg": 156000,
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 153350,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 152000,
+					"bc1p9ppjyrcpa88kpxljh40tvchkngdnf23awfl6uejt64dka4mt9yss6gkzez": 146000,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    216505,
+				UtxoAmount:   9780398673,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  13972,
+				Holders: map[string]int64{
+					"bc1psar3ak7efwncv048k9lxetg924edw84tryzddmm2srjmfjkuk7wszs0vct": 102878707,
+					"bc1p7md5p8p9h5k0w38hzrnwessxh5uttevc4nz9t0snxqz0g564rgvqwhjchr": 68940000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+					"bc1pw7t7h62dk76q2zu05psqnwg38qjvvf0rpej7lek0ynhthqd26ffqrzw4rq": 60360000,
+					"bc1pqfvjxm6w0nx2c66nfp36a9gdcp6a4r4lchegup9769lrlsvq7f2szarhlr": 57200000,
+					"bc1pggazu7wm4la3vt745qryfuj39hm202e5ljpar72nym4l9xvkhjhqd9pe3d": 55460000,
+					"bc1pgfz630c2jp5ehwpcswzkrs85sddnj4xjastc7z92a7h6gurxfqhsknd732": 53680000,
+					"bc1q8ksruedue2uwc7zrmg3c3ac55wflxclpaed4ys":                     48000000,
+					"bc1prlgxsn7wqc8dfmrkjzxsyzp70hsts3tf937vmr76x37npkmekgxsqg6y5j": 47510258,
+				},
+			},
+		},
+	},
+	840000: {
+		Height:         840000,
+		TickerCount:    393,
+		AssetUtxoCount: 903100,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    8085,
+				UtxoAmount:   19336214,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+				HolderCount:  3069,
+				Holders: map[string]int64{
+					"bc1pn84jwndjk5zenzjf0kmtytdk7h3rqznxzf7ku4nx4nmmwtygm59qsj2y4e": 450000,
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 308896,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1prqvme4naatxmde3zdkltjqsal0a5sttll5h2hpgf73p4jazv7tgswca9jj": 185880,
+					"bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu": 176442,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 152000,
+					"bc1p544f4l28pydx8wja5zmx5ntzt97c70u6vrkaqughpwzfssc47a4qauvr4u": 129000,
+					"bc1p9gl9ex8apc9h78d6rldmz92zxn2wugqfrjwt5k9htvsz7a3e07sqxhdm8s": 121300,
+					"bc1pc503267c0x7amqy9ydguymasvh8hwj9e863ul5wlcf7zzh4vtfksdd9379": 119000,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    182709,
+				UtxoAmount:   9718714909,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  15682,
+				Holders: map[string]int64{
+					"bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu": 381426713,
+					"bc1psq6xlaawpzpd0z68ef9r0kqt5lzkqy9zqwj2a2kent6p4z6etxtqy7eugc": 100000000,
+					"bc1pm0jgthnm3rnmddyffn0qn769pele0r85f5aw2gc6we762e6kd9msz673pt": 80000000,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+					"bc1py6pu203c7sdyfv6zyclvaf4fpd0ghw4z003wwka83fwta0w2yckqsmn5zx": 60000000,
+					"bc1pqfvjxm6w0nx2c66nfp36a9gdcp6a4r4lchegup9769lrlsvq7f2szarhlr": 54467108,
+					"bc1pgfz630c2jp5ehwpcswzkrs85sddnj4xjastc7z92a7h6gurxfqhsknd732": 53680000,
+					"bc1pyu56aw3c9uay46mvn5ecwpk048qnze44y4qlj6agvaeqm4k5dn6qwp00v8": 53066923,
+				},
+			},
+		},
+	},
+	850000: {
+		Height:         850000,
+		TickerCount:    487,
+		AssetUtxoCount: 857949,
+		Tickers: map[string]*TickerStatus{
+			"atom": {
+				AtomicalId:   "56a8702bab3d2405eb9a356fd0725ca112a93a8efd1ecca06c6085e7278f0341i0",
+				UtxoCount:    8229,
+				UtxoAmount:   19330214,
+				MintedTimes:  21000,
+				MintedAmount: 21000000,
+				MaxMints:     21000,
+				HolderCount:  3233,
+				Holders: map[string]int64{
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 496348,
+					"bc1pn84jwndjk5zenzjf0kmtytdk7h3rqznxzf7ku4nx4nmmwtygm59qsj2y4e": 341000,
+					"bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu": 225250,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1prqvme4naatxmde3zdkltjqsal0a5sttll5h2hpgf73p4jazv7tgswca9jj": 185880,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 163851,
+					"bc1pg2ktxj95uct8xj0j0p9vqm829ktdfwuaayhwtygnflg6qqgz8kms98plhc": 142990,
+					"bc1pg6r0mdvzcf407vamm9670vtzcywlrcc6naj03r85qr5avvkuk6cql930r4": 140525,
+					"bc1p544f4l28pydx8wja5zmx5ntzt97c70u6vrkaqughpwzfssc47a4qauvr4u": 129000,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    166432,
+				UtxoAmount:   9698976708,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  18523,
+				Holders: map[string]int64{
+					"bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu": 359780914,
+					"bc1puxcfn62ceyxu4m5rrk89vh9eydd682avlqjphx57mxekglmuhj9snu77w4": 105175183,
+					"bc1psq6xlaawpzpd0z68ef9r0kqt5lzkqy9zqwj2a2kent6p4z6etxtqy7eugc": 100000000,
+					"bc1py6pu203c7sdyfv6zyclvaf4fpd0ghw4z003wwka83fwta0w2yckqsmn5zx": 97307600,
+					"bc1pkskzpe3r9wt46y04ph23wqk4qn5g7uw4t2srshhseuh9fyvn6mfqp3sgtj": 94536502,
+					"bc1pm0jgthnm3rnmddyffn0qn769pele0r85f5aw2gc6we762e6kd9msz673pt": 80000000,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+					"bc1p7ct25q76d7pgds4ds32kthj8zjrf8nsf78ysg7gxyapr5ldekpgqzftml4": 56195810,
+				},
+			},
+		},
+	},
 	860000: {
 		Height:         860000,
 		TickerCount:    642,
@@ -633,6 +809,40 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  21000,
 				MintedAmount: 21000000,
 				MaxMints:     21000,
+				HolderCount:  7680,
+				Holders: map[string]int64{
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 572773,
+					"bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu": 395362,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 163851,
+					"bc1pn84jwndjk5zenzjf0kmtytdk7h3rqznxzf7ku4nx4nmmwtygm59qsj2y4e": 161000,
+					"bc1pg6r0mdvzcf407vamm9670vtzcywlrcc6naj03r85qr5avvkuk6cql930r4": 140525,
+					"bc1pg2ktxj95uct8xj0j0p9vqm829ktdfwuaayhwtygnflg6qqgz8kms98plhc": 123083,
+					"bc1p9gl9ex8apc9h78d6rldmz92zxn2wugqfrjwt5k9htvsz7a3e07sqxhdm8s": 121300,
+					"bc1py8cgr0vznjz4dvrkp495y5vm74uqh2796lq4uys6ts9rvd0shtqqznpcyu": 117135,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    154128,
+				UtxoAmount:   9696961667,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  21993,
+				Holders: map[string]int64{
+					"bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu": 285969399,
+					"bc1puxcfn62ceyxu4m5rrk89vh9eydd682avlqjphx57mxekglmuhj9snu77w4": 105175183,
+					"bc1psq6xlaawpzpd0z68ef9r0kqt5lzkqy9zqwj2a2kent6p4z6etxtqy7eugc": 100000000,
+					"bc1p337u20hy8a8m06664ntkx432m8ztdad4h30k9dw8rn84gw5dw24su7kty2": 97922701,
+					"bc1py6pu203c7sdyfv6zyclvaf4fpd0ghw4z003wwka83fwta0w2yckqsmn5zx": 97307600,
+					"bc1pkskzpe3r9wt46y04ph23wqk4qn5g7uw4t2srshhseuh9fyvn6mfqp3sgtj": 94536502,
+					"bc1pm0jgthnm3rnmddyffn0qn769pele0r85f5aw2gc6we762e6kd9msz673pt": 80000000,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+				},
 			},
 		},
 	},
@@ -648,6 +858,40 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  21000,
 				MintedAmount: 21000000,
 				MaxMints:     21000,
+				HolderCount:  8782,
+				Holders: map[string]int64{
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 669435,
+					"bc1pg2ktxj95uct8xj0j0p9vqm829ktdfwuaayhwtygnflg6qqgz8kms98plhc": 273083,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 186893,
+					"bc1pn84jwndjk5zenzjf0kmtytdk7h3rqznxzf7ku4nx4nmmwtygm59qsj2y4e": 161000,
+					"bc1pvesnwzz63l3gru9l309yyppkrswl0u5y4s5mr95hxds3z5chmmls9ssr8q": 152466,
+					"bc1pg6r0mdvzcf407vamm9670vtzcywlrcc6naj03r85qr5avvkuk6cql930r4": 141525,
+					"bc1p9gl9ex8apc9h78d6rldmz92zxn2wugqfrjwt5k9htvsz7a3e07sqxhdm8s": 121300,
+					"bc1py8cgr0vznjz4dvrkp495y5vm74uqh2796lq4uys6ts9rvd0shtqqznpcyu": 118135,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    148249,
+				UtxoAmount:   9688667436,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  23326,
+				Holders: map[string]int64{
+					"bc1puxcfn62ceyxu4m5rrk89vh9eydd682avlqjphx57mxekglmuhj9snu77w4": 105175183,
+					"bc1psq6xlaawpzpd0z68ef9r0kqt5lzkqy9zqwj2a2kent6p4z6etxtqy7eugc": 100000000,
+					"bc1p337u20hy8a8m06664ntkx432m8ztdad4h30k9dw8rn84gw5dw24su7kty2": 98042701,
+					"bc1py6pu203c7sdyfv6zyclvaf4fpd0ghw4z003wwka83fwta0w2yckqsmn5zx": 97307600,
+					"bc1pkskzpe3r9wt46y04ph23wqk4qn5g7uw4t2srshhseuh9fyvn6mfqp3sgtj": 94536502,
+					"bc1p0nkzg0qss837pfcyjc4qfr60vjlyrza8f4ss8krgladglmhlph3qrqwnqa": 88847966,
+					"bc1pm0jgthnm3rnmddyffn0qn769pele0r85f5aw2gc6we762e6kd9msz673pt": 80000000,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+				},
 			},
 		},
 	},
@@ -663,6 +907,40 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  21000,
 				MintedAmount: 21000000,
 				MaxMints:     21000,
+				HolderCount:  8763,
+				Holders: map[string]int64{
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 838027,
+					"bc1pvesnwzz63l3gru9l309yyppkrswl0u5y4s5mr95hxds3z5chmmls9ssr8q": 378302,
+					"bc1p9uwfwtu6xpwynpd82tu04evjcygcgllyg0t3r9hqxm5l9cpyudvsjcc8sq": 283179,
+					"bc1pg2ktxj95uct8xj0j0p9vqm829ktdfwuaayhwtygnflg6qqgz8kms98plhc": 273083,
+					"bc1p7qtgvew6zpqklpsujjt8lhm9hwdk8y362dr9kj9mxfvnz2afa0yqp83ez2": 227997,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 186893,
+					"bc1pn84jwndjk5zenzjf0kmtytdk7h3rqznxzf7ku4nx4nmmwtygm59qsj2y4e": 161000,
+					"bc1pg6r0mdvzcf407vamm9670vtzcywlrcc6naj03r85qr5avvkuk6cql930r4": 141525,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    138695,
+				UtxoAmount:   9601151819,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  25930,
+				Holders: map[string]int64{
+					"bc1qwjv97kps9vszpq85jknepsvfs8qlvp3ytcnkml":                     109246306,
+					"bc1p337u20hy8a8m06664ntkx432m8ztdad4h30k9dw8rn84gw5dw24su7kty2": 106457714,
+					"bc1puxcfn62ceyxu4m5rrk89vh9eydd682avlqjphx57mxekglmuhj9snu77w4": 105175183,
+					"bc1psq6xlaawpzpd0z68ef9r0kqt5lzkqy9zqwj2a2kent6p4z6etxtqy7eugc": 101319569,
+					"bc1py6pu203c7sdyfv6zyclvaf4fpd0ghw4z003wwka83fwta0w2yckqsmn5zx": 97307600,
+					"bc1pkskzpe3r9wt46y04ph23wqk4qn5g7uw4t2srshhseuh9fyvn6mfqp3sgtj": 94536502,
+					"bc1p0nkzg0qss837pfcyjc4qfr60vjlyrza8f4ss8krgladglmhlph3qrqwnqa": 90839371,
+					"bc1pm0jgthnm3rnmddyffn0qn769pele0r85f5aw2gc6we762e6kd9msz673pt": 80000000,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+				},
 			},
 		},
 	},
@@ -678,6 +956,40 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  21000,
 				MintedAmount: 21000000,
 				MaxMints:     21000,
+				HolderCount:  8599,
+				Holders: map[string]int64{
+					"bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk": 926214,
+					"bc1pvesnwzz63l3gru9l309yyppkrswl0u5y4s5mr95hxds3z5chmmls9ssr8q": 327603,
+					"bc1p9uwfwtu6xpwynpd82tu04evjcygcgllyg0t3r9hqxm5l9cpyudvsjcc8sq": 283179,
+					"bc1p7qtgvew6zpqklpsujjt8lhm9hwdk8y362dr9kj9mxfvnz2afa0yqp83ez2": 274997,
+					"bc1pfr28ahxfl4y4qq3xay9e4pgwck5kddqplfgu2ked0uzxc90yydxsqfgd33": 245068,
+					"bc1pg2ktxj95uct8xj0j0p9vqm829ktdfwuaayhwtygnflg6qqgz8kms98plhc": 210093,
+					"bc1pry3mph3vy7u4spcjpmfpuemcmyxhahmftsaddfevtp4pheg3q2lsnytluu": 206000,
+					"bc1qxvtams3gj5ye8d2ju07dy7cnuzf8zjaz85y2n6":                     203379,
+					"bc1pptsyhluekq60z5x5twq9nt5g9w3ymz6p4emrsdsz2p238vevfraqzt7k34": 200000,
+					"bc1pgxkn7anuaxnc7rrl9h26t68w3jwwaw88hxr38lg2vvyjrxspty6qnays97": 186893,
+				},
+			},
+			"quark": {
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    138460,
+				UtxoAmount:   9502002790,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  31280,
+				Holders: map[string]int64{
+					"bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu":                     143264352,
+					"bc1quhruqrghgcca950rvhtrg7cpd7u8k6svpzgzmrjy8xyukacl5lkq0r8l2d": 128080257,
+					"bc1qwjv97kps9vszpq85jknepsvfs8qlvp3ytcnkml":                     109246306,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+					"bc1pgfz630c2jp5ehwpcswzkrs85sddnj4xjastc7z92a7h6gurxfqhsknd732": 52956774,
+					"bc1psnrfefhlr2cyex8azk9qjw9fcwywzca2z78yg765nrsfw2082yqq2lhyxt": 52550012,
+					"bc1pqfvjxm6w0nx2c66nfp36a9gdcp6a4r4lchegup9769lrlsvq7f2szarhlr": 52507108,
+					"bc1qlx87a27s84ngdyveaqmcanxre8n4pk6lw998kfncqkndeqdmuuzs74zh0v": 51980345,
+				},
 			},
 		},
 	},
@@ -693,10 +1005,25 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MaxMints:   420000,
 			},
 			"quark": {
-				AtomicalId: "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
-				UtxoCount:  136522,
-				UtxoAmount: 9372835953,
-				MaxMints:   500000,
+				AtomicalId:   "9125f03bcf9325f6071762b9aee00b461a0b43ed157c336e2e89e07f47ea6f66i0",
+				UtxoCount:    136522,
+				UtxoAmount:   9372835953,
+				MintedTimes:  500000,
+				MintedAmount: 10000000000,
+				MaxMints:     500000,
+				HolderCount:  36748,
+				Holders: map[string]int64{
+					"bc1qwjv97kps9vszpq85jknepsvfs8qlvp3ytcnkml":                     109246306,
+					"bc1pgfz630c2jp5ehwpcswzkrs85sddnj4xjastc7z92a7h6gurxfqhsknd732": 102976762,
+					"bc1q6z23472n4nu4khksm3j8ax5rwdjc30y5ygrle2":                     87686557,
+					"bc1p59jn8l62um3tf7rj3qskjty93c0c2ghwrrfd6dpuvjfn9tzp4p8qmgzwws": 75300000,
+					"bc1p8xe6exmsh0p90agephzjrlen7thaquvacpwqdm3f28sjmy5s0uhqk7vw4z": 64700000,
+					"bc1p2way0h8jf2wkdgkdhwkgk54tc7qsmkyzwe27lgdse2g7uem2t7uq77trml": 60800000,
+					"bc1puu8ej28nw90kj8fa34k4we88vazck3l8rys2kum5a07nleudah3sxmq67d": 54483052,
+					"bc1psnrfefhlr2cyex8azk9qjw9fcwywzca2z78yg765nrsfw2082yqq2lhyxt": 52644100,
+					"bc1pqfvjxm6w0nx2c66nfp36a9gdcp6a4r4lchegup9769lrlsvq7f2szarhlr": 52507108,
+					"bc1qkl6tgpehvj00hmurkxd20hxusdhqn97p48z59a":                     51979790,
+				},
 			},
 			"infinity": {
 				AtomicalId: "0d5e64d42e4520e17bc204fe25662b0cf2d2a65c350766d6171facaadccb371bi0",
@@ -833,6 +1160,9 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 
 var testnet4Checkpoint = map[int]*CheckPoint{}
 
+var atomHolderStartHeight, atomHolderEndHeight int
+var atomHeightToHolderRecords map[int]map[string]map[string]*atomValidate.HolderCSVRecord
+
 func (s *Indexer) CheckPointWithBlockHeight(height int) {
 	startTime := time.Now()
 
@@ -906,7 +1236,91 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 			}
 		}
 	}
+	s.validateHolderDataLocked(height)
 	common.Log.Infof("AtomIndexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
+}
+
+func readAtomHolderDataToMap(dir string) (int, int) {
+	records, err := atomValidate.ReadHolderCSVDir(dir)
+	if err != nil {
+		common.Log.Panicf("ReadAtomHolderCSVDir %s failed, %v", dir, err)
+	}
+
+	startHeight := int(^uint(0) >> 1)
+	endHeight := 0
+	atomHeightToHolderRecords = make(map[int]map[string]map[string]*atomValidate.HolderCSVRecord)
+	for _, record := range records {
+		tickerToHolders := atomHeightToHolderRecords[record.Height]
+		if tickerToHolders == nil {
+			tickerToHolders = make(map[string]map[string]*atomValidate.HolderCSVRecord)
+			atomHeightToHolderRecords[record.Height] = tickerToHolders
+		}
+		holders := tickerToHolders[record.Ticker]
+		if holders == nil {
+			holders = make(map[string]*atomValidate.HolderCSVRecord)
+			tickerToHolders[record.Ticker] = holders
+		}
+		holders[record.Address] = record
+
+		if record.Height < startHeight {
+			startHeight = record.Height
+		}
+		if record.Height > endHeight {
+			endHeight = record.Height
+		}
+	}
+	if len(records) == 0 {
+		startHeight = 0
+	}
+	common.Log.Infof("readAtomHolderDataToMap height %d %d, records %d", startHeight, endHeight, len(records))
+	return startHeight, endHeight
+}
+
+func (s *Indexer) validateHolderDataLocked(height int) {
+	if s.chaincfgParam == nil || s.chaincfgParam.Net != wire.MainNet {
+		return
+	}
+	if atomHeightToHolderRecords == nil {
+		atomHolderStartHeight, atomHolderEndHeight = readAtomHolderDataToMap("./indexer/atom/validate/holders")
+	}
+	if len(atomHeightToHolderRecords) == 0 || height < atomHolderStartHeight || height > atomHolderEndHeight {
+		return
+	}
+
+	tickerToHolders := atomHeightToHolderRecords[height]
+	if len(tickerToHolders) == 0 {
+		return
+	}
+
+	var failed []string
+	for ticker, holders := range tickerToHolders {
+		verified := true
+		for address, record := range holders {
+			addressId := s.baseIndexer.GetAddressIdFromDB(address)
+			if addressId == common.INVALID_ID {
+				common.Log.Errorf("AtomIndexer.validateHolderData GetAddressIdFromDB %s failed", address)
+				failed = append(failed, ticker)
+				verified = false
+				continue
+			}
+			amount := s.tickerHolders[ticker][addressId]
+			if amount != record.Amount {
+				common.Log.Errorf("AtomIndexer.validateHolderData %s %s amount different %d %d",
+					address, ticker, record.Amount, amount)
+				failed = append(failed, ticker)
+				verified = false
+			}
+		}
+		if verified {
+			common.Log.Infof("AtomIndexer.validateHolderData %s %d check succeeded.", ticker, len(holders))
+		} else {
+			common.Log.Infof("AtomIndexer.validateHolderData %s check failed.", ticker)
+		}
+	}
+
+	if len(failed) > 0 {
+		common.Log.Panicf("check atom %v holders failed", failed)
+	}
 }
 
 func (s *Indexer) checkPoint(height int) *CheckPoint {
@@ -917,15 +1331,19 @@ func (s *Indexer) checkPoint(height int) *CheckPoint {
 }
 
 func (s *Indexer) tickerUtxoSummaryLocked(ticker string) (int, int64) {
+	ticker = strings.ToLower(ticker)
+	var count int
 	var amount int64
-	utxos := s.tickerUtxos[strings.ToLower(ticker)]
-	for _, value := range utxos {
-		if value <= 0 {
-			continue
+	for _, balances := range s.utxoBalances {
+		for _, balance := range balances {
+			if strings.ToLower(balance.Ticker) != ticker || balance.Amount <= 0 {
+				continue
+			}
+			count++
+			amount += balance.Amount
 		}
-		amount += value
 	}
-	return len(utxos), amount
+	return count, amount
 }
 
 func (s *Indexer) assetUtxoCountLocked() int {

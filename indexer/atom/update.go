@@ -354,8 +354,8 @@ func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Tra
 		grouped[balance.AtomicalId] = append(grouped[balance.AtomicalId], balance)
 	}
 	customActivated := block.Height >= s.heights.CustomColoring
-	isSplit := op != nil && op.Op == OpSplit
-	isCustom := op != nil && op.Op == OpCustomColor && customActivated
+	isSplit := op != nil && op.InputIndex == 0 && op.Op == OpSplit
+	isCustom := op != nil && op.InputIndex == 0 && op.Op == OpCustomColor && customActivated
 	if !isSplit && !isCustom {
 		atomicalIds := orderedTransferAtomicalIds(grouped, spent, block.Height >= s.heights.Dmint)
 		s.applyRegularTransfer(block, txIndex, tx, grouped, atomicalIds)
@@ -757,6 +757,14 @@ func (s *Indexer) addUtxoBalanceInMemory(balance *UtxoBalance) {
 	}
 	ticker := strings.ToLower(balance.Ticker)
 	balance.Ticker = ticker
+	key := GetUtxoBalanceKey(balance.UtxoId, balance.AtomicalId)
+	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
+		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
+	}
+	if existing := s.utxoBalances[balance.UtxoId][balance.AtomicalId]; existing != nil {
+		s.removeUtxoBalanceFromIndexes(existing, true)
+		delete(s.utxoDeleted, key)
+	}
 	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
 		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
 	}
@@ -777,7 +785,7 @@ func (s *Indexer) addUtxoBalanceInMemory(balance *UtxoBalance) {
 		t.HolderCount = len(s.tickerHolders[ticker])
 		s.touchTicker(t)
 	}
-	s.utxoTouched[GetUtxoBalanceKey(balance.UtxoId, balance.AtomicalId)] = balance.Clone()
+	s.utxoTouched[key] = balance.Clone()
 	s.holderTouched[GetHolderAssetKey(balance.AddressId, ticker)] = s.holderBalances[balance.AddressId][ticker]
 	s.holderTouched[GetTickerHolderKey(ticker, balance.AddressId)] = s.tickerHolders[ticker][balance.AddressId]
 }
@@ -788,6 +796,12 @@ func (s *Indexer) addLoadedUtxoBalanceInMemory(balance *UtxoBalance) {
 	}
 	ticker := strings.ToLower(balance.Ticker)
 	balance.Ticker = ticker
+	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
+		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
+	}
+	if existing := s.utxoBalances[balance.UtxoId][balance.AtomicalId]; existing != nil {
+		s.removeUtxoBalanceFromIndexes(existing, false)
+	}
 	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
 		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
 	}
@@ -813,6 +827,13 @@ func (s *Indexer) removeUtxoBalanceInMemory(balance *UtxoBalance) {
 	if balance == nil {
 		return
 	}
+	s.removeUtxoBalanceFromIndexes(balance, true)
+	key := GetUtxoBalanceKey(balance.UtxoId, balance.AtomicalId)
+	s.utxoDeleted[key] = balance.Clone()
+	delete(s.utxoTouched, key)
+}
+
+func (s *Indexer) removeUtxoBalanceFromIndexes(balance *UtxoBalance, trackPending bool) {
 	ticker := strings.ToLower(balance.Ticker)
 	if items := s.utxoBalances[balance.UtxoId]; items != nil {
 		delete(items, balance.AtomicalId)
@@ -840,11 +861,13 @@ func (s *Indexer) removeUtxoBalanceInMemory(balance *UtxoBalance) {
 	}
 	if t := s.getTickerLocked(ticker); t != nil {
 		t.HolderCount = len(s.tickerHolders[ticker])
-		s.touchTicker(t)
+		if trackPending {
+			s.touchTicker(t)
+		}
 	}
-	key := GetUtxoBalanceKey(balance.UtxoId, balance.AtomicalId)
-	s.utxoDeleted[key] = balance.Clone()
-	delete(s.utxoTouched, key)
+	if !trackPending {
+		return
+	}
 	s.holderTouched[GetHolderAssetKey(balance.AddressId, ticker)] = s.holderBalances[balance.AddressId][ticker]
 	s.holderTouched[GetTickerHolderKey(ticker, balance.AddressId)] = s.tickerHolders[ticker][balance.AddressId]
 }

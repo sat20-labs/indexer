@@ -390,6 +390,39 @@ func TestSubtractKeepsHolderTouchedChangedAfterBackup(t *testing.T) {
 	}
 }
 
+func TestAddUtxoBalanceReplacesExistingIndexes(t *testing.T) {
+	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
+	idx.addTicker(&Ticker{Id: 0, Name: "atom", DisplayName: "atom"})
+
+	first := &UtxoBalance{UtxoId: 1, AddressId: 10, Outpoint: "txa:0", AtomicalId: "atomid", Ticker: "atom", Amount: 1000}
+	second := &UtxoBalance{UtxoId: 1, AddressId: 10, Outpoint: "txa:0", AtomicalId: "atomid", Ticker: "atom", Amount: 1000}
+	idx.addUtxoBalanceInMemory(first)
+	idx.addUtxoBalanceInMemory(second)
+
+	count, amount := idx.tickerUtxoSummaryLocked("atom")
+	if count != 1 || amount != 1000 {
+		t.Fatalf("duplicate add should replace existing balance, got count=%d amount=%d", count, amount)
+	}
+	if got := idx.tickerUtxos["atom"][1]; got != 1000 {
+		t.Fatalf("ticker utxo helper should not double count, got %d", got)
+	}
+	if got := idx.tickerHolders["atom"][10]; got != 1000 {
+		t.Fatalf("holder helper should not double count, got %d", got)
+	}
+
+	idx.removeUtxoBalanceInMemory(second)
+	count, amount = idx.tickerUtxoSummaryLocked("atom")
+	if count != 0 || amount != 0 {
+		t.Fatalf("remove after duplicate add should clear balance, got count=%d amount=%d", count, amount)
+	}
+	if got := idx.tickerUtxos["atom"][1]; got != 0 {
+		t.Fatalf("ticker utxo helper should be cleared, got %d", got)
+	}
+	if got := idx.tickerHolders["atom"][10]; got != 0 {
+		t.Fatalf("holder helper should be cleared, got %d", got)
+	}
+}
+
 func TestRegularTransferAfterCustomColoringBurnsRemainderWithoutFallback(t *testing.T) {
 	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
 	idx.heights.CustomColoring = 27000
@@ -522,7 +555,7 @@ func TestCustomColorNestedPayloadAssignsPartialOutputs(t *testing.T) {
 	}
 }
 
-func TestCustomColorFromNonZeroInputApplies(t *testing.T) {
+func TestCustomColorFromNonZeroInputUsesRegularColoring(t *testing.T) {
 	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
 	idx.heights.CustomColoring = 27000
 	idx.addTicker(&Ticker{Id: 0, Name: "pc", DisplayName: "pc"})
@@ -543,11 +576,40 @@ func TestCustomColorFromNonZeroInputApplies(t *testing.T) {
 			},
 		}},
 	})
-	if got := idx.GetUtxoAssets(2)["pc"]; got != 0 {
-		t.Fatalf("custom op from input 1 should not regular-color output 0, got %d", got)
+	if got := idx.GetUtxoAssets(2)["pc"]; got != 333 {
+		t.Fatalf("custom op from input 1 should fall back to regular coloring, got %d", got)
 	}
-	if got := idx.GetUtxoAssets(3)["pc"]; got != 333 {
-		t.Fatalf("custom op from input 1 should color output 1 with 333, got %d", got)
+	if got := idx.GetUtxoAssets(3)["pc"]; got != 0 {
+		t.Fatalf("custom op from input 1 should not color output 1, got %d", got)
+	}
+}
+
+func TestSplitFromNonZeroInputUsesRegularColoring(t *testing.T) {
+	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
+	idx.heights.CustomColoring = 999999
+	idx.addTicker(&Ticker{Id: 0, Name: "split", DisplayName: "split"})
+	idx.addUtxoBalanceInMemory(&UtxoBalance{UtxoId: 1, AddressId: 10, Outpoint: "txa:0", AtomicalId: "splitid", Ticker: "split", Amount: 1000})
+	txid := "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	idx.UpdateTransfer(&common.Block{
+		Height: 27020,
+		Transactions: []*common.Transaction{{
+			TxId: txid,
+			Inputs: []*common.TxInput{
+				testTxInput(1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0, 1000, 27010, nil),
+				testTxInput(5, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 0, 1000, 27010,
+					atomWitnessPayload(t, []byte{0x01, 'y'}, map[string]any{"splitid": uint64(600)})),
+			},
+			Outputs: []*common.TxOutputV2{
+				testTxOutput(2, 11, txid, 0, 600),
+				testTxOutput(3, 12, txid, 1, 700),
+			},
+		}},
+	})
+	if got := idx.GetUtxoAssets(2)["split"]; got != 600 {
+		t.Fatalf("split op from input 1 should fall back to regular coloring, got %d", got)
+	}
+	if got := idx.GetUtxoAssets(3)["split"]; got != 0 {
+		t.Fatalf("split op from input 1 should not skip output 0 and color output 1, got %d", got)
 	}
 }
 

@@ -171,7 +171,7 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 
 		currPrecision = len(decimalPartStr)
 		if currPrecision > maxPrecision {
-			return nil, fmt.Errorf("decimal exceeds maximum precition: %s", s)
+			return nil, fmt.Errorf("decimal exceeds maximum precision: %s", s)
 		}
 		n := maxPrecision - currPrecision
 		for i := 0; i < n; i++ {
