@@ -69,23 +69,28 @@ func (s *Service) sendRawTxs(c *gin.Context) {
 
 	result, err := bitcoin_rpc.ShareBitconRpc.TestTx(req.SignedTxHex)
 	if err != nil {
-	    resp.Code = -1
+		resp.Code = -1
 		resp.Msg = err.Error()
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	var reject bool
-	for _, r := range result {
+	rejectDetails := make([]string, 0)
+	for i, r := range result {
 		if r.Allowed {
 			resp.Data = append(resp.Data, r.TxId)
 		} else {
-			resp.Data = append(resp.Data, r.RejectReason)
-			reject = true
+			reason := strings.TrimSpace(r.RejectReason)
+			if reason == "" {
+				reason = "rejected without reason"
+			}
+			detail := fmt.Sprintf("tx[%d] %s rejected: %s", i, r.TxId, reason)
+			resp.Data = append(resp.Data, detail)
+			rejectDetails = append(rejectDetails, detail)
 		}
 	}
-	if reject {
+	if len(rejectDetails) != 0 {
 		resp.Code = -1
-		resp.Msg = "reject"
+		resp.Msg = strings.Join(rejectDetails, "; ")
 		c.JSON(http.StatusOK, resp)
 		return
 	}
@@ -127,8 +132,8 @@ func (s *Service) testRawTx(c *gin.Context) {
 	}
 	for _, r := range result {
 		resp.Data = append(resp.Data, &rpcwire.TxTestResult{
-			TxId: r.TxId,
-			Allowed: r.Allowed,
+			TxId:         r.TxId,
+			Allowed:      r.Allowed,
 			RejectReason: r.RejectReason,
 		})
 	}
@@ -230,7 +235,7 @@ func (s *Service) getTxInfo(c *gin.Context) {
 
 	var blockHeight int64
 	if tx.BlockHash == "" {
-		// try to read utxoId 
+		// try to read utxoId
 		for _, txOut := range tx.Vout {
 			utxo := fmt.Sprintf("%s:%d", txid, txOut.N)
 			id := base_indexer.ShareBaseIndexer.GetUtxoId(utxo)
@@ -256,7 +261,6 @@ func (s *Service) getTxInfo(c *gin.Context) {
 		}
 	}
 
-	
 	txInfo := &rpcwire.TxInfo{
 		TxID:          tx.Txid,
 		Version:       tx.Version,
@@ -334,7 +338,7 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 
 	var blockHeight int64
 	if tx.BlockHash == "" {
-		// try to read utxoId 
+		// try to read utxoId
 		for _, txOut := range tx.Vout {
 			utxo := fmt.Sprintf("%s:%d", txid, txOut.N)
 			id := base_indexer.ShareBaseIndexer.GetUtxoId(utxo)
@@ -449,7 +453,6 @@ func (s *Service) getBestBlockHeight(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-
 func (s *Service) feeSummary(c *gin.Context) {
 	resp := &rpcwire.FeeSummaryResp{
 		BaseResp: rpcwire.BaseResp{
@@ -506,4 +509,3 @@ func (s *Service) feeSummary(c *gin.Context) {
 	resp.Data.List[2].FeeRate = strconv.FormatFloat((ret.FeeRate * 100000), 'f', 3, 64)
 	c.JSON(http.StatusOK, resp)
 }
-
