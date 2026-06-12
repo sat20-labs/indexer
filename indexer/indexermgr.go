@@ -366,6 +366,7 @@ func (b *IndexerMgr) dbgc() {
 	db.RunDBGC(b.ftDB)
 	db.RunDBGC(b.brc20DB)
 	db.RunDBGC(b.runesDB)
+	db.RunDBGC(b.atomDB)
 	common.Log.Infof("dbgc completed")
 }
 
@@ -373,6 +374,10 @@ func (b *IndexerMgr) closeDB() {
 	common.Log.Infof("IndexerMgr->closeDB ")
 	b.dbgc()
 
+	if b.atomDB != nil {
+		b.atomDB.Close()
+		b.atomDB = nil
+	}
 	if b.runesDB != nil {
 		b.runesDB.Close()
 		b.runesDB = nil
@@ -417,6 +422,13 @@ func (b *IndexerMgr) checkSelf() {
 	// 检查一个关闭一个，节省空间
 	ok := false
 	for {
+		ok = b.atomIndexer.CheckSelf()
+		if !ok {
+			break
+		}
+		b.atomDB.Close()
+		b.atomDB = nil
+
 		ok = b.brc20Indexer.CheckSelf()
 		if !ok {
 			break
