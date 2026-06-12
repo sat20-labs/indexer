@@ -1,6 +1,8 @@
 package atom
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -1183,6 +1185,7 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 	if checkpoint.AssetUtxoCount != 0 {
 		count := s.assetUtxoCountLocked()
 		if count != checkpoint.AssetUtxoCount {
+			common.Log.Infof("atom asset utxo summary at %d: %s", height, s.assetUtxoSummaryLocked(20))
 			common.Log.Panicf("atom asset utxo count different at %d: %d %d", height, count, checkpoint.AssetUtxoCount)
 		}
 	}
@@ -1356,4 +1359,38 @@ func (s *Indexer) assetUtxoCountLocked() int {
 		}
 	}
 	return count
+}
+
+func (s *Indexer) assetUtxoSummaryLocked(limit int) string {
+	counts := make(map[string]int)
+	for _, balances := range s.utxoBalances {
+		for _, balance := range balances {
+			if balance.Amount <= 0 {
+				continue
+			}
+			counts[strings.ToLower(balance.Ticker)]++
+		}
+	}
+	type row struct {
+		ticker string
+		count  int
+	}
+	rows := make([]row, 0, len(counts))
+	for ticker, count := range counts {
+		rows = append(rows, row{ticker: ticker, count: count})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].count == rows[j].count {
+			return rows[i].ticker < rows[j].ticker
+		}
+		return rows[i].count > rows[j].count
+	})
+	if limit > len(rows) || limit <= 0 {
+		limit = len(rows)
+	}
+	parts := make([]string, 0, limit)
+	for _, row := range rows[:limit] {
+		parts = append(parts, fmt.Sprintf("%s=%d", row.ticker, row.count))
+	}
+	return strings.Join(parts, ",")
 }
