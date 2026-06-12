@@ -435,7 +435,8 @@ func (s *Handle) getMintPermission(c *gin.Context) {
 		return
 	}
 
-	mintDetail, err := s.model.GetMintPermissionInfo(ticker, address)
+	protocol := c.Query("protocol")
+	mintDetail, err := s.model.GetMintPermissionInfoV2(protocol, ticker, address)
 	if err != nil {
 		resp.Code = -1
 		resp.Msg = err.Error()

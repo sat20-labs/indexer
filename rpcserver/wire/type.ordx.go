@@ -57,7 +57,7 @@ type MintDetailInfo struct {
 type MintPermissionInfo struct {
 	Ticker  string `json:"ticker"`
 	Address string `json:"address"`
-	Amount  int64  `json:"amount"`
+	Amount  string `json:"amount"`
 }
 
 type FeeInfo struct {
@@ -583,4 +583,3 @@ type MintHistoryItemV3 struct {
 	InscriptionID  string `json:"inscriptionId,omitempty" example:"bac89275b4c0a0ba6aaa603d749a1c88ae3033da9f6d6e661a28fb40e8dca362i0"`
 	InscriptionNum int64  `json:"inscriptionNumber,omitempty" example:"67269474" description:"Inscription number of the holder"`
 }
-

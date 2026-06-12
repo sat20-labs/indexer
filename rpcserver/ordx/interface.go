@@ -174,11 +174,68 @@ func (s *Model) GetMintDetailInfo(inscriptionId string) (*rpcwire.MintDetailInfo
 }
 
 func (s *Model) GetMintPermissionInfo(ticker, address string) (*rpcwire.MintPermissionInfo, error) {
-	amount := s.indexer.GetMintPermissionInfo(ticker, address)
-	if amount < 0 {
-		return nil, fmt.Errorf("GetMintPermission failed. %s %s", ticker, address)
+	return s.GetMintPermissionInfoV2(common.PROTOCOL_NAME_ORDX, ticker, address)
+}
+
+func (s *Model) GetMintPermissionInfoV2(protocol, ticker, address string) (*rpcwire.MintPermissionInfo, error) {
+	if protocol == "" {
+		protocol = common.PROTOCOL_NAME_ORDX
 	}
 
+	amount := ""
+	switch protocol {
+	case common.PROTOCOL_NAME_ORDX:
+		permission := s.indexer.GetMintPermissionInfo(ticker, address)
+		if permission < 0 {
+			return nil, fmt.Errorf("GetMintPermission failed. %s:%s %s", protocol, ticker, address)
+		}
+		amount = fmt.Sprintf("%d", permission)
+	default:
+		assetName := &common.TickerName{
+			Protocol: protocol,
+			Type:     common.ASSET_TYPE_FT,
+			Ticker:   ticker,
+		}
+		tickerInfo := s.indexer.GetTickerInfo(assetName)
+		if tickerInfo == nil {
+			return nil, fmt.Errorf("can't find ticker %s:%s", protocol, ticker)
+		}
+		if protocol == common.PROTOCOL_NAME_BRC20 && tickerInfo.SelfMint > 0 {
+			holder := s.indexer.GetHolderAddress(tickerInfo.InscriptionId)
+			if holder != address {
+				return nil, fmt.Errorf("ticker %s:%s is self mint, current address does not hold deploy inscription", protocol, ticker)
+			}
+		}
+		limit, err := common.NewDecimalFromString(tickerInfo.Limit, tickerInfo.Divisibility)
+		if err != nil || limit.Sign() <= 0 {
+			return nil, fmt.Errorf("ticker %s:%s is not mintable", protocol, ticker)
+		}
+		maxSupply, err := common.NewDecimalFromString(tickerInfo.MaxSupply, tickerInfo.Divisibility)
+		if err != nil || maxSupply.Sign() <= 0 {
+			return nil, fmt.Errorf("ticker %s:%s has invalid max supply", protocol, ticker)
+		}
+		totalMinted, err := common.NewDecimalFromString(tickerInfo.TotalMinted, tickerInfo.Divisibility)
+		if err != nil {
+			return nil, fmt.Errorf("ticker %s:%s has invalid minted amount", protocol, ticker)
+		}
+		remaining := common.DecimalSub(maxSupply, totalMinted)
+		if remaining.Sign() <= 0 {
+			return nil, fmt.Errorf("ticker %s:%s mint cap reached", protocol, ticker)
+		}
+		if limit.Cmp(remaining) > 0 {
+			amount = remaining.String()
+		} else {
+			amount = limit.String()
+		}
+
+		height := s.indexer.GetSyncHeight()
+		if tickerInfo.StartBlock > 0 && height < tickerInfo.StartBlock {
+			return nil, fmt.Errorf("ticker %s:%s mint has not started", protocol, ticker)
+		}
+		if tickerInfo.EndBlock > 0 && height >= tickerInfo.EndBlock {
+			return nil, fmt.Errorf("ticker %s:%s mint ended", protocol, ticker)
+		}
+	}
 	ret := &rpcwire.MintPermissionInfo{
 		Ticker:  ticker,
 		Address: address,
@@ -423,7 +480,7 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
 			n := s.getBindingSatFromOrdxTicker(&ticker)
-			
+
 			asset := rpcwire.InscriptionAsset{}
 			asset.TypeName = ticker.Type
 			asset.Ticker = ticker.Ticker
@@ -433,7 +490,7 @@ func (s *Model) GetUtxoList2(address string, tickerName string, start, limit int
 			asset.InscriptionID = ""
 
 			resp.Assets = append(resp.Assets, &asset)
-			
+
 		}
 
 		result = append(result, resp)
@@ -488,7 +545,7 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 		resp.AssetAmount = 0
 		for ticker, tickAbbrInfo := range tickAbbrInfoMap {
 			n := s.getBindingSatFromOrdxTicker(&ticker)
-			
+
 			asset := rpcwire.InscriptionAsset{}
 			asset.TypeName = ticker.Type
 			asset.Ticker = ticker.Ticker
@@ -498,7 +555,7 @@ func (s *Model) GetUtxoList3(address string, start, limit int) ([]*rpcwire.Ticke
 			asset.InscriptionID = ""
 
 			resp.Assets = append(resp.Assets, &asset)
-			
+
 		}
 		result = append(result, resp)
 	}
