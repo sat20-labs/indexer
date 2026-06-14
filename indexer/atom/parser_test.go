@@ -555,7 +555,7 @@ func TestCustomColorNestedPayloadAssignsPartialOutputs(t *testing.T) {
 	}
 }
 
-func TestCustomColorFromNonZeroInputUsesRegularColoring(t *testing.T) {
+func TestCustomColorFromNonZeroInputAppliesWhenPayloadNamesAtomical(t *testing.T) {
 	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
 	idx.heights.CustomColoring = 27000
 	idx.addTicker(&Ticker{Id: 0, Name: "pc", DisplayName: "pc"})
@@ -576,11 +576,41 @@ func TestCustomColorFromNonZeroInputUsesRegularColoring(t *testing.T) {
 			},
 		}},
 	})
-	if got := idx.GetUtxoAssets(2)["pc"]; got != 333 {
-		t.Fatalf("custom op from input 1 should fall back to regular coloring, got %d", got)
+	if got := idx.GetUtxoAssets(2)["pc"]; got != 0 {
+		t.Fatalf("custom op from input 1 should skip output 0, got %d", got)
 	}
-	if got := idx.GetUtxoAssets(3)["pc"]; got != 0 {
-		t.Fatalf("custom op from input 1 should not color output 1, got %d", got)
+	if got := idx.GetUtxoAssets(3)["pc"]; got != 333 {
+		t.Fatalf("custom op from input 1 should color output 1, got %d", got)
+	}
+}
+
+func TestCustomColorAppliesToAtomicalSpentByNonZeroOpInput(t *testing.T) {
+	idx := NewIndexer(nil, &chaincfg.TestNet4Params)
+	idx.heights.CustomColoring = 27000
+	atomicalId := "536737aadfaffa17233bca342be2571e14916f6a29003ff4766d515283e68e90i0"
+	idx.addTicker(&Ticker{Id: 0, AtomicalId: atomicalId, Name: "electron", DisplayName: "electron"})
+	idx.addUtxoBalanceInMemory(&UtxoBalance{UtxoId: 5, AddressId: 10, Outpoint: "txb:0", AtomicalId: atomicalId, Ticker: "electron", Amount: 546})
+	txid := "bdd01faeb5531bf00dd392565bccf05fec3534c37a8779a01a2cf520a818885e"
+	idx.UpdateTransfer(&common.Block{
+		Height: 27020,
+		Transactions: []*common.Transaction{{
+			TxId: txid,
+			Inputs: []*common.TxInput{
+				testTxInput(1, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 0, 333, 27010, nil),
+				testTxInput(5, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 0, 546, 27010,
+					atomWitnessPayload(t, []byte{0x01, 'z'}, map[string]any{atomicalId: map[string]any{"1": uint64(546)}})),
+			},
+			Outputs: []*common.TxOutputV2{
+				testTxOutput(2, 11, txid, 0, 546),
+				testTxOutput(3, 11, txid, 1, 546),
+			},
+		}},
+	})
+	if got := idx.GetUtxoAssets(2)["electron"]; got != 0 {
+		t.Fatalf("custom op input asset should skip output 0, got %d", got)
+	}
+	if got := idx.GetUtxoAssets(3)["electron"]; got != 546 {
+		t.Fatalf("custom op input asset should color output 1, got %d", got)
 	}
 }
 

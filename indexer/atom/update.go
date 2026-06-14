@@ -38,9 +38,14 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 	s.checkPointWithBlockHeightLocked(block.Height, time.Now())
 }
 
-func (s *Indexer) collectInputBalances(tx *common.Transaction) []*UtxoBalance {
-	result := make([]*UtxoBalance, 0)
-	for _, input := range tx.Inputs {
+type spentBalance struct {
+	balance    *UtxoBalance
+	inputIndex int
+}
+
+func (s *Indexer) collectInputBalances(tx *common.Transaction) []*spentBalance {
+	result := make([]*spentBalance, 0)
+	for inputIndex, input := range tx.Inputs {
 		items := s.utxoBalances[input.UtxoId]
 		if len(items) == 0 {
 			continue
@@ -52,7 +57,7 @@ func (s *Indexer) collectInputBalances(tx *common.Transaction) []*UtxoBalance {
 		sortAtomicalIds(atomicalIds)
 		for _, atomicalId := range atomicalIds {
 			balance := items[atomicalId]
-			result = append(result, balance.Clone())
+			result = append(result, &spentBalance{balance: balance.Clone(), inputIndex: inputIndex})
 			s.removeUtxoBalanceInMemory(balance)
 		}
 	}
@@ -345,17 +350,17 @@ func (s *Indexer) validDftMintBitwork(height int, tx *common.Transaction, op *Op
 	return true
 }
 
-func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Transaction, op *Operation, spent []*UtxoBalance) {
+func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Transaction, op *Operation, spent []*spentBalance) {
 	if len(spent) == 0 {
 		return
 	}
 	grouped := make(map[string][]*UtxoBalance)
 	for _, balance := range spent {
-		grouped[balance.AtomicalId] = append(grouped[balance.AtomicalId], balance)
+		grouped[balance.balance.AtomicalId] = append(grouped[balance.balance.AtomicalId], balance.balance)
 	}
 	customActivated := block.Height >= s.heights.CustomColoring
-	isSplit := op != nil && op.InputIndex == 0 && op.Op == OpSplit
-	isCustom := op != nil && op.InputIndex == 0 && op.Op == OpCustomColor && customActivated
+	isSplit := op != nil && op.Op == OpSplit
+	isCustom := op != nil && op.Op == OpCustomColor && customActivated
 	if !isSplit && !isCustom {
 		atomicalIds := orderedTransferAtomicalIds(grouped, spent, block.Height >= s.heights.Dmint)
 		s.applyRegularTransfer(block, txIndex, tx, grouped, atomicalIds)
@@ -366,11 +371,14 @@ func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Tra
 	for _, atomicalId := range atomicalIds {
 		amount, ticker := groupedAmount(grouped[atomicalId])
 		assignments, _ := s.assignRegular(tx, startOutput, amount, customActivated)
-		if isSplit {
+		if isSplit && spentFromInput(spent, atomicalId, op.InputIndex) {
 			assignments = s.assignSplit(tx, atomicalId, amount, op, customActivated)
 		}
 		if isCustom {
 			assignments = s.assignCustom(tx, atomicalId, amount, op)
+			if len(assignments) == 0 {
+				assignments, _ = s.assignRegular(tx, startOutput, amount, customActivated)
+			}
 		}
 		if len(assignments) > 0 {
 			startOutput = assignments[len(assignments)-1].OutputIndex + 1
@@ -379,18 +387,28 @@ func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Tra
 	}
 }
 
-func orderedTransferAtomicalIds(grouped map[string][]*UtxoBalance, spent []*UtxoBalance, fifo bool) []string {
+func spentFromInput(spent []*spentBalance, atomicalId string, inputIndex int) bool {
+	for _, item := range spent {
+		if item.inputIndex == inputIndex && item.balance.AtomicalId == atomicalId {
+			return true
+		}
+	}
+	return false
+}
+
+func orderedTransferAtomicalIds(grouped map[string][]*UtxoBalance, spent []*spentBalance, fifo bool) []string {
 	if !fifo {
 		return sortedAtomicalIds(grouped)
 	}
 	result := make([]string, 0, len(grouped))
 	seen := make(map[string]bool, len(grouped))
 	for _, balance := range spent {
-		if seen[balance.AtomicalId] {
+		atomicalId := balance.balance.AtomicalId
+		if seen[atomicalId] {
 			continue
 		}
-		seen[balance.AtomicalId] = true
-		result = append(result, balance.AtomicalId)
+		seen[atomicalId] = true
+		result = append(result, atomicalId)
 	}
 	return result
 }

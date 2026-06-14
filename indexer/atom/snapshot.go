@@ -55,6 +55,7 @@ func (s *Indexer) WriteCompareSnapshot(path string) error {
 	type utxoRow struct {
 		ticker   string
 		outpoint string
+		utxoId   uint64
 		amount   int64
 		atomical string
 		sortKey  string
@@ -68,6 +69,7 @@ func (s *Indexer) WriteCompareSnapshot(path string) error {
 			row := utxoRow{
 				ticker:   balance.Ticker,
 				outpoint: balance.Outpoint,
+				utxoId:   balance.UtxoId,
 				amount:   balance.Amount,
 				atomical: balance.AtomicalId,
 			}
@@ -81,9 +83,10 @@ func (s *Indexer) WriteCompareSnapshot(path string) error {
 	for _, row := range rows {
 		fmt.Fprintf(
 			&builder,
-			"utxo|ticker=%s|outpoint=%s|amount=%d|atomical=%s\n",
+			"utxo|ticker=%s|outpoint=%s|utxo_id=%d|amount=%d|atomical=%s\n",
 			row.ticker,
 			row.outpoint,
+			row.utxoId,
 			row.amount,
 			row.atomical,
 		)

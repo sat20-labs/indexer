@@ -1,9 +1,14 @@
 package atom
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	atomValidate "github.com/sat20-labs/indexer/indexer/atom/validate"
@@ -27,6 +32,7 @@ type TickerStatus struct {
 	MaxMints     int64
 	HolderCount  int
 	Holders      map[string]int64
+	Utxos        map[uint64]int64
 }
 
 var mainnetCheckpoint = map[int]*CheckPoint{
@@ -748,6 +754,17 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 			},
 		},
 	},
+	849044: {
+		Height: 849044,
+		Tickers: map[string]*TickerStatus{
+			"electron": {
+				AtomicalId: "536737aadfaffa17233bca342be2571e14916f6a29003ff4766d515283e68e90i0",
+				Utxos: map[uint64]int64{
+					29172929710260225: 546,
+				},
+			},
+		},
+	},
 	850000: {
 		Height:         850000,
 		TickerCount:    487,
@@ -1162,6 +1179,10 @@ var testnet4Checkpoint = map[int]*CheckPoint{}
 
 var atomHolderStartHeight, atomHolderEndHeight int
 var atomHeightToHolderRecords map[int]map[string]map[string]*atomValidate.HolderCSVRecord
+var atomUtxoStartHeight, atomUtxoEndHeight int
+var atomHeightToUtxoRecords map[int]map[string]map[uint64]*atomValidate.UtxoCSVRecord
+var atomTickerStartHeight, atomTickerEndHeight int
+var atomHeightToTickerRecords map[int]map[string]*atomValidate.TickerCSVRecord
 
 func (s *Indexer) CheckPointWithBlockHeight(height int) {
 	startTime := time.Now()
@@ -1235,9 +1256,105 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 				common.Log.Panicf("atom %s holder %s amount different at %d: %d %d", name, address, height, holderAmount, amount)
 			}
 		}
+		for utxoId, amount := range tickerStatus.Utxos {
+			utxoAmount := s.tickerAmountInUtxoLocked(utxoId, name)
+			if utxoAmount != amount {
+				common.Log.Panicf("atom %s utxo %d amount different at %d: %d %d", name, utxoId, height, utxoAmount, amount)
+			}
+		}
 	}
+	s.validateTickerDataLocked(height)
 	s.validateHolderDataLocked(height)
+	s.validateUtxoDataLocked(height)
 	common.Log.Infof("AtomIndexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
+}
+
+func readAtomTickerDataToMap(dir string) (int, int) {
+	records, err := atomValidate.ReadTickerCSVDir(dir)
+	if err != nil {
+		common.Log.Panicf("ReadAtomTickerCSVDir %s failed, %v", dir, err)
+	}
+
+	startHeight := int(^uint(0) >> 1)
+	endHeight := 0
+	atomHeightToTickerRecords = make(map[int]map[string]*atomValidate.TickerCSVRecord)
+	for _, record := range records {
+		tickers := atomHeightToTickerRecords[record.Height]
+		if tickers == nil {
+			tickers = make(map[string]*atomValidate.TickerCSVRecord)
+			atomHeightToTickerRecords[record.Height] = tickers
+		}
+		tickers[record.Ticker] = record
+
+		if record.Height < startHeight {
+			startHeight = record.Height
+		}
+		if record.Height > endHeight {
+			endHeight = record.Height
+		}
+	}
+	if len(records) == 0 {
+		startHeight = 0
+	}
+	common.Log.Infof("readAtomTickerDataToMap height %d %d, records %d", startHeight, endHeight, len(records))
+	return startHeight, endHeight
+}
+
+func (s *Indexer) validateTickerDataLocked(height int) {
+	if s.chaincfgParam == nil || s.chaincfgParam.Net != wire.MainNet {
+		return
+	}
+	if atomHeightToTickerRecords == nil {
+		atomTickerStartHeight, atomTickerEndHeight = readAtomTickerDataToMap(atomValidateDir("tickers"))
+	}
+	if len(atomHeightToTickerRecords) == 0 || height < atomTickerStartHeight || height > atomTickerEndHeight {
+		return
+	}
+
+	records := atomHeightToTickerRecords[height]
+	if len(records) == 0 {
+		return
+	}
+	if int(s.status.TickerCount) != len(records) {
+		common.Log.Panicf("AtomIndexer.validateTickerData ticker count different at %d: %d %d", height, s.status.TickerCount, len(records))
+	}
+
+	var failed []string
+	for ticker, record := range records {
+		info := s.getTickerLocked(ticker)
+		if info == nil {
+			common.Log.Errorf("AtomIndexer.validateTickerData %s missing", ticker)
+			failed = append(failed, ticker)
+			continue
+		}
+		utxoCount, utxoAmount := s.tickerUtxoSummaryLocked(ticker)
+		verified := true
+		if info.AtomicalId != record.AtomicalId ||
+			info.MintedTimes != record.MintedTimes ||
+			info.MintedAmount != record.MintedAmount ||
+			info.MaxMints != record.MaxMints ||
+			utxoCount != record.UtxoCount ||
+			utxoAmount != record.UtxoAmount {
+			common.Log.Errorf("AtomIndexer.validateTickerData %s different atomical %s/%s minted_times %d/%d minted_amount %d/%d max_mints %d/%d utxos %d/%d amount %d/%d",
+				ticker,
+				info.AtomicalId, record.AtomicalId,
+				info.MintedTimes, record.MintedTimes,
+				info.MintedAmount, record.MintedAmount,
+				info.MaxMints, record.MaxMints,
+				utxoCount, record.UtxoCount,
+				utxoAmount, record.UtxoAmount,
+			)
+			verified = false
+		}
+		if !verified {
+			failed = append(failed, ticker)
+		}
+	}
+
+	if len(failed) > 0 {
+		common.Log.Panicf("check atom %v tickers failed", failed)
+	}
+	common.Log.Infof("AtomIndexer.validateTickerData %d tickers check succeeded.", len(records))
 }
 
 func readAtomHolderDataToMap(dir string) (int, int) {
@@ -1281,7 +1398,7 @@ func (s *Indexer) validateHolderDataLocked(height int) {
 		return
 	}
 	if atomHeightToHolderRecords == nil {
-		atomHolderStartHeight, atomHolderEndHeight = readAtomHolderDataToMap("./indexer/atom/validate/holders")
+		atomHolderStartHeight, atomHolderEndHeight = readAtomHolderDataToMap(atomValidateDir("holders"))
 	}
 	if len(atomHeightToHolderRecords) == 0 || height < atomHolderStartHeight || height > atomHolderEndHeight {
 		return
@@ -1295,11 +1412,12 @@ func (s *Indexer) validateHolderDataLocked(height int) {
 	var failed []string
 	for ticker, holders := range tickerToHolders {
 		verified := true
+		expectedTotal := int64(0)
 		for address, record := range holders {
-			addressId := s.baseIndexer.GetAddressIdFromDB(address)
+			expectedTotal += record.Amount
+			addressId := s.validateHolderAddressId(address)
 			if addressId == common.INVALID_ID {
 				common.Log.Errorf("AtomIndexer.validateHolderData GetAddressIdFromDB %s failed", address)
-				failed = append(failed, ticker)
 				verified = false
 				continue
 			}
@@ -1307,20 +1425,149 @@ func (s *Indexer) validateHolderDataLocked(height int) {
 			if amount != record.Amount {
 				common.Log.Errorf("AtomIndexer.validateHolderData %s %s amount different %d %d",
 					address, ticker, record.Amount, amount)
-				failed = append(failed, ticker)
 				verified = false
 			}
+		}
+		holderCount, holderAmount := s.tickerHolderSummaryLocked(ticker)
+		if holderCount != len(holders) || holderAmount != expectedTotal {
+			common.Log.Errorf("AtomIndexer.validateHolderData %s summary different count %d %d amount %d %d",
+				ticker, len(holders), holderCount, expectedTotal, holderAmount)
+			verified = false
 		}
 		if verified {
 			common.Log.Infof("AtomIndexer.validateHolderData %s %d check succeeded.", ticker, len(holders))
 		} else {
 			common.Log.Infof("AtomIndexer.validateHolderData %s check failed.", ticker)
+			failed = append(failed, ticker)
 		}
 	}
 
 	if len(failed) > 0 {
 		common.Log.Panicf("check atom %v holders failed", failed)
 	}
+}
+
+func (s *Indexer) validateHolderAddressId(address string) uint64 {
+	addressId := s.baseIndexer.GetAddressIdFromDB(address)
+	if addressId != common.INVALID_ID {
+		return addressId
+	}
+
+	script, err := hex.DecodeString(address)
+	if err != nil || len(script) == 0 {
+		return common.INVALID_ID
+	}
+	_, addresses, _, err := txscript.ExtractPkScriptAddrs(script, s.chaincfgParam)
+	if err == nil && len(addresses) > 0 {
+		addressId = s.baseIndexer.GetAddressIdFromDB(addresses[0].EncodeAddress())
+		if addressId != common.INVALID_ID {
+			return addressId
+		}
+	}
+	return s.baseIndexer.GetAddressIdFromDB(base64.StdEncoding.EncodeToString(script))
+}
+
+func readAtomUtxoDataToMap(dir string) (int, int) {
+	records, err := atomValidate.ReadUtxoCSVDir(dir)
+	if err != nil {
+		common.Log.Panicf("ReadAtomUtxoCSVDir %s failed, %v", dir, err)
+	}
+
+	startHeight := int(^uint(0) >> 1)
+	endHeight := 0
+	atomHeightToUtxoRecords = make(map[int]map[string]map[uint64]*atomValidate.UtxoCSVRecord)
+	for _, record := range records {
+		tickerToUtxos := atomHeightToUtxoRecords[record.Height]
+		if tickerToUtxos == nil {
+			tickerToUtxos = make(map[string]map[uint64]*atomValidate.UtxoCSVRecord)
+			atomHeightToUtxoRecords[record.Height] = tickerToUtxos
+		}
+		utxos := tickerToUtxos[record.Ticker]
+		if utxos == nil {
+			utxos = make(map[uint64]*atomValidate.UtxoCSVRecord)
+			tickerToUtxos[record.Ticker] = utxos
+		}
+		utxos[record.UtxoId] = record
+
+		if record.Height < startHeight {
+			startHeight = record.Height
+		}
+		if record.Height > endHeight {
+			endHeight = record.Height
+		}
+	}
+	if len(records) == 0 {
+		startHeight = 0
+	}
+	common.Log.Infof("readAtomUtxoDataToMap height %d %d, records %d", startHeight, endHeight, len(records))
+	return startHeight, endHeight
+}
+
+func (s *Indexer) validateUtxoDataLocked(height int) {
+	if s.chaincfgParam == nil || s.chaincfgParam.Net != wire.MainNet {
+		return
+	}
+	if atomHeightToUtxoRecords == nil {
+		atomUtxoStartHeight, atomUtxoEndHeight = readAtomUtxoDataToMap(atomValidateDir("utxos"))
+	}
+	if len(atomHeightToUtxoRecords) == 0 || height < atomUtxoStartHeight || height > atomUtxoEndHeight {
+		return
+	}
+
+	tickerToUtxos := atomHeightToUtxoRecords[height]
+	if len(tickerToUtxos) == 0 {
+		return
+	}
+
+	var failed []string
+	for ticker, utxos := range tickerToUtxos {
+		verified := true
+		expectedTotal := int64(0)
+		for utxoId, record := range utxos {
+			expectedTotal += record.Amount
+			amount := s.tickerAmountInUtxoLocked(utxoId, ticker)
+			if amount != record.Amount {
+				common.Log.Errorf("AtomIndexer.validateUtxoData %s %d amount different %d %d",
+					ticker, utxoId, record.Amount, amount)
+				verified = false
+			}
+		}
+		utxoCount, utxoAmount := s.tickerUtxoSummaryLocked(ticker)
+		if utxoCount != len(utxos) || utxoAmount != expectedTotal {
+			common.Log.Errorf("AtomIndexer.validateUtxoData %s summary different count %d %d amount %d %d",
+				ticker, len(utxos), utxoCount, expectedTotal, utxoAmount)
+			verified = false
+		}
+		if verified {
+			common.Log.Infof("AtomIndexer.validateUtxoData %s %d check succeeded.", ticker, len(utxos))
+		} else {
+			common.Log.Infof("AtomIndexer.validateUtxoData %s check failed.", ticker)
+			failed = append(failed, ticker)
+		}
+	}
+
+	if len(failed) > 0 {
+		common.Log.Panicf("check atom %v utxos failed", failed)
+	}
+}
+
+func (s *Indexer) tickerAmountInUtxoLocked(utxoId uint64, ticker string) int64 {
+	ticker = strings.ToLower(ticker)
+	var amount int64
+	for _, balance := range s.utxoBalances[utxoId] {
+		if strings.ToLower(balance.Ticker) == ticker && balance.Amount > 0 {
+			amount += balance.Amount
+		}
+	}
+	return amount
+}
+
+func atomValidateDir(name string) string {
+	root := os.Getenv("ATOM_VALIDATE_ROOT")
+	if root == "" {
+		root = "./indexer/atom/validate"
+	}
+	return filepath.Join(root, name)
 }
 
 func (s *Indexer) checkPoint(height int) *CheckPoint {
@@ -1342,6 +1589,20 @@ func (s *Indexer) tickerUtxoSummaryLocked(ticker string) (int, int64) {
 			count++
 			amount += balance.Amount
 		}
+	}
+	return count, amount
+}
+
+func (s *Indexer) tickerHolderSummaryLocked(ticker string) (int, int64) {
+	ticker = strings.ToLower(ticker)
+	var count int
+	var amount int64
+	for _, balance := range s.tickerHolders[ticker] {
+		if balance <= 0 {
+			continue
+		}
+		count++
+		amount += balance
 	}
 	return count, amount
 }
