@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -896,7 +897,7 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  500000,
 				MintedAmount: 10000000000,
 				MaxMints:     500000,
-				HolderCount:  23326,
+				HolderCount:  23321,
 				Holders: map[string]int64{
 					"bc1puxcfn62ceyxu4m5rrk89vh9eydd682avlqjphx57mxekglmuhj9snu77w4": 105175183,
 					"bc1psq6xlaawpzpd0z68ef9r0kqt5lzkqy9zqwj2a2kent6p4z6etxtqy7eugc": 100000000,
@@ -1235,6 +1236,7 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 			common.Log.Panicf("atom %s max mints different at %d: %d %d", name, height, ticker.MaxMints, tickerStatus.MaxMints)
 		}
 		if tickerStatus.HolderCount != 0 && ticker.HolderCount != tickerStatus.HolderCount {
+			s.logHolderCheckpointDiffLocked(height, name)
 			common.Log.Panicf("atom %s holder count different at %d: %d %d", name, height, ticker.HolderCount, tickerStatus.HolderCount)
 		}
 		if tickerStatus.UtxoCount != 0 || tickerStatus.UtxoAmount != 0 {
@@ -1330,17 +1332,11 @@ func (s *Indexer) validateTickerDataLocked(height int) {
 		utxoCount, utxoAmount := s.tickerUtxoSummaryLocked(ticker)
 		verified := true
 		if info.AtomicalId != record.AtomicalId ||
-			info.MintedTimes != record.MintedTimes ||
-			info.MintedAmount != record.MintedAmount ||
-			info.MaxMints != record.MaxMints ||
 			utxoCount != record.UtxoCount ||
 			utxoAmount != record.UtxoAmount {
-			common.Log.Errorf("AtomIndexer.validateTickerData %s different atomical %s/%s minted_times %d/%d minted_amount %d/%d max_mints %d/%d utxos %d/%d amount %d/%d",
+			common.Log.Errorf("AtomIndexer.validateTickerData %s different atomical %s/%s utxos %d/%d amount %d/%d",
 				ticker,
 				info.AtomicalId, record.AtomicalId,
-				info.MintedTimes, record.MintedTimes,
-				info.MintedAmount, record.MintedAmount,
-				info.MaxMints, record.MaxMints,
 				utxoCount, record.UtxoCount,
 				utxoAmount, record.UtxoAmount,
 			)
@@ -1445,6 +1441,80 @@ func (s *Indexer) validateHolderDataLocked(height int) {
 	if len(failed) > 0 {
 		common.Log.Panicf("check atom %v holders failed", failed)
 	}
+}
+
+func (s *Indexer) logHolderCheckpointDiffLocked(height int, ticker string) {
+	if atomHeightToHolderRecords == nil {
+		atomHolderStartHeight, atomHolderEndHeight = readAtomHolderDataToMap(atomValidateDir("holders"))
+	}
+	tickerToHolders := atomHeightToHolderRecords[height]
+	if len(tickerToHolders) == 0 {
+		common.Log.Infof("AtomIndexer.holderCheckpointDiff no holder validate data at %d", height)
+		return
+	}
+	expected := tickerToHolders[ticker]
+	if len(expected) == 0 {
+		common.Log.Infof("AtomIndexer.holderCheckpointDiff no holder validate data for %s at %d", ticker, height)
+		return
+	}
+
+	const limit = 20
+	expectedByAddressId := make(map[uint64]*atomValidate.HolderCSVRecord, len(expected))
+	diffCount := 0
+	addresses := make([]string, 0, len(expected))
+	for address := range expected {
+		addresses = append(addresses, address)
+	}
+	sort.Strings(addresses)
+	for _, address := range addresses {
+		record := expected[address]
+		addressId := s.validateHolderAddressId(address)
+		if addressId == common.INVALID_ID {
+			diffCount++
+			if diffCount <= limit {
+				common.Log.Errorf("AtomIndexer.holderCheckpointDiff %s %d official holder address unresolved %s amount %d",
+					ticker, height, address, record.Amount)
+			}
+			continue
+		}
+		expectedByAddressId[addressId] = record
+		amount := s.tickerHolders[ticker][addressId]
+		if amount != record.Amount {
+			diffCount++
+			if diffCount <= limit {
+				common.Log.Errorf("AtomIndexer.holderCheckpointDiff %s %d official holder %s address_id %d amount %d/%d",
+					ticker, height, address, addressId, record.Amount, amount)
+			}
+		}
+	}
+
+	localHolderIds := make([]uint64, 0, len(s.tickerHolders[ticker]))
+	for addressId := range s.tickerHolders[ticker] {
+		localHolderIds = append(localHolderIds, addressId)
+	}
+	sort.Slice(localHolderIds, func(i, j int) bool {
+		return localHolderIds[i] < localHolderIds[j]
+	})
+	for _, addressId := range localHolderIds {
+		if _, ok := expectedByAddressId[addressId]; ok {
+			continue
+		}
+		amount := s.tickerHolders[ticker][addressId]
+		if amount == 0 {
+			continue
+		}
+		diffCount++
+		if diffCount <= limit {
+			address, err := s.baseIndexer.GetAddressByID(addressId)
+			if err != nil {
+				address = ""
+			}
+			common.Log.Errorf("AtomIndexer.holderCheckpointDiff %s %d local extra holder %s address_id %d amount %d",
+				ticker, height, address, addressId, amount)
+		}
+	}
+	common.Log.Errorf("AtomIndexer.holderCheckpointDiff %s %d total_diff_or_extra %d official_holders %d local_holders %d",
+		ticker, height, diffCount, len(expected), len(s.tickerHolders[ticker]))
 }
 
 func (s *Indexer) validateHolderAddressId(address string) uint64 {

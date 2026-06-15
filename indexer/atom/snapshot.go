@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +15,14 @@ func (s *Indexer) WriteCompareSnapshot(path string) error {
 
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
+
+	return s.writeCompareSnapshotLocked(path)
+}
+
+func (s *Indexer) writeCompareSnapshotLocked(path string) error {
+	if path == "" {
+		return nil
+	}
 
 	var builder strings.Builder
 	fmt.Fprintf(
@@ -97,4 +106,24 @@ func (s *Indexer) WriteCompareSnapshot(path string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func (s *Indexer) writeTargetCompareSnapshotLocked(height int) (bool, error) {
+	path := os.Getenv("ATOM_DEBUG_ATOM_SNAPSHOT_FILE")
+	if path == "" {
+		return false, nil
+	}
+	targetPath := os.Getenv("ATOM_DEBUG_HEIGHT_FILE")
+	if targetPath == "" {
+		return false, nil
+	}
+	data, err := os.ReadFile(targetPath)
+	if err != nil {
+		return false, err
+	}
+	target, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil || target != height {
+		return false, err
+	}
+	return true, s.writeCompareSnapshotLocked(path)
 }

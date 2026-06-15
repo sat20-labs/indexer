@@ -35,6 +35,11 @@ func (s *Indexer) UpdateTransfer(block *common.Block) {
 		}
 		s.applyTransfer(block, txIndex, tx, op, spent)
 	}
+	if written, err := s.writeTargetCompareSnapshotLocked(block.Height); err != nil {
+		common.Log.Errorf("AtomIndexer.writeTargetCompareSnapshot failed at %d: %v", block.Height, err)
+	} else if written {
+		common.Log.Infof("AtomIndexer target compare snapshot written at %d before checkpoint", block.Height)
+	}
 	s.checkPointWithBlockHeightLocked(block.Height, time.Now())
 }
 
