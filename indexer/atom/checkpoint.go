@@ -946,7 +946,7 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  500000,
 				MintedAmount: 10000000000,
 				MaxMints:     500000,
-				HolderCount:  25930,
+				HolderCount:  25906,
 				Holders: map[string]int64{
 					"bc1qwjv97kps9vszpq85jknepsvfs8qlvp3ytcnkml":                     109246306,
 					"bc1p337u20hy8a8m06664ntkx432m8ztdad4h30k9dw8rn84gw5dw24su7kty2": 106457714,
@@ -995,7 +995,7 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  500000,
 				MintedAmount: 10000000000,
 				MaxMints:     500000,
-				HolderCount:  31280,
+				HolderCount:  31240,
 				Holders: map[string]int64{
 					"bc1qw8wrek2m7nlqldll66ajnwr9mh64syvkt67zlu":                     143264352,
 					"bc1quhruqrghgcca950rvhtrg7cpd7u8k6svpzgzmrjy8xyukacl5lkq0r8l2d": 128080257,
