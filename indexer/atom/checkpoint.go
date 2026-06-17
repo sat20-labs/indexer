@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
@@ -1029,7 +1030,7 @@ var mainnetCheckpoint = map[int]*CheckPoint{
 				MintedTimes:  500000,
 				MintedAmount: 10000000000,
 				MaxMints:     500000,
-				HolderCount:  36748,
+				HolderCount:  36691,
 				Holders: map[string]int64{
 					"bc1qwjv97kps9vszpq85jknepsvfs8qlvp3ytcnkml":                     109246306,
 					"bc1pgfz630c2jp5ehwpcswzkrs85sddnj4xjastc7z92a7h6gurxfqhsknd732": 102976762,
@@ -1524,17 +1525,54 @@ func (s *Indexer) validateHolderAddressId(address string) uint64 {
 	}
 
 	script, err := hex.DecodeString(address)
-	if err != nil || len(script) == 0 {
-		return common.INVALID_ID
+	if err == nil && len(script) != 0 {
+		if addressId := s.validateHolderScriptAddressId(script); addressId != common.INVALID_ID {
+			return addressId
+		}
 	}
+
+	if script := segwitAddressScript(address, s.chaincfgParam.Bech32HRPSegwit); len(script) != 0 {
+		return s.validateHolderScriptAddressId(script)
+	}
+
+	return common.INVALID_ID
+}
+
+func (s *Indexer) validateHolderScriptAddressId(script []byte) uint64 {
 	_, addresses, _, err := txscript.ExtractPkScriptAddrs(script, s.chaincfgParam)
 	if err == nil && len(addresses) > 0 {
-		addressId = s.baseIndexer.GetAddressIdFromDB(addresses[0].EncodeAddress())
+		addressId := s.baseIndexer.GetAddressIdFromDB(addresses[0].EncodeAddress())
 		if addressId != common.INVALID_ID {
 			return addressId
 		}
 	}
 	return s.baseIndexer.GetAddressIdFromDB(base64.StdEncoding.EncodeToString(script))
+}
+
+func segwitAddressScript(address string, expectedHRP string) []byte {
+	hrp, data, err := bech32.DecodeNoLimit(address)
+	if err != nil || hrp != expectedHRP || len(data) == 0 {
+		return nil
+	}
+	version := data[0]
+	if version > 16 {
+		return nil
+	}
+	program, err := bech32.ConvertBits(data[1:], 5, 8, false)
+	if err != nil || len(program) == 0 {
+		return nil
+	}
+	builder := txscript.NewScriptBuilder()
+	if version == 0 {
+		builder.AddOp(txscript.OP_0)
+	} else {
+		builder.AddOp(txscript.OP_1 - 1 + version)
+	}
+	script, err := builder.AddData(program).Script()
+	if err != nil {
+		return nil
+	}
+	return script
 }
 
 func readAtomUtxoDataToMap(dir string) (int, int) {

@@ -6,8 +6,16 @@ func TestReadAtomUtxo860000CSV(t *testing.T) {
 	testUtxoCSV(t, "./utxos/atom-utxos-860000.csv", "atom", 860000, 12899, 19330214, 27780330264199168, 1000)
 }
 
+func TestReadAtomUtxo900000CSV(t *testing.T) {
+	testUtxoCSV(t, "./utxos/atom-utxos-900000.csv", "atom", 900000, 13156, 19325316, 27780330264199168, 1000)
+}
+
 func TestReadQuarkUtxo860000CSV(t *testing.T) {
 	testUtxoCSV(t, "./utxos/quark-utxos-860000.csv", "quark", 860000, 154128, 9696961667, 28265729728184320, 20000)
+}
+
+func TestReadQuarkUtxo900000CSV(t *testing.T) {
+	testUtxoCSV(t, "./utxos/quark-utxos-900000.csv", "quark", 900000, 136522, 9372835953, 28269509542674432, 20000)
 }
 
 func TestReadAllUtxo860000CSV(t *testing.T) {
