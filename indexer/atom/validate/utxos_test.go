@@ -2,41 +2,33 @@ package validate
 
 import "testing"
 
-func TestReadAtomUtxo860000CSV(t *testing.T) {
-	testUtxoCSV(t, "./utxos/atom-utxos-860000.csv", "atom", 860000, 12899, 19330214, 27780330264199168, 1000)
+func TestReadAtomUtxo950000CSV(t *testing.T) {
+	testUtxoCSV(t, "./utxos/atom-utxos-950000.csv", "atom", 950000, 12932, 19114209, 27780330264199168, 1000)
 }
 
-func TestReadAtomUtxo900000CSV(t *testing.T) {
-	testUtxoCSV(t, "./utxos/atom-utxos-900000.csv", "atom", 900000, 13156, 19325316, 27780330264199168, 1000)
+func TestReadQuarkUtxo950000CSV(t *testing.T) {
+	testUtxoCSV(t, "./utxos/quark-utxos-950000.csv", "quark", 950000, 158791, 9160533072, 28269509542674432, 20000)
 }
 
-func TestReadQuarkUtxo860000CSV(t *testing.T) {
-	testUtxoCSV(t, "./utxos/quark-utxos-860000.csv", "quark", 860000, 154128, 9696961667, 28265729728184320, 20000)
-}
-
-func TestReadQuarkUtxo900000CSV(t *testing.T) {
-	testUtxoCSV(t, "./utxos/quark-utxos-900000.csv", "quark", 900000, 136522, 9372835953, 28269509542674432, 20000)
-}
-
-func TestReadAllUtxo860000CSV(t *testing.T) {
-	records, err := ReadUtxoCSV("./utxos/all-utxos-860000.csv")
+func TestReadAllUtxo950000CSV(t *testing.T) {
+	records, err := ReadUtxoCSV("./utxos/all-utxos-950000.csv")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 832478 {
+	if len(records) != 773049 {
 		t.Fatalf("utxo count mismatch: got %d", len(records))
 	}
 	var actualTotal int64
 	for _, record := range records {
 		actualTotal += record.Amount
-		if record.Height != 860000 {
+		if record.Height != 950000 {
 			t.Fatalf("unexpected height %d", record.Height)
 		}
 	}
-	if actualTotal != 42655520242 {
+	if actualTotal != 38741982969 {
 		t.Fatalf("utxo total mismatch: got %d", actualTotal)
 	}
-	if records[0].Ticker != "0" || records[0].UtxoId != 27876742945046528 || records[0].Amount != 1000 {
+	if records[0].Ticker != "0" || records[0].UtxoId != 27946356145127424 || records[0].Amount != 1000 {
 		t.Fatalf("unexpected first utxo: %+v", records[0])
 	}
 }

@@ -3,19 +3,11 @@ package validate
 import "testing"
 
 func TestReadAtomHolderCSV(t *testing.T) {
-	testHolderCSV(t, "./holders/atom-holders-900000.csv", "atom", 900000, 8213, 19325316, "bc1pu62x0qzqn758srcmm0ctlxgum55a06am3njj3jgatkmyu9plmypsshzp45", 1151992)
+	testHolderCSV(t, "./holders/atom-holders-950000.csv", "atom", 950000, 8087, 19114209, "bc1pu62x0qzqn758srcmm0ctlxgum55a06am3njj3jgatkmyu9plmypsshzp45", 1151992)
 }
 
-func TestReadQuarkHolder900000CSV(t *testing.T) {
-	testHolderCSV(t, "./holders/quark-holders-900000.csv", "quark", 900000, 36691, 9372835953, "bc1qwjv97kps9vszpq85jknepsvfs8qlvp3ytcnkml", 109246306)
-}
-
-func TestReadAtomHolder860000CSV(t *testing.T) {
-	testHolderCSV(t, "./holders/atom-holders-860000.csv", "atom", 860000, 7680, 19330214, "bc1p3eze9y3krkxk848t0ph4d0y4mml22ht3z7g5snr8npdecrfkmuzsm433rk", 572773)
-}
-
-func TestReadQuarkHolder860000CSV(t *testing.T) {
-	testHolderCSV(t, "./holders/quark-holders-860000.csv", "quark", 860000, 21993, 9696961667, "bc1p3dfge99g2ulp8ry7almgr64fmwqzfxqclgh5mca39rzl2lw3zvasavfyzu", 285969399)
+func TestReadQuarkHolder950000CSV(t *testing.T) {
+	testHolderCSV(t, "./holders/quark-holders-950000.csv", "quark", 950000, 56650, 9160533072, "bc1qt87mprj2fl6kw4leypz2vw0valfqndgcdutwgf", 114409682)
 }
 
 func testHolderCSV(t *testing.T, path, ticker string, height, count int, total int64, topAddress string, topAmount int64) {
