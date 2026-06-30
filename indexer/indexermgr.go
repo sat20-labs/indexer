@@ -21,6 +21,7 @@ import (
 	"github.com/sat20-labs/indexer/indexer/nft"
 	"github.com/sat20-labs/indexer/indexer/ns"
 	"github.com/sat20-labs/indexer/indexer/runes"
+	"github.com/sat20-labs/indexer/share/btclucky"
 
 	"github.com/btcsuite/btcd/chaincfg"
 )
@@ -88,6 +89,9 @@ type IndexerMgr struct {
 	addressToNameMap     map[string][]*common.Nft
 	pendingFreezeReplay  []*common.FreezeDirective
 	freezeLookaheadCache map[int]*common.Block
+	btcLuckyTemplate     *btclucky.TemplateService
+	lastBTCLuckyTip      int
+	lastBTCLuckyTipHash  string
 	/////////////////////////////////
 }
 
@@ -151,6 +155,45 @@ func NewIndexerMgr(
 	}
 
 	return instance
+}
+
+func (b *IndexerMgr) LocalDB() common.KVDB {
+	return b.localDB
+}
+
+func (b *IndexerMgr) Config() *config.YamlConf {
+	return b.cfg
+}
+
+func (b *IndexerMgr) SetBTCLuckyTemplateService(svc *btclucky.TemplateService) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.btcLuckyTemplate = svc
+}
+
+func (b *IndexerMgr) refreshBTCLuckyTemplateAtTip() {
+	b.mutex.Lock()
+	svc := b.btcLuckyTemplate
+	height := b.base.GetHeight()
+	hash := b.base.GetHash()
+	chainTip := b.base.GetChainTip()
+	if svc == nil || height <= 0 || height != chainTip ||
+		(b.lastBTCLuckyTip == height && b.lastBTCLuckyTipHash == hash) {
+		b.mutex.Unlock()
+		return
+	}
+	b.mutex.Unlock()
+
+	if err := svc.RefreshTemplate(); err != nil {
+		common.Log.Warnf("refresh BTC lucky template at L1 tip %d failed: %v", height, err)
+		return
+	}
+	b.mutex.Lock()
+	if b.lastBTCLuckyTip < height || b.lastBTCLuckyTipHash != hash {
+		b.lastBTCLuckyTip = height
+		b.lastBTCLuckyTipHash = hash
+	}
+	b.mutex.Unlock()
 }
 
 func (b *IndexerMgr) Init() {
@@ -264,6 +307,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 							// 这个时候，BaseIndexer.SyncToChainTip 不能再进行数据库的内部更新，会破坏内存中的数据
 							b.base.SetUpdateDBCallback(nil)
 							b.updateDB()
+							b.refreshBTCLuckyTemplateAtTip()
 							if b.maxIndexHeight <= 0 {
 								if os.Getenv("ATOM_DEBUG_DISABLE_MEMPOOL") != "1" {
 									b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)

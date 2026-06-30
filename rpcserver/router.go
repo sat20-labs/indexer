@@ -46,19 +46,21 @@ type RateLimit struct {
 }
 
 type Rpc struct {
-	basicService     *base.Service
-	ordxService      *ordx.Service
-	ordService       *ord.Service
-	btcdService      *bitcoind.Service
+	basicService *base.Service
+	ordxService  *ordx.Service
+	ordService   *ord.Service
+	btcdService  *bitcoind.Service
 	//apidoc           *APIDoc
 }
 
 func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
+	btcdService := bitcoind.NewService(baseIndexer.Config(), baseIndexer.LocalDB())
+	baseIndexer.SetBTCLuckyTemplateService(btcdService.BTCLuckyTemplateService())
 	return &Rpc{
-		basicService:     base.NewService(baseIndexer),
-		ordxService:      ordx.NewService(baseIndexer),
-		ordService:       ord.NewService(),
-		btcdService:      bitcoind.NewService(),
+		basicService: base.NewService(baseIndexer),
+		ordxService:  ordx.NewService(baseIndexer),
+		ordService:   ord.NewService(),
+		btcdService:  btcdService,
 		//apidoc:           &APIDoc{},
 	}
 }

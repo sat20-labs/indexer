@@ -1653,6 +1653,10 @@ func (b *BaseIndexer) GetHeight() int {
 	return b.lastHeight
 }
 
+func (b *BaseIndexer) GetHash() string {
+	return b.lastHash
+}
+
 func (b *BaseIndexer) GetChainTip() int {
 	return b.stats.ChainTip
 }
