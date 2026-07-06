@@ -395,6 +395,10 @@ func (s *TemplateService) rememberFound(record FoundBlockRecord) {
 	db := s.cfg.FoundBlocksDB
 	s.mu.Unlock()
 
+	log.Infof("BTC lucky found block metadata block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s job_id=%s template_id=%s submitted=%v result=%q",
+		record.BlockHash, record.BlockHeight, record.CoinbaseTxID, record.Vout, record.Amount,
+		record.RewardAddress, record.JobID, record.TemplateID, record.Submitted, record.SubmitResult)
+
 	if err := appendFoundBlockRecord(db, record); err != nil {
 		log.Warnf("failed to persist BTC lucky found block record: %v", err)
 	}
