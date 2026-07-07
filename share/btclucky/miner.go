@@ -281,9 +281,23 @@ func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
 				}
 				record, err := m.backend.SubmitSolution(solution)
 				if err != nil {
+					if record != nil {
+						log.Infof("BTC lucky miner found block submit failed block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s job_id=%s template_id=%s worker_id=%d submitted=%v result=%q error=%q",
+							record.BlockHash, record.BlockHeight, record.CoinbaseTxID, record.Vout, record.Amount,
+							record.RewardAddress, record.JobID, record.TemplateID, solution.WorkerID,
+							record.Submitted, record.SubmitResult, err.Error())
+					} else {
+						log.Infof("BTC lucky miner found candidate submit failed header_hash=%s reward_address=%s job_id=%s template_id=%s worker_id=%d extra_nonce=%d nonce=%d ntime=%d error=%q",
+							solution.HeaderHash, solution.RewardAddress, solution.JobID, solution.TemplateID,
+							solution.WorkerID, solution.ExtraNonce, solution.Nonce, solution.NTime, err.Error())
+					}
 					m.setSubmit(err.Error())
 					return
 				}
+				log.Infof("BTC lucky miner found block submitted block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s job_id=%s template_id=%s worker_id=%d submitted=%v result=%q",
+					record.BlockHash, record.BlockHeight, record.CoinbaseTxID, record.Vout, record.Amount,
+					record.RewardAddress, record.JobID, record.TemplateID, solution.WorkerID,
+					record.Submitted, record.SubmitResult)
 				m.setSubmit(record.SubmitResult)
 				return
 			}
