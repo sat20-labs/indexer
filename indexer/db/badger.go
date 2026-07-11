@@ -17,13 +17,13 @@ package db
 // }
 
 // func openBadgerDB(filepath string) (*badger.DB, error) {
-	
+
 // 	opt := badger.DefaultOptions(filepath).
 // 		WithBlockCacheSize(3000 << 20).
 // 		WithDir(filepath).
 // 		WithValueDir(filepath).
 // 		WithLoggingLevel(badger.WARNING)
-	
+
 // 	return badger.Open(opt)
 // }
 
@@ -195,6 +195,12 @@ package db
 // 		return nil
 // 	})
 // 	return val, err
+// }
+
+// func (b *badgerDB) View(fn func(txn common.ReadBatch) error) error {
+// 	return b.db.View(func(txn *badger.Txn) error {
+// 		return fn(&badgerReadBatch{txn: txn})
+// 	})
 // }
 
 // func (b *badgerDB) Update(fn func(any) error) error {
