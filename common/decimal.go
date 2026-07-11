@@ -12,83 +12,43 @@ import (
 	"lukechampine.com/uint128"
 )
 
-const MAX_PRECISION = 64
+const (
+	MAX_PRECISION                   = 63
+	MaxProtocolDecimalTextLength    = 256
+	MaxProtocolDecimalIntegerDigits = 128
+)
 
-var precisionFactor [64]*big.Int = [64]*big.Int{
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(0), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(1), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(2), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(3), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(4), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(5), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(6), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(7), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(8), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(11), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(12), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(13), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(14), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(17), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(19), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(20), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(21), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(22), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(23), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(24), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(25), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(26), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(27), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(28), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(29), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(31), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(32), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(33), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(34), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(35), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(36), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(37), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(38), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(39), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(40), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(41), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(42), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(43), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(44), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(45), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(46), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(47), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(48), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(49), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(50), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(51), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(52), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(53), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(54), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(55), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(56), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(57), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(58), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(59), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(60), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(61), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(62), nil),
-	new(big.Int).Exp(big.NewInt(10), big.NewInt(63), nil),
-}
+var precisionFactor = func() [MAX_PRECISION + 1]*big.Int {
+	var factors [MAX_PRECISION + 1]*big.Int
+	for i := range factors {
+		factors[i] = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(i)), nil)
+	}
+	return factors
+}()
 
 func DecimalScale(precision int) *big.Int {
-	if precision < 0 {
-		return big.NewInt(1)
-	}
-	if precision > MAX_PRECISION {
-		return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(precision)), nil)
-	}
+	mustDecimalPrecision(precision)
 	return precisionFactor[precision]
+}
+
+func mustDecimalPrecision(precision int) {
+	if err := ValidateDecimalPrecision(precision); err != nil {
+		panic(err)
+	}
+}
+
+func ValidateDecimalPrecision(precision int) error {
+	if precision < 0 || precision > MAX_PRECISION {
+		return fmt.Errorf("decimal precision %d outside protocol range 0..%d", precision, MAX_PRECISION)
+	}
+	return nil
+}
+
+func (d *Decimal) Validate() error {
+	if d == nil || d.Value == nil {
+		return errors.New("invalid nil decimal")
+	}
+	return ValidateDecimalPrecision(d.Precision)
 }
 
 // Decimal represents a fixed-point decimal number with 18 decimal places
@@ -103,17 +63,13 @@ func NewDefaultDecimal(v int64) *Decimal {
 
 // v 是乘10的p次方后的值，也就是需要往前点p个小数点才是真正的值
 func NewDecimalWithScale(v int64, p int) *Decimal {
-	if p > MAX_PRECISION {
-		p = MAX_PRECISION
-	}
+	mustDecimalPrecision(p)
 	return &Decimal{Precision: p, Value: new(big.Int).SetInt64(v)}
 }
 
 // v是整数部分的值，小数点不动 （跟NewDecimalFromString类似）
 func NewDecimal(v int64, p int) *Decimal {
-	if p > MAX_PRECISION {
-		Log.Panic("too big precision")
-	}
+	mustDecimalPrecision(p)
 	value := big.NewInt(v)
 	if p != 0 {
 		value = new(big.Int).Mul(value, precisionFactor[p])
@@ -124,9 +80,7 @@ func NewDecimal(v int64, p int) *Decimal {
 
 // v是整数部分的值，小数点不动 （跟NewDecimalFromString类似）
 func NewDecimalMaxUint64(p int) *Decimal {
-	if p > MAX_PRECISION {
-		Log.Panic("too big precision")
-	}
+	mustDecimalPrecision(p)
 	value := new(big.Int).SetUint64(math.MaxUint64)
 	if p != 0 {
 		value = new(big.Int).Mul(value, precisionFactor[p])
@@ -137,8 +91,11 @@ func NewDecimalMaxUint64(p int) *Decimal {
 
 // NewDecimalFromString creates a Decimal instance from a string
 func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
-	if s == "" {
-		return nil, errors.New("empty string")
+	if len(s) == 0 || len(s) > MaxProtocolDecimalTextLength {
+		return nil, fmt.Errorf("invalid decimal text length %d", len(s))
+	}
+	if err := ValidateDecimalPrecision(maxPrecision); err != nil {
+		return nil, err
 	}
 
 	parts := strings.Split(s, ".")
@@ -153,6 +110,10 @@ func NewDecimalFromString(s string, maxPrecision int) (*Decimal, error) {
 	var neg bool
 	if integerPartStr[0] == '-' {
 		neg = true
+	}
+	integerDigits := strings.TrimPrefix(strings.TrimPrefix(integerPartStr, "-"), "+")
+	if len(integerDigits) > MaxProtocolDecimalIntegerDigits {
+		return nil, fmt.Errorf("decimal integer exceeds %d digits", MaxProtocolDecimalIntegerDigits)
 	}
 
 	// SetString("-0", 10) 结果跟 SetString("0", 10) 一样，需要特殊处理
@@ -206,11 +167,12 @@ func (d *Decimal) Clone() *Decimal {
 
 // String returns the string representation of a Decimal instance
 func (d *Decimal) String() string {
-	if d == nil {
+	if d == nil || d.Value == nil {
 		return "0"
 	}
+	scale := DecimalScale(d.Precision)
 	value := new(big.Int).Abs(d.Value)
-	quotient, remainder := new(big.Int).QuoRem(value, precisionFactor[d.Precision], new(big.Int))
+	quotient, remainder := new(big.Int).QuoRem(value, scale, new(big.Int))
 	sign := ""
 	if d.Value.Sign() < 0 {
 		sign = "-"
@@ -224,6 +186,9 @@ func (d *Decimal) String() string {
 }
 
 func NewDecimalFromFormatString(s string) (*Decimal, error) {
+	if len(s) == 0 || len(s) > MaxProtocolDecimalTextLength {
+		return nil, fmt.Errorf("invalid decimal text length %d", len(s))
+	}
 	parts := strings.Split(s, ":")
 	switch len(parts) {
 	case 1:
@@ -231,6 +196,9 @@ func NewDecimalFromFormatString(s string) (*Decimal, error) {
 	case 2:
 		precision, err := strconv.Atoi(parts[1])
 		if err != nil {
+			return nil, err
+		}
+		if err := ValidateDecimalPrecision(precision); err != nil {
 			return nil, err
 		}
 		return NewDecimalFromString(parts[0], precision)
@@ -248,6 +216,9 @@ func (d *Decimal) ToFormatString() string {
 
 // 实现自定义 JSON 序列化逻辑
 func (d *Decimal) MarshalJSON() ([]byte, error) {
+	if err := d.Validate(); err != nil {
+		return nil, err
+	}
 	return json.Marshal(map[string]interface{}{
 		"Precision": d.Precision,
 		"Value":     d.Value.String(),
@@ -264,6 +235,9 @@ func (d *Decimal) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &tmp); err != nil {
 		return err
 	}
+	if len(tmp.Value) == 0 || len(tmp.Value) > MaxProtocolDecimalTextLength {
+		return fmt.Errorf("invalid decimal value length %d", len(tmp.Value))
+	}
 
 	n := new(big.Int)
 	n, ok := n.SetString(tmp.Value, 10)
@@ -271,6 +245,9 @@ func (d *Decimal) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid value %s", tmp.Value)
 	}
 
+	if err := ValidateDecimalPrecision(tmp.Precision); err != nil {
+		return err
+	}
 	d.Precision = tmp.Precision
 	d.Value = n
 	return nil
@@ -294,6 +271,8 @@ func (d *Decimal) NewPrecision(precision int) *Decimal {
 	if d == nil {
 		return nil
 	}
+	mustDecimalPrecision(d.Precision)
+	mustDecimalPrecision(precision)
 	if d.Precision == precision {
 		return d.Clone()
 	}
@@ -312,6 +291,8 @@ func (d *Decimal) SetPrecision(precision int) *Decimal {
 	if d == nil {
 		return nil
 	}
+	mustDecimalPrecision(d.Precision)
+	mustDecimalPrecision(precision)
 	if d.Precision == precision {
 		return d
 	}
@@ -330,6 +311,8 @@ func (d *Decimal) SetPrecision(precision int) *Decimal {
 
 // 精度调整，同时四舍五入
 func (d *Decimal) SetPrecisionWithRound(targetPrecision int) Decimal {
+	mustDecimalPrecision(d.Precision)
+	mustDecimalPrecision(targetPrecision)
 	if d.Precision == targetPrecision {
 		return Decimal{
 			Precision: targetPrecision,
@@ -573,6 +556,12 @@ func (d *Decimal) MulV2(other *Decimal) *Decimal {
 	if d == nil || other == nil {
 		return nil
 	}
+	mustDecimalPrecision(d.Precision)
+	mustDecimalPrecision(other.Precision)
+	if d.Precision > MAX_PRECISION-other.Precision {
+		panic(fmt.Errorf("decimal multiplication precision %d exceeds maximum %d",
+			d.Precision+other.Precision, MAX_PRECISION))
+	}
 	value := new(big.Int).Mul(d.Value, other.Value)
 	precision := d.Precision + other.Precision
 	return &Decimal{Precision: precision, Value: value}
@@ -756,26 +745,53 @@ func (d *Decimal) UInt64() uint64 {
 
 // 向上取整
 func (d *Decimal) Ceil() int64 {
-	if d == nil {
-		return 0
-	}
-	if d.Precision == 0 {
-		return d.Value.Int64()
-	}
-
-	return int64(math.Ceil(d.Float64()))
+	value, _ := d.CeilInt64()
+	return value
 }
 
 // 向下取整
 func (d *Decimal) Floor() int64 {
-	if d == nil {
-		return 0
-	}
-	if d.Precision == 0 {
-		return d.Value.Int64()
-	}
+	value, _ := d.FloorInt64()
+	return value
+}
 
-	return int64(math.Floor(d.Float64()))
+func (d *Decimal) CeilInt64() (int64, error) {
+	q, r, err := d.integerQuotientAndRemainder()
+	if err != nil {
+		return 0, err
+	}
+	if r.Sign() != 0 && d.Value.Sign() > 0 {
+		q.Add(q, big.NewInt(1))
+	}
+	if !q.IsInt64() {
+		return 0, errors.New("decimal ceil overflows int64")
+	}
+	return q.Int64(), nil
+}
+
+func (d *Decimal) FloorInt64() (int64, error) {
+	q, r, err := d.integerQuotientAndRemainder()
+	if err != nil {
+		return 0, err
+	}
+	if r.Sign() != 0 && d.Value.Sign() < 0 {
+		q.Sub(q, big.NewInt(1))
+	}
+	if !q.IsInt64() {
+		return 0, errors.New("decimal floor overflows int64")
+	}
+	return q.Int64(), nil
+}
+
+func (d *Decimal) integerQuotientAndRemainder() (*big.Int, *big.Int, error) {
+	if d == nil || d.Value == nil {
+		return nil, nil, errors.New("invalid nil decimal")
+	}
+	scale := DecimalScale(d.Precision)
+	q := new(big.Int)
+	r := new(big.Int)
+	q.QuoRem(d.Value, scale, r)
+	return q, r, nil
 }
 
 // 4舍5入

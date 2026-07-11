@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"lukechampine.com/uint128"
@@ -158,6 +159,91 @@ func TestDecimalPreservesOriginalAddBehaviorAndProvidesAlignedAdd(t *testing.T) 
 	if got, want := alignedDiff.ToFormatString(), "90.917131312199321968:18"; got != want {
 		t.Fatalf("unexpected aligned diff: got %s want %s", got, want)
 	}
+}
+
+func TestDecimalRejectsInvalidProtocolPrecision(t *testing.T) {
+	for _, input := range []string{"1:64", "1:-1", "1:999999"} {
+		if _, err := NewDecimalFromFormatString(input); err == nil {
+			t.Fatalf("expected %q to be rejected", input)
+		}
+	}
+	if _, err := NewDecimalFromString("1."+strings.Repeat("0", 64), 64); err == nil {
+		t.Fatal("expected 64 fractional digits to be rejected")
+	}
+}
+
+func TestDecimalInvariantPrecisionOverflowPanics(t *testing.T) {
+	tests := map[string]func(){
+		"scaled constructor": func() { _ = NewDecimalWithScale(1, MAX_PRECISION+1) },
+		"constructor":        func() { _ = NewDecimal(1, MAX_PRECISION+1) },
+		"new precision":      func() { _ = NewDefaultDecimal(1).NewPrecision(MAX_PRECISION + 1) },
+		"string": func() {
+			d := NewDefaultDecimal(1)
+			d.Precision = MAX_PRECISION + 1
+			_ = d.String()
+		},
+	}
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("expected precision invariant violation to panic")
+				}
+			}()
+			call()
+		})
+	}
+}
+
+func TestDecimalMulV2PrecisionOverflowPanics(t *testing.T) {
+	left, err := NewDecimalFromFormatString("1:40")
+	if err != nil {
+		t.Fatal(err)
+	}
+	right, err := NewDecimalFromFormatString("1:40")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected precision overflow to panic")
+		}
+	}()
+	_ = left.MulV2(right)
+}
+
+func TestDecimalExactCeilFloor(t *testing.T) {
+	tests := []struct {
+		input string
+		ceil  int64
+		floor int64
+	}{
+		{input: "1000000000000000.01:2", ceil: 1000000000000001, floor: 1000000000000000},
+		{input: "-1000000000000000.01:2", ceil: -1000000000000000, floor: -1000000000000001},
+	}
+	for _, test := range tests {
+		d, err := NewDecimalFromFormatString(test.input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ceil, err := d.CeilInt64()
+		if err != nil || ceil != test.ceil {
+			t.Fatalf("ceil(%s): got %d err %v want %d", test.input, ceil, err, test.ceil)
+		}
+		floor, err := d.FloorInt64()
+		if err != nil || floor != test.floor {
+			t.Fatalf("floor(%s): got %d err %v want %d", test.input, floor, err, test.floor)
+		}
+	}
+}
+
+func FuzzDecimalFormatParserNeverPanics(f *testing.F) {
+	for _, seed := range []string{"1:64", "1:-1", "1:999999", "1:63", "0.01:2"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, input string) {
+		_, _ = NewDecimalFromFormatString(input)
+	})
 }
 
 func TestDecimalPrecision(t *testing.T) {
