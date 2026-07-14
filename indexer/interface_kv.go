@@ -3,12 +3,21 @@ package indexer
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
+
+const (
+	maxKVKeysPerPubKey = 128
+	maxKVValueBytes    = 200 * 1024
+	maxKVRequestBytes  = 2 * 1024 * 1024
+)
+
+var errKVKeyLimitReached = errors.New("KV key limit reached")
 
 type RegisterPubKeyInfo struct {
 	PubKey      []byte
@@ -53,10 +62,19 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	return value.RefreshTime-time.Now().Unix() < 7*24*int64(time.Hour.Seconds())
 }
 
-// TODO 每个地址限制多少条记录，每条记录限制多大？
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 	b.rpcEnter()
 	defer b.rpcLeft()
+	b.kvMutex.Lock()
+	defer b.kvMutex.Unlock()
+
+	keysByPubKey, err := validateKVWriteRequest(kvs)
+	if err != nil {
+		return err
+	}
+	if err := b.ensureKVKeyQuota(keysByPubKey); err != nil {
+		return err
+	}
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Close()
@@ -73,7 +91,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 			checkedPubKey[pkStr] = true
 		}
 
-		if len(value.Value) > 200*1024 {
+		if len(value.Value) > maxKVValueBytes {
 			return fmt.Errorf("too large data %d", len(value.Value))
 		}
 
@@ -102,7 +120,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 		common.Log.Infof("keyValue saved. %s", key)
 	}
 
-	err := wb.Flush()
+	err = wb.Flush()
 	if err != nil {
 		common.Log.Errorf("flushing writes to db %v", err)
 		return err
@@ -114,6 +132,15 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
 	b.rpcEnter()
 	defer b.rpcLeft()
+	b.kvMutex.Lock()
+	defer b.kvMutex.Unlock()
+
+	if len(keys) > maxKVKeysPerPubKey {
+		return fmt.Errorf("too many keys in one request: %d (max %d)", len(keys), maxKVKeysPerPubKey)
+	}
+	if kvKeyRequestSize(keys) > maxKVRequestBytes {
+		return fmt.Errorf("delete request too large (max %d bytes)", maxKVRequestBytes)
+	}
 
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Close()
@@ -137,6 +164,101 @@ func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
 	}
 
 	return nil
+}
+
+func validateKVWriteRequest(kvs []*common.KeyValue) (map[string]map[string]struct{}, error) {
+	if len(kvs) == 0 {
+		return nil, fmt.Errorf("empty KV request")
+	}
+	if len(kvs) > maxKVKeysPerPubKey {
+		return nil, fmt.Errorf("too many values in one request: %d (max %d)", len(kvs), maxKVKeysPerPubKey)
+	}
+
+	keysByPubKey := make(map[string]map[string]struct{})
+	totalBytes := 0
+	for _, value := range kvs {
+		if value == nil {
+			return nil, fmt.Errorf("nil KV value")
+		}
+		if len(value.Value) > maxKVValueBytes {
+			return nil, fmt.Errorf("too large data %d", len(value.Value))
+		}
+
+		totalBytes += len(value.Key) + len(value.Value) + len(value.PubKey) + len(value.Signature)
+		if totalBytes > maxKVRequestBytes {
+			return nil, fmt.Errorf("KV request too large (max %d bytes)", maxKVRequestBytes)
+		}
+
+		pkStr := hex.EncodeToString(value.PubKey)
+		if _, ok := keysByPubKey[pkStr]; !ok {
+			keysByPubKey[pkStr] = make(map[string]struct{})
+		}
+		keysByPubKey[pkStr][value.Key] = struct{}{}
+	}
+
+	for pubkey, keys := range keysByPubKey {
+		if len(keys) > maxKVKeysPerPubKey {
+			return nil, fmt.Errorf("too many distinct keys for pubkey %s: %d (max %d)", pubkey, len(keys), maxKVKeysPerPubKey)
+		}
+	}
+	return keysByPubKey, nil
+}
+
+func (b *IndexerMgr) ensureKVKeyQuota(keysByPubKey map[string]map[string]struct{}) error {
+	for pubkey, keys := range keysByPubKey {
+		existingKeys, err := b.countKVKeys(pubkey)
+		if err != nil {
+			return err
+		}
+
+		newKeys := 0
+		for key := range keys {
+			_, err := b.kvDB.Read([]byte(getKvKey(pubkey, key)))
+			if err == nil {
+				continue
+			}
+			if !errors.Is(err, common.ErrKeyNotFound) {
+				return fmt.Errorf("checking existing KV key failed: %w", err)
+			}
+			newKeys++
+		}
+
+		// Legacy data may predate this limit.  Allow it to be updated or
+		// deleted, but never permit another key to be added.
+		if existingKeys > maxKVKeysPerPubKey && newKeys == 0 {
+			continue
+		}
+		if existingKeys+newKeys > maxKVKeysPerPubKey {
+			return fmt.Errorf("KV key limit exceeded for pubkey %s: %d existing, %d new, max %d", pubkey, existingKeys, newKeys, maxKVKeysPerPubKey)
+		}
+	}
+	return nil
+}
+
+func (b *IndexerMgr) countKVKeys(pubkey string) (int, error) {
+	count := 0
+	err := b.kvDB.BatchRead([]byte(getKvKey(pubkey, "")), false, func(_, _ []byte) error {
+		count++
+		if count > maxKVKeysPerPubKey {
+			return errKVKeyLimitReached
+		}
+		return nil
+	})
+	if errors.Is(err, errKVKeyLimitReached) {
+		return count, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("counting KV keys failed: %w", err)
+	}
+	return count, nil
+}
+
+func kvKeyRequestSize(keys []string) int {
+	total := 0
+	for _, key := range keys {
+		total += len(key)
+	}
+	return total
 }
 
 func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error) {

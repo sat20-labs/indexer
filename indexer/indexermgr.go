@@ -79,8 +79,9 @@ type IndexerMgr struct {
 	nftBackupDB    *nft.NftIndexer
 
 	/////////////////////////////////
-	mutex sync.RWMutex                           // 保护下面的数据
-	clmap map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
+	mutex   sync.RWMutex                           // 保护下面的数据
+	kvMutex sync.Mutex                             // 串行化 KV 配额检查及写入
+	clmap   map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
 	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer

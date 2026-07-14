@@ -139,17 +139,17 @@ DB 抽象在 `common/db_interface.go`，实现集中在 `indexer/db`。当前 `N
 - `brc20`
 - `runes`
 - `local`
-- `dkvs`
+- `dkvs`（历史目录名；承载当前 KV API 的 Pebble 数据）
 
 Pebble 参数偏向大索引编译：32GB cache、较大 memtable、Bloom filter、单线程 compaction。注释里明确区分编译期和服务期参数，但当前打开默认走 `buildOptions()`。
 
-## Mempool / MPN / DKVS
+## Mempool / MPN
 
 `indexer/mempool.go` 是轻量 mempool 跟踪，用 bitcoind mempool 数据维护未确认花费、锁定 UTXO 等状态，供 v3 API 构造交易时过滤。
 
 `indexer/mpn` 是更完整的 P2P/mempool node，很多代码来自 btcd 的 peer/connmgr/netsync/mempool/addrmgr 体系。但按当前项目状态，它没有实际接入运行主流程：`IndexerMgr.StartDaemon` 里启动 MPN 的代码被注释掉，现阶段主流程只应按 `MiniMemPool` 理解。
 
-`dkvs/` 是基于 libp2p Kademlia DHT 的分布式 KV 能力。但按当前项目状态，这个目录中的代码也没有实际作为 indexer 主流程依赖使用。`indexer/interface_kv.go` 和 `rpcserver/ordx/handler_kv.go` 暴露了 KV 注册、put/get/del 一类 API 形状，但不要把 `indexer/dkvs` 当作当前运行时问题排查入口，除非任务明确要求研究这块。
+原先基于 libp2p Kademlia DHT 的 `dkvs/` 实现已删除，且不属于 indexer 运行主流程。当前 KV 注册、put/get/del API 由 `indexer/interface_kv.go` 与 `rpcserver/ordx/handler_kv.go` 直接处理；其 Pebble 数据目录仍沿用历史名称 `dkvs`，不要将该目录误认为 DHT 模块。
 
 ## 关键数据流
 
@@ -173,7 +173,7 @@ bitcoind RPC
 - `IndexerMgr` 是单例，测试或工具代码多次调用 `NewIndexerMgr` 会拿到同一个实例。
 - `cmd/main.go` 不是服务入口，改启动流程要看根 `main.go`。
 - `processOrdProtocol` 的模块顺序不要随意调整。
-- `indexer/mpn` 和 `indexer/dkvs` 当前不是实际使用的主流程代码，不要把它们误判成运行依赖。
+- `indexer/mpn` 当前不是实际使用的主流程代码，不要把它误判成运行依赖；`dkvs` 仅是现有 KV 数据目录的历史名称。
 - DB 落库有延迟和 clone/subtract 机制，修状态写入时要同时考虑实时实例、备份实例、Subtract 后的残留。
 - `rpcEnter` / `rpcLeft` 和 `reloading` / `rpcProcessing` 用来避免 reorg 重载与 RPC 查询并发冲突。
 - 多个模块用 protobuf/gob/msgpack 混合序列化，改 DB value 类型时要找到对应 `db.go` / `dbkey.go` / `update.go`。

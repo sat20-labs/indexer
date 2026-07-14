@@ -30,7 +30,7 @@ go test ./... -run '^$' -vet=off
 ```
 
 Plain `go test ./... -run '^$'` currently fails before this package because of
-pre-existing vet format issues in `dkvs`, `indexer/mpn`, and `indexer/nft`.
+pre-existing vet format issues in `indexer/mpn` and `indexer/nft`.
 
 External reconciliation should compare our ticker and UTXO state against an
 Atomicals ElectrumX proxy. The mainnet proxy provided during implementation is:
