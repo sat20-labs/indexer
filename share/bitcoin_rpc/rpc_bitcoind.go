@@ -133,6 +133,20 @@ func (p *BitcoindRPC) GetRawTx(txid string) (string, error) {
 	return ret, nil
 }
 
+func (p *BitcoindRPC) GetTxOut(txid string, vout uint32, includeMempool bool) (*bitcoind.UTransactionOut, error) {
+	out, err := p.bitcoind.GetTxOut(txid, vout, includeMempool)
+	if err != nil {
+		return nil, err
+	}
+	// Bitcoin Core returns JSON null for a missing or spent output. The
+	// go-bitcoind dependency unmarshals null into a zero value, so distinguish
+	// it by fields that are always present for a real gettxout result.
+	if out.Bestblock == "" && out.ScriptPubKey.Hex == "" {
+		return nil, nil
+	}
+	return &out, nil
+}
+
 func (p *BitcoindRPC) GetBlockCount() (uint64, error) {
 	if height, ok, err := debugBlockCount(); ok {
 		return height, err

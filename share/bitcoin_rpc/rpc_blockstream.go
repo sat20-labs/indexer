@@ -2,6 +2,7 @@ package bitcoin_rpc
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/OLProtocol/go-bitcoind"
 	"github.com/sat20-labs/indexer/common"
@@ -40,7 +41,6 @@ func (p *RESTClient) GetUrl(path string) *URL {
 	}
 }
 
-
 type BlockStreamClient struct {
 	*RESTClient
 }
@@ -49,7 +49,6 @@ func NewBlockStreamClient(scheme, host, proxy string, http HttpClient) *BlockStr
 	client := NewRESTClient(scheme, host, proxy, http)
 	return &BlockStreamClient{client}
 }
-
 
 func (p *BlockStreamClient) TestTx(signedTxHex string) (*bitcoind.TransactionTestResult, error) {
 	return nil, nil
@@ -76,6 +75,10 @@ func (p *BlockStreamClient) GetRawTx(txId string) (string, error) {
 	return hex.EncodeToString(rsp), nil
 }
 
+func (p *BlockStreamClient) GetTxOut(txid string, vout uint32, includeMempool bool) (*bitcoind.UTransactionOut, error) {
+	return nil, fmt.Errorf("gettxout is not implemented by the blockstream adapter")
+}
+
 func (p *BlockStreamClient) GetBlockCount() (uint64, error) {
 	return 0, nil
 }
@@ -96,17 +99,16 @@ func (p *BlockStreamClient) GetBlockHeader(blockhash string) (*bitcoind.BlockHea
 	return nil, nil
 }
 
-
 // TODO 需要本地维护一个mempool，加快查询速度
 func (p *BlockStreamClient) GetMemPool() ([]string, error) {
 	return nil, nil
 }
 
-func (p *BlockStreamClient) GetMemPoolEntry(txId string)  (*bitcoind.MemPoolEntry, error) {
+func (p *BlockStreamClient) GetMemPoolEntry(txId string) (*bitcoind.MemPoolEntry, error) {
 	return nil, nil
 }
 
 func (p *BlockStreamClient) EstimateSmartFeeWithMode(minconf int, mode string) (*bitcoind.EstimateSmartFeeResult, error) {
-	
+
 	return nil, nil
 }

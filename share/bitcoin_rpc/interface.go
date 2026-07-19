@@ -8,7 +8,8 @@ type BitcoinRPC interface {
 
 	GetTx(txid string) (*bitcoind.RawTransaction, error)
 	GetRawTx(txid string) (string, error)
-	
+	GetTxOut(txid string, vout uint32, includeMempool bool) (*bitcoind.UTransactionOut, error)
+
 	GetBlockCount() (uint64, error)
 	GetBestBlockHash() (string, error)
 	GetBlockHash(height uint64) (string, error)

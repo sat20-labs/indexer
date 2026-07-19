@@ -52,6 +52,16 @@ func (s *Service) BTCLuckyTemplateService() *btclucky.TemplateService {
 }
 
 func (s *Service) InitRouter(r *gin.Engine, basePath string) {
+	r.POST(basePath+"/v3/bitcoin/utxos/by-scripts", s.getBitcoinUTXOsByScripts)
+	r.POST(basePath+"/v3/bitcoin/utxos/status", s.getBitcoinUTXOStatuses)
+	r.POST(basePath+"/v3/bitcoin/tx/status/batch", s.getBitcoinTxStatuses)
+	r.POST(basePath+"/v3/bitcoin/rawtx/batch", s.getBitcoinRawTxs)
+	r.POST(basePath+"/v3/bitcoin/outspends/batch", s.getBitcoinOutspends)
+	r.POST(basePath+"/v3/bitcoin/tx/broadcast", s.broadcastBitcoinTx)
+	r.GET(basePath+"/v3/bitcoin/tip", s.getBitcoinTip)
+	r.GET(basePath+"/v3/bitcoin/block-header/:height", s.getBitcoinBlockHeader)
+	r.GET(basePath+"/v3/bitcoin/fee-rate", s.getBitcoinFeeRate)
+
 	//broadcast raw tx => blockstream api: POST /tx
 	r.POST(basePath+"/btc/tx", s.sendRawTx)
 	r.POST(basePath+"/btc/txs", s.sendRawTxs)
