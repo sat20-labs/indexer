@@ -3,6 +3,7 @@ package indexer
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sat20-labs/indexer/common"
 )
@@ -45,5 +46,21 @@ func TestValidateKVWriteRequestLimitsDataSize(t *testing.T) {
 	}
 	if _, err := validateKVWriteRequest(values); err == nil {
 		t.Fatal("expected an oversized aggregate request to be rejected")
+	}
+}
+
+func TestRegistrationFreshUsesForwardAge(t *testing.T) {
+	now := time.Unix(1_000_000, 0).Unix()
+	inside := now - int64(supportedKeyGracePeriod.Seconds()) + 1
+	expired := now - int64(supportedKeyGracePeriod.Seconds())
+
+	if !isRegistrationFresh(inside, now) {
+		t.Fatal("registration inside grace period should be fresh")
+	}
+	if isRegistrationFresh(expired, now) {
+		t.Fatal("registration at grace-period boundary should be expired")
+	}
+	if isRegistrationFresh(now+1, now) {
+		t.Fatal("future registration timestamp should not be accepted")
 	}
 }

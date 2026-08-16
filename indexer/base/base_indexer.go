@@ -25,6 +25,7 @@ type AddressStatus struct {
 
 type BlockProcCallback func(*common.Block, []*common.Range)
 type UpdateDBCallback func(wantToDelete map[string]uint64)
+type PostUpdateDBCallback func()
 
 type BaseIndexer struct {
 	db    common.KVDB
@@ -54,8 +55,9 @@ type BaseIndexer struct {
 	chaincfgParam    *chaincfg.Params
 	maxIndexHeight   int
 
-	blockprocCB BlockProcCallback
-	updateDBCB  UpdateDBCallback
+	blockprocCB    BlockProcCallback
+	updateDBCB     UpdateDBCallback
+	postUpdateDBCB PostUpdateDBCallback
 }
 
 const BLOCK_PREFETCH = 12
@@ -110,6 +112,10 @@ func (b *BaseIndexer) Init() {
 
 func (b *BaseIndexer) SetUpdateDBCallback(cb2 UpdateDBCallback) {
 	b.updateDBCB = cb2
+}
+
+func (b *BaseIndexer) SetPostUpdateDBCallback(cb PostUpdateDBCallback) {
+	b.postUpdateDBCB = cb
 }
 
 func (b *BaseIndexer) SetBlockCallback(cb1 BlockProcCallback) {
@@ -255,6 +261,9 @@ func (b *BaseIndexer) forceUpdateDB() {
 		// }
 
 		b.CleanEmptyAddress(org, wantToDelete)
+		if b.postUpdateDBCB != nil {
+			b.postUpdateDBCB()
+		}
 
 		common.Log.Infof("forceUpdateDB sync to height %d", b.stats.SyncHeight)
 	} //else {

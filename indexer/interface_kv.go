@@ -19,6 +19,13 @@ const (
 
 var errKVKeyLimitReached = errors.New("KV key limit reached")
 
+const supportedKeyGracePeriod = 7 * 24 * time.Hour
+
+func isRegistrationFresh(refreshTime, now int64) bool {
+	age := now - refreshTime
+	return age >= 0 && age < int64(supportedKeyGracePeriod.Seconds())
+}
+
 type RegisterPubKeyInfo struct {
 	PubKey      []byte
 	ChannelAddr string
@@ -37,9 +44,16 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 	b.rpcEnter()
 	defer b.rpcLeft()
 
+	return b.isSupportedKey(pubkey)
+}
+
+// isSupportedKey is the internal form for callers that already hold an RPC
+// admission token. Keeping the gate at the public boundary avoids nested
+// rpcEnter deadlocks during DB reload admission changes.
+func (b *IndexerMgr) isSupportedKey(pubkey []byte) bool {
 	// TODO 以后可以配置增加更多的pubkey，或者注册的地址
 	pkStr := hex.EncodeToString(pubkey)
-	if pkStr == common.GetBootstrapPubKey() && pkStr == common.GetCoreNodePubKey() {
+	if pkStr == common.GetBootstrapPubKey() || pkStr == common.GetCoreNodePubKey() {
 		return true
 	}
 
@@ -52,14 +66,16 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 		common.Log.Infof("GobGetDB %s failed, %v", key, err)
 		return false
 	}
-	// 是否检查超时时，或者检查通道地址上是否有资产？
+	// Preserve the original authorization semantics. GetAssetSummaryInAddress
+	// now uses internal name-index helpers, so it is safe to call while the
+	// outer RPC admission token is held.
 	assets := b.GetAssetSummaryInAddress(value.ChannelAddr)
 	if len(assets) != 0 {
 		return true
 	}
 
 	// 如果没有资产，是否超时？
-	return value.RefreshTime-time.Now().Unix() < 7*24*int64(time.Hour.Seconds())
+	return isRegistrationFresh(value.RefreshTime, time.Now().Unix())
 }
 
 func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
@@ -84,7 +100,7 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 		pkStr := hex.EncodeToString(value.PubKey)
 		_, ok := checkedPubKey[pkStr]
 		if !ok {
-			if !b.IsSupportedKey(value.PubKey) {
+			if !b.isSupportedKey(value.PubKey) {
 				common.Log.Errorf("unsupport pubkey")
 				return fmt.Errorf("unsupport pubkey")
 			}

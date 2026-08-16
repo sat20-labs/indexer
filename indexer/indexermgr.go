@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -67,6 +68,8 @@ type IndexerMgr struct {
 
 	// 跑数据
 	lastCheckHeight int
+	lastDBGCAttempt time.Time
+	lastDBGC        time.Time
 	base            *base_indexer.BaseIndexer
 	// 备份所有需要写入数据库的数据
 	baseBackupDB   *base_indexer.BaseIndexer
@@ -95,6 +98,8 @@ type IndexerMgr struct {
 	lastBTCLuckyTipHash  string
 	/////////////////////////////////
 }
+
+const dbGCInterval = time.Hour
 
 var instance *IndexerMgr
 
@@ -205,6 +210,9 @@ func (b *IndexerMgr) Init() {
 	b.base = base_indexer.NewBaseIndexer(b.baseDB, b.chaincfgParam, b.maxIndexHeight, b.periodFlushToDB)
 	b.base.Init()
 	b.base.SetUpdateDBCallback(b.forceUpdateDB)
+	b.base.SetPostUpdateDBCallback(func() {
+		b.runDBGC(time.Now(), false)
+	})
 	b.base.SetBlockCallback(b.processOrdProtocol)
 	b.lastCheckHeight = b.base.GetSyncHeight()
 	b.initCollections()
@@ -319,6 +327,10 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						if b.maxIndexHeight > 0 {
 							if b.maxIndexHeight <= b.base.GetHeight() {
 								b.updateDB()
+								// checkSelf closes the index databases as it verifies them, so
+								// finish Badger GC after the final buffered commit and before
+								// the self-check starts.
+								b.runDBGC(time.Now(), true)
 								if !b.notCheckSelf {
 									b.checkSelf()
 								}
@@ -327,7 +339,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 							}
 						}
 
-						b.dbgc()
+						b.runDBGC(time.Now(), false)
 						// 每周定期检查数据 （目前主网一次检查需要半个小时-1个小时，需要考虑这个影响）
 						// if b.lastCheckHeight != b.compiling.GetSyncHeight() {
 						// 	period := 1000
@@ -395,29 +407,65 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	b.miniMempool.Stop()
 	// mpn.StopMPN(mpnode)
 
-	// close all
-	b.closeDB()
+	// Close/reload operations use the same admission barrier as buffered DB
+	// commits. Stop has already drained all mempool-owned workers.
+	b.withIndexerStateWriteBarrier("shutdown", b.closeDB)
 
 	common.Log.Info("IndexerMgr exited.")
 }
 
-func (b *IndexerMgr) dbgc() {
-	db.RunDBGC(b.kvDB)
-	db.RunDBGC(b.localDB)
-	db.RunDBGC(b.baseDB)
-	db.RunDBGC(b.nftDB)
-	db.RunDBGC(b.nsDB)
-	db.RunDBGC(b.exoticDB)
-	db.RunDBGC(b.ftDB)
-	db.RunDBGC(b.brc20DB)
-	db.RunDBGC(b.runesDB)
-	db.RunDBGC(b.atomDB)
-	common.Log.Infof("dbgc completed")
+func (b *IndexerMgr) dbgc() (ran bool, success bool) {
+	databases := []common.KVDB{
+		b.kvDB,
+		b.localDB,
+		b.baseDB,
+		b.nftDB,
+		b.nsDB,
+		b.exoticDB,
+		b.ftDB,
+		b.brc20DB,
+		b.runesDB,
+		b.atomDB,
+	}
+	failures := 0
+	for _, database := range databases {
+		err := db.RunDBGC(database)
+		if errors.Is(err, db.ErrGCUnsupported) {
+			continue
+		}
+		ran = true
+		if err != nil {
+			failures++
+			common.Log.Errorf("dbgc failed: %v", err)
+		}
+	}
+	if !ran {
+		common.Log.Debugf("dbgc skipped: active database backend has no online GC")
+		return false, true
+	}
+	if failures == 0 {
+		common.Log.Infof("dbgc completed")
+		return true, true
+	}
+	common.Log.Errorf("dbgc completed with %d failures", failures)
+	return true, false
+}
+
+func (b *IndexerMgr) runDBGC(now time.Time, force bool) {
+	if !force && !b.lastDBGCAttempt.IsZero() && now.Sub(b.lastDBGCAttempt) < dbGCInterval {
+		return
+	}
+	b.lastDBGCAttempt = now
+	// The active Pebble backend intentionally reports unsupported. Only a
+	// backend that actually ran GC advances lastDBGC.
+	if ran, success := b.dbgc(); ran && success {
+		b.lastDBGC = now
+	}
 }
 
 func (b *IndexerMgr) closeDB() {
 	common.Log.Infof("IndexerMgr->closeDB ")
-	b.dbgc()
+	_, _ = b.dbgc()
 
 	if b.atomDB != nil {
 		b.atomDB.Close()
@@ -550,40 +598,22 @@ func (b *IndexerMgr) forceUpdateDB(wantToDelete map[string]uint64) {
 
 func (b *IndexerMgr) handleReorg(height int) {
 	common.Log.Infof("IndexerMgr handleReorg enter...")
-	// 需要等rpc都完成，再重新启动
-	atomic.AddInt32(&b.reloading, 1)
-	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
-		time.Sleep(10 * time.Millisecond)
-	}
-	atomic.AddInt32(&b.reloading, 1)
-	defer func() {
-		atomic.AddInt32(&b.reloading, -2)
-	}()
-
-	// 要确保下面的调用，没有rpc的调用
 	b.miniMempool.Stop()
-	b.closeDB()
-	b.Init() // 数据库重新打开
-	b.miniMempool.ProcessReorg()
-	b.base.SetReorgHeight(height)
-
+	b.withIndexerStateWriteBarrier("reorg", func() {
+		b.closeDB()
+		b.Init()
+		b.base.SetReorgHeight(height)
+	})
 	common.Log.Infof("IndexerMgr handleReorg completed.")
 }
 
 func (b *IndexerMgr) handleHistoricalReload(height int) {
 	common.Log.Infof("IndexerMgr handleHistoricalReload enter from height %d...", height)
-	atomic.AddInt32(&b.reloading, 1)
-	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
-		time.Sleep(10 * time.Millisecond)
-	}
-	atomic.AddInt32(&b.reloading, 1)
-	defer func() {
-		atomic.AddInt32(&b.reloading, -2)
-	}()
-
-	b.closeDB()
-	b.Init()
-
+	b.miniMempool.Stop()
+	b.withIndexerStateWriteBarrier("historical reload", func() {
+		b.closeDB()
+		b.Init()
+	})
 	common.Log.Infof("IndexerMgr handleHistoricalReload completed.")
 }
 
@@ -621,7 +651,7 @@ func (b *IndexerMgr) updateDB() {
 		common.Log.Infof("performUpdateDBInBuffer nothing to do at height %d-%d", complingHeight, syncHeight)
 	} else {
 		if b.baseBackupDB == nil {
-			b.prepareDBBuffer()
+			b.withDBBufferReaderBarrier(b.prepareDBBuffer)
 		}
 		// 这个区间不备份数据
 		if gap < 2*blocksInHistory {
@@ -634,14 +664,49 @@ func (b *IndexerMgr) updateDB() {
 
 		// 到达高度时，将备份的数据写入数据库中。
 		common.Log.Infof("performUpdateDBInBuffer performUpdateDBInBuffer at height %d-%d", complingHeight, syncHeight)
-		b.performUpdateDBInBuffer()
+		b.withDBBufferReaderBarrier(func() {
+			b.performUpdateDBInBuffer()
 
-		// 备份当前高度的数据
-		b.prepareDBBuffer()
+			// 备份当前高度的数据
+			b.prepareDBBuffer()
+		})
 	}
 	if writeAtomSnapshot {
 		b.writeAtomDebugSnapshot()
 	}
+}
+
+// withDBBufferReaderBarrier preserves the existing call-site name while all
+// index state mutations share one lock ordering.
+func (b *IndexerMgr) withDBBufferReaderBarrier(update func()) {
+	b.withIndexerStateWriteBarrier("DB buffer", update)
+}
+
+// withIndexerStateWriteBarrier makes commits, reloads and shutdown one state
+// transition from readers' point of view. The writer must drain/pause mempool
+// readers before closing RPC admission: a mempool reader may enter rpcEnter
+// while holding its read lock, so the reverse order would deadlock.
+func (b *IndexerMgr) withIndexerStateWriteBarrier(label string, update func()) {
+	if b.miniMempool != nil {
+		b.miniMempool.pauseIndexerReads()
+		defer b.miniMempool.resumeIndexerReads()
+	}
+
+	atomic.AddInt32(&b.reloading, 1)
+	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	start := time.Now()
+	common.Log.Infof("%s reader barrier entered", label)
+	defer func() {
+		// Reopen RPC admission before allowing mempool readers that may
+		// immediately enter an RPC-gated indexer read.
+		atomic.AddInt32(&b.reloading, -1)
+		common.Log.Infof("%s reader barrier exited, held %v", label, time.Since(start))
+	}()
+
+	update()
 }
 
 func (b *IndexerMgr) shouldWriteAtomDebugSnapshot() bool {
@@ -770,7 +835,7 @@ func (p *IndexerMgr) repair() bool {
 	// 		return nil
 	// 	}
 	// 	if strings.ToLower(deploy.P) != "brc-20" ||
-	// 	strings.ToLower(deploy.Op) != "deploy" {
+	// 		strings.ToLower(deploy.Op) != "deploy" {
 	// 		return nil
 	// 	}
 

@@ -46,7 +46,10 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 		return true
 	}
 
-	if b.HasNameInUtxo(utxoId) {
+	// Use the underlying name indexer here rather than the public
+	// HasNameInUtxo wrapper. This helper is also used from already-admitted RPC
+	// reads and must not recursively enter the RPC admission gate.
+	if b.ns.HasNamesInUtxo(utxoId) {
 		return true
 	}
 
@@ -78,7 +81,7 @@ func (b *IndexerMgr) HasAssetInUtxo(utxoId uint64, excludingExotic bool) bool {
 		return true
 	}
 
-	if b.HasNameInUtxo(utxoId) {
+	if b.ns.HasNamesInUtxo(utxoId) {
 		return true
 	}
 
@@ -149,7 +152,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 			bSpecialTicker = true
 		}
 		for utxoId := range utxos {
-			names := b.GetNamesWithUtxo(utxoId)
+			names := b.ns.GetNamesWithUtxo2(utxoId)
 			amount := 0
 			if bSpecialTicker {
 				for _, name := range names {
@@ -202,7 +205,9 @@ func (b *IndexerMgr) GetAssetSummaryInAddress(address string) map[common.TickerN
 	}
 
 	result := make(map[common.TickerName]int64)
-	nsAsset := b.GetSubNameSummaryWithAddress(address)
+	// Internal form: callers such as isSupportedKey may already hold the RPC
+	// admission token.
+	nsAsset := b.getSubNameSummaryWithAddress(address, nil)
 	for k, v := range nsAsset {
 		tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: k}
 		result[tickName] = v
@@ -274,7 +279,7 @@ func (b *IndexerMgr) GetAssetUTXOsInAddress(address string) map[common.TickerNam
 			result[tickName] = append(result[tickName], utxoId)
 		}
 
-		names := b.GetNamesWithUtxo(utxoId)
+		names := b.ns.GetNamesWithUtxo2(utxoId)
 		if len(names) > 0 {
 			for _, name := range names {
 				tickName := common.TickerName{Protocol: common.PROTOCOL_NAME_ORDX, Type: common.ASSET_TYPE_NS, Ticker: name}
@@ -382,7 +387,7 @@ func (b *IndexerMgr) GetMintHistory(tick string, start, limit int) []*common.Min
 		r, _ := b.GetNftHistory(start, limit)
 		return r
 	case common.ASSET_TYPE_NS:
-		return b.GetNameHistory(start, limit)
+		return b.getNameHistory(start, limit)
 	case common.ASSET_TYPE_EXOTIC:
 	default:
 

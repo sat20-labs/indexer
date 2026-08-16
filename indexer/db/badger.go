@@ -4,43 +4,90 @@ package db
 // 	"bytes"
 // 	"encoding/gob"
 // 	"errors"
+// 	"fmt"
 // 	"io"
 // 	"os"
+// 	"time"
 
 // 	"github.com/dgraph-io/badger/v4"
 // 	"github.com/sat20-labs/indexer/common"
 // )
+
+// const defaultBadgerBlockCacheMB = 2048
 
 // type badgerDB struct {
 // 	path string
 // 	db   *badger.DB
 // }
 
-// func openBadgerDB(filepath string) (*badger.DB, error) {
+// func openBadgerDB(path string, cacheSizeMB int) (*badger.DB, error) {
+// 	if path == "" {
+// 		path = "./data/db"
+// 	}
+// 	if cacheSizeMB <= 0 {
+// 		cacheSizeMB = defaultBadgerBlockCacheMB
+// 	}
 
-// 	opt := badger.DefaultOptions(filepath).
-// 		WithBlockCacheSize(3000 << 20).
-// 		WithDir(filepath).
-// 		WithValueDir(filepath).
+// 	cacheBytes := int64(cacheSizeMB) << 20
+
+// 	opt := badger.DefaultOptions(path).
+// 		WithDir(path).
+// 		WithValueDir(path).
+// 		WithBlockCacheSize(cacheBytes).
 // 		WithLoggingLevel(badger.WARNING)
+
+// 	common.Log.Infof(
+// 		"badger block cache capacity: %dMB",
+// 		cacheSizeMB,
+// 	)
 
 // 	return badger.Open(opt)
 // }
 
 // func NewBadgerDB(path string) common.KVDB {
-// 	db, err := initBadgerDB(path)
-// 	if err != nil {
-// 		common.Log.Errorf("initBadgerDB failed, %v", err)
-// 		return nil
-// 	}
-// 	return &badgerDB{path: path, db: db}
+// 	return NewBadgerDBWithCache(path, 0)
 // }
 
-// func initBadgerDB(path string) (*badger.DB, error) {
-// 	if path == "" {
-// 		path = "./data/db"
+// func NewBadgerDBWithCache(path string, cacheSizeMB int) common.KVDB {
+// 	bdb, err := openBadgerDB(path, cacheSizeMB)
+// 	if err != nil {
+// 		common.Log.Errorf("openBadgerDB %s failed: %v", path, err)
+// 		return nil
 // 	}
-// 	return openBadgerDB(path)
+
+// 	return &badgerDB{
+// 		path: path,
+// 		db:   bdb,
+// 	}
+// }
+
+// func (b *badgerDB) RunGC() error {
+// 	if b == nil || b.db == nil || b.db.IsClosed() {
+// 		return nil
+// 	}
+
+// 	const discardRatio = 0.5
+// 	start := time.Now()
+// 	rewrites := 0
+// 	for {
+// 		err := b.db.RunValueLogGC(discardRatio)
+// 		if errors.Is(err, badger.ErrNoRewrite) {
+// 			break
+// 		}
+// 		if err != nil {
+// 			return fmt.Errorf("badger value log GC %s: %w", b.path, err)
+// 		}
+// 		rewrites++
+// 	}
+
+// 	if err := b.db.Sync(); err != nil {
+// 		return fmt.Errorf("sync Badger DB after GC %s: %w", b.path, err)
+// 	}
+// 	common.Log.Infof(
+// 		"badger value log GC completed: path=%s rewrites=%d elapsed=%v",
+// 		b.path, rewrites, time.Since(start),
+// 	)
+// 	return nil
 // }
 
 // func (b *badgerDB) get(key []byte) ([]byte, error) {

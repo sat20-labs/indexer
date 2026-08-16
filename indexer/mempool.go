@@ -5,1150 +5,902 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"strings"
-
+	"sort"
 	"sync"
 	"time"
-
-	//"github.com/pebbe/zmq4"
 
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/config"
-	"github.com/sat20-labs/indexer/indexer/runes/runestone"
 	"github.com/sat20-labs/indexer/share/bitcoin_rpc"
 )
 
-// 一个简化的内存池数据同步线程，启动时先从节点拉取所有mempool数据，然后通过p2p协议实时同步TX
+const mempoolRetryMaxPasses = 64
 
+// MiniMemPool is a deliberately small mempool view. It tracks confirmed UTXOs
+// spent by unconfirmed transactions and only exposes new outputs that can be
+// proven to be plain sats. Unconfirmed asset outputs are classified as
+// non-plain/unknown and are never recursively rebuilt.
 type UserUtxoInMempool struct {
-    SpentUtxo           map[string]*common.TxOutput  // 被花费的UTXO，作为tx的输入
-    UnconfirmedUtxoMap  map[string]*common.TxOutput  // 新生成的UTXO，作为tx的输出
+	SpentUtxo               map[string]*common.TxOutput
+	UnconfirmedPlainUtxoMap map[string]*common.TxOutput
 }
 
 type MiniMemPool struct {
-    txMap    map[string]*wire.MsgTx          // 内存池中所有tx， key: TxId
-    spentUtxoMap  map[string]*common.TxOutput          // key: utxo，内存池中所有tx的输入utxo
-    unConfirmedUtxoMap  map[string]*common.TxOutput    // key: utxo，内存池中所有tx的输出utxo
-    addrUtxoMap  map[string]*UserUtxoInMempool   // key:address，内存池中所有tx的输入和输出的所属地址
-    running  bool
-    lastSyncTime int64
-    peer *peer.Peer
-    ticker *time.Ticker
+	txMap        map[string]*wire.MsgTx
+	spentUtxoMap map[string]*common.TxOutput
 
-    mutex   sync.RWMutex
+	// spentByOutpoint owns the spend admission for an input. inputsByTx and
+	// childrenByTx make replacement/conflict cleanup deterministic.
+	spentByOutpoint map[string]string
+	inputsByTx      map[string][]string
+	childrenByTx    map[string]map[string]struct{}
+
+	// confirmedSpent keeps a just-mined input unavailable until the confirmed
+	// index has caught up and no longer returns the old UTXO.
+	confirmedSpent map[string]struct{}
+
+	// knownPlainUtxoMap keeps plain outputs even after they are spent by a
+	// child transaction, so the child can be retried/classified without
+	// recursively rebuilding its parent. The per-address map below only keeps
+	// currently available plain outputs.
+	knownPlainUtxoMap map[string]*common.TxOutput
+	utxoStateMap      map[string]mempoolUtxoState
+	classifiedTxMap   map[string]bool
+	addrUtxoMap       map[string]*UserUtxoInMempool
+
+	// Serialize transaction classification and all graph mutations.
+	processingMutex sync.Mutex
+	mutex           sync.RWMutex
+
+	// indexerReadBarrier prevents mempool transaction classification from
+	// reading indexer state while indexer state is committed/reloaded/closed.
+	indexerReadBarrier sync.RWMutex
+
+	// Lifecycle state. Stop closes admission, disconnects the peer and waits
+	// for all owned workers instead of relying on a fixed sleep.
+	lifecycleMutex sync.Mutex
+	running        bool
+	syncing        bool
+	stopChan       chan struct{}
+	workerWG       sync.WaitGroup
+	peer           *peer.Peer
+	lastSyncTime   int64
 }
 
 func NewMiniMemPool() *MiniMemPool {
-    r := &MiniMemPool{}
-    r.init()
-    return r
+	p := &MiniMemPool{}
+	p.init()
+	return p
+}
+
+func (p *MiniMemPool) resetStateLocked() {
+	p.txMap = make(map[string]*wire.MsgTx)
+	p.spentUtxoMap = make(map[string]*common.TxOutput)
+	p.spentByOutpoint = make(map[string]string)
+	p.inputsByTx = make(map[string][]string)
+	p.childrenByTx = make(map[string]map[string]struct{})
+	p.confirmedSpent = make(map[string]struct{})
+	p.knownPlainUtxoMap = make(map[string]*common.TxOutput)
+	p.utxoStateMap = make(map[string]mempoolUtxoState)
+	p.classifiedTxMap = make(map[string]bool)
+	p.addrUtxoMap = make(map[string]*UserUtxoInMempool)
 }
 
 func (p *MiniMemPool) init() {
-    p.mutex.Lock()
-    defer p.mutex.Unlock()
-    p.txMap = make(map[string]*wire.MsgTx)
-    p.spentUtxoMap = make(map[string]*common.TxOutput)
-    p.unConfirmedUtxoMap = make(map[string]*common.TxOutput)
-    p.addrUtxoMap = make(map[string]*UserUtxoInMempool)
+	p.processingMutex.Lock()
+	defer p.processingMutex.Unlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.resetStateLocked()
 }
 
-// indexer同步到最高区块，再启动
 func (p *MiniMemPool) Start(cfg *config.Bitcoin) {
-    if p.running {
-        return
-    }
+	p.lifecycleMutex.Lock()
+	if p.running {
+		p.lifecycleMutex.Unlock()
+		return
+	}
+	p.running = true
+	p.stopChan = make(chan struct{})
+	stop := p.stopChan
+	p.lifecycleMutex.Unlock()
 
-    p.running = true
-    go p.fetchMempoolFromRPC()
-
-    netParam := instance.GetChainParam()
-    addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
-    go p.listenP2PTx(addr)
-
-    p.traceThread()
-
-    // zmqTxPort := "38333"
-    // zmqBlockPort := "38332"
-    // if !instance.IsMainnet() {
-    //     zmqTxPort = "58333"
-    //     zmqBlockPort = "58332"
-    // }
-
-    // zmqTxAddr := fmt.Sprintf("tcp://%s:%s", cfg.Host, zmqTxPort)
-    // zmqBlockAddr := fmt.Sprintf("tcp://%s:%s", cfg.Host, zmqBlockPort)
-
-    // go p.listenZMQTx(zmqTxAddr)
-    // go p.listenZMQBlock(zmqBlockAddr)
+	netParam := instance.GetChainParam()
+	addr := fmt.Sprintf("%s:%s", cfg.Host, netParam.DefaultPort)
+	p.startWorker(stop, func() { p.listenP2PTx(addr, stop) })
+	p.startWorker(stop, func() { p.traceThread(stop) })
+	p.scheduleSync(true)
 }
 
-func (p *MiniMemPool) traceThread() {
-    if p.ticker != nil {
-        return
-    }
-    go func() {
-		p.ticker = time.NewTicker(60*time.Second)
-		for {
-			select {
-			case <-p.ticker.C:
-                p.mutex.RLock()
-                common.Log.Infof("mempool: tx = %d, spent utxo = %d, unconfirmd utxo = %d", 
-                    len(p.txMap), len(p.spentUtxoMap), len(p.unConfirmedUtxoMap))
-                p.mutex.RUnlock()
-            }
+func (p *MiniMemPool) startWorker(stop chan struct{}, fn func()) bool {
+	p.lifecycleMutex.Lock()
+	if !p.running || p.stopChan != stop {
+		p.lifecycleMutex.Unlock()
+		return false
+	}
+	p.workerWG.Add(1)
+	p.lifecycleMutex.Unlock()
+
+	go func() {
+		defer p.workerWG.Done()
+		fn()
+	}()
+	return true
+}
+
+func (p *MiniMemPool) traceThread(stop <-chan struct{}) {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			p.mutex.RLock()
+			availablePlain := 0
+			for _, user := range p.addrUtxoMap {
+				availablePlain += len(user.UnconfirmedPlainUtxoMap)
+			}
+			common.Log.Infof("mempool: tx=%d spent=%d confirmed-spent=%d known-plain=%d available-plain=%d",
+				len(p.txMap), len(p.spentByOutpoint), len(p.confirmedSpent), len(p.knownPlainUtxoMap), availablePlain)
+			p.mutex.RUnlock()
 		}
+	}
+}
+
+// Stop closes all new work, disconnects P2P and waits until every owned worker
+// and in-flight classifier has exited before indexer databases may be closed.
+func (p *MiniMemPool) Stop() {
+	p.lifecycleMutex.Lock()
+	if !p.running {
+		p.lifecycleMutex.Unlock()
+		return
+	}
+	p.running = false
+	stop := p.stopChan
+	peerConn := p.peer
+	p.stopChan = nil
+	p.peer = nil
+	if stop != nil {
+		close(stop)
+	}
+	p.lifecycleMutex.Unlock()
+
+	if peerConn != nil {
+		peerConn.Disconnect()
+	}
+	p.workerWG.Wait()
+
+	// Peer callbacks are owned by btcd/peer, not workerWG. Drain any callback
+	// that entered classification before Disconnect returned.
+	p.processingMutex.Lock()
+	p.processingMutex.Unlock()
+
+	p.lifecycleMutex.Lock()
+	p.syncing = false
+	p.lifecycleMutex.Unlock()
+}
+
+func (p *MiniMemPool) pauseIndexerReads() {
+	p.indexerReadBarrier.Lock()
+}
+
+func (p *MiniMemPool) resumeIndexerReads() {
+	p.indexerReadBarrier.Unlock()
+}
+
+func (p *MiniMemPool) enterIndexerRead() {
+	p.indexerReadBarrier.RLock()
+}
+
+func (p *MiniMemPool) leaveIndexerRead() {
+	p.indexerReadBarrier.RUnlock()
+}
+
+func (p *MiniMemPool) scheduleSync(initial bool) {
+	p.lifecycleMutex.Lock()
+	if !p.running || p.syncing || p.stopChan == nil {
+		p.lifecycleMutex.Unlock()
+		return
+	}
+	p.syncing = true
+	stop := p.stopChan
+	p.workerWG.Add(1)
+	p.lifecycleMutex.Unlock()
+
+	go func() {
+		defer p.workerWG.Done()
+		succeeded := p.syncMempoolFromRPC(stop, initial)
+		p.lifecycleMutex.Lock()
+		if p.stopChan == stop {
+			p.syncing = false
+			if succeeded {
+				p.lastSyncTime = time.Now().Unix()
+			}
+		}
+		p.lifecycleMutex.Unlock()
 	}()
 }
 
-
-// 数据关闭前，要先停止内存池模块
-func (p *MiniMemPool) Stop() {
-    p.running = false
-    // 稍等一下，等相关操作都完成，后面数据库要关闭了
-    time.Sleep(time.Second)
+func (p *MiniMemPool) shouldStop(stop <-chan struct{}) bool {
+	select {
+	case <-stop:
+		return true
+	default:
+		return false
+	}
 }
 
-// 通过RPC拉取mempool
-func (p *MiniMemPool) fetchMempoolFromRPC() {
-    start := time.Now()
-    common.Log.Infof("start to fetch all tx from mempool")
-    txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
-    if err != nil {
-        common.Log.Infof("GetMemPool error: %v", err)
-        return
-    }
-    for _, txId := range txIds {
-        txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
-        if err != nil {
-            common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
-            continue
-        }
-        tx, err := DecodeMsgTx(txHex)
-        if err != nil {
-            common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
-            continue
-        }
-        if !p.running {
-            return
-        }
-        p.txBroadcasted(tx)
-    }
-    p.lastSyncTime = time.Now().Unix()
-    common.Log.Infof("fetchMempoolFromRPC fetch %d tx, %v", len(txIds), time.Since(start).String())
-}
+// syncMempoolFromRPC reconciles membership without recursively fetching parent
+// transactions. It only removes transactions that existed when the snapshot
+// started, so a P2P transaction arriving during the RPC scan is not evicted by
+// an older snapshot.
+func (p *MiniMemPool) syncMempoolFromRPC(stop <-chan struct{}, initial bool) bool {
+	start := time.Now()
+	common.Log.Infof("start to reconcile mempool (initial=%v)", initial)
 
-// 重新同步池子
-func (p *MiniMemPool) resyncMempoolFromRPC() {
-    start := time.Now()
-    common.Log.Infof("start to fetch all tx from mempool")
-    txIds, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
-    if err != nil {
-        common.Log.Infof("GetMemPool error: %v", err)
-        return
-    }
-    newMap := make(map[string]bool)
-    add := make([]string, 0)
-    p.mutex.Lock()
-    for _, txId := range txIds {
-        newMap[txId] = true
-        _, ok := p.txMap[txId]
-        if ok {
-            continue
-        }
-        add = append(add, txId)
-    }
-    del := make([]string, 0)
-    for k := range p.txMap {
-        _, ok := newMap[k]
-        if ok {
-            continue
-        }
-        del = append(del, k)
-    }
-   
-    common.Log.Infof("resyncMempoolFromRPC, new pool size %d, old pool size %d", len(txIds), len(p.txMap))
-    common.Log.Infof("resyncMempoolFromRPC, added %d, deleted %d", len(add), len(del))
-     p.mutex.Unlock()
+	p.mutex.RLock()
+	existingAtStart := make(map[string]struct{}, len(p.txMap))
+	for txID := range p.txMap {
+		existingAtStart[txID] = struct{}{}
+	}
+	p.mutex.RUnlock()
 
-    if len(txIds) == len(add) {
-        // 全新数据
-        p.init()
+	txIDs, err := bitcoin_rpc.ShareBitconRpc.GetMemPool()
+	if err != nil {
+		common.Log.Infof("GetMemPool error: %v", err)
+		return false
+	}
+	if p.shouldStop(stop) {
+		return false
+	}
 
-        for _, txId := range txIds {
-            if !p.running {
-                return
-            }
-            txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
-            if err != nil {
-                common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
-                continue
-            }
-            tx, err := DecodeMsgTx(txHex)
-            if err != nil {
-                common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
-                continue
-            }
-            p.txBroadcasted(tx)
-        }
-    } else {
-        // 部分更新
-        p.mutex.Lock()
-        for _, txId := range del {
-            tx, ok := p.txMap[txId]
-            if ok {
-                p.txConfirmed(tx)
-            }
-        }
-        p.mutex.Unlock()
+	snapshot := make(map[string]struct{}, len(txIDs))
+	added := make(map[string]*wire.MsgTx)
+	for _, txID := range txIDs {
+		snapshot[txID] = struct{}{}
+		if _, existed := existingAtStart[txID]; existed {
+			continue
+		}
+		if p.shouldStop(stop) {
+			return false
+		}
+		txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txID)
+		if err != nil {
+			common.Log.Errorf("GetRawTx %s failed, %v", txID, err)
+			continue
+		}
+		tx, err := DecodeMsgTx(txHex)
+		if err != nil {
+			common.Log.Errorf("DecodeMsgTx %s failed, %v", txID, err)
+			continue
+		}
+		added[txID] = tx
+	}
 
-        for _, txId := range add {
-            if !p.running {
-                return
-            }
-            txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(txId)
-            if err != nil {
-                common.Log.Errorf("GetRawTx %s failed, %v", txId, err)
-                continue
-            }
-            tx, err := DecodeMsgTx(txHex)
-            if err != nil {
-                common.Log.Errorf("DecodeMsgTx %s failed, %v", txId, err)
-                continue
-            }
-            p.txBroadcasted(tx)
-        }
-    }
+	missing := make([]string, 0)
+	for txID := range existingAtStart {
+		if _, ok := snapshot[txID]; !ok {
+			missing = append(missing, txID)
+		}
+	}
+	sort.Strings(missing)
 
-    p.lastSyncTime = time.Now().Unix()
-    common.Log.Infof("resyncMempoolFromRPC completed. %v", time.Since(start).String())
+	p.processingMutex.Lock()
+	p.mutex.Lock()
+	for _, txID := range missing {
+		if _, stillPresent := p.txMap[txID]; stillPresent {
+			p.removeTransactionLocked(txID, true, false)
+		}
+	}
+	p.mutex.Unlock()
+	p.processingMutex.Unlock()
+
+	for _, txID := range txIDs {
+		if tx := added[txID]; tx != nil {
+			p.txBroadcasted(tx)
+		}
+		if p.shouldStop(stop) {
+			return false
+		}
+	}
+	p.retryPendingTransactions(mempoolRetryMaxPasses)
+	p.pruneConfirmedSpends()
+
+	common.Log.Infof("mempool reconciliation completed: node=%d added=%d removed=%d elapsed=%v",
+		len(txIDs), len(added), len(missing), time.Since(start))
+	return true
 }
 
 func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
-	// 1. 将十六进制字符串解码为字节切片
 	txBytes, err := hex.DecodeString(txHex)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding hex string: %v", err)
 	}
-
-	// 2. 创建一个新的 wire.MsgTx 对象
 	msgTx := wire.NewMsgTx(wire.TxVersion)
-
-	// 3. 从字节切片中解析交易
-	err = msgTx.Deserialize(bytes.NewReader(txBytes))
-	if err != nil {
+	if err := msgTx.Deserialize(bytes.NewReader(txBytes)); err != nil {
 		return nil, fmt.Errorf("error deserializing transaction: %v", err)
 	}
-
 	return msgTx, nil
 }
 
-// 外部不加锁
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
-    netParam := instance.GetChainParam()
-    txId := tx.TxID()
-    p.mutex.Lock()
-    _, ok := p.txMap[txId]
-    if ok {
-        p.mutex.Unlock()
-        common.Log.Debugf("tx %s already in mempool", txId)
-        return 
-    }
-    p.txMap[txId] = tx
-    common.Log.Debugf("add tx %s to mempool %d", txId, len(p.txMap))
+	p.processingMutex.Lock()
+	defer p.processingMutex.Unlock()
 
-    // shallow snapshot of unConfirmedUtxoMap for rebuild
-    preFectcher := make(map[string]*common.TxOutput, len(p.unConfirmedUtxoMap))
-    for k, v := range p.unConfirmedUtxoMap {
-        preFectcher[k] = v
-    }
-    p.mutex.Unlock()
+	p.enterIndexerRead()
+	defer p.leaveIndexerRead()
 
-    // Heavy work OUTSIDE LOCK:
-    inputs, outpus, err := p.rebuildTxOutput(tx, preFectcher)
-    if err != nil {
-        common.Log.Errorf("rebuildTxOutput %s failed, %v", txId, err)
-        return 
-    }
+	txID := tx.TxID()
+	p.mutex.Lock()
+	if _, exists := p.txMap[txID]; !exists {
+		p.admitTransactionLocked(tx)
+	} else if p.classifiedTxMap[txID] {
+		p.mutex.Unlock()
+		common.Log.Debugf("tx %s already classified in mempool", txID)
+		return
+	}
+	p.mutex.Unlock()
 
-    p.mutex.Lock()
-    for _, info := range inputs {
-        addr, err := common.PkScriptToAddr(info.OutValue.PkScript, netParam)
-        if err != nil {
-            common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(info.OutValue.PkScript), err)
-            continue
-        }
-        p.spentUtxoMap[info.OutPointStr] = info
-        common.Log.Debugf("add utxo %s to spentUtxoMap with %s", info.OutPointStr, addr)
-        user, ok := p.addrUtxoMap[addr]
-        if !ok {
-            user = &UserUtxoInMempool{
-                SpentUtxo: make(map[string]*common.TxOutput),
-                UnconfirmedUtxoMap: make(map[string]*common.TxOutput),
-            }
-            p.addrUtxoMap[addr] = user
-        }
-        user.SpentUtxo[info.OutPointStr] = info
-    }
+	inputs, status := p.resolveMempoolInputs(tx)
+	p.commitMempoolSpentInputs(txID, inputs)
 
-    for _, txOut := range outpus {
-        if common.IsOpReturn(txOut.OutValue.PkScript) {
-            continue
-        }
-        addr, err := common.PkScriptToAddr(txOut.OutValue.PkScript, netParam)
-        if err != nil {
-            //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
-            continue
-        }
-        unconfirmedUtxo := txOut.OutPointStr
-        p.unConfirmedUtxoMap[unconfirmedUtxo] = txOut
-        common.Log.Debugf("add utxo %s to unConfirmedUtxoMap with %s", unconfirmedUtxo, addr)
-        user, ok := p.addrUtxoMap[addr]
-        if !ok {
-            user = &UserUtxoInMempool{
-                SpentUtxo: make(map[string]*common.TxOutput),
-                UnconfirmedUtxoMap: make(map[string]*common.TxOutput),
-            }
-            p.addrUtxoMap[addr] = user
-        }
-        user.UnconfirmedUtxoMap[unconfirmedUtxo] = txOut
-    }
-    p.mutex.Unlock()
+	switch status {
+	case mempoolResolvePending:
+		common.Log.Debugf("mempool tx %s waits for known parent/input", txID)
+		return
+	case mempoolResolveBlocked:
+		p.mutex.Lock()
+		p.classifiedTxMap[txID] = true
+		p.mutex.Unlock()
+		common.Log.Debugf("mempool tx %s output classification stopped by non-plain/unknown mempool input", txID)
+		return
+	}
+
+	outputs, occupied, ok := p.allocateKnownMempoolTx(tx, inputs)
+	if !ok {
+		p.mutex.Lock()
+		p.classifiedTxMap[txID] = true
+		p.mutex.Unlock()
+		common.Log.Debugf("mempool tx %s output classification intentionally unresolved", txID)
+		return
+	}
+	p.commitMempoolOutputs(tx, outputs, occupied)
 }
 
-// 外部加锁
-func (p *MiniMemPool) txConfirmed(tx *wire.MsgTx) {
-    txId := tx.TxID()
-    _, ok := p.txMap[txId]
-    if !ok {
-        common.Log.Infof("not found tx %s in mempool %d", txId, len(p.txMap))
-        return
-    }
-    
-    delete(p.txMap, txId)
-    common.Log.Debugf("tx %s removed from mempool %d", txId, len(p.txMap))
-    
-    netParam := instance.GetChainParam()
-    for _, txIn := range tx.TxIn {
-        if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
-            continue // coinbase
-        }
-        spentUtxo := txIn.PreviousOutPoint.String()
-        info, ok := p.spentUtxoMap[spentUtxo]
-        if !ok {
-            common.Log.Errorf("can't find utxo %s in spentUtxoMap", spentUtxo)
-            continue
-        }
-        delete(p.spentUtxoMap, spentUtxo)
-        common.Log.Debugf("delete utxo %s from spentUtxoMap", spentUtxo)
+func (p *MiniMemPool) admitTransactionLocked(tx *wire.MsgTx) {
+	txID := tx.TxID()
+	if _, exists := p.txMap[txID]; exists {
+		return
+	}
 
-        addr, err := common.PkScriptToAddr(info.OutValue.PkScript, netParam)
-        if err != nil {
-            //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
-            continue
-        }
-        user, ok := p.addrUtxoMap[addr]
-        if ok {
-            common.Log.Debugf("delete utxo %s from address %s SpentUtxo", spentUtxo, addr)
-            delete(user.SpentUtxo, spentUtxo)
-        }
-    }
+	inputs := make([]string, 0, len(tx.TxIn))
+	for _, txIn := range tx.TxIn {
+		if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
+			continue
+		}
+		outpoint := txIn.PreviousOutPoint.String()
+		inputs = append(inputs, outpoint)
+		if owner := p.spentByOutpoint[outpoint]; owner != "" && owner != txID {
+			// A newly relayed replacement invalidates the previous spender and
+			// every descendant that depends on its unconfirmed outputs.
+			p.removeTransactionLocked(owner, true, true)
+		}
+	}
 
-    for i, txOut := range tx.TxOut {
-        if common.IsOpReturn(txOut.PkScript) {
-            continue
-        }
-        unconfirmedUtxo := fmt.Sprintf("%s:%d", txId, i)
-        addr, err := common.PkScriptToAddr(txOut.PkScript, netParam)
-        if err != nil {
-            //common.Log.Errorf("PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
-            continue
-        }
-        delete(p.unConfirmedUtxoMap, unconfirmedUtxo)
-        common.Log.Debugf("delete utxo %s from unConfirmedUtxoMap", unconfirmedUtxo)
-        user, ok := p.addrUtxoMap[addr]
-        if ok {
-            common.Log.Debugf("delete utxo %s from address %s unConfirmedUtxoMap", unconfirmedUtxo, addr)
-            delete(user.UnconfirmedUtxoMap, unconfirmedUtxo)
-        }
-    }
+	p.txMap[txID] = tx
+	p.classifiedTxMap[txID] = false
+	p.inputsByTx[txID] = inputs
+	for i := range tx.TxOut {
+		p.utxoStateMap[fmt.Sprintf("%s:%d", txID, i)] = mempoolUtxoUnknown
+	}
+	for _, txIn := range tx.TxIn {
+		if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
+			continue
+		}
+		outpoint := txIn.PreviousOutPoint.String()
+		parentID := txIn.PreviousOutPoint.Hash.String()
+		if p.childrenByTx[parentID] == nil {
+			p.childrenByTx[parentID] = make(map[string]struct{})
+		}
+		p.childrenByTx[parentID][txID] = struct{}{}
+		p.spentByOutpoint[outpoint] = txID
+		p.removePlainAvailabilityLocked(outpoint)
+	}
 }
 
+func (p *MiniMemPool) commitMempoolSpentInputs(txID string, inputs []*mempoolResolvedInput) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-// // 通过ZMQ监听交易广播，代替P2P监听
-// func (p *MiniMemPool) listenZMQTx(zmqAddr string) {
-//     subscriber, err := zmq4.NewSocket(zmq4.SUB)
-//     if err != nil {
-//         common.Log.Errorf("ZMQ NewSocket error: %v", err)
-//         return
-//     }
-//     defer subscriber.Close()
+	for _, resolved := range inputs {
+		if resolved == nil || resolved.output == nil {
+			continue
+		}
+		info := resolved.output
+		outpoint := info.OutPointStr
+		if outpoint == "" || p.spentByOutpoint[outpoint] != txID {
+			continue
+		}
+		p.spentUtxoMap[outpoint] = info.Clone()
+		p.addSpentToAddressLocked(outpoint, info)
+		p.removePlainAvailabilityLocked(outpoint)
+	}
+}
 
-//     err = subscriber.Connect(zmqAddr)
-//     if err != nil {
-//         common.Log.Errorf("ZMQ Connect error: %v", err)
-//         return
-//     }
-//     // 订阅所有消息
-//     err = subscriber.SetSubscribe("")
-//     if err != nil {
-//         common.Log.Errorf("ZMQ SetSubscribe error: %v", err)
-//         return
-//     }
+func (p *MiniMemPool) commitMempoolOutputs(tx *wire.MsgTx, outputs []*common.TxOutput, occupied []bool) {
+	txID := tx.TxID()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-//     common.Log.Infof("ZMQ listening for raw tx at %s", zmqAddr)
-//     for {
-//         msg, err := subscriber.RecvMessage(0)
-//         if err != nil {
-//             common.Log.Errorf("ZMQ RecvMessage error: %v", err)
-//             time.Sleep(time.Second)
-//             continue
-//         }
-//         if len(msg) < 2 {
-//             continue
-//         }
-//         topic := msg[0]
-//         raw := msg[1]
-//         if topic != "rawtx" {
-//             continue
-//         }
-//         txBytes := []byte(raw)
-//         // ZMQ 传递的是二进制，需要解码
-//         tx := wire.NewMsgTx(wire.TxVersion)
-//         err = tx.Deserialize(bytes.NewReader(txBytes))
-//         if err != nil {
-//             common.Log.Errorf("ZMQ tx Deserialize error: %v", err)
-//             continue
-//         }
-//         p.mutex.Lock()
-//         common.Log.Infof("ZMQ OnTx %s", tx.TxID())
-//         p.txBroadcasted(tx)
-//         p.mutex.Unlock()
-//     }
-// }
+	for i, output := range outputs {
+		if output == nil || i >= len(occupied) {
+			continue
+		}
+		outpoint := fmt.Sprintf("%s:%d", txID, i)
+		if mempoolOutputUnspendable(tx.TxOut[i]) || occupied[i] {
+			p.utxoStateMap[outpoint] = mempoolUtxoNonPlain
+			p.removeKnownPlainLocked(outpoint)
+			continue
+		}
 
-// func (p *MiniMemPool) listenZMQBlock(zmqAddr string) {
-//     subscriber, err := zmq4.NewSocket(zmq4.SUB)
-//     if err != nil {
-//         common.Log.Errorf("ZMQ NewSocket error: %v", err)
-//         return
-//     }
-//     defer subscriber.Close()
+		plain := output.Clone()
+		plain.UtxoId = common.INVALID_ID
+		plain.OutPointStr = outpoint
+		plain.Assets = nil
+		plain.Offsets = make(map[common.AssetName]common.AssetOffsets)
+		plain.SatBindingMap = make(map[int64]*common.AssetInfo)
+		plain.Invalids = make(map[common.AssetName]bool)
+		p.utxoStateMap[outpoint] = mempoolUtxoPlain
+		p.knownPlainUtxoMap[outpoint] = plain
 
-//     err = subscriber.Connect(zmqAddr)
-//     if err != nil {
-//         common.Log.Errorf("ZMQ Connect error: %v", err)
-//         return
-//     }
-//     err = subscriber.SetSubscribe("")
-//     if err != nil {
-//         common.Log.Errorf("ZMQ SetSubscribe error: %v", err)
-//         return
-//     }
+		if p.spentByOutpoint[outpoint] == "" {
+			if _, confirmed := p.confirmedSpent[outpoint]; !confirmed {
+				p.addPlainAvailabilityLocked(outpoint, plain)
+			}
+		}
+	}
+	p.classifiedTxMap[txID] = true
+}
 
-//     common.Log.Infof("ZMQ listening for raw block at %s", zmqAddr)
-//     for {
-//         msg, err := subscriber.RecvMessage(0)
-//         if err != nil {
-//             common.Log.Errorf("ZMQ RecvMessage error: %v", err)
-//             time.Sleep(time.Second)
-//             continue
-//         }
-//         if len(msg) < 2 {
-//             continue
-//         }
-//         topic := msg[0]
-//         raw := msg[1]
-//         if topic != "rawblock" {
-//             continue
-//         }
-//         blockBytes := []byte(raw)
-//         block := wire.NewMsgBlock(&wire.BlockHeader{})
-//         err = block.Deserialize(bytes.NewReader(blockBytes))
-//         if err != nil {
-//             common.Log.Errorf("ZMQ block Deserialize error: %v", err)
-//             continue
-//         }
-//         common.Log.Infof("ZMQ OnBlock %s", block.BlockHash().String())
-//         p.ProcessBlock(block)
-//     }
-// }
+func (p *MiniMemPool) getOrCreateUserLocked(address string) *UserUtxoInMempool {
+	user := p.addrUtxoMap[address]
+	if user == nil {
+		user = &UserUtxoInMempool{
+			SpentUtxo:               make(map[string]*common.TxOutput),
+			UnconfirmedPlainUtxoMap: make(map[string]*common.TxOutput),
+		}
+		p.addrUtxoMap[address] = user
+	}
+	return user
+}
 
-// 接受p2p的消息
-func (p *MiniMemPool) listenP2PTx(addr string) {
-    if p.peer != nil && p.peer.Connected() {
-        return
-    }
-    for {
-        cfg := &peer.Config{
+func (p *MiniMemPool) addressForOutput(output *common.TxOutput) (string, bool) {
+	if output == nil || instance == nil || instance.GetChainParam() == nil {
+		return "", false
+	}
+	address, err := common.PkScriptToAddr(output.OutValue.PkScript, instance.GetChainParam())
+	return address, err == nil
+}
+
+func (p *MiniMemPool) addSpentToAddressLocked(outpoint string, output *common.TxOutput) {
+	address, ok := p.addressForOutput(output)
+	if !ok {
+		return
+	}
+	p.getOrCreateUserLocked(address).SpentUtxo[outpoint] = output.Clone()
+}
+
+func (p *MiniMemPool) removeSpentDetailLocked(outpoint string) {
+	info := p.spentUtxoMap[outpoint]
+	delete(p.spentUtxoMap, outpoint)
+	address, ok := p.addressForOutput(info)
+	if !ok {
+		return
+	}
+	if user := p.addrUtxoMap[address]; user != nil {
+		delete(user.SpentUtxo, outpoint)
+	}
+}
+
+func (p *MiniMemPool) addPlainAvailabilityLocked(outpoint string, output *common.TxOutput) {
+	address, ok := p.addressForOutput(output)
+	if !ok {
+		return
+	}
+	p.getOrCreateUserLocked(address).UnconfirmedPlainUtxoMap[outpoint] = output.Clone()
+}
+
+func (p *MiniMemPool) removePlainAvailabilityLocked(outpoint string) {
+	output := p.knownPlainUtxoMap[outpoint]
+	address, ok := p.addressForOutput(output)
+	if !ok {
+		return
+	}
+	if user := p.addrUtxoMap[address]; user != nil {
+		delete(user.UnconfirmedPlainUtxoMap, outpoint)
+	}
+}
+
+func (p *MiniMemPool) restorePlainAvailabilityLocked(outpoint string) {
+	if p.spentByOutpoint[outpoint] != "" {
+		return
+	}
+	if _, confirmed := p.confirmedSpent[outpoint]; confirmed {
+		return
+	}
+	if output := p.knownPlainUtxoMap[outpoint]; output != nil {
+		p.addPlainAvailabilityLocked(outpoint, output)
+	}
+}
+
+func (p *MiniMemPool) removeKnownPlainLocked(outpoint string) {
+	p.removePlainAvailabilityLocked(outpoint)
+	delete(p.knownPlainUtxoMap, outpoint)
+}
+
+// removeTransactionLocked requires p.mutex. recursive is used for RBF/conflict
+// eviction. restoreInputs is false only when the transaction has confirmed;
+// its inputs remain hidden by confirmedSpent until the index catches up.
+func (p *MiniMemPool) removeTransactionLocked(txID string, restoreInputs, recursive bool) {
+	if recursive {
+		children := make([]string, 0, len(p.childrenByTx[txID]))
+		for child := range p.childrenByTx[txID] {
+			children = append(children, child)
+		}
+		sort.Strings(children)
+		for _, child := range children {
+			p.removeTransactionLocked(child, true, true)
+		}
+	}
+
+	tx := p.txMap[txID]
+	for _, outpoint := range p.inputsByTx[txID] {
+		parentID := ""
+		if parsed, err := wire.NewOutPointFromString(outpoint); err == nil {
+			parentID = parsed.Hash.String()
+		}
+		if parentID != "" {
+			if children := p.childrenByTx[parentID]; children != nil {
+				delete(children, txID)
+				if len(children) == 0 {
+					delete(p.childrenByTx, parentID)
+				}
+			}
+		}
+		if p.spentByOutpoint[outpoint] == txID {
+			delete(p.spentByOutpoint, outpoint)
+			if restoreInputs {
+				p.removeSpentDetailLocked(outpoint)
+				p.restorePlainAvailabilityLocked(outpoint)
+			}
+		}
+	}
+
+	if tx != nil {
+		for i := range tx.TxOut {
+			outpoint := fmt.Sprintf("%s:%d", txID, i)
+			p.removeKnownPlainLocked(outpoint)
+			delete(p.utxoStateMap, outpoint)
+		}
+	}
+	delete(p.txMap, txID)
+	delete(p.classifiedTxMap, txID)
+	delete(p.inputsByTx, txID)
+	delete(p.childrenByTx, txID)
+}
+
+func (p *MiniMemPool) retryPendingTransactions(maxPasses int) {
+	if maxPasses <= 0 {
+		return
+	}
+	for pass := 0; pass < maxPasses; pass++ {
+		p.mutex.RLock()
+		pendingIDs := make([]string, 0)
+		for txID := range p.txMap {
+			if !p.classifiedTxMap[txID] {
+				pendingIDs = append(pendingIDs, txID)
+			}
+		}
+		sort.Strings(pendingIDs)
+		pending := make([]*wire.MsgTx, 0, len(pendingIDs))
+		for _, txID := range pendingIDs {
+			pending = append(pending, p.txMap[txID])
+		}
+		p.mutex.RUnlock()
+		if len(pending) == 0 {
+			return
+		}
+
+		before := len(pending)
+		for _, tx := range pending {
+			if tx != nil {
+				p.txBroadcasted(tx)
+			}
+		}
+		p.mutex.RLock()
+		after := 0
+		for txID := range p.txMap {
+			if !p.classifiedTxMap[txID] {
+				after++
+			}
+		}
+		p.mutex.RUnlock()
+		if after == 0 || after >= before {
+			return
+		}
+	}
+}
+
+func (p *MiniMemPool) confirmTransactionLocked(tx *wire.MsgTx) {
+	txID := tx.TxID()
+	for _, txIn := range tx.TxIn {
+		if txIn.PreviousOutPoint.Index >= wire.MaxPrevOutIndex {
+			continue
+		}
+		outpoint := txIn.PreviousOutPoint.String()
+		if owner := p.spentByOutpoint[outpoint]; owner != "" && owner != txID {
+			p.removeTransactionLocked(owner, true, true)
+		}
+		delete(p.spentByOutpoint, outpoint)
+		p.confirmedSpent[outpoint] = struct{}{}
+		p.removePlainAvailabilityLocked(outpoint)
+	}
+	// Preserve valid descendants: once this transaction confirms, children may
+	// remain in the node mempool and will resolve through the confirmed index.
+	p.removeTransactionLocked(txID, false, false)
+}
+
+func (p *MiniMemPool) pruneConfirmedSpends() {
+	if instance == nil {
+		return
+	}
+	p.mutex.RLock()
+	outpoints := make([]string, 0, len(p.confirmedSpent))
+	for outpoint := range p.confirmedSpent {
+		outpoints = append(outpoints, outpoint)
+	}
+	p.mutex.RUnlock()
+	if len(outpoints) == 0 {
+		return
+	}
+	sort.Strings(outpoints)
+
+	prunable := make([]string, 0)
+	p.enterIndexerRead()
+	for _, outpoint := range outpoints {
+		if instance.GetTxOutputWithUtxoV2(outpoint, true) == nil {
+			prunable = append(prunable, outpoint)
+		}
+	}
+	p.leaveIndexerRead()
+
+	p.mutex.Lock()
+	for _, outpoint := range prunable {
+		if _, stillConfirmed := p.confirmedSpent[outpoint]; !stillConfirmed {
+			continue
+		}
+		delete(p.confirmedSpent, outpoint)
+		if p.spentByOutpoint[outpoint] == "" {
+			p.removeSpentDetailLocked(outpoint)
+		}
+	}
+	p.mutex.Unlock()
+}
+
+func (p *MiniMemPool) listenP2PTx(addr string, stop <-chan struct{}) {
+	for {
+		if p.shouldStop(stop) {
+			return
+		}
+		cfg := &peer.Config{
 			UserAgentName:    "MempoolSync",
 			UserAgentVersion: "0.1",
 			ChainParams:      instance.GetChainParam(),
 			Listeners: peer.MessageListeners{
 				OnTx: func(_ *peer.Peer, msg *wire.MsgTx) {
-                    if !p.running {
-                        return
-                    }
-                    common.Log.Debugf("OnTx %s", msg.TxID())
+					if p.shouldStop(stop) {
+						return
+					}
+					common.Log.Debugf("OnTx %s", msg.TxID())
 					p.txBroadcasted(msg)
+					p.retryPendingTransactions(mempoolRetryMaxPasses)
 				},
-                OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
-                    if !p.running {
-                        return
-                    }
-                    common.Log.Infof("OnBlock %s", msg.BlockHash().String())
-                    // 需要检查当前区块是不是tip
-                    p.ProcessBlock(msg)
-                },
-                OnInv: func(peer *peer.Peer, msg *wire.MsgInv) {
-                    if !p.running {
-                        return
-                    }
-                    common.Log.Debugf("OnInv: %v", msg.InvList)
-                    var getDataMsg wire.MsgGetData
-                    for _, inv := range msg.InvList {
-                        if inv.Type == wire.InvTypeTx || inv.Type == wire.InvTypeBlock {
-                            getDataMsg.AddInvVect(inv)
-                        }
-                    }
-                    if len(getDataMsg.InvList) > 0 {
-                        peer.QueueMessage(&getDataMsg, nil)
-                    }
-                },
+				OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, _ []byte) {
+					if p.shouldStop(stop) {
+						return
+					}
+					common.Log.Infof("OnBlock %s", msg.BlockHash().String())
+					p.ProcessBlock(msg)
+				},
+				OnInv: func(remote *peer.Peer, msg *wire.MsgInv) {
+					if p.shouldStop(stop) {
+						return
+					}
+					common.Log.Debugf("OnInv: %v", msg.InvList)
+					var getDataMsg wire.MsgGetData
+					for _, inv := range msg.InvList {
+						if inv.Type == wire.InvTypeTx || inv.Type == wire.InvTypeBlock {
+							_ = getDataMsg.AddInvVect(inv)
+						}
+					}
+					if len(getDataMsg.InvList) > 0 {
+						remote.QueueMessage(&getDataMsg, nil)
+					}
+				},
 			},
 		}
-        outBoundPeer, err := peer.NewOutboundPeer(cfg, addr)
-        if err != nil {
-            common.Log.Errorf("NewOutboundPeer error: %v", err)
-            time.Sleep(time.Second * 5)
-            continue
-        }
-        conn, err := net.Dial("tcp", addr)
-        if err != nil {
-            common.Log.Errorf("Dial P2P error: %v", err)
-            time.Sleep(time.Second * 5)
-            continue
-        }
-        outBoundPeer.AssociateConnection(conn)
-        common.Log.Infof("Connected to P2P node: %s", addr)
-
-        p.peer = outBoundPeer
-
-        // 等待断开
-        for outBoundPeer.Connected() {
-            time.Sleep(3*time.Second)
-        }
-        common.Log.Warningf("Disconnected from P2P node: %s, will reconnect...", addr)
-        time.Sleep(time.Second * 5)
-    }
-}
-
-
-// 处理已经确认的tx
-func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
-    start := time.Now()
-    p.mutex.Lock()
-    for _, tx := range msg.Transactions {
-        p.txConfirmed(tx)
-    }
-    common.Log.Infof("ProcessBlock completed, new size %d. %v", len(p.txMap), time.Since(start).String())
-    p.mutex.Unlock()
-
-    if time.Now().Unix() - p.lastSyncTime >= 36000 {
-        go p.resyncMempoolFromRPC()
-    }
-}
-
-// 处理回滚
-func (p *MiniMemPool) ProcessReorg() {
-    // 清空所有数据
-    p.init()
-    p.running = false
-    // 等主线程通过Start()重新启动
-    //p.fetchMempoolFromRPC()
-    common.Log.Infof("ProcessReorg, reset mempool")
-    
-    // 重新读内存池数据
-}
-
-// 返回没有被花费的utxo
-func (p *MiniMemPool) RemoveSpentUtxo(utxos []string) []string {
-    p.mutex.RLock()
-    defer p.mutex.RUnlock()
-
-    result := make([]string, 0)
-    for _, utxo := range utxos {
-        _, ok := p.spentUtxoMap[utxo]
-        if ok {
-            continue
-        }
-        result = append(result, utxo)
-    }
-    return result
-}
-
-// 返回没有被花费的utxo
-func (p *MiniMemPool) IsSpent(utxo string) bool {
-    p.mutex.RLock()
-    defer p.mutex.RUnlock()
-
-    _, ok := p.spentUtxoMap[utxo]
-    return ok
-}
-
-// 返回内存池中的该地址的被花费的utxo
-func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
-    p.mutex.RLock()
-    defer p.mutex.RUnlock()
-
-    addrUtxo, ok := p.addrUtxoMap[address]
-    if !ok {
-        return nil
-    }
-
-    result := make([]string, 0)
-    for k := range addrUtxo.SpentUtxo {
-        result = append(result, k)
-    }
-    return result
-}
-
-// 返回内存池中属于该地址的还没确认的新生成的UTXO
-func (p *MiniMemPool) GetUnconfirmedNewUtxoByAddress(address string) map[string]*common.TxOutput {
-    p.mutex.RLock()
-    defer p.mutex.RUnlock()
-
-    addrUtxo, ok := p.addrUtxoMap[address]
-    if !ok {
-        return nil
-    }
-
-    result := make(map[string]*common.TxOutput)
-    for k, v := range addrUtxo.UnconfirmedUtxoMap {
-        result[k] = v
-    }
-    return result
-}
-
-
-// 返回内存池中属于该地址的还没确认的已经花费的UTXO
-func (p *MiniMemPool) GetUnconfirmedSpentUtxoByAddress(address string) map[uint64]*common.TxOutput {
-    p.mutex.RLock()
-    defer p.mutex.RUnlock()
-
-    addrUtxo, ok := p.addrUtxoMap[address]
-    if !ok {
-        return nil
-    }
-
-    // 如果utxoId无效，说明是还未确认的tx的输出，使用一个临时的id，不要跟现有的id冲突
-    invalidId := uint64(common.INVALID_ID)
-
-    result := make(map[uint64]*common.TxOutput, 0)
-    for _, v := range addrUtxo.SpentUtxo { 
-        id := v.UtxoId
-        if id == common.INVALID_ID {
-            id = invalidId
-            invalidId--
-        }
-        result[id] = v
-    }
-    return result
-}
-
-
-// 直接从p2p协议同步数据，但比较慢
-// syncedBlocks map[chainhash.Hash]int // 已同步区块
-// lastBlockHash *chainhash.Hash        // 最新同步到的区块hash
-// syncMutex sync.Mutex                 // 区块同步相关锁
-//  OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
-//     if !p.running {
-//         return
-//     }
-//     // common.Log.Infof("OnBlock %s", msg.BlockHash().String())
-//     // p.ProcessBlock(msg)
-
-//     blockHash := msg.BlockHash()
-//     prevHash := msg.Header.PrevBlock
-//     p.syncMutex.Lock()
-//     prevHeight, ok := p.syncedBlocks[prevHash]
-//     var height int
-//     if ok {
-//         height = prevHeight + 1
-//     } else {
-//         // 如果找不到，可能是断点同步或重组，可以特殊处理
-//         height = -1 // 或者查找其他来源
-//     }
-//     p.syncedBlocks[blockHash] = height
-//     common.Log.Infof("OnBlock %s, height=%d", blockHash.String(), height)
-//     p.syncMutex.Unlock()
-    
-//     p.lastBlockHash = &blockHash
-//     p.ProcessBlock(msg)
-//     common.Log.Infof("Synced block %s", blockHash.String())
-//     // 主动请求下一个区块
-//     p.sendGetBlocks(&chainhash.Hash{})
-    
-    
-// },
-// OnInv: func(peer *peer.Peer, msg *wire.MsgInv) {
-//     if !p.running {
-//         return
-//     }
-//     //common.Log.Debugf("OnInv: %v", msg.InvList)
-//     var getDataMsg wire.MsgGetData
-//     for _, inv := range msg.InvList {
-//         if inv.Type == wire.InvTypeTx {
-//             getDataMsg.AddInvVect(inv)
-//         }
-
-//         if inv.Type == wire.InvTypeBlock {
-//             // 只请求未同步过的区块
-//             _, ok := p.syncedBlocks[inv.Hash]
-//             if !ok {
-//                 getDataMsg.AddInvVect(inv)
-//             }
-//         }
-//     }
-//     if len(getDataMsg.InvList) > 0 {
-//         peer.QueueMessage(&getDataMsg, nil)
-//     }
-// },
-
-// func (p *MiniMemPool) StartBlockSyncFromGenesis() {
-//     genesisHash := instance.GetChainParam().GenesisHash
-//     go p.syncBlocksFromHash(genesisHash)
-// }
-
-// func (p *MiniMemPool) StartBlockSyncFromHash(startHash *chainhash.Hash) {
-//     go p.syncBlocksFromHash(startHash)
-// }
-
-// func (p *MiniMemPool) syncBlocksFromHash(startHash *chainhash.Hash) {
-//     p.syncMutex.Lock()
-//     p.lastBlockHash = startHash
-//     p.syncMutex.Unlock()
-//     p.sendGetBlocks(&chainhash.Hash{}) // hashStop为零，表示同步到tip
-// }
-
-// func (p *MiniMemPool) sendGetBlocks(hashStop *chainhash.Hash) {
-//     if p.peer == nil || !p.peer.Connected() {
-//         common.Log.Errorf("P2P peer not connected")
-//         return
-//     }
-//     getBlocksMsg := wire.NewMsgGetBlocks(hashStop)
-//     // 你还需要设置 BlockLocatorHashes（区块定位器），否则对方不知道你从哪里开始同步
-//     // 例如只同步从某个起点hash开始：
-//     if p.lastBlockHash != nil {
-//         getBlocksMsg.BlockLocatorHashes = append(getBlocksMsg.BlockLocatorHashes, p.lastBlockHash)
-//     } else {
-//         // 创世区块
-//         genesisHash := instance.GetChainParam().GenesisHash
-//         getBlocksMsg.BlockLocatorHashes = append(getBlocksMsg.BlockLocatorHashes, genesisHash)
-//     }
-//     p.peer.QueueMessage(getBlocksMsg, nil)
-//     common.Log.Infof("Sent getblocks, locator=%s, stop=%s", getBlocksMsg.BlockLocatorHashes[0].String(), hashStop.String())
-// }
-
-
-// 该Tx还没有确认，才有可能重建，索引器的限制，utxo被花费后就删除了
-// 对于brc20，资产暂时由output管理，只处理inscribe-transfer，其输出携带对应的资产
-func (p *MiniMemPool) rebuildTxOutput(tx *wire.MsgTx, preFectcher map[string]*common.TxOutput) (
-	[]*common.TxOutput, []*common.TxOutput, error) {
-	// 尝试为tx的输出分配资产
-	// 按ordx协议的规则
-	// 按runes协议的规则
-	// 增加brc20的规则：在transfer时，可以认为是直接绑定在一个聪上，容纳所有brc20的资产，由TxOutput执行相关规则
-	var inputs []*common.TxOutput
-	var input *common.TxOutput
-    var status int
-	for i, txIn := range tx.TxIn {
-		if txIn.PreviousOutPoint.Index == wire.MaxPrevOutIndex {
+		outbound, err := peer.NewOutboundPeer(cfg, addr)
+		if err != nil {
+			common.Log.Errorf("NewOutboundPeer error: %v", err)
+			select {
+			case <-stop:
+				return
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
-		utxo := txIn.PreviousOutPoint.String()
-
-		info, ok := preFectcher[utxo]
-		if !ok {
-            info = instance.GetTxOutputWithUtxoV2(utxo, true)
-            if info == nil {
-                // 递归调用
-                preTxId := txIn.PreviousOutPoint.Hash.String()
-                p.mutex.RLock()
-                preTx := p.txMap[preTxId]
-                p.mutex.RUnlock()
-                if preTx == nil {
-                    common.Log.Debugf("rebuildTxOutput GetTx %s failed", preTxId)
-                    txHex, err := bitcoin_rpc.ShareBitconRpc.GetRawTx(preTxId)
-                    if err != nil {
-                        common.Log.Errorf("rebuildTxOutput GetRawTx %s failed, %v", preTxId, err)
-                        return nil, nil, err
-                    }
-                    preTx, err = DecodeMsgTx(txHex)
-                    if err != nil {
-                        common.Log.Errorf("rebuildTxOutput DecodeMsgTx %s failed, %v", preTxId, err)
-                        return nil, nil, err
-                    }
-                }
-                _, outs, err := p.rebuildTxOutput(preTx, preFectcher)
-                if err != nil {
-                    common.Log.Errorf("rebuildTxOutput %s failed, %v", preTxId, err)
-                    return nil, nil, err
-                }
-                for _, out := range outs {
-                    preFectcher[out.OutPointStr] = out
-                }
-                info = outs[txIn.PreviousOutPoint.Index]
-            }
-            preFectcher[utxo] = info
+		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+		if err != nil {
+			common.Log.Errorf("Dial P2P error: %v", err)
+			select {
+			case <-stop:
+				return
+			case <-time.After(5 * time.Second):
+			}
+			continue
 		}
+		outbound.AssociateConnection(conn)
 
-        s, err := processInscription(tx, i, preFectcher)
-		if err == nil {
-			// 处理铸造铸造结果 
-            // 将铸造结果当作input的资产数据，直接添加到info中, 在cut中按照sat的位置分配资产结果
-            status = s
+		p.lifecycleMutex.Lock()
+		if !p.running || p.stopChan != stop {
+			p.lifecycleMutex.Unlock()
+			outbound.Disconnect()
+			return
 		}
+		p.peer = outbound
+		p.lifecycleMutex.Unlock()
+		common.Log.Infof("Connected to P2P node: %s", addr)
 
-		if input == nil {
-			input = info
-		} else {
-			input.Append(info)
+		for outbound.Connected() {
+			select {
+			case <-stop:
+				outbound.Disconnect()
+				return
+			case <-time.After(3 * time.Second):
+			}
 		}
-		inputs = append(inputs, info.Clone())
+		p.lifecycleMutex.Lock()
+		if p.peer == outbound {
+			p.peer = nil
+		}
+		p.lifecycleMutex.Unlock()
+		common.Log.Warningf("Disconnected from P2P node: %s, will reconnect...", addr)
+		select {
+		case <-stop:
+			return
+		case <-time.After(5 * time.Second):
+		}
 	}
-
-	txId := tx.TxID()
-	outputs := make([]*common.TxOutput, 0)
-	defaultRuneOutput := -1
-	var err error
-	var edicts []runestone.Edict
-	for i, txOut := range tx.TxOut {
-		var curr *common.TxOutput
-		if common.IsOpReturn(txOut.PkScript) {
-			stone := runestone.Runestone{}
-			result, err := stone.DecipherFromPkScript(txOut.PkScript)
-			if err == nil {
-				if result.Runestone != nil {
-					edicts = result.Runestone.Edicts
-				}
-			}
-			if txOut.Value != 0 {
-				curr, input, err = input.Cut(txOut.Value)
-				if err != nil {
-					common.Log.Errorf("rebuildTxOutput %s Cut %d failed, %v", tx.TxID(), i, err)
-					return nil, nil, err
-				}
-				curr.OutValue.PkScript = txOut.PkScript
-			} else {
-				curr = common.GenerateTxOutput(tx, i)
-			}
-		} else {
-			curr, input, err = input.Cut(txOut.Value)
-			if err != nil {
-				common.Log.Errorf("rebuildTxOutput %s Cut %d failed, %v", tx.TxID(), i, err)
-				return nil, nil, err
-			}
-			curr.OutValue.PkScript = txOut.PkScript
-			if defaultRuneOutput == -1 {
-				defaultRuneOutput = i
-			}
-
-            // 检查有效性
-            addr, err := common.PkScriptToAddr(txOut.PkScript, instance.GetChainParam())
-            if err != nil {
-                common.Log.Errorf("rebuildTxOutput PkScriptToAddr %s failed, %v", hex.EncodeToString(txOut.PkScript), err)
-                return nil, nil, err
-            }
-            addrId := instance.GetAddressId(addr) // 有可能是全新的地址
-            // TODO 在rpc模块中暂时生成一个新的地址和id，用于处理mint和transfer结果
-            // 目前我们的使用场景，不会存在mint还没确认，就直接transfer的情况，可以不处理这种情况，地址没有就当作invalid
-            
-            deleteAsset := make(map[string]*common.AssetInfo)
-            for _, asset := range curr.Assets {
-                var invalid bool
-                switch asset.Name.Protocol {
-                case common.PROTOCOL_NAME_ORDX:
-                case common.PROTOCOL_NAME_BRC20:
-                    switch status {
-                    case 1: // inscribe-mint
-                    case 2: // inscribe-transfer
-                        holderInfo := instance.brc20Indexer.GetHolderAbbrInfo(addrId, asset.Name.Ticker)
-                        if holderInfo == nil {
-                            // 找不到，很可能这个transfer无效（只有在前面该地址做了mint，并且该mint还没confirmed，才有可能有效）
-                            invalid = true
-                        } else {
-                            if asset.Amount.Cmp(holderInfo.AvailableBalance) > 0 {
-                                // 无效
-                                invalid = true
-                            }
-                        }
-                    }
-                }
-                if invalid {
-                    deleteAsset[asset.Name.String()] = &asset
-                }
-            }
-            for _, v := range deleteAsset {
-                // 删除这个资产
-                curr.RemoveAsset(&v.Name)
-            }
-		}
-		curr.OutPointStr = fmt.Sprintf("%s:%d", txId, i)
-		outputs = append(outputs, curr)
-	}
-
-	// 执行runes的转移规则
-	for _, edict := range edicts {
-		if int(edict.Output) >= len(tx.TxOut) {
-			return nil, nil, fmt.Errorf("rebuildTxOutput invalid edict %v", edict)
-		}
-
-		tickerInfo := instance.RunesIndexer.GetRuneInfoWithId(edict.ID.String())
-		if tickerInfo == nil {
-			return nil, nil, fmt.Errorf("rebuildTxOutput can't find tick %s", edict.ID.String())
-		}
-		
-		amount := common.NewDecimalFromUint128(edict.Amount, int(tickerInfo.Divisibility))
-
-		asset := common.AssetInfo{
-			Name:       common.AssetName{
-				Protocol: common.PROTOCOL_NAME_RUNES,
-				Type: common.ASSET_TYPE_FT,
-				Ticker: tickerInfo.Name,
-			},
-			Amount:     *amount,
-			BindingSat: 0,
-		}
-
-		output := outputs[edict.Output]
-		if output.Assets != nil {
-			output.Assets.Add(&asset)
-		} else {
-			output.Assets = common.TxAssets{asset}
-		}
-
-        if defaultRuneOutput >= 0 {
-            output = outputs[defaultRuneOutput]
-            err := output.Assets.Subtract(&asset)
-            if err != nil {
-                return nil, nil, err
-            }
-        }
-	}
-
-	return inputs, outputs, nil
 }
 
-// 只处理transfer，并且没有做数据校验
-func processInscription(tx *wire.MsgTx, i int, 
-    preFectcher map[string]*common.TxOutput) (int, error) {
-    
-    txIn := tx.TxIn[i]
-    inscriptions, _, err := common.ParseInscription(txIn.Witness)
-    if err != nil {
-        return 0, err
-    }
+func (p *MiniMemPool) ProcessBlock(msg *wire.MsgBlock) {
+	start := time.Now()
+	p.processingMutex.Lock()
+	p.mutex.Lock()
+	for _, tx := range msg.Transactions {
+		p.confirmTransactionLocked(tx)
+	}
+	remaining := len(p.txMap)
+	p.mutex.Unlock()
+	p.processingMutex.Unlock()
+	common.Log.Infof("ProcessBlock completed, new size %d. %v", remaining, time.Since(start))
 
-    // 需要先确保这里能拿到数据
-    input := preFectcher[txIn.PreviousOutPoint.String()]
-    var status int // 假设一个tx只有一个状态
-    for _, insc := range inscriptions {
-        protocol, content := common.GetProtocol(insc)
-        switch protocol {
-        case "ordx":
-            ordxInfo, bOrdx := common.IsOrdXProtocol(insc)
-            if !bOrdx {
-                continue
-            }
-            ordxType := common.GetBasicContent(ordxInfo)
-            switch ordxType.Op {
-            case "deploy":
-                // deployInfo := common.ParseDeployContent(ordxInfo)
-                // if deployInfo == nil {
-                // 	fmt.Printf("ParseDeployContent failed, %v", err)
-                // 	continue
-                // }
-                // assetName := common.AssetName{
-                //  Protocol: common.PROTOCOL_NAME_ORDX,
-                //  Type:     common.ASSET_TYPE_FT,
-                // 	Ticker:   deployInfo.Ticker,
-                // }
-                
-            case "mint":
-                // mintInfo := common.ParseMintContent(ordxInfo)
-                // if mintInfo == nil {
-                //     fmt.Printf("ParseMintContent failed, %v", err)
-                //     continue
-                // }
-                // assetName := common.AssetName{
-                //     Protocol: common.PROTOCOL_NAME_ORDX,
-                //     Type:     common.ASSET_TYPE_FT,
-                //     Ticker:   mintInfo.Ticker,
-                // }
-                // ticker := instance.GetTickerInfo(&assetName)
-                // if ticker == nil {
-                //     fmt.Printf("ticker %s not exists", mintInfo.Ticker)
-                //     continue
-                // }
+	// Reconcile every block. scheduleSync is single-flight, so a slow previous
+	// reconciliation cannot create overlapping resets or RPC scans.
+	p.scheduleSync(false)
+}
 
-                // satpoint := 0
-                // if insc[common.FIELD_POINT] != nil {
-                //     satpoint = common.GetSatpoint(insc[common.FIELD_POINT])
-                //     if int64(satpoint) >= input.Value() {
-                //         satpoint = 0
-                //     }
-                // }
+func (p *MiniMemPool) ProcessReorg() {
+	p.Stop()
+	p.init()
+	common.Log.Infof("ProcessReorg, reset mempool")
+}
 
-                // amt := ticker.Limit
-                // if mintInfo.Amt != "" {
-                //     amt = mintInfo.Amt
-                // }
-                // dAmt, err := common.NewDecimalFromString(amt, 0)
-                // if err != nil {
-                //     fmt.Printf("NewDecimalFromString %s failed, %v", amt, err)
-                //     continue
-                // }
+func (p *MiniMemPool) RemoveSpentUtxo(utxos []string) []string {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-                // asset := common.AssetInfo{
-                //     Name:       assetName,
-                //     Amount:     *dAmt,
-                //     BindingSat: uint32(ticker.N),
-                // }
-                // input.Assets.Add(&asset)
-                // satsNum := common.GetBindingSatNum(dAmt, uint32(ticker.N))
-                // input.Offsets[assetName] = common.AssetOffsets{&common.OffsetRange{
-                //     Start: int64(satpoint), 
-                //     End: int64(satpoint) + satsNum},
-                // }
-                // status = 1
-                // // 暂时假定有效
-            }
+	result := make([]string, 0)
+	for _, utxo := range utxos {
+		_, pending := p.spentByOutpoint[utxo]
+		_, confirmed := p.confirmedSpent[utxo]
+		if !pending && !confirmed {
+			result = append(result, utxo)
+		}
+	}
+	return result
+}
 
-        case "brc-20":
-            brc20Content := common.ParseBrc20BaseContent(string(content))
-            if brc20Content == nil {
-                continue
-            }
-            switch brc20Content.Op {
-            case "deploy":
-                // deployInfo := common.ParseBrc20DeployContent(string(content))
-                // if deployInfo == nil {
-                //     continue
-                // }
-                // if len(deployInfo.Ticker) == 5 {
-                //     if deployInfo.SelfMint != "true" {
-                //         common.Log.Errorf("deploy, tick length 5, but not self_mint")
-                //         continue
-                //     }
-                // }
-                // assetName := common.AssetName{
-                //     Protocol: common.PROTOCOL_NAME_BRC20,
-                //     Type:     common.ASSET_TYPE_FT,
-                //     Ticker:   deployInfo.Ticker,
-                // }
+func (p *MiniMemPool) IsSpent(utxo string) bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	if p.spentByOutpoint[utxo] != "" {
+		return true
+	}
+	_, confirmed := p.confirmedSpent[utxo]
+	return confirmed
+}
 
-            case "mint":
-                // mintInfo := common.ParseBrc20MintContent(string(content))
-                // if mintInfo == nil {
-                //     continue
-                // }
+func (p *MiniMemPool) GetSpentUtxoByAddress(address string) []string {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-                // assetName := common.AssetName{
-                //    Protocol: common.PROTOCOL_NAME_BRC20,
-                //     Type:     common.ASSET_TYPE_FT,
-                //     Ticker:   mintInfo.Ticker,
-                // }
-                // ticker := instance.brc20Indexer.GetTicker(mintInfo.Ticker)
-                // if ticker == nil {
-                //     fmt.Printf("ticker %s not exists", mintInfo.Ticker)
-                //     continue
-                // }
+	addrUtxo := p.addrUtxoMap[address]
+	if addrUtxo == nil {
+		return nil
+	}
+	result := make([]string, 0, len(addrUtxo.SpentUtxo))
+	for outpoint := range addrUtxo.SpentUtxo {
+		if p.spentByOutpoint[outpoint] != "" {
+			result = append(result, outpoint)
+			continue
+		}
+		if _, confirmed := p.confirmedSpent[outpoint]; confirmed {
+			result = append(result, outpoint)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
 
-                // if ticker.SelfMint {
-                    
-                // }
-                
-                // // 调用 (s *IndexerMgr) handleMintTicker 检查是否是正确的铸造
+// GetUnconfirmedPlainUtxoByAddress returns only currently unspent mempool
+// outputs that have been fully classified and contain no supported asset.
+func (p *MiniMemPool) GetUnconfirmedPlainUtxoByAddress(address string) map[string]*common.TxOutput {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-                // amt := &ticker.Limit
-                // if mintInfo.Amt != "" {
-                //     amt, err = common.NewDecimalFromString(mintInfo.Amt, int(ticker.Decimal))
-                //     if err != nil {
-                //         fmt.Printf("NewDecimalFromString %s failed, %v", amt, err)
-                //         continue
-                //     }
-                // }
+	addrUtxo := p.addrUtxoMap[address]
+	if addrUtxo == nil {
+		return nil
+	}
+	result := make(map[string]*common.TxOutput, len(addrUtxo.UnconfirmedPlainUtxoMap))
+	for outpoint, output := range addrUtxo.UnconfirmedPlainUtxoMap {
+		if p.spentByOutpoint[outpoint] != "" {
+			continue
+		}
+		if _, confirmed := p.confirmedSpent[outpoint]; confirmed {
+			continue
+		}
+		result[outpoint] = output.Clone()
+	}
+	return result
+}
 
-                // mintedAmt := ticker.Minted.Add(amt)
-                // if mintedAmt.Cmp(&ticker.Max) > 0 {
-                //     amt = ticker.Max.Sub(&ticker.Minted)
-                // }
-                // if amt.Sign() == 0 {
-                //     continue
-                // }
+func (p *MiniMemPool) GetUnconfirmedSpentUtxoByAddress(address string) map[uint64]*common.TxOutput {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-                // asset := common.AssetInfo{
-                //     Name:       assetName,
-                //     Amount:     *amt,
-                //     BindingSat: 0,
-                // }
-                // // 假装是从这个输入转移到输出
-                // input.Assets.Add(&asset)
-                // input.Offsets[assetName] = common.AssetOffsets{&common.OffsetRange{Start: 0, End: 1}}
-                // input.SatBindingMap[0] = asset.Clone()
-                // status = 1
-
-            case "transfer":
-                transferInfo := common.ParseBrc20TransferContent(string(content))
-                if transferInfo == nil {
-                    continue
-                }
-                if len(insc[common.FIELD_CONTENT_TYPE]) == 0 {
-                    continue
-                }
-
-                parts := strings.Split(string(insc[common.FIELD_CONTENT_TYPE]), ";")
-                switch parts[0] {
-                case "application/json", "text/plain":
-                    // valid
-                default:
-                    continue
-                }
-                
-                assetName := common.AssetName{
-                    Protocol: common.PROTOCOL_NAME_BRC20,
-                    Type:     common.ASSET_TYPE_FT,
-                    Ticker:   transferInfo.Ticker,
-                }
-                ticker := instance.GetTickerInfo(&assetName)
-                if ticker == nil {
-                    fmt.Printf("ticker %s not exists", transferInfo.Ticker)
-                    continue
-                }
-
-                amt := transferInfo.Amt
-                dAmt, err := common.NewDecimalFromString(amt, ticker.Divisibility)
-                if err != nil {
-                    fmt.Printf("NewDecimalFromString %s failed, %v", amt, err)
-                    continue
-                }
-
-                asset := common.AssetInfo{
-                    Name:       assetName,
-                    Amount:     *dAmt,
-                    BindingSat: 0,
-                }
-                // 假定有效，在最后再做检查
-                // 假装是从这个输入转移到输出，在输出的地方，检查是否有足够的资产可以转移
-                input.Assets.Add(&asset)
-                input.Offsets[assetName] = common.AssetOffsets{&common.OffsetRange{Start: 0, End: 1}}
-                input.SatBindingMap[0] = asset.Clone()
-                status = 2
-            }
-        }
-    }
-
-    return status, nil
+	addrUtxo := p.addrUtxoMap[address]
+	if addrUtxo == nil {
+		return nil
+	}
+	invalidID := uint64(common.INVALID_ID)
+	result := make(map[uint64]*common.TxOutput, len(addrUtxo.SpentUtxo))
+	for outpoint, output := range addrUtxo.SpentUtxo {
+		if p.spentByOutpoint[outpoint] == "" {
+			if _, confirmed := p.confirmedSpent[outpoint]; !confirmed {
+				continue
+			}
+		}
+		id := output.UtxoId
+		if id == common.INVALID_ID {
+			id = invalidID
+			invalidID--
+		}
+		result[id] = output.Clone()
+	}
+	return result
 }

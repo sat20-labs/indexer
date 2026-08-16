@@ -127,6 +127,32 @@ func (s *Indexer) GetUtxoAssets(utxoId uint64) map[string]int64 {
 	return result
 }
 
+// GetUtxoBalances returns the atomical-level balances for one confirmed UTXO.
+// Mempool transfer classification needs the atomical id, not only the ticker
+// summary, because the protocol assigns each atomical independently.
+func (s *Indexer) GetUtxoBalances(utxoId uint64) []*UtxoBalance {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	items := s.utxoBalances[utxoId]
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(items))
+	for atomicalId := range items {
+		ids = append(ids, atomicalId)
+	}
+	sortAtomicalIds(ids)
+
+	result := make([]*UtxoBalance, 0, len(ids))
+	for _, atomicalId := range ids {
+		if balance := items[atomicalId]; balance != nil {
+			result = append(result, balance.Clone())
+		}
+	}
+	return result
+}
+
 func (s *Indexer) GetAssetsWithUtxo(utxoId uint64) map[string]common.AssetOffsets {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()

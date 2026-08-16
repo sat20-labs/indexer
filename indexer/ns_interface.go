@@ -11,10 +11,9 @@ func (b *IndexerMgr) GetNSStatus() *common.NameServiceStatus {
 	return b.ns.GetStatus()
 }
 
+// getNameInfoWithRegInfo is an internal helper. The caller must already be in
+// an RPC-gated read when reload consistency is required.
 func (b *IndexerMgr) getNameInfoWithRegInfo(reg *ns.NameRegister) *common.NameInfo {
-	b.rpcEnter()
-	defer b.rpcLeft()
-
 	address := b.GetAddressById(reg.Nft.OwnerAddressId)
 	utxo := b.GetUtxoById(reg.Nft.UtxoId)
 	kvs := make(map[string]*common.KeyValueInDB)
@@ -59,30 +58,17 @@ func (b *IndexerMgr) GetNameWithInscriptionId(id string) *common.NameInfo {
 	b.rpcEnter()
 	defer b.rpcLeft()
 
+	return b.getNameWithInscriptionId(id)
+}
+
+func (b *IndexerMgr) getNameWithInscriptionId(id string) *common.NameInfo {
 	reg := b.ns.GetNameRegisterInfoWithInscriptionId(id)
 	if reg == nil {
 		common.Log.Errorf("GetNameWithInscriptionId %s failed", id)
 		return nil
 	}
 
-	address := b.GetAddressById(reg.Nft.OwnerAddressId)
-	utxo := b.GetUtxoById(reg.Nft.UtxoId)
-	kvs := make(map[string]*common.KeyValueInDB)
-	attr := b.ns.GetNameProperties(reg)
-	if attr != nil {
-		for k, v := range attr.KVs {
-			kvs[k] = &common.KeyValueInDB{Value: v.Value, InscriptionId: v.InscriptionId}
-		}
-	}
-
-	return &common.NameInfo{
-		Base:         reg.Nft.Base,
-		Id:           reg.Id,
-		Name:         reg.Name,
-		OwnerAddress: address,
-		Utxo:         utxo,
-		KVs:          kvs,
-	}
+	return b.getNameInfoWithRegInfo(reg)
 }
 
 func (b *IndexerMgr) GetNamesWithUtxo(utxoId uint64) []string {
@@ -151,7 +137,7 @@ func (b *IndexerMgr) GetNamesWithAddress(address string, start, limit int) ([]*c
 	result := make([]*common.NameInfo, 0)
 	rngs := nfts[start:end]
 	for _, nft := range rngs {
-		info := b.GetNameWithInscriptionId(nft.Base.InscriptionId)
+		info := b.getNameWithInscriptionId(nft.Base.InscriptionId)
 		if info != nil {
 			result = append(result, info)
 		}
@@ -207,7 +193,7 @@ func (b *IndexerMgr) GetSubNamesWithAddress(address, sub string, start, limit in
 	result := make([]*common.NameInfo, 0)
 	rngs := subSet[start:end]
 	for _, nft := range rngs {
-		info := b.GetNameWithInscriptionId(nft.Base.InscriptionId)
+		info := b.getNameWithInscriptionId(nft.Base.InscriptionId)
 		if info != nil {
 			result = append(result, info)
 		}
@@ -245,7 +231,7 @@ func (b *IndexerMgr) GetSubNamesWithFilters(address, sub, filters string, start,
 	result := make([]*common.NameInfo, 0)
 	rngs := subSet[start:end]
 	for _, nft := range rngs {
-		info := b.GetNameWithInscriptionId(nft.Base.InscriptionId)
+		info := b.getNameWithInscriptionId(nft.Base.InscriptionId)
 		if info != nil {
 			result = append(result, info)
 		}
@@ -253,7 +239,6 @@ func (b *IndexerMgr) GetSubNamesWithFilters(address, sub, filters string, start,
 
 	return result, total
 }
-
 
 func (b *IndexerMgr) GetNamesWithKey(address, key string, start, limit int) ([]*common.NameInfo, int) {
 	b.rpcEnter()
@@ -268,7 +253,7 @@ func (b *IndexerMgr) GetNamesWithKey(address, key string, start, limit int) ([]*
 		// if sub != "" && subName != sub {
 		// 	continue
 		// }
-		info := b.GetNameWithInscriptionId(nft.Base.InscriptionId)
+		info := b.getNameWithInscriptionId(nft.Base.InscriptionId)
 		if info == nil {
 			continue
 		}
@@ -359,7 +344,7 @@ func (b *IndexerMgr) getNamesWithUtxo(utxoId uint64) map[string]common.AssetOffs
 		offsets := common.AssetOffsets{
 			{
 				Start: name.Nft.Offset,
-				End: name.Nft.Offset+1,
+				End:   name.Nft.Offset + 1,
 			},
 		}
 		result[name.Name] = offsets
@@ -371,6 +356,10 @@ func (p *IndexerMgr) GetNameHistory(start int, limit int) []*common.MintAbbrInfo
 	p.rpcEnter()
 	defer p.rpcLeft()
 
+	return p.getNameHistory(start, limit)
+}
+
+func (p *IndexerMgr) getNameHistory(start int, limit int) []*common.MintAbbrInfo {
 	result := make([]*common.MintAbbrInfo, 0)
 	names := p.ns.GetNames(start, limit)
 	for _, name := range names {
