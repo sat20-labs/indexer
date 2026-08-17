@@ -169,9 +169,32 @@ func (b *BaseIndexer) Subtract(another *BaseIndexer) {
 		delete(b.utxoIndex.Index, key)
 	}
 
-	for k := range another.addressValueMap {
-		v, ok := b.addressValueMap[k]
-		if ok && v.Op == 0 {
+	for k, flushed := range another.addressValueMap {
+		current, ok := b.addressValueMap[k]
+		if !ok {
+			continue
+		}
+		if current.Op == 0 {
+			delete(b.addressValueMap, k)
+			continue
+		}
+
+		// Normal addresses are persisted as a full replacement, so their
+		// current map must retain the flushed entries when the address changes
+		// again after Clone. NullData/OP_RETURN is different: its very large
+		// address record is append-only, and the live map is the pending delta.
+		// Remove the flushed delta here or every later service snapshot will
+		// append the same UTXOs again.
+		if current.AddressType != int(txscript.NullDataTy) &&
+			flushed.AddressType != int(txscript.NullDataTy) {
+			continue
+		}
+		for utxoId, flushedValue := range flushed.Utxos {
+			if currentValue, exists := current.Utxos[utxoId]; exists && currentValue == flushedValue {
+				delete(current.Utxos, utxoId)
+			}
+		}
+		if len(current.Utxos) == 0 {
 			delete(b.addressValueMap, k)
 		}
 	}
@@ -1263,11 +1286,26 @@ func (b *BaseIndexer) appendAddressUtxosToDBV2(key []byte, value *common.Address
 }
 
 func appendAddressUtxosToBytes(existing []byte, utxos map[uint64]int64) ([]byte, error) {
-	updated := append([]byte(nil), existing...)
+	pending := make(map[uint64]int64, len(utxos))
 	for utxoId, utxoValue := range utxos {
+		pending[utxoId] = utxoValue
+	}
+	if err := removePersistedAddressUtxos(existing, pending); err != nil {
+		return nil, err
+	}
+
+	updated := append([]byte(nil), existing...)
+	utxoIds := make([]uint64, 0, len(pending))
+	for utxoId := range pending {
+		utxoIds = append(utxoIds, utxoId)
+	}
+	sort.Slice(utxoIds, func(i, j int) bool {
+		return utxoIds[i] < utxoIds[j]
+	})
+	for _, utxoId := range utxoIds {
 		item, err := proto.Marshal(&common.UtxoIdInDB{
 			UtxoId: utxoId,
-			Value:  utxoValue,
+			Value:  pending[utxoId],
 		})
 		if err != nil {
 			return nil, err
@@ -1276,6 +1314,84 @@ func appendAddressUtxosToBytes(existing []byte, utxos map[uint64]int64) ([]byte,
 		updated = protowire.AppendBytes(updated, item)
 	}
 	return updated, nil
+}
+
+// removePersistedAddressUtxos makes the append-only NullData address update
+// idempotent without decoding the complete historical address record into a
+// second in-memory UTXO map. Only the small pending delta is retained.
+func removePersistedAddressUtxos(existing []byte, pending map[uint64]int64) error {
+	for len(existing) > 0 && len(pending) > 0 {
+		num, typ, n := protowire.ConsumeTag(existing)
+		if n < 0 {
+			return protowire.ParseError(n)
+		}
+		existing = existing[n:]
+
+		if num == 3 && typ == protowire.BytesType {
+			item, n := protowire.ConsumeBytes(existing)
+			if n < 0 {
+				return protowire.ParseError(n)
+			}
+			utxoId, utxoValue, err := decodeAddressUtxo(item)
+			if err != nil {
+				return err
+			}
+			if pendingValue, ok := pending[utxoId]; ok {
+				if pendingValue != utxoValue {
+					return fmt.Errorf(
+						"address UTXO %d value changed from %d to %d",
+						utxoId, utxoValue, pendingValue,
+					)
+				}
+				delete(pending, utxoId)
+			}
+			existing = existing[n:]
+			continue
+		}
+
+		n = protowire.ConsumeFieldValue(num, typ, existing)
+		if n < 0 {
+			return protowire.ParseError(n)
+		}
+		existing = existing[n:]
+	}
+	return nil
+}
+
+func decodeAddressUtxo(data []byte) (uint64, int64, error) {
+	var utxoId uint64
+	var utxoValue int64
+	for len(data) > 0 {
+		num, typ, n := protowire.ConsumeTag(data)
+		if n < 0 {
+			return 0, 0, protowire.ParseError(n)
+		}
+		data = data[n:]
+
+		switch {
+		case num == 1 && typ == protowire.VarintType:
+			value, n := protowire.ConsumeVarint(data)
+			if n < 0 {
+				return 0, 0, protowire.ParseError(n)
+			}
+			utxoId = value
+			data = data[n:]
+		case num == 2 && typ == protowire.VarintType:
+			value, n := protowire.ConsumeVarint(data)
+			if n < 0 {
+				return 0, 0, protowire.ParseError(n)
+			}
+			utxoValue = int64(value)
+			data = data[n:]
+		default:
+			n = protowire.ConsumeFieldValue(num, typ, data)
+			if n < 0 {
+				return 0, 0, protowire.ParseError(n)
+			}
+			data = data[n:]
+		}
+	}
+	return utxoId, utxoValue, nil
 }
 
 func (b *BaseIndexer) loadSyncStatsFromDB() {
