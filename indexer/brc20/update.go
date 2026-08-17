@@ -449,7 +449,8 @@ func (s *BRC20Indexer) cancelTransferNft(transfer *TransferNftInfo, height, inde
 	//s.addTransferNft(transfer)
 
 	// 检查该transfer nft最后输出到哪个utxoId
-	nft := s.nftIndexer.GetNftWithIdWithNoLock(transfer.TransferNft.Id)
+	nft := resolveTransferNftLocation(transfer,
+		s.nftIndexer.GetNftWithIdWithNoLock)
 
 	action := HolderAction{
 		Height:     height,
@@ -1074,10 +1075,15 @@ func (s *BRC20Indexer) TxInputProcess(txIndex int, tx *common.Transaction,
 		// 比如其中的一个：3f04ce47dc1ed5fc04243d3282dae6d472111fe584b2318d0715b6a1c9bb9664i0
 		if len(inputTransferNfts) != 0 {
 			for _, transfer := range inputTransferNfts {
-				if !transfer.TransferNft.IsInvalid {
-					transfer.TransferNft.IsInvalid = true
-					s.cancelTransferNft(transfer, block.Height, txIndex, tx)
+				if transfer.TransferNft.IsInvalid {
+					nft := resolveTransferNftLocation(transfer,
+						s.nftIndexer.GetNftWithIdWithNoLock)
+					s.spendInvalidTransferNft(transfer, block.Height, txIndex, nft)
+					continue
 				}
+
+				transfer.TransferNft.IsInvalid = true
+				s.cancelTransferNft(transfer, block.Height, txIndex, tx)
 			}
 		}
 	}
