@@ -81,7 +81,11 @@ func (s *Service) sendRawTxs(c *gin.Context) {
 		} else {
 			reason := strings.TrimSpace(r.RejectReason)
 			if reason == "" {
-				reason = "rejected without reason"
+				// Bitcoin Core may return a package-level error without a
+				// per-transaction reject reason.  The current RPC client drops
+				// that field, so keep the distinction visible instead of
+				// reporting a misleading generic rejection.
+				reason = "package rejected without per-transaction reason (possible package-error)"
 			}
 			detail := fmt.Sprintf("tx[%d] %s rejected: %s", i, r.TxId, reason)
 			resp.Data = append(resp.Data, detail)

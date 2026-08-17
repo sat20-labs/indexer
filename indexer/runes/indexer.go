@@ -685,7 +685,6 @@ func (s *Indexer) CheckSelf() bool {
 			common.Log.Errorf("rune %s checkHolders failed", rune.Name)
 			return false
 		}
-		s.dbWrite.ClearLogs() // 清除cache
 	}
 	common.Log.Infof("rune check amount took %v.", time.Since(startTime))
 	common.Log.Infof("runes has %d holders", len(allHolders))
