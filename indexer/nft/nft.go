@@ -202,6 +202,7 @@ func (p *NftIndexer) Clone(baseIndexer *base.BaseIndexer) *NftIndexer {
 		newInst.contentTypeMap[k] = v
 		newInst.contentTypeToIdMap[v] = k
 	}
+	newInst.lastContentTypeId = p.lastContentTypeId
 
 	newInst.nftAdded = make([]*common.Nft, len(p.nftAdded))
 	for i, nft := range p.nftAdded {
@@ -252,11 +253,13 @@ func (p *NftIndexer) Subtract(another *NftIndexer) {
 	for k := range another.nftIdToinscriptionMap {
 		delete(p.nftIdToinscriptionMap, k)
 	}
-	for k := range another.contentTypeMap {
-		delete(p.contentTypeMap, k)
-	}
-	for k := range another.contentTypeToIdMap {
-		delete(p.contentTypeToIdMap, k)
+	// contentTypeMap/contentTypeToIdMap are durable lookup state, not
+	// pending write buffers. Removing them would allocate duplicate IDs
+	// for MIME types already known after the first service snapshot.
+	// Advance the live persistence boundary with the flushed snapshot; any
+	// content types allocated after the snapshot remain above this value.
+	if p.lastContentTypeId < another.status.ContentTypeCount {
+		p.lastContentTypeId = another.status.ContentTypeCount
 	}
 	for k, v := range another.collectionMap {
 		if galleryInfoEqual(p.collectionMap[k], v) {
@@ -661,7 +664,7 @@ func (p *NftIndexer) CheckSelf() bool {
 	}
 
 	count := p.status.Count + p.status.CurseCount - uint64(len(p.nftAdded))
-	if count != uint64(len(nftsInT1)) || p.status.Count != uint64(lastkey+1) {
+	if count != uint64(len(nftsInT1)) || count != uint64(lastkey+1) {
 		common.Log.Errorf("nft count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
 		result = false
 	}

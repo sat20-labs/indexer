@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
-rm indexer-testnet
-go build -o indexer-testnet
+export INDEXER_DB_BACKEND=badger
+
+if ! ./build.sh; then
+  exit 1
+fi
 
 if [ $# -eq 0 ]; then
   nohup ./indexer-testnet -env ./testnet.env > ./nohup_testnet.log 2>&1 &
@@ -13,4 +16,3 @@ else
     echo "unknown parameter"
   fi
 fi
-

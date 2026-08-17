@@ -136,18 +136,11 @@ func (b *BaseIndexer) Clone(setStoredFlag bool) *BaseIndexer {
 
 	newInst.addressValueMap = make(map[string]*common.AddressValueV2)
 	for key, value := range b.addressValueMap {
-		n := common.AddressValueV2{
-			AddressId: value.AddressId,
-			Op:        value.Op,
-			Utxos:     make(map[uint64]int64),
-		}
+		n := value.Clone()
 		if setStoredFlag {
 			value.Op = 0 // 当作已经写入数据库
 		}
-		for id, v := range value.Utxos {
-			n.Utxos[id] = v
-		}
-		newInst.addressValueMap[key] = &n
+		newInst.addressValueMap[key] = n
 	}
 	newInst.idToAddressMap = make(map[uint64]string)
 	for k, v := range b.idToAddressMap {
@@ -1454,13 +1447,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_ADDRESSV2)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
-		//ids := b.printfUtxos(utxos1)
-		//b.deleteUtxos(ids)
-		// 因为badger数据库的bug，在DB_KEY_UTXO中删除的数据可能还会出现，在检查后需要重新删除，再次检查，但只重新检查一次
-		// if !b.reCheck {
-		// 	b.reCheck = true
-		// 	return b.CheckSelf()
-		// }
 		b.printfUtxos(utxos1)
 	}
 

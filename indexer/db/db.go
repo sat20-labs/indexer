@@ -25,12 +25,11 @@ func RunDBGC(kvdb common.KVDB) error {
 
 func NewKVDB(path string) common.KVDB {
 	//return NewLevelDB(path)
-	return NewPebbleDB(path, 0)
-	//return NewBadgerDB(path)
+	return newKVDB(path)
 	//return NewLMDB(path)
 	//return NewBoltDB(path)
 }
 
 func NewKVDBWithCache(path string, cacheSizeMB int) common.KVDB {
-	return NewPebbleDB(path, cacheSizeMB)
+	return newKVDBWithCache(path, cacheSizeMB)
 }

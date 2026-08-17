@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
-rm indexer-mainnet
-go build -o indexer-mainnet  -ldflags="-s -w"
+#export INDEXER_DB_BACKEND=badger
+
+if ! ./build.sh; then
+  exit 1
+fi
 
 if [ $# -eq 0 ]; then
   nohup ./indexer-mainnet -env ./mainnet.env > ./nohup_mainnet.log 2>&1 &
@@ -13,4 +16,3 @@ else
     echo "unknown parameter"
   fi
 fi
-

@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/sat20-labs/indexer/common/pb"
-
 )
 
 const (
@@ -30,24 +29,24 @@ type UtxoValue struct {
 }
 
 type AddressValueInDB struct {
-	AddressId   uint64
-	Op          int                   // -1 deleted; 0 read from db; 1 added
-	Utxos       map[uint64]*UtxoValue // utxoid -> value
+	AddressId uint64
+	Op        int                   // -1 deleted; 0 read from db; 1 added
+	Utxos     map[uint64]*UtxoValue // utxoid -> value
 }
 
 type AddressValue struct {
-	AddressId   uint64
-	Utxos       map[uint64]int64 // utxoid -> value
+	AddressId uint64
+	Utxos     map[uint64]int64 // utxoid -> value
 }
 
 type AddressValueInDBV2 = pb.PbAddressValueInDB
 
-func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2{
+func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2 {
 	r := &AddressValueV2{
-		AddressId: p.AddressId,
+		AddressId:   p.AddressId,
 		AddressType: int(p.AddressType),
-		Op: 0,
-		Utxos: make(map[uint64]int64),
+		Op:          0,
+		Utxos:       make(map[uint64]int64),
 	}
 	for _, id := range p.Utxos {
 		r.Utxos[id.UtxoId] = id.Value
@@ -58,20 +57,39 @@ func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2{
 type AddressValueV2 struct {
 	AddressId   uint64
 	AddressType int
-	Op          int             // -1 deleted; 0 read from db; 1 added/modified
+	Op          int              // -1 deleted; 0 read from db; 1 added/modified
 	Utxos       map[uint64]int64 // utxoid，全量数据
+}
+
+// Clone returns a fully independent copy. AddressType is persistence metadata:
+// omitting it changes the write semantics of NullData/OP_RETURN addresses.
+func (p *AddressValueV2) Clone() *AddressValueV2 {
+	if p == nil {
+		return nil
+	}
+
+	clone := &AddressValueV2{
+		AddressId:   p.AddressId,
+		AddressType: p.AddressType,
+		Op:          p.Op,
+		Utxos:       make(map[uint64]int64, len(p.Utxos)),
+	}
+	for id, value := range p.Utxos {
+		clone.Utxos[id] = value
+	}
+	return clone
 }
 
 func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
 	n := &AddressValueInDBV2{
-		AddressId: p.AddressId,
+		AddressId:   p.AddressId,
 		AddressType: int32(p.AddressType),
-		Utxos: make([]*UtxoIdInDB, 0),
+		Utxos:       make([]*UtxoIdInDB, 0),
 	}
 	for id, value := range p.Utxos {
 		n.Utxos = append(n.Utxos, &UtxoIdInDB{
 			UtxoId: id,
-			Value: value,
+			Value:  value,
 		})
 	}
 	return n

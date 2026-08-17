@@ -22,7 +22,7 @@ import (
 var _enable_compress_nft = false
 
 // 每个NFT Mint都调用
-func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64, 
+func (p *NftIndexer) NftMint(input *common.TxInput, inOffset int64,
 	nft *common.Nft, tx *common.Transaction) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -86,7 +86,7 @@ func (p *NftIndexer) sortInscriptionInBlock(block *common.Block) int {
 						// unbound
 						idx += totalTxs + 1
 					}
-				} // else c5ce8f9e0dee52be34cc75b7d4df66d8fe58d6d02c2737a898d7d1755f61fc24i0 
+				} // else c5ce8f9e0dee52be34cc75b7d4df66d8fe58d6d02c2737a898d7d1755f61fc24i0
 				_, outTxIndex, _ := common.FromUtxoId(info.UtxoId)
 				if outTxIndex == 0 {
 					// fee spent
@@ -232,15 +232,15 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 			// }
 
 			// 合并资产
-			sats := p.utxoMap[input.UtxoId]                 // 已经铭刻的聪
+			sats := p.utxoMap[input.UtxoId] // 已经铭刻的聪
 			if sats == nil {
 				sats = make(map[int64]int64)
 			}
 
 			/*
-			寻找重复的铭文，需要考虑几个特殊的case：
-			1. 本区块新增加的nft，有可能已经是重复铭刻同一个聪
-			2. 输入的utxo是本区块生成的，所以这个时候utxoMap没有任何sats。这里需要想办法解决聪在本区块内能唯一表示，仅靠utxo内的偏移，会导致结果
+				寻找重复的铭文，需要考虑几个特殊的case：
+				1. 本区块新增加的nft，有可能已经是重复铭刻同一个聪
+				2. 输入的utxo是本区块生成的，所以这个时候utxoMap没有任何sats。这里需要想办法解决聪在本区块内能唯一表示，仅靠utxo内的偏移，会导致结果
 			*/
 			addedNft := p.nftAddedUtxoMap[input.UtxoId] // 本次区块中铭刻的聪
 			// 将铸造资产加入utxomap，并计算可能的reinscription
@@ -251,12 +251,12 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 					p.addNftToSatMap(nft)
 					// unbound 不加入utxomap
 					continue
-				} 
+				}
 				for sat, offset := range sats {
 					if offset == info.InOffset {
 						if sat != nft.Base.Sat {
 							nft.Base.Sat = sat // 同一个聪，需要命名一致
-							// 根据ordinals规则，判断是否是reinscription 
+							// 根据ordinals规则，判断是否是reinscription
 							if nft.Base.BlockHeight < int32(common.Jubilee_Height) {
 								if nft.Base.CurseType == 0 {
 									nftsInSat := p.satMap[nft.Base.Sat] // 预加载，肯定有值
@@ -323,7 +323,7 @@ func (p *NftIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Rang
 		//common.Log.Infof("process %s outputs takes %v", tx.TxId, time.Since(t2))
 		if change != nil {
 			// 处理testnet4中fee聪丢失的情况
-			if newSize + change.Value() <= coinbaseSize {
+			if newSize+change.Value() <= coinbaseSize {
 				coinbaseInput.Append(change)
 				newSize += change.Value()
 			} else {
@@ -474,6 +474,17 @@ func (p *NftIndexer) innerUpdateTransfer(tx *common.Transaction,
 		}
 	}
 	return change
+}
+
+func contentTypeIDsToPersist(lastPersisted, current int) []int {
+	if current <= lastPersisted {
+		return nil
+	}
+	ids := make([]int, 0, current-lastPersisted)
+	for id := lastPersisted + 1; id <= current; id++ {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // 跟base数据库同步
@@ -648,7 +659,7 @@ func (p *NftIndexer) UpdateDB() {
 	//startTime = time.Now()
 
 	//common.Log.Debugf("add %d content type...", p.status.ContentTypeCount-p.lastContentTypeId)
-	for ctId := p.lastContentTypeId; ctId < p.status.ContentTypeCount; ctId++ {
+	for _, ctId := range contentTypeIDsToPersist(p.lastContentTypeId, p.status.ContentTypeCount) {
 		key := GetCTKey(ctId)
 		value := p.contentTypeMap[ctId]
 		err := db.SetDB([]byte(key), value, wb)
@@ -691,7 +702,6 @@ func (p *NftIndexer) UpdateDB() {
 
 	common.Log.Infof("NftIndexer->UpdateDB takes %v", time.Since(startTime))
 }
-
 
 func (p *NftIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*common.Range) {
 	p.mutex.Lock()
@@ -748,7 +758,7 @@ func (p *NftIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*comm
 		satLoadingVector := make([]*pair, 0, len(satsToLoad))
 		for k := range satsToLoad {
 			satLoadingVector = append(satLoadingVector, &pair{
-				key: GetSatKey(k),
+				key:    GetSatKey(k),
 				utxoId: uint64(k),
 			})
 		}
@@ -816,9 +826,9 @@ func retrieveValue(v any) string {
 func retrieveTitle(tm map[string]any) string {
 	for k, v := range tm {
 		lk := strings.ToLower(k)
-		if lk == "title" || 
-		lk == "collection" ||
-		lk == "collection title" {
+		if lk == "title" ||
+			lk == "collection" ||
+			lk == "collection title" {
 			return retrieveValue(v)
 		}
 	}
@@ -828,9 +838,9 @@ func retrieveTitle(tm map[string]any) string {
 func retrieveAuthor(tm map[string]any) string {
 	for k, v := range tm {
 		lk := strings.ToLower(k)
-		if lk == "author" || 
-		lk == "creator" || 
-		lk == "artist" {
+		if lk == "author" ||
+			lk == "creator" ||
+			lk == "artist" {
 			return retrieveValue(v)
 		}
 	}
@@ -900,8 +910,8 @@ func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
 		// 检查输入是否有parent
 		assetName := common.AssetName{
 			Protocol: common.PROTOCOL_NAME_ORDX,
-			Type: common.ASSET_TYPE_NFT,
-			Ticker: fmt.Sprintf("%d", parent.Base.Sat),
+			Type:     common.ASSET_TYPE_NFT,
+			Ticker:   fmt.Sprintf("%d", parent.Base.Sat),
 		}
 		found := false
 		for _, txIn := range tx.Inputs {
@@ -922,22 +932,21 @@ func (p *NftIndexer) handleCollection(nft *common.Nft, tx *common.Transaction) {
 			// new collection
 			title, author, desc := retrieveFromMetaData(parent.Base.MetaData)
 			collection = &CollectionInfo{
-				Id: int64(p.status.CollectionCount),
-				NftId: parent.Base.Id,
+				Id:            int64(p.status.CollectionCount),
+				NftId:         parent.Base.Id,
 				InscriptionId: parent.Base.InscriptionId,
-				Title: title,
-				Author: author,
-				Description: desc,
+				Title:         title,
+				Author:        author,
+				Description:   desc,
 			}
-			p.collectionMap[parent.Base.Id] = collection 
+			p.collectionMap[parent.Base.Id] = collection
 			p.status.CollectionCount++
 		}
 		collection.Items = append(collection.Items, nft.Base.Id)
-		
+
 		i++
 	}
 }
-
 
 func BrotliDecompress(data []byte) ([]byte, error) {
 	reader := brotli.NewReader(bytes.NewReader(data))
@@ -952,14 +961,14 @@ func BrotliDecompress(data []byte) ([]byte, error) {
 }
 
 func ParseProperties(data []byte) (*common.Properties, error) {
-    var p common.Properties
+	var p common.Properties
 
-    err := cbor.Unmarshal(data, &p)
-    if err != nil {
-        return nil, err
-    }
+	err := cbor.Unmarshal(data, &p)
+	if err != nil {
+		return nil, err
+	}
 
-    return &p, nil
+	return &p, nil
 }
 
 // 需要tx所有输入已经加载资产信息
@@ -1005,12 +1014,12 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 			}
 
 			gallery = &GalleryInfo{
-				Id: int64(p.status.GalleryCount),
-				NftId: nft.Base.Id,
+				Id:            int64(p.status.GalleryCount),
+				NftId:         nft.Base.Id,
 				InscriptionId: nft.Base.InscriptionId,
-				Author: author,
-				Title: title,
-				Description: desc,
+				Author:        author,
+				Title:         title,
+				Description:   desc,
 			}
 		}
 		for _, item := range decodedData.Items {
@@ -1021,7 +1030,7 @@ func (p *NftIndexer) handleGallery(nft *common.Nft) {
 			}
 		}
 		if len(gallery.Items) > 0 {
-			p.galleryMap[nft.Base.Id] = gallery 
+			p.galleryMap[nft.Base.Id] = gallery
 			p.status.GalleryCount++
 		} else {
 			common.Log.Infof("%s is empty gallery", nft.Base.InscriptionId)

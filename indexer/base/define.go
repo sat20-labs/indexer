@@ -20,15 +20,16 @@ type IrregularSubsidy struct {
 	SatsLeakBlocks map[int]int64
 }
 
-func (p *SyncStats) Clone () *SyncStats {
+func (p *SyncStats) Clone() *SyncStats {
 	c := &SyncStats{
-		ChainTip: p.ChainTip,
-		SyncHeight: p.SyncHeight,
+		ChainTip:      p.ChainTip,
+		SyncHeight:    p.SyncHeight,
 		SyncBlockHash: p.SyncBlockHash,
-		AllUtxoCount: p.AllUtxoCount,
-		AddressCount: p.AddressCount,
-		UtxoCount: p.UtxoCount,
-		TotalSats: p.TotalSats,
+		AllUtxoCount:  p.AllUtxoCount,
+		AddressCount:  p.AddressCount,
+		UtxoCount:     p.UtxoCount,
+		TotalSats:     p.TotalSats,
+		BurnedSats:    p.BurnedSats,
 	}
 	c.ReorgsDetected = make([]int, len(p.ReorgsDetected))
 	copy(c.ReorgsDetected, p.ReorgsDetected)

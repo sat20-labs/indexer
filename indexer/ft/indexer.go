@@ -151,9 +151,9 @@ func (s *FTIndexer) Clone(nftIndexer *nft.NftIndexer) *FTIndexer {
 	}
 	newInst.reloadRequestHeight = s.reloadRequestHeight
 
-	newInst.tickerAdded = make(map[string]*common.Ticker, 0)
+	newInst.tickerAdded = make(map[string]*common.Ticker, len(s.tickerAdded))
 	for key, value := range s.tickerAdded {
-		newInst.tickerAdded[key] = value
+		newInst.tickerAdded[key] = value.Clone()
 	}
 
 	newInst.tickerMap = make(map[string]*TickInfo, 0)
@@ -223,8 +223,10 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 	//s.holderActionList = s.holderActionList[len(another.holderActionList):]
 	s.holderActionList = append([]*HolderAction(nil), s.holderActionList[len(another.holderActionList):]...)
 
-	for key := range another.tickerAdded {
-		delete(s.tickerAdded, key)
+	for key, snapshot := range another.tickerAdded {
+		if tickerStateEqual(s.tickerAdded[key], snapshot) {
+			delete(s.tickerAdded, key)
+		}
 	}
 
 	for key, value := range another.tickerMap {
@@ -256,6 +258,13 @@ func (s *FTIndexer) Subtract(another *FTIndexer) {
 	s.reloadRequestHeight = 0
 
 	// 不需要更新 holderInfo 和 utxoMap
+}
+
+func tickerStateEqual(a, b *common.Ticker) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func stateEqual(a, b *common.FreezeState) bool {
