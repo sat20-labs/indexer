@@ -663,9 +663,26 @@ func (p *NftIndexer) CheckSelf() bool {
 		result = false
 	}
 
-	count := p.status.Count + p.status.CurseCount - uint64(len(p.nftAdded))
-	if count != uint64(len(nftsInT1)) || count != uint64(lastkey+1) {
-		common.Log.Errorf("nft count different %d %d %d", count, len(nftsInT1), uint64(lastkey+1))
+	var pendingPositive uint64
+	for _, nft := range p.nftAdded {
+		if nft.Base.Id >= 0 {
+			pendingPositive++
+		}
+	}
+	persistedTotal := p.status.Count + p.status.CurseCount - uint64(len(p.nftAdded))
+	persistedPositive := p.status.Count - pendingPositive
+	lastPositiveCount := uint64(0)
+	if lastkey >= 0 {
+		lastPositiveCount = uint64(lastkey) + 1
+	}
+	if persistedTotal != uint64(len(nftsInT1)) ||
+		persistedTotal != uint64(len(buckmap)) ||
+		persistedPositive != lastPositiveCount {
+		common.Log.Errorf(
+			"nft count different: persisted total %d, sat table %d, buck table %d, "+
+				"persisted positive %d, last positive count %d",
+			persistedTotal, len(nftsInT1), len(buckmap), persistedPositive, lastPositiveCount,
+		)
 		result = false
 	}
 

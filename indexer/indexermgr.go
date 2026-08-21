@@ -292,6 +292,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 	bWantExit := false
 	isRunning := false
 	disableSync := false // 启动rpc，不再同步数据
+	lastHeight := -1
 	tick := func() {
 		if disableSync {
 			return
@@ -300,6 +301,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 			isRunning = true
 			go func() {
 				for !bWantExit {
+					lastHeight = b.base.GetHeight()
 					ret := b.base.SyncToChainTip(stopIndexerChan)
 					if ret == 0 {
 						if reloadHeight, directives := b.ftIndexer.ConsumeReloadRequest(); reloadHeight > 0 {
@@ -322,6 +324,12 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 									b.miniMempool.Start(&b.cfg.ShareRPC.Bitcoin)
 								}
 							}
+
+							if lastHeight == b.base.GetHeight() {
+								// 没有新区块了
+								time.Sleep(10*time.Second)
+							}
+							
 						}
 
 						if b.maxIndexHeight > 0 {
