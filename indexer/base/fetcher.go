@@ -124,21 +124,31 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 	return bl
 }
 
-// Prefetches blocks from bitcoind and sends them to the blocksChan
-func (b *BaseIndexer) spawnBlockFetcher(startHeigh int, endHeight int, stopChan chan struct{}) {
-	currentHeight := startHeigh
-	for currentHeight <= endHeight {
+// sendBlockOrStop transfers ownership of a fetched block to the consumer, or
+// returns false immediately when synchronization is cancelled.
+func sendBlockOrStop(blocks chan<- *common.Block, block *common.Block, stop <-chan struct{}) bool {
+	select {
+	case blocks <- block:
+		return true
+	case <-stop:
+		return false
+	}
+}
+
+// Prefetches blocks from bitcoind and sends them to the blocksChan.
+func (b *BaseIndexer) spawnBlockFetcher(startHeight int, endHeight int, stopChan chan struct{}) {
+	for currentHeight := startHeight; currentHeight <= endHeight; currentHeight++ {
 		select {
 		case <-stopChan:
 			return
 		default:
-			block := FetchBlock(currentHeight, b.chaincfgParam)
-			b.blocksChan <- block
-			currentHeight += 1
+		}
+
+		block := FetchBlock(currentHeight, b.chaincfgParam)
+		if !sendBlockOrStop(b.blocksChan, block, stopChan) {
+			return
 		}
 	}
-
-	<-stopChan
 }
 
 func (b *BaseIndexer) drainBlocksChan() {

@@ -1,3 +1,5 @@
+//go:build live
+
 package brc20
 
 import (
@@ -9,10 +11,8 @@ import (
 	"testing"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/brc20/validate"
 	"github.com/stretchr/testify/assert"
 )
-
 
 func GetRawData(txID string, network string) ([][]byte, error) {
 	url := ""
@@ -110,7 +110,6 @@ func TestParser_ord20(t *testing.T) {
 
 }
 
-
 type nftItem struct {
 	Id                 int64  `json:"id"`
 	Name               string `json:"name"`
@@ -136,7 +135,6 @@ type nftInfo struct {
 	Delegate     string `json:"delegate"`
 }
 
-
 type BaseResp struct {
 	Code int    `json:"code" example:"0"`
 	Msg  string `json:"msg" example:"ok"`
@@ -147,10 +145,8 @@ type NftInfoResp struct {
 	Data *nftInfo `json:"data"`
 }
 
-
-
 func GetInscription(id int64, host string) (*nftInfo, error) {
-	
+
 	url := fmt.Sprintf("%s/nft/nftid/%d", host, id)
 
 	response, err := http.Get(url)
@@ -159,7 +155,6 @@ func GetInscription(id int64, host string) (*nftInfo, error) {
 
 	}
 	defer response.Body.Close()
-	
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to retrieve data for %s from the API, error: %v", url, err)
@@ -174,10 +169,9 @@ func GetInscription(id int64, host string) (*nftInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", url, err)
 	}
-	
+
 	return data.Data, nil
 }
-
 
 type NftStatusData struct {
 	Version string     `json:"version"`
@@ -186,14 +180,13 @@ type NftStatusData struct {
 	Nfts    []*nftItem `json:"nfts"`
 }
 
-
 type NftStatusResp struct {
 	BaseResp
 	Data *NftStatusData `json:"data"`
 }
 
 func GetNftStatus(host string) (*NftStatusData, error) {
-	
+
 	url := fmt.Sprintf("%s/nft/status", host)
 
 	response, err := http.Get(url)
@@ -202,7 +195,6 @@ func GetNftStatus(host string) (*NftStatusData, error) {
 
 	}
 	defer response.Body.Close()
-	
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to retrieve data for %s from the API, error: %v", url, err)
@@ -217,10 +209,9 @@ func GetNftStatus(host string) (*NftStatusData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode JSON response for %s, error: %v", url, err)
 	}
-	
+
 	return data.Data, nil
 }
-
 
 func TestCompareInscription(t *testing.T) {
 	//url0 := "http://192.168.1.101:8019/btc/testnet"
@@ -250,7 +241,7 @@ func TestCompareInscription(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		nft2, err := GetInscription(i, host2)
 		if err != nil {
 			t.Fatal(err)
@@ -265,160 +256,9 @@ func TestCompareInscription(t *testing.T) {
 			fmt.Printf("%d: %s outpoint different %d %d\n", i, nft1.InscriptionId, nft1.OutPoint, nft2.OutPoint)
 		}
 
-		if i % 1000 == 0 {
+		if i%1000 == 0 {
 			fmt.Printf("%d\n", i)
 		}
 	}
 
-}
-
-func TestParseValidateHolderFileData(t *testing.T) {
-	validateHolderData, err := validate.ReadBRC20HolderCSV("./validate/holders/holders_931177.csv")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20HolderCSV failed, %v", err)
-	}
-	
-	var startHeight, endHeight int
-	startHeight = 0xffffffff
-
-	tickers := make(map[string]bool)
-	heightToHolderRecords := make(map[int]map[string]map[string]*validate.BRC20HolderCSVRecord)
-	for _, record := range validateHolderData {
-		tickerToHolders, ok := heightToHolderRecords[record.LastHeight]
-		if !ok {
-			tickerToHolders = make(map[string]map[string]*validate.BRC20HolderCSVRecord)
-			heightToHolderRecords[record.LastHeight] = tickerToHolders
-		}
-		holders, ok := tickerToHolders[record.Token]
-		if !ok {
-			holders = make(map[string]*validate.BRC20HolderCSVRecord)
-			tickerToHolders[record.Token] = holders
-		}
-		holders[record.Address] = record
-		tickers[record.Token] = true
-
-		if record.LastHeight > endHeight {
-			endHeight = record.LastHeight
-		}
-		if record.LastHeight < startHeight {
-			startHeight = record.LastHeight
-		}
-	}
-
-	// 931177
-	fmt.Printf("len %d, height %d-%d, %v\n", len(heightToHolderRecords), startHeight, endHeight, tickers)
-}
-
-func TestParseValidateHolderDir(t *testing.T) {
-	var err error
-	validateHolderData, err := validate.ReadBRC20HolderCSVDir("./validate/holders")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20HolderCSVDir failed, %v", err)
-	}
-	
-	var startHeight, endHeight int
-	startHeight = 0xffffffff
-
-	tickers := make(map[string]bool)
-	heightToHolderRecords := make(map[int]map[string]map[string]*validate.BRC20HolderCSVRecord)
-	for _, record := range validateHolderData {
-		tickerToHolders, ok := heightToHolderRecords[record.LastHeight]
-		if !ok {
-			tickerToHolders = make(map[string]map[string]*validate.BRC20HolderCSVRecord)
-			heightToHolderRecords[record.LastHeight] = tickerToHolders
-		}
-		holders, ok := tickerToHolders[record.Token]
-		if !ok {
-			holders = make(map[string]*validate.BRC20HolderCSVRecord)
-			tickerToHolders[record.Token] = holders
-		}
-		holders[record.Address] = record
-		tickers[record.Token] = true
-
-		if record.LastHeight > endHeight {
-			endHeight = record.LastHeight
-		}
-		if record.LastHeight < startHeight {
-			startHeight = record.LastHeight
-		}
-	}
-
-	// 928228-928300
-	fmt.Printf("len %d, height %d-%d, %v\n", len(heightToHolderRecords), startHeight, endHeight, tickers)
-}
-
-
-func TestParseSplitFile(t *testing.T) {
-	err := validate.SplitCSVFile("./validate/ordi.csv", "./validate/ordi", 40000, "ordi")
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestFilterFile(t *testing.T) {
-	err := validate.FilterCSVFile("./validate/dior_records.csv", "./validate/dior_records_2", 902394)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestParseValidateDir_history(t *testing.T) {
-	var err error
-	validateData, start, end, err := validate.ReadBRC20CSVDir("./validate/ordi")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
-	}
-
-	fmt.Printf("len %d, height %d %d", len(validateData), start, end)
-}
-
-
-func TestParseValidateData_history(t *testing.T) {
-	validateHolderData, start, end, err := validate.ReadBRC20CSV("./validate/pizza_records.csv")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20CSV failed, %v", err)
-	}
-
-	fmt.Printf("len %d, height %d %d", len(validateHolderData), start, end)
-}
-
-
-func TestCompareValidateFile(t *testing.T) {
-
-	validateData1, _, _, err := validate.ReadBRC20CSVDir("./validate/ordi")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
-	}
-
-	validateData2, _, _, err := validate.ReadBRC20CSV("./validate/ordi_records.csv")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
-	}
-
-	// validateData2, err := validate.ReadBRC20CSV("./validate/ordi.csv")
-	// if err != nil {
-	// 	common.Log.Panicf("ReadBRC20CSVDir failed, %v", err)
-	// }
-
-	diff1 := findDiffInMap(validateData1, validateData2)
-	fmt.Printf("diff1 %d\n", len(diff1))
-	for _, d := range diff1 {
-		fmt.Printf("%v\n", validateData1[d])
-	}
-
-	diff2 := findDiffInMap(validateData2, validateData1)
-	fmt.Printf("diff2 %d\n", len(diff2))
-	for _, d := range diff2 {
-		fmt.Printf("%v\n", validateData2[d])
-	}
-
-}
-
-func TestParseValidateData_tickers(t *testing.T) {
-	tickerAll, err := validate.ReadBRC20TickersCSV("./validate/ticker_all.csv")
-	if err != nil {
-		common.Log.Panicf("ReadBRC20TickersCSV failed, %v", err)
-	}
-
-	fmt.Printf("tickers %d", len(tickerAll))
 }

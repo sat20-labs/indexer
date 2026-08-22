@@ -51,7 +51,7 @@ type spentBalance struct {
 func (s *Indexer) collectInputBalances(tx *common.Transaction) []*spentBalance {
 	result := make([]*spentBalance, 0)
 	for inputIndex, input := range tx.Inputs {
-		items := s.utxoBalances[input.UtxoId]
+		items := s.ensureUtxoBalancesLoadedLocked(input.UtxoId)
 		if len(items) == 0 {
 			continue
 		}
@@ -318,11 +318,13 @@ func (s *Indexer) validMintEnvelope(height int, tx *common.Transaction, op *Oper
 }
 
 func (s *Indexer) dftMintedTimesLocked(tickerName string, ticker *Ticker) int64 {
-	actualMints := ticker.MintedTimes
-	if historyMints := int64(len(s.mintHistory[strings.ToLower(tickerName)])); historyMints > actualMints {
-		actualMints = historyMints
+	_ = tickerName
+	if ticker == nil {
+		return 0
 	}
-	return actualMints
+	// Ticker.MintedTimes is the durable aggregate. Mint history is query data
+	// and is no longer loaded process-wide.
+	return ticker.MintedTimes
 }
 
 func (s *Indexer) validDftMintBitwork(height int, tx *common.Transaction, op *Operation, ticker *Ticker, actualMints int64) bool {
@@ -780,36 +782,48 @@ func (s *Indexer) addUtxoBalanceInMemory(balance *UtxoBalance) {
 	}
 	ticker := strings.ToLower(balance.Ticker)
 	balance.Ticker = ticker
-	key := GetUtxoBalanceKey(balance.UtxoId, balance.AtomicalId)
-	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
-		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
-	}
-	if existing := s.utxoBalances[balance.UtxoId][balance.AtomicalId]; existing != nil {
-		s.removeUtxoBalanceFromIndexes(existing, true)
-		delete(s.utxoDeleted, key)
-	}
-	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
-		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
-	}
-	s.utxoBalances[balance.UtxoId][balance.AtomicalId] = balance.Clone()
-	if _, ok := s.tickerUtxos[ticker]; !ok {
+
+	items := s.ensureUtxoBalancesLoadedLocked(balance.UtxoId)
+	s.ensureHolderAggregateLoadedLocked(balance.AddressId, ticker)
+	if s.tickerUtxos[ticker] == nil {
 		s.tickerUtxos[ticker] = make(map[uint64]int64)
 	}
+	if _, exists := s.tickerUtxos[ticker][balance.UtxoId]; !exists {
+		var existingTotal int64
+		for _, item := range items {
+			if strings.EqualFold(item.Ticker, ticker) {
+				existingTotal += item.Amount
+			}
+		}
+		s.tickerUtxos[ticker][balance.UtxoId] = existingTotal
+	}
+
+	key := GetUtxoBalanceKey(balance.UtxoId, balance.AtomicalId)
+	if existing := items[balance.AtomicalId]; existing != nil {
+		s.removeUtxoBalanceFromIndexes(existing, true)
+		delete(s.utxoDeleted, key)
+		items = s.utxoBalances[balance.UtxoId]
+		if items == nil {
+			items = make(map[string]*UtxoBalance)
+			s.utxoBalances[balance.UtxoId] = items
+		}
+	}
+
+	beforeHolder := s.holderBalances[balance.AddressId][ticker]
+	items[balance.AtomicalId] = balance.Clone()
 	s.tickerUtxos[ticker][balance.UtxoId] += balance.Amount
-	if _, ok := s.holderBalances[balance.AddressId]; !ok {
-		s.holderBalances[balance.AddressId] = make(map[string]int64)
-	}
 	s.holderBalances[balance.AddressId][ticker] += balance.Amount
-	if _, ok := s.tickerHolders[ticker]; !ok {
-		s.tickerHolders[ticker] = make(map[uint64]int64)
-	}
 	s.tickerHolders[ticker][balance.AddressId] += balance.Amount
+	afterHolder := s.holderBalances[balance.AddressId][ticker]
 	if t := s.getTickerLocked(ticker); t != nil {
-		t.HolderCount = len(s.tickerHolders[ticker])
+		if beforeHolder == 0 && afterHolder > 0 {
+			t.HolderCount++
+		}
 		s.touchTicker(t)
 	}
+
 	s.utxoTouched[key] = balance.Clone()
-	s.holderTouched[GetHolderAssetKey(balance.AddressId, ticker)] = s.holderBalances[balance.AddressId][ticker]
+	s.holderTouched[GetHolderAssetKey(balance.AddressId, ticker)] = afterHolder
 	s.holderTouched[GetTickerHolderKey(ticker, balance.AddressId)] = s.tickerHolders[ticker][balance.AddressId]
 }
 
@@ -819,31 +833,10 @@ func (s *Indexer) addLoadedUtxoBalanceInMemory(balance *UtxoBalance) {
 	}
 	ticker := strings.ToLower(balance.Ticker)
 	balance.Ticker = ticker
-	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
-		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
-	}
-	if existing := s.utxoBalances[balance.UtxoId][balance.AtomicalId]; existing != nil {
-		s.removeUtxoBalanceFromIndexes(existing, false)
-	}
-	if _, ok := s.utxoBalances[balance.UtxoId]; !ok {
+	if s.utxoBalances[balance.UtxoId] == nil {
 		s.utxoBalances[balance.UtxoId] = make(map[string]*UtxoBalance)
 	}
 	s.utxoBalances[balance.UtxoId][balance.AtomicalId] = balance.Clone()
-	if _, ok := s.tickerUtxos[ticker]; !ok {
-		s.tickerUtxos[ticker] = make(map[uint64]int64)
-	}
-	s.tickerUtxos[ticker][balance.UtxoId] += balance.Amount
-	if _, ok := s.holderBalances[balance.AddressId]; !ok {
-		s.holderBalances[balance.AddressId] = make(map[string]int64)
-	}
-	s.holderBalances[balance.AddressId][ticker] += balance.Amount
-	if _, ok := s.tickerHolders[ticker]; !ok {
-		s.tickerHolders[ticker] = make(map[uint64]int64)
-	}
-	s.tickerHolders[ticker][balance.AddressId] += balance.Amount
-	if t := s.getTickerLocked(ticker); t != nil {
-		t.HolderCount = len(s.tickerHolders[ticker])
-	}
 }
 
 func (s *Indexer) removeUtxoBalanceInMemory(balance *UtxoBalance) {
@@ -857,33 +850,44 @@ func (s *Indexer) removeUtxoBalanceInMemory(balance *UtxoBalance) {
 }
 
 func (s *Indexer) removeUtxoBalanceFromIndexes(balance *UtxoBalance, trackPending bool) {
+	if balance == nil {
+		return
+	}
 	ticker := strings.ToLower(balance.Ticker)
-	if items := s.utxoBalances[balance.UtxoId]; items != nil {
-		delete(items, balance.AtomicalId)
-		if len(items) == 0 {
-			delete(s.utxoBalances, balance.UtxoId)
-		}
+	s.ensureHolderAggregateLoadedLocked(balance.AddressId, ticker)
+	items := s.ensureUtxoBalancesLoadedLocked(balance.UtxoId)
+	if s.tickerUtxos[ticker] == nil {
+		s.tickerUtxos[ticker] = make(map[uint64]int64)
 	}
-	if items := s.tickerUtxos[ticker]; items != nil {
-		items[balance.UtxoId] -= balance.Amount
-		if items[balance.UtxoId] <= 0 {
-			delete(items, balance.UtxoId)
+	if _, exists := s.tickerUtxos[ticker][balance.UtxoId]; !exists {
+		var total int64
+		for _, item := range items {
+			if strings.EqualFold(item.Ticker, ticker) {
+				total += item.Amount
+			}
 		}
+		s.tickerUtxos[ticker][balance.UtxoId] = total
 	}
-	if items := s.holderBalances[balance.AddressId]; items != nil {
-		items[ticker] -= balance.Amount
-		if items[ticker] <= 0 {
-			delete(items, ticker)
-		}
+
+	beforeHolder := s.holderBalances[balance.AddressId][ticker]
+	delete(items, balance.AtomicalId)
+	if len(items) == 0 {
+		delete(s.utxoBalances, balance.UtxoId)
 	}
-	if items := s.tickerHolders[ticker]; items != nil {
-		items[balance.AddressId] -= balance.Amount
-		if items[balance.AddressId] <= 0 {
-			delete(items, balance.AddressId)
-		}
+	s.tickerUtxos[ticker][balance.UtxoId] -= balance.Amount
+	if s.tickerUtxos[ticker][balance.UtxoId] < 0 {
+		common.Log.Panicf("atom ticker UTXO balance became negative: %s/%d", ticker, balance.UtxoId)
 	}
+	s.holderBalances[balance.AddressId][ticker] -= balance.Amount
+	s.tickerHolders[ticker][balance.AddressId] -= balance.Amount
+	if s.holderBalances[balance.AddressId][ticker] < 0 || s.tickerHolders[ticker][balance.AddressId] < 0 {
+		common.Log.Panicf("atom holder balance became negative: %s/%d", ticker, balance.AddressId)
+	}
+	afterHolder := s.holderBalances[balance.AddressId][ticker]
 	if t := s.getTickerLocked(ticker); t != nil {
-		t.HolderCount = len(s.tickerHolders[ticker])
+		if beforeHolder > 0 && afterHolder == 0 && t.HolderCount > 0 {
+			t.HolderCount--
+		}
 		if trackPending {
 			s.touchTicker(t)
 		}
@@ -891,6 +895,6 @@ func (s *Indexer) removeUtxoBalanceFromIndexes(balance *UtxoBalance, trackPendin
 	if !trackPending {
 		return
 	}
-	s.holderTouched[GetHolderAssetKey(balance.AddressId, ticker)] = s.holderBalances[balance.AddressId][ticker]
+	s.holderTouched[GetHolderAssetKey(balance.AddressId, ticker)] = afterHolder
 	s.holderTouched[GetTickerHolderKey(ticker, balance.AddressId)] = s.tickerHolders[ticker][balance.AddressId]
 }

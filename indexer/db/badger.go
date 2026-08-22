@@ -1,4 +1,4 @@
-//go:build badger
+//go:build !pebble
 
 package db
 
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	badgerOptions "github.com/dgraph-io/badger/v4/options"
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -26,28 +27,39 @@ func openBadgerDB(path string, cacheSizeMB int) (*badger.DB, error) {
 	if path == "" {
 		path = "./data/db"
 	}
-	if cacheSizeMB <= 0 {
+	if cacheSizeMB < 0 {
 		cacheSizeMB = defaultBadgerBlockCacheMB
 	}
 
 	cacheBytes := int64(cacheSizeMB) << 20
+	indexCacheMB := cacheSizeMB / 4
+	if indexCacheMB < 1 {
+		indexCacheMB = 1
+	}
+	indexCacheBytes := int64(indexCacheMB) << 20
 
 	opt := badger.DefaultOptions(path).
 		WithDir(path).
 		WithValueDir(path).
 		WithBlockCacheSize(cacheBytes).
+		WithIndexCacheSize(indexCacheBytes).
 		WithLoggingLevel(badger.WARNING)
+	if cacheSizeMB == 0 {
+		// Badger requires a block cache when compression is enabled. A DB
+		// with zero cache budget therefore writes new tables uncompressed.
+		opt = opt.WithCompression(badgerOptions.None)
+	}
 
 	common.Log.Infof(
-		"badger block cache capacity: %dMB",
-		cacheSizeMB,
+		"badger cache capacity: path=%s block=%dMB index=%dMB",
+		path, cacheSizeMB, indexCacheMB,
 	)
 
 	return badger.Open(opt)
 }
 
 func NewBadgerDB(path string) common.KVDB {
-	return NewBadgerDBWithCache(path, 0)
+	return NewBadgerDBWithCache(path, defaultBadgerBlockCacheMB)
 }
 
 func NewBadgerDBWithCache(path string, cacheSizeMB int) common.KVDB {
@@ -126,11 +138,6 @@ func (b *badgerDB) close() error {
 	return b.db.Close()
 }
 
-func (b *badgerDB) commit() error {
-	// Badger 写事务自动 commit，这里保持接口一致
-	return nil
-}
-
 func (b *badgerDB) Read(key []byte) ([]byte, error) {
 	return b.get(key)
 }
@@ -155,47 +162,87 @@ func (b *badgerDB) Close() error {
 	return b.close()
 }
 
-func (b *badgerDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) error) error {
+func badgerPrefixSuccessor(prefix []byte) []byte {
+	if len(prefix) == 0 {
+		return nil
+	}
+	result := append([]byte(nil), prefix...)
+	for i := len(result) - 1; i >= 0; i-- {
+		if result[i] != 0xff {
+			result[i]++
+			return result[:i+1]
+		}
+	}
+	return nil
+}
+
+func scanCallbackResult(err error) error {
+	if errors.Is(err, common.ErrStopScan) {
+		return nil
+	}
+	return err
+}
+
+func (b *badgerDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
 	opt := badger.DefaultIteratorOptions
-	opt.PrefetchValues = true
-	opt.Reverse = reverse
+	opt.PrefetchValues = !options.KeysOnly
+	if options.PrefetchSize > 0 {
+		opt.PrefetchSize = options.PrefetchSize
+	}
+	opt.Reverse = options.Reverse
+	opt.Prefix = options.Prefix
 
 	return b.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(opt)
 		defer it.Close()
 
-		var seekKey []byte
-		if len(start) > 0 {
-			seekKey = start
-		} else if len(prefix) > 0 {
-			seekKey = prefix
-		}
-
-		if seekKey != nil {
-			it.Seek(seekKey)
-		} else {
-			if reverse {
-				it.Rewind()
-				if !it.Valid() {
-					return nil
-				}
-				it.Seek([]byte{0xFF, 0xFF, 0xFF, 0xFF})
+		if len(options.Start) > 0 {
+			it.Seek(options.Start)
+			if it.Valid() && !options.StartInclusive && bytes.Equal(it.Item().Key(), options.Start) {
+				it.Next()
+			}
+		} else if options.Reverse && len(options.Prefix) > 0 {
+			if upper := badgerPrefixSuccessor(options.Prefix); upper != nil {
+				it.Seek(upper)
 			} else {
 				it.Rewind()
 			}
+			if it.Valid() && !bytes.HasPrefix(it.Item().Key(), options.Prefix) {
+				it.Next()
+			}
+		} else {
+			it.Rewind()
 		}
 
+		count := 0
 		for ; it.Valid(); it.Next() {
 			item := it.Item()
-			k := item.Key()
-			if len(prefix) > 0 && !bytes.HasPrefix(k, prefix) {
+			key := item.Key()
+			if len(options.Prefix) > 0 && !bytes.HasPrefix(key, options.Prefix) {
 				break
 			}
-			err := item.Value(func(v []byte) error {
-				return r(append([]byte{}, k...), append([]byte{}, v...))
-			})
+			if options.CopyKey {
+				key = item.KeyCopy(nil)
+			}
+
+			var err error
+			if options.KeysOnly {
+				err = r(key, nil)
+			} else {
+				err = item.Value(func(value []byte) error {
+					if options.CopyValue {
+						value = append([]byte(nil), value...)
+					}
+					return r(key, value)
+				})
+			}
 			if err != nil {
-				return err
+				return scanCallbackResult(err)
+			}
+
+			count++
+			if options.Limit > 0 && count >= options.Limit {
+				break
 			}
 		}
 		return nil
@@ -203,11 +250,25 @@ func (b *badgerDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) 
 }
 
 func (b *badgerDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error {
-	return b.iter(prefix, nil, reverse, r)
+	return b.Scan(common.ScanOptions{
+		Prefix:       prefix,
+		Reverse:      reverse,
+		CopyKey:      true,
+		CopyValue:    true,
+		PrefetchSize: badger.DefaultIteratorOptions.PrefetchSize,
+	}, r)
 }
 
 func (b *badgerDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error {
-	return b.iter(prefix, seekKey, reverse, r)
+	return b.Scan(common.ScanOptions{
+		Prefix:         prefix,
+		Start:          seekKey,
+		Reverse:        reverse,
+		StartInclusive: true,
+		CopyKey:        true,
+		CopyValue:      true,
+		PrefetchSize:   badger.DefaultIteratorOptions.PrefetchSize,
+	}, r)
 }
 
 type badgerReadBatch struct {
@@ -291,21 +352,21 @@ func (b *badgerDB) RestoreFromFile(fname string) error {
 	}
 	defer f.Close()
 	dec := gob.NewDecoder(f)
-	return b.db.Update(func(txn *badger.Txn) error {
-		for {
-			var kv [2][]byte
-			if err := dec.Decode(&kv); err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
+	wb := b.db.NewWriteBatch()
+	defer wb.Cancel()
+	for {
+		var kv [2][]byte
+		if err := dec.Decode(&kv); err != nil {
+			if err == io.EOF {
+				break
 			}
-			if err := txn.Set(kv[0], kv[1]); err != nil {
-				return err
-			}
+			return err
 		}
-		return nil
-	})
+		if err := wb.Set(kv[0], kv[1]); err != nil {
+			return err
+		}
+	}
+	return wb.Flush()
 }
 
 type badgerWriteBatch struct {

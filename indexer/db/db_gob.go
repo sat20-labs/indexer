@@ -52,12 +52,11 @@ func GetRawValueFromDB(key []byte, db common.KVDB) ([]byte, error) {
 	return db.Read(key)
 }
 
-
 func GetRawValueFromTxn(key []byte, db common.ReadBatch) ([]byte, error) {
 	return db.Get(key)
 }
 
-func GetValueFromDB(key []byte, v interface{}, db common.KVDB) (error) {
+func GetValueFromDB(key []byte, v interface{}, db common.KVDB) error {
 	buf, err := db.Read(key)
 	if err != nil {
 		return err
@@ -68,7 +67,7 @@ func GetValueFromDB(key []byte, v interface{}, db common.KVDB) (error) {
 	return nil
 }
 
-func GetValueFromTxn(key []byte, v interface{}, db common.ReadBatch) (error) {
+func GetValueFromTxn(key []byte, v interface{}, db common.ReadBatch) error {
 	buf, err := db.Get(key)
 	if err != nil {
 		return err
@@ -110,10 +109,6 @@ func GetAddressDBKey(address string) []byte {
 
 func GetAddressDBKeyV2(address string) []byte {
 	return []byte(common.DB_KEY_ADDRESSV2 + address)
-}
-
-func GetAddressValueDBKey(addressid uint64, utxoid uint64) []byte {
-	return []byte(fmt.Sprintf(common.DB_KEY_ADDRESSVALUE+"%x-%x", addressid, utxoid))
 }
 
 func GetUtxoIdKey(id uint64) []byte {
@@ -194,7 +189,6 @@ func GetAddressIdFromDB(db common.KVDB, address string) (uint64, error) {
 	return common.BytesToUint64(key), nil
 }
 
-
 func GetAddressIdFromTxn(db common.ReadBatch, address string) (uint64, error) {
 	key, err := db.Get(GetAddressDBKey(address))
 	if err != nil {
@@ -254,5 +248,3 @@ func RestoreDB(backupFile string, db common.KVDB) error {
 	}
 	return wb.Flush()
 }
-
-

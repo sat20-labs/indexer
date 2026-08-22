@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
@@ -43,9 +42,10 @@ type IndexerMgr struct {
 	localDB common.KVDB
 	kvDB    common.KVDB
 
-	// 保护这两个数据
-	reloading     int32
-	rpcProcessing int32
+	// RPC readers hold the read side; reload/commit/shutdown holds the write
+	// side. The standard RWMutex closes the admission race in the old pair of
+	// atomic counters.
+	rpcAdmission sync.RWMutex
 
 	// 配置参数
 	chaincfgParam   *chaincfg.Params
@@ -327,9 +327,9 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 
 							if lastHeight == b.base.GetHeight() {
 								// 没有新区块了
-								time.Sleep(10*time.Second)
+								time.Sleep(10 * time.Second)
 							}
-							
+
 						}
 
 						if b.maxIndexHeight > 0 {
@@ -626,21 +626,11 @@ func (b *IndexerMgr) handleHistoricalReload(height int) {
 }
 
 func (b *IndexerMgr) rpcEnter() {
-	for atomic.LoadInt32(&b.reloading) > 0 {
-		time.Sleep(10 * time.Microsecond)
-	}
-	atomic.AddInt32(&b.rpcProcessing, 1)
-	if atomic.LoadInt32(&b.reloading) > 0 {
-		atomic.AddInt32(&b.rpcProcessing, -1)
-		for atomic.LoadInt32(&b.reloading) > 0 {
-			time.Sleep(10 * time.Microsecond)
-		}
-		atomic.AddInt32(&b.rpcProcessing, 1)
-	}
+	b.rpcAdmission.RLock()
 }
 
 func (b *IndexerMgr) rpcLeft() {
-	atomic.AddInt32(&b.rpcProcessing, -1)
+	b.rpcAdmission.RUnlock()
 }
 
 // 为了回滚数据，我们采用这样的策略：
@@ -700,17 +690,13 @@ func (b *IndexerMgr) withIndexerStateWriteBarrier(label string, update func()) {
 		defer b.miniMempool.resumeIndexerReads()
 	}
 
-	atomic.AddInt32(&b.reloading, 1)
-	for atomic.LoadInt32(&b.rpcProcessing) > 0 {
-		time.Sleep(10 * time.Millisecond)
-	}
-
+	b.rpcAdmission.Lock()
 	start := time.Now()
 	common.Log.Infof("%s reader barrier entered", label)
 	defer func() {
 		// Reopen RPC admission before allowing mempool readers that may
 		// immediately enter an RPC-gated indexer read.
-		atomic.AddInt32(&b.reloading, -1)
+		b.rpcAdmission.Unlock()
 		common.Log.Infof("%s reader barrier exited, held %v", label, time.Since(start))
 	}()
 

@@ -10,7 +10,7 @@ import (
 func TestIsSatInRange(t *testing.T) {
 
 	size := common.SubsidyInTheory(MAX_SUBSIDY_HEIGHT + 1)
-	assert.False(t, size == 0)
+	assert.Zero(t, size)
 
 	ranges := []*common.Range{
 		{

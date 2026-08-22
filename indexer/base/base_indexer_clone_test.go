@@ -1,13 +1,13 @@
 package base
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/sat20-labs/indexer/common"
 	indexdb "github.com/sat20-labs/indexer/indexer/db"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestSyncStatsClonePreservesAllPersistedFields(t *testing.T) {
@@ -33,7 +33,7 @@ func TestSyncStatsClonePreservesAllPersistedFields(t *testing.T) {
 	}
 }
 
-func TestBaseIndexerClonePreservesAddressMetadata(t *testing.T) {
+func TestBaseIndexerCloneCopiesAddressDeltas(t *testing.T) {
 	source := NewBaseIndexer(nil, &chaincfg.TestNet4Params, 0, 100)
 	source.utxoIndex = common.NewUTXOIndex()
 	source.addressValueMap["OP_RETURN"] = &common.AddressValueV2{
@@ -45,17 +45,12 @@ func TestBaseIndexerClonePreservesAddressMetadata(t *testing.T) {
 			1002: 50,
 		},
 	}
+	source.addressUtxoDeleted[41] = map[uint64]bool{900: true}
 
 	clone := source.Clone(true)
 	got := clone.addressValueMap["OP_RETURN"]
-	if got == nil {
-		t.Fatal("cloned OP_RETURN address is missing")
-	}
-	if got.AddressId != 41 {
-		t.Fatalf("AddressId = %d, want 41", got.AddressId)
-	}
-	if got.AddressType != int(txscript.NullDataTy) {
-		t.Fatalf("AddressType = %d, want NullDataTy(%d)", got.AddressType, txscript.NullDataTy)
+	if got == nil || got.AddressId != 41 || got.AddressType != int(txscript.NullDataTy) {
+		t.Fatalf("cloned address metadata = %#v", got)
 	}
 	if got.Op != 1 {
 		t.Fatalf("clone Op = %d, want snapshot value 1", got.Op)
@@ -66,15 +61,17 @@ func TestBaseIndexerClonePreservesAddressMetadata(t *testing.T) {
 
 	got.Utxos[1001] = 999
 	delete(got.Utxos, 1002)
+	delete(clone.addressUtxoDeleted[41], 900)
 	if source.addressValueMap["OP_RETURN"].Utxos[1001] != 25 {
-		t.Fatal("clone shares the source UTXO map")
+		t.Fatal("clone shares the source UTXO addition map")
 	}
-	if _, ok := source.addressValueMap["OP_RETURN"].Utxos[1002]; !ok {
-		t.Fatal("deleting a cloned UTXO changed the source")
+	if !source.addressUtxoDeleted[41][900] {
+		t.Fatal("clone shares the source UTXO deletion map")
 	}
 }
 
-func TestBaseIndexerSnapshotAppendsOPReturnAddressState(t *testing.T) {
+func openBaseTestDB(t *testing.T) common.KVDB {
+	t.Helper()
 	kv := indexdb.NewKVDBWithCache(t.TempDir(), 1)
 	if kv == nil {
 		t.Fatal("open test database")
@@ -84,211 +81,162 @@ func TestBaseIndexerSnapshotAppendsOPReturnAddressState(t *testing.T) {
 			t.Errorf("close test database: %v", err)
 		}
 	})
+	return kv
+}
 
+func newBaseForUpdate(kv common.KVDB) *BaseIndexer {
+	indexer := NewBaseIndexer(kv, &chaincfg.TestNet4Params, 0, 100)
+	indexer.stats = &SyncStats{ReorgsDetected: make([]int, 0)}
+	indexer.lastHeight = 1
+	indexer.lastHash = "snapshot-hash"
+	indexer.utxoIndex = common.NewUTXOIndex()
+	return indexer
+}
+
+func addPendingBaseUtxo(indexer *BaseIndexer, address string, addressID, utxoID uint64, value int64, op int) {
+	out := common.NewTxOutputV2(value)
+	out.UtxoId = utxoID
+	out.OutPointStr = "0000000000000000000000000000000000000000000000000000000000000001:0"
+	out.AddressId = addressID
+	out.AddressType = int(txscript.WitnessV1TaprootTy)
+	indexer.utxoIndex.Index[out.OutPointStr] = out
+	indexer.addressValueMap[address] = &common.AddressValueV2{
+		AddressId:   addressID,
+		AddressType: int(txscript.WitnessV1TaprootTy),
+		Op:          op,
+		Utxos:       map[uint64]int64{utxoID: value},
+	}
+	indexer.idToAddressMap[addressID] = address
+}
+
+func TestBaseIndexerUpdateDBStoresAddressUtxosByPrefix(t *testing.T) {
+	kv := openBaseTestDB(t)
 	const (
-		addressID uint64 = 7
-		oldUtxoID uint64 = 1001
-		newUtxoID uint64 = 1002
+		address   = "bc1ptestaddress"
+		addressID = uint64(7)
+		utxoID    = uint64(1001)
+		value     = int64(25)
+	)
+	indexer := newBaseForUpdate(kv)
+	addPendingBaseUtxo(indexer, address, addressID, utxoID, value, 1)
+
+	indexer.UpdateDB()
+
+	var meta common.AddressValueInDBV2
+	if err := indexdb.GetValueFromDBWithProto3(indexdb.GetAddressDBKeyV2(address), kv, &meta); err != nil {
+		t.Fatalf("read address metadata: %v", err)
+	}
+	if meta.AddressId != addressID || len(meta.Utxos) != 0 {
+		t.Fatalf("metadata = %#v; want stable id and no embedded UTXOs", &meta)
+	}
+
+	raw, err := kv.Read(indexdb.GetAddressValueDBKey(addressID, utxoID))
+	if err != nil {
+		t.Fatalf("read address UTXO: %v", err)
+	}
+	got, err := indexdb.DecodeAddressUtxoValue(raw)
+	if err != nil || got != value {
+		t.Fatalf("address UTXO = %d, %v; want %d", got, err, value)
+	}
+
+	utxos, err := indexer.loadAddressUtxos(kv, addressID)
+	if err != nil {
+		t.Fatalf("load address UTXOs: %v", err)
+	}
+	if len(utxos) != 1 || utxos[utxoID] != value {
+		t.Fatalf("address UTXOs = %v", utxos)
+	}
+}
+
+func TestBaseIndexerUpdateDBDeletesUtxoButKeepsAddressMetadata(t *testing.T) {
+	kv := openBaseTestDB(t)
+	const (
+		address   = "bc1ptestaddress"
+		addressID = uint64(7)
+		utxoID    = uint64(1001)
 	)
 
-	wb := kv.NewWriteBatch()
-	existing := &common.AddressValueInDBV2{
+	seed := newBaseForUpdate(kv)
+	addPendingBaseUtxo(seed, address, addressID, utxoID, 25, 1)
+	seed.UpdateDB()
+
+	remove := newBaseForUpdate(kv)
+	remove.addressValueMap[address] = &common.AddressValueV2{
 		AddressId:   addressID,
-		AddressType: int32(txscript.NullDataTy),
-		Utxos: []*common.UtxoIdInDB{
-			{UtxoId: oldUtxoID, Value: 25},
-		},
+		AddressType: int(txscript.WitnessV1TaprootTy),
+		Op:          0,
+		Utxos:       make(map[uint64]int64),
 	}
-	if err := indexdb.SetDBWithProto3(
-		indexdb.GetAddressDBKeyV2("OP_RETURN"), existing, wb,
-	); err != nil {
-		wb.Close()
-		t.Fatalf("seed OP_RETURN address: %v", err)
-	}
-	if err := wb.Flush(); err != nil {
-		wb.Close()
-		t.Fatalf("flush seeded OP_RETURN address: %v", err)
-	}
-	wb.Close()
+	remove.addressUtxoDeleted[addressID] = map[uint64]bool{utxoID: true}
+	remove.UpdateDB()
 
-	source := NewBaseIndexer(kv, &chaincfg.TestNet4Params, 0, 100)
-	source.stats = &SyncStats{ReorgsDetected: make([]int, 0)}
-	source.lastHeight = 1
-	source.lastHash = "snapshot-hash"
-	source.utxoIndex = common.NewUTXOIndex()
-
-	output := common.NewTxOutputV2(20)
-	output.UtxoId = newUtxoID
-	output.OutPointStr = "0000000000000000000000000000000000000000000000000000000000000001:0"
-	output.AddressId = addressID
-	output.AddressType = int(txscript.NullDataTy)
-	source.utxoIndex.Index[output.OutPointStr] = output
-	source.addressValueMap["OP_RETURN"] = &common.AddressValueV2{
-		AddressId:   addressID,
-		AddressType: int(txscript.NullDataTy),
-		Op:          1,
-		Utxos: map[uint64]int64{
-			newUtxoID: 20,
-		},
+	if _, err := kv.Read(indexdb.GetAddressValueDBKey(addressID, utxoID)); err != common.ErrKeyNotFound {
+		t.Fatalf("deleted address UTXO read error = %v, want ErrKeyNotFound", err)
 	}
-
-	snapshot := source.Clone(true)
-	snapshot.UpdateDB()
-
-	var got common.AddressValueInDBV2
-	if err := indexdb.GetValueFromDBWithProto3(
-		indexdb.GetAddressDBKeyV2("OP_RETURN"), kv, &got,
-	); err != nil {
-		t.Fatalf("read persisted OP_RETURN address: %v", err)
+	var meta common.AddressValueInDBV2
+	if err := indexdb.GetValueFromDBWithProto3(indexdb.GetAddressDBKeyV2(address), kv, &meta); err != nil {
+		t.Fatalf("address metadata was deleted: %v", err)
 	}
-	if got.AddressType != int32(txscript.NullDataTy) {
-		t.Fatalf("persisted AddressType = %d, want NullDataTy(%d)", got.AddressType, txscript.NullDataTy)
-	}
-
-	utxos := make(map[uint64]int64, len(got.Utxos))
-	for _, item := range got.Utxos {
-		utxos[item.UtxoId] = item.Value
-	}
-	if value, ok := utxos[oldUtxoID]; !ok || value != 25 {
-		t.Fatalf("historical OP_RETURN UTXO = (%d, %v), want (25, true)", value, ok)
-	}
-	if value, ok := utxos[newUtxoID]; !ok || value != 20 {
-		t.Fatalf("new OP_RETURN UTXO = (%d, %v), want (20, true)", value, ok)
+	if meta.AddressId != addressID {
+		t.Fatalf("address id = %d, want %d", meta.AddressId, addressID)
 	}
 }
 
-func TestBaseIndexerSubtractKeepsOnlyNewOPReturnDelta(t *testing.T) {
+func TestBaseIndexerSubtractKeepsOnlyNewAddressDeltas(t *testing.T) {
 	source := NewBaseIndexer(nil, &chaincfg.MainNetParams, 0, 100)
 	source.utxoIndex = common.NewUTXOIndex()
-	source.addressValueMap["OP_RETURN"] = &common.AddressValueV2{
-		AddressId:   7,
-		AddressType: int(txscript.NullDataTy),
-		Op:          1,
-		Utxos: map[uint64]int64{
-			1001: 25,
-		},
+	source.addressValueMap["address"] = &common.AddressValueV2{
+		AddressId: 7,
+		Op:        1,
+		Utxos:     map[uint64]int64{1001: 25},
 	}
+	source.addressUtxoDeleted[7] = map[uint64]bool{900: true}
 
 	flushed := source.Clone(true)
-	current := source.addressValueMap["OP_RETURN"]
+	current := source.addressValueMap["address"]
 	current.Utxos[1002] = 20
-	current.Op = 1
+	source.addressUtxoDeleted[7][901] = true
 
 	source.Subtract(flushed)
-	got := source.addressValueMap["OP_RETURN"]
-	if got == nil {
-		t.Fatal("new OP_RETURN delta was removed")
+	got := source.addressValueMap["address"]
+	if got == nil || len(got.Utxos) != 1 || got.Utxos[1002] != 20 {
+		t.Fatalf("pending additions = %#v", got)
 	}
-	if len(got.Utxos) != 1 {
-		t.Fatalf("pending OP_RETURN UTXOs = %v, want only the new delta", got.Utxos)
-	}
-	if value, ok := got.Utxos[1002]; !ok || value != 20 {
-		t.Fatalf("new OP_RETURN UTXO = (%d, %v), want (20, true)", value, ok)
-	}
-	if _, ok := got.Utxos[1001]; ok {
-		t.Fatal("flushed OP_RETURN UTXO remained in the live delta")
+	if source.addressUtxoDeleted[7][900] || !source.addressUtxoDeleted[7][901] {
+		t.Fatalf("pending deletions = %v", source.addressUtxoDeleted[7])
 	}
 }
 
-func TestAppendAddressUtxosToBytesIsIdempotent(t *testing.T) {
-	existing, err := proto.Marshal(&common.AddressValueInDBV2{
-		AddressId:   7,
-		AddressType: int32(txscript.NullDataTy),
-		Utxos: []*common.UtxoIdInDB{
-			{UtxoId: 1001, Value: 25},
+func TestBaseIndexerUpdateDBCountsOnlyPersistedDeletes(t *testing.T) {
+	kv := openBaseTestDB(t)
+	if err := kv.Write(indexdb.GetUtxoIdKey(1), []byte("persisted-utxo-key")); err != nil {
+		t.Fatalf("seed persisted UTXO id: %v", err)
+	}
+
+	indexer := newBaseForUpdate(kv)
+	indexer.stats.UtxoCount = 1
+	indexer.delUTXOs = []*common.TxOutputV2{
+		{
+			TxOutput: common.TxOutput{
+				UtxoId:      1,
+				OutPointStr: strings.Repeat("0", 64) + ":0",
+			},
 		},
-	})
-	if err != nil {
-		t.Fatalf("marshal existing address: %v", err)
-	}
-
-	updated, err := appendAddressUtxosToBytes(existing, map[uint64]int64{
-		1001: 25,
-		1002: 20,
-	})
-	if err != nil {
-		t.Fatalf("append address UTXOs: %v", err)
-	}
-
-	var got common.AddressValueInDBV2
-	if err := proto.Unmarshal(updated, &got); err != nil {
-		t.Fatalf("unmarshal updated address: %v", err)
-	}
-	if len(got.Utxos) != 2 {
-		t.Fatalf("persisted UTXO records = %d, want 2: %v", len(got.Utxos), got.Utxos)
-	}
-	counts := make(map[uint64]int)
-	values := make(map[uint64]int64)
-	for _, item := range got.Utxos {
-		counts[item.UtxoId]++
-		values[item.UtxoId] = item.Value
-	}
-	if counts[1001] != 1 || values[1001] != 25 {
-		t.Fatalf("existing UTXO count/value = %d/%d, want 1/25", counts[1001], values[1001])
-	}
-	if counts[1002] != 1 || values[1002] != 20 {
-		t.Fatalf("new UTXO count/value = %d/%d, want 1/20", counts[1002], values[1002])
-	}
-
-	if _, err := appendAddressUtxosToBytes(existing, map[uint64]int64{1001: 26}); err == nil {
-		t.Fatal("value mismatch for an existing address UTXO was accepted")
-	}
-}
-
-func TestBaseIndexerServiceSnapshotsDoNotRepeatOPReturnDelta(t *testing.T) {
-	kv := indexdb.NewKVDBWithCache(t.TempDir(), 1)
-	if kv == nil {
-		t.Fatal("open test database")
-	}
-	t.Cleanup(func() {
-		if err := kv.Close(); err != nil {
-			t.Errorf("close test database: %v", err)
-		}
-	})
-
-	live := NewBaseIndexer(kv, &chaincfg.MainNetParams, 0, 100)
-	live.utxoIndex = common.NewUTXOIndex()
-	live.stats = &SyncStats{}
-	live.addressValueMap["OP_RETURN"] = &common.AddressValueV2{
-		AddressId:   7,
-		AddressType: int(txscript.NullDataTy),
-		Op:          1,
-		Utxos: map[uint64]int64{
-			1001: 25,
+		{
+			TxOutput: common.TxOutput{
+				UtxoId:      2,
+				OutPointStr: strings.Repeat("1", 64) + ":0",
+			},
 		},
 	}
 
-	first := live.Clone(true)
-	current := live.addressValueMap["OP_RETURN"]
-	current.Utxos[1002] = 20
-	current.Op = 1
+	indexer.UpdateDB()
 
-	// This is the service-mode order: remove the flushed snapshot from the
-	// live buffer, persist it, then create/persist the next snapshot.
-	live.Subtract(first)
-	first.UpdateDB()
-	second := live.Clone(true)
-	second.UpdateDB()
-
-	var got common.AddressValueInDBV2
-	if err := indexdb.GetValueFromDBWithProto3(
-		indexdb.GetAddressDBKeyV2("OP_RETURN"), kv, &got,
-	); err != nil {
-		t.Fatalf("read persisted OP_RETURN address: %v", err)
+	var persisted SyncStats
+	if err := indexdb.GetValueFromDB([]byte(SyncStatsKey), &persisted, kv); err != nil {
+		t.Fatalf("read persisted stats: %v", err)
 	}
-	if len(got.Utxos) != 2 {
-		t.Fatalf("persisted OP_RETURN records = %d, want 2: %v", len(got.Utxos), got.Utxos)
-	}
-	counts := make(map[uint64]int)
-	var total int64
-	for _, item := range got.Utxos {
-		counts[item.UtxoId]++
-		total += item.Value
-	}
-	if counts[1001] != 1 || counts[1002] != 1 {
-		t.Fatalf("persisted OP_RETURN counts = %v, want one record per UTXO", counts)
-	}
-	if total != 45 {
-		t.Fatalf("persisted OP_RETURN sats = %d, want 45", total)
+	if persisted.UtxoCount != 0 {
+		t.Fatalf("UtxoCount=%d, want 0; same-window UTXO delete must not decrement durable count", persisted.UtxoCount)
 	}
 }

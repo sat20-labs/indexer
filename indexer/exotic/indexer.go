@@ -36,8 +36,8 @@ func (p *HolderInfo) Clone() *HolderInfo {
 		newTickerInfo[k] = assets.Clone()
 	}
 	return &HolderInfo{
-		AddressId: p.AddressId, 
-		Tickers: newTickerInfo}
+		AddressId: p.AddressId,
+		Tickers:   newTickerInfo}
 }
 
 func (p *HolderInfo) AddTickerAsset(name string, assetInfo *common.AssetAbbrInfo) int64 {
@@ -57,7 +57,7 @@ func (p *HolderInfo) RemoveTickerAsset(name string, assetInfo *common.AssetAbbrI
 	if !ok {
 		return
 	}
-	
+
 	tickerAsset.Offsets.Remove(assetInfo.Offsets)
 	if tickerAsset.AssetAmt() == 0 {
 		delete(p.Tickers, name)
@@ -72,11 +72,13 @@ type ExoticIndexer struct {
 	mutex sync.RWMutex // 只保护这几个结构
 
 	// 只加载必要的数据
-	tickerMap  map[string]*TickInfo        // 没几个，全部加载
-	holderInfo map[uint64]*HolderInfo      // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
-	
-	// 全量数据， TODO 优化
-	utxoMap    map[string]map[uint64]int64 // ticker -> utxoId -> 资产数量. 动态数据，跟随Holder变更，需要保存在数据库中。
+	tickerMap  map[string]*TickInfo   // 没几个，全部加载
+	holderInfo map[uint64]*HolderInfo // utxoId -> holder 用于动态更新ticker的holder数据，需要备份到数据库
+
+	// Unflushed state only. Durable balances are authoritative in Badger.
+	utxoMap              map[string]map[uint64]int64 // pending ticker/UTXO values
+	utxoDeleted          map[string]map[uint64]bool  // pending ticker/UTXO deletes
+	holderBalanceTouched map[string]int64            // encoded ticker/address key -> aggregate amount
 
 	holderActionList []*HolderAction
 	tickerAdded      map[string]*common.Ticker // key: ticker
@@ -122,9 +124,9 @@ func (p *ExoticIndexer) Init(baseIndexer *base.BaseIndexer) {
 		// }
 		p.holderInfo = make(map[uint64]*HolderInfo)
 
-		// TODO 不要加载所有
-		p.utxoMap = p.loadAllTickerToUtxoMapFromDB()
-		
+		p.utxoMap = make(map[string]map[uint64]int64)
+		p.utxoDeleted = make(map[string]map[uint64]bool)
+		p.holderBalanceTouched = make(map[string]int64)
 
 		p.holderActionList = make([]*HolderAction, 0)
 		p.tickerAdded = make(map[string]*common.Ticker, 0)
@@ -153,18 +155,31 @@ func (p *ExoticIndexer) Clone(baseIndexer *base.BaseIndexer) *ExoticIndexer {
 	newInst.tickerMap = make(map[string]*TickInfo, 0)
 	for key, value := range p.tickerMap {
 		//if len(value.MintAdded) > 0 {
-			tick := TickInfo{}
-			tick.Name = value.Name
-			tick.MintAdded = make([]*common.Mint, len(value.MintAdded))
-			copy(tick.MintAdded, value.MintAdded)
-			tick.Ticker = value.Ticker.Clone()
-			newInst.tickerMap[key] = &tick
+		tick := TickInfo{}
+		tick.Name = value.Name
+		tick.MintAdded = make([]*common.Mint, len(value.MintAdded))
+		copy(tick.MintAdded, value.MintAdded)
+		tick.Ticker = value.Ticker.Clone()
+		newInst.tickerMap[key] = &tick
 		//}
 	}
 
 	// 保存holderActionList对应的数据
 	newInst.holderInfo = make(map[uint64]*HolderInfo, 0)
 	newInst.utxoMap = make(map[string]map[uint64]int64, 0)
+	newInst.utxoDeleted = make(map[string]map[uint64]bool, len(p.utxoDeleted))
+	for ticker, deleted := range p.utxoDeleted {
+		copyDeleted := make(map[uint64]bool, len(deleted))
+		for utxoID := range deleted {
+			copyDeleted[utxoID] = true
+		}
+		newInst.utxoDeleted[ticker] = copyDeleted
+	}
+	newInst.holderBalanceTouched = make(map[string]int64, len(p.holderBalanceTouched))
+	for key, amount := range p.holderBalanceTouched {
+		newInst.holderBalanceTouched[key] = amount
+	}
+
 	for _, action := range p.holderActionList {
 		if action.Action > 0 {
 			value, ok := p.holderInfo[action.UtxoId]
@@ -223,19 +238,34 @@ func (p *ExoticIndexer) Subtract(another *ExoticIndexer) {
 		ticker, ok := p.tickerMap[key]
 		if ok {
 			ticker.MintAdded = append([]*common.Mint(nil), ticker.MintAdded[len(value.MintAdded):]...)
-		}		
+		}
 	}
 
-	// utxoMap是某个ticker的全量utxo，不能删除。TODO 这里无法删除，会导致utxomap数据量太大
-	// for name, value := range another.utxoMap {
-	// 	n, ok := p.utxoMap[name]
-	// 	if ok {
-	// 		for utxoId := range value {
-	// 			delete(n, utxoId)
-	// 			delete(p.holderInfo, utxoId)
-	// 		}
-	// 	}
-	// }
+	for ticker, flushed := range another.utxoMap {
+		current := p.utxoMap[ticker]
+		for utxoID, amount := range flushed {
+			if currentAmount, ok := current[utxoID]; ok && currentAmount == amount {
+				delete(current, utxoID)
+			}
+		}
+		if len(current) == 0 {
+			delete(p.utxoMap, ticker)
+		}
+	}
+	for ticker, flushed := range another.utxoDeleted {
+		current := p.utxoDeleted[ticker]
+		for utxoID := range flushed {
+			delete(current, utxoID)
+		}
+		if len(current) == 0 {
+			delete(p.utxoDeleted, ticker)
+		}
+	}
+	for key, amount := range another.holderBalanceTouched {
+		if current, ok := p.holderBalanceTouched[key]; ok && current == amount {
+			delete(p.holderBalanceTouched, key)
+		}
+	}
 }
 
 func newExoticDefaultTicker(name string) *common.Ticker {
@@ -286,59 +316,63 @@ func (s *ExoticIndexer) GetDBVersion() string {
 }
 
 func (p *ExoticIndexer) CheckSelf() bool {
-	//common.Log.Infof("ExoticIndexer->CheckSelf ...")
-	startTime := time.Now()
-	for name := range p.tickerMap {
-		//common.Log.Infof("checking ticker %s", name)
-		holdermap := p.GetHolderAndAmountWithTick(name)
-		holderAmount := int64(0)
-		for _, amt := range holdermap {
-			holderAmount += amt
-		}
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
-		ticker := p.GetTicker(name)
-		mintAmount := ticker.TotalMinted
-		if holderAmount != mintAmount {
-			common.Log.Errorf("ExoticIndexer ticker %s amount incorrect. %d %d", name, mintAmount, holderAmount)
+	startTime := time.Now()
+	for name, tickInfo := range p.tickerMap {
+		if tickInfo == nil || tickInfo.Ticker == nil {
+			common.Log.Errorf("ExoticIndexer ticker %s metadata missing", name)
 			return false
 		}
 
-		common.Log.Infof("ExoticIndexer %s amount: %d, holders: %d", name, mintAmount, len(holdermap))
+		holders := p.getTickerHolderAmounts(name)
+		var holderAmount int64
+		for _, amount := range holders {
+			holderAmount += amount
+		}
+		if holderAmount != tickInfo.Ticker.TotalMinted {
+			common.Log.Errorf(
+				"ExoticIndexer ticker %s holder amount incorrect: minted=%d holders=%d",
+				name, tickInfo.Ticker.TotalMinted, holderAmount,
+			)
+			return false
+		}
 
-		utxos, ok := p.utxoMap[name]
-		if !ok {
-			if holderAmount != 0 {
-				common.Log.Errorf("ExoticIndexer ticker %s has no asset utxos", name)
+		utxos := p.getTickerUtxos(name)
+		var utxoAmount int64
+		for utxoID, amount := range utxos {
+			utxoAmount += amount
+			holder := p.holderInfoForRead(utxoID)
+			if holder == nil {
+				common.Log.Errorf("ExoticIndexer ticker %s UTXO %d has no holder record", name, utxoID)
 				return false
 			}
-		} else {
-			amontInUtxos := int64(0)
-			for utxo, amoutInUtxo := range utxos {
-				amontInUtxos += amoutInUtxo
-
-				holderInfo, ok := p.holderInfo[utxo]
-				if !ok {
-					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d not in holdermap", name, utxo)
-					return false
-				}
-				tickAssetInfo, ok := holderInfo.Tickers[name]
-				if !ok {
-					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d not in holders", name, utxo)
-					return false
-				}
-				amountInHolder := tickAssetInfo.AssetAmt()
-				if amountInHolder != amoutInUtxo {
-					common.Log.Errorf("ExoticIndexer ticker %s's utxo %d assets %d and %d different", name, utxo, amoutInUtxo, amountInHolder)
-					return false
-				}
+			asset := holder.Tickers[name]
+			if asset == nil {
+				common.Log.Errorf("ExoticIndexer ticker %s UTXO %d missing asset detail", name, utxoID)
+				return false
+			}
+			if asset.AssetAmt() != amount {
+				common.Log.Errorf(
+					"ExoticIndexer ticker %s UTXO %d amount differs: index=%d holder=%d",
+					name, utxoID, amount, asset.AssetAmt(),
+				)
+				return false
 			}
 		}
+		if utxoAmount != holderAmount {
+			common.Log.Errorf(
+				"ExoticIndexer ticker %s UTXO total %d != holder total %d",
+				name, utxoAmount, holderAmount,
+			)
+			return false
+		}
+		common.Log.Infof("ExoticIndexer %s amount: %d, holders: %d, utxos: %d", name, holderAmount, len(holders), len(utxos))
 	}
 
-	// 最后才设置dbver
 	p.setDBVersion()
 	common.Log.Infof("ExoticIndexer CheckSelf took %v.", time.Since(startTime))
-
 	return true
 }
 
@@ -383,4 +417,3 @@ func (p *ExoticIndexer) printHolders(name string) {
 	common.Log.Infof("holders from holder DB")
 	PrintHoldersWithMap(holdermap, p.baseIndexer)
 }
-

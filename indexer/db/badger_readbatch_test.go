@@ -1,4 +1,4 @@
-//go:build badger
+//go:build !pebble
 
 package db
 

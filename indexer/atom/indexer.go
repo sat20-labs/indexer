@@ -78,8 +78,8 @@ func (s *Indexer) Init(baseIndexer *base.BaseIndexer) {
 	s.baseIndexer = baseIndexer
 	s.status = s.loadStatusFromDB()
 	s.loadTickersFromDB()
-	s.loadUtxoBalancesFromDB()
-	s.loadMintHistoryFromDB()
+	// Durable balances and history remain authoritative in Badger. Runtime
+	// maps contain only lazily loaded processing state and unflushed deltas.
 }
 
 func (s *Indexer) Clone(baseIndexer *base.BaseIndexer) *Indexer {

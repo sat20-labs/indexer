@@ -5,7 +5,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
@@ -16,15 +15,15 @@ import (
 )
 
 type Indexer struct {
-	dbWrite                    *store.DbWrite
-	baseIndexer                *base.BaseIndexer
-	chaincfgParam              *chaincfg.Params
-	enableHeight               int
-	height                     int
-	blockTime                  uint64
-	Status                     *table.RunesStatus
-	minimumRune                *runestone.Rune
-	
+	dbWrite       *store.DbWrite
+	baseIndexer   *base.BaseIndexer
+	chaincfgParam *chaincfg.Params
+	enableHeight  int
+	height        int
+	blockTime     uint64
+	Status        *table.RunesStatus
+	minimumRune   *runestone.Rune
+
 	// TODO 不要共用cache，会导致检索效率下降
 	idToEntryTbl               *table.RuneIdToEntryTable           // RuneId->RuneEntry
 	runeToIdTbl                *table.RuneToIdTable                // Rune->RuneId
@@ -37,17 +36,16 @@ type Indexer struct {
 	//addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable // addressId+utxoId -> runeId+balance  TODO 这个没用
 
 	// transferUpdate 临时使用
-	burnedMap                  table.RuneIdLotMap
-	HolderUpdateCount          int
-	HolderRemoveCount          int
+	burnedMap         table.RuneIdLotMap
+	HolderUpdateCount int
+	HolderRemoveCount int
 
 	// checkpoint 临时使用
 	holderMapInPrevBlock map[uint64]*common.Decimal
 }
 
 func NewIndexer(db common.KVDB, param *chaincfg.Params, bCheckValidateFile bool) *Indexer {
-	logs := cmap.New[*store.DbLog]()
-	dbWrite := store.NewDbWrite(db, &logs)
+	dbWrite := store.NewDbWrite(db)
 	enableHeight := 840000
 	if !common.IsMainnet() {
 		enableHeight = 30562
@@ -220,7 +218,7 @@ func (s *Indexer) CheckSelf() bool {
 
 		if rune.Number < 10 {
 			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
-		} 
+		}
 
 		if checkUtxo {
 			//startTime2 = time.Now()
@@ -278,7 +276,7 @@ func (s *Indexer) CheckSelf() bool {
 			common.Log.Infof("runes %s checked.", r)
 		}
 		return true
-	}	
+	}
 
 	if s.chaincfgParam.Net == wire.MainNet && s.height == 919482 {
 		expectedmap1 := map[string]string{

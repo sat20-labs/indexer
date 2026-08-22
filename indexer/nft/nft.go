@@ -459,6 +459,8 @@ func (p *NftIndexer) CheckSelf() bool {
 	blessCount := 0
 	curseCount := 0
 	nftMap := make(map[int64]bool)
+	primaryNfts := make(map[int64]int64) // nft id -> sat
+	lastPositiveID := int64(-1)
 	p.db.BatchRead([]byte(DB_PREFIX_NFT), false, func(k, v []byte) error {
 		//defer wg.Done()
 
@@ -466,6 +468,10 @@ func (p *NftIndexer) CheckSelf() bool {
 		err := db.DecodeBytesWithProto3(v, &value)
 		if err != nil {
 			common.Log.Panicf("item.Value error: %v", err)
+		}
+		primaryNfts[value.Id] = value.Sat
+		if value.Id >= 0 && value.Id > lastPositiveID {
+			lastPositiveID = value.Id
 		}
 		if value.CurseType < 0 {
 			nftMap[value.Id] = true
@@ -553,20 +559,10 @@ func (p *NftIndexer) CheckSelf() bool {
 	common.Log.Infof("%s table takes %v", DB_PREFIX_UTXO, time.Since(startTime2))
 	common.Log.Infof("2: utxo %d, sats %d", len(utxosInT2), len(satsInT2))
 
-	bs := NewBuckStore(p.db)
-	lastkey := bs.GetLastKey() // 仅仅是正数铭文id
-	var buckmap map[int64]*BuckValue
-	getbuck := func() {
-		//defer wg.Done()
-		startTime2 := time.Now()
-		buckmap = bs.GetAll()
-		common.Log.Infof("%s table takes %v", DB_PREFIX_BUCK, time.Since(startTime2))
-		common.Log.Infof("3: nfts %d", len(buckmap))
-	}
-	getbuck()
+	common.Log.Infof("%s primary table contains %d NFTs", DB_PREFIX_NFT, len(primaryNfts))
 
 	//wg.Wait()
-	common.Log.Infof("nft count: %d %d %d", p.status.Count+p.status.CurseCount-uint64(len(p.nftAdded)), len(nftsInT1), len(buckmap))
+	common.Log.Infof("nft count: %d %d %d", p.status.Count+p.status.CurseCount-uint64(len(p.nftAdded)), len(nftsInT1), len(primaryNfts))
 
 	wrongAddress := make([]uint64, 0)
 	wrongUtxo1 := make([]uint64, 0)
@@ -607,17 +603,15 @@ func (p *NftIndexer) CheckSelf() bool {
 
 	wrongIds := make([]int64, 0)
 	wrongSats := make([]int64, 0)
-	for id, v := range buckmap {
-		_, ok := nftsInT1[id]
-		if !ok {
+	for id, sat := range primaryNfts {
+		if !nftsInT1[id] {
 			wrongIds = append(wrongIds, id)
 		}
-		if v.Sat < 0 {
+		if sat < 0 {
 			continue
 		}
-		_, ok = satsInT1[uint64(v.Sat)]
-		if !ok {
-			wrongSats = append(wrongSats, v.Sat)
+		if _, ok := satsInT1[uint64(sat)]; !ok {
+			wrongSats = append(wrongSats, sat)
 		}
 	}
 
@@ -672,16 +666,16 @@ func (p *NftIndexer) CheckSelf() bool {
 	persistedTotal := p.status.Count + p.status.CurseCount - uint64(len(p.nftAdded))
 	persistedPositive := p.status.Count - pendingPositive
 	lastPositiveCount := uint64(0)
-	if lastkey >= 0 {
-		lastPositiveCount = uint64(lastkey) + 1
+	if lastPositiveID >= 0 {
+		lastPositiveCount = uint64(lastPositiveID) + 1
 	}
 	if persistedTotal != uint64(len(nftsInT1)) ||
-		persistedTotal != uint64(len(buckmap)) ||
+		persistedTotal != uint64(len(primaryNfts)) ||
 		persistedPositive != lastPositiveCount {
 		common.Log.Errorf(
-			"nft count different: persisted total %d, sat table %d, buck table %d, "+
+			"nft count different: persisted total %d, sat table %d, primary table %d, "+
 				"persisted positive %d, last positive count %d",
-			persistedTotal, len(nftsInT1), len(buckmap), persistedPositive, lastPositiveCount,
+			persistedTotal, len(nftsInT1), len(primaryNfts), persistedPositive, lastPositiveCount,
 		)
 		result = false
 	}

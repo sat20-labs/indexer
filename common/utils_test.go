@@ -15,19 +15,19 @@ import (
 func TestBinarySearch(t *testing.T) {
 
 	utxos := make([]*UtxoIdInDB, 0)
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:10, Value:1})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:20, Value:2})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:15, Value:3})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:25, Value:4})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:5, Value:5})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:35, Value:6})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:24, Value:7})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:26, Value:8})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 10, Value: 1})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 20, Value: 2})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 15, Value: 3})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 25, Value: 4})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 5, Value: 5})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 35, Value: 6})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 24, Value: 7})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 26, Value: 8})
 	printUtxos(utxos)
 
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:25, Value:9})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:5, Value:11})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:35, Value:10})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 25, Value: 9})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 5, Value: 11})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 35, Value: 10})
 
 	printUtxos(utxos)
 
@@ -50,10 +50,10 @@ func printUtxos(utxos []*UtxoIdInDB) {
 func TestSliceCopy(t *testing.T) {
 
 	utxos := make([]*UtxoIdInDB, 0)
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:10, Value:1})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:20, Value:2})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:15, Value:3})
-	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId:25, Value:4})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 10, Value: 1})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 20, Value: 2})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 15, Value: 3})
+	utxos = InsertUtxo(utxos, &UtxoIdInDB{UtxoId: 25, Value: 4})
 	destination := make([]*UtxoIdInDB, len(utxos))
 
 	copy(destination, utxos)
@@ -62,7 +62,7 @@ func TestSliceCopy(t *testing.T) {
 	fmt.Printf("%v\n", destination)
 
 	utxos = DeleteUtxo(utxos, 20)
-	destination = InsertUtxo(destination, &UtxoIdInDB{UtxoId:35, Value:5})
+	destination = InsertUtxo(destination, &UtxoIdInDB{UtxoId: 35, Value: 5})
 
 	fmt.Printf("%v\n", utxos)
 	fmt.Printf("%v\n", destination)
@@ -268,19 +268,23 @@ func Deserialize(data []byte) (*UtxoValueInDBv2, error) {
 }
 
 func TestDecode3(t *testing.T) {
+	const (
+		height  = 123456
+		txIndex = 321
+		vout    = 7
+	)
+	utxoID := ToUtxoId(height, txIndex, vout)
+	gotHeight, gotTxIndex, gotVout := FromUtxoId(utxoID)
+	if gotHeight != height || gotTxIndex != txIndex || gotVout != vout {
+		t.Fatalf("round trip=(%d,%d,%d), want (%d,%d,%d)", gotHeight, gotTxIndex, gotVout, height, txIndex, vout)
+	}
 
-	value := int64(1)
-
-	bytes := Uint64ToBytes(uint64(value))
-	fmt.Printf("%v", bytes)
-
-	value2 := int64(BytesToUint64(bytes))
-	fmt.Printf("%d", value2)
-
-	utxoid := ToUtxoId(0x7ffffffe, 0xeffe, 0x1effe)
-	fmt.Printf("%x\n", utxoid)
-	v1, v2, v3 := FromUtxoId(utxoid)
-	fmt.Printf("%x %x %x\n", v1, v2, v3)
+	defer func() {
+		if recover() == nil {
+			t.Fatal("ToUtxoId should panic for out-of-range parameters")
+		}
+	}()
+	_ = ToUtxoId(0x7ffffffe, 0xeffe, 0x1effe)
 }
 
 func TestGenerateSeed2(t *testing.T) {
@@ -298,26 +302,25 @@ func TestGenerateSeed2(t *testing.T) {
 
 }
 
-
 func TestGenerateSeed(t *testing.T) {
 
 	assetVector := []*AssetInfo{
 		{
 			Name: AssetName{
 				Protocol: "ord",
-				Type: "o",
-				Ticker: "12345678",
+				Type:     "o",
+				Ticker:   "12345678",
 			},
-			Amount: *NewDecimal(1, 0),
+			Amount:     *NewDecimal(1, 0),
 			BindingSat: 1,
 		},
 		{
 			Name: AssetName{
 				Protocol: "ordx",
-				Type: "f",
-				Ticker: "rarepizza",
+				Type:     "f",
+				Ticker:   "rarepizza",
 			},
-			Amount: *NewDecimal(1000, 0),
+			Amount:     *NewDecimal(1000, 0),
 			BindingSat: 1,
 		},
 	}

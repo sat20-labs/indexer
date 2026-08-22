@@ -136,7 +136,7 @@ func (p *NftIndexer) GetNftsWithAddress(utxoMap map[uint64]int64) []*common.Nft 
 		for _, id := range info.Nfts {
 			nfts = append(nfts, id)
 			nftmap[id] = &common.Nft{Base: nil,
-			OwnerAddressId: info.OwnerAddressId, UtxoId: info.UtxoId, Offset: info.Offset}
+				OwnerAddressId: info.OwnerAddressId, UtxoId: info.UtxoId, Offset: info.Offset}
 		}
 	}
 	sort.Slice(nfts, func(i, j int) bool {
@@ -195,38 +195,30 @@ func (p *NftIndexer) GetNftWithId(id int64) *common.Nft {
 }
 
 func (p *NftIndexer) getNftWithId(id int64) *common.Nft {
-
-	nft := p.getNftInBuffer(id)
-	if nft != nil {
+	if nft := p.getNftInBuffer(id); nft != nil {
 		return nft
 	}
 
-	buckDB := NewBuckStore(p.db)
-	bv, err := buckDB.Get(id)
-	if err != nil {
+	// The primary NFT record already contains the immutable sat number, so a
+	// separate id->sat bucket index is unnecessary.
+	nft, err := p.loadNftFromDB(id)
+	if err != nil || nft == nil || nft.Base == nil {
 		return nil
 	}
 
-	nfts := &common.NftsInSat{}
-	err = loadNftsInSatFromDB(bv.Sat, nfts, p.db)
-	if err != nil {
+	location := &common.NftsInSat{}
+	if err := loadNftsInSatFromDB(nft.Base.Sat, location, p.db); err != nil {
 		return nil
 	}
-
-	for _, nftId := range nfts.Nfts {
-		if nftId == id {
-			nft, err := p.loadNftFromDB(nftId)
-			if err != nil {
-				return nil
-			}
-			nft.OwnerAddressId = nfts.OwnerAddressId
-			nft.UtxoId = nfts.UtxoId
-			nft.Offset = nfts.Offset
-
-			return nft
+	for _, nftID := range location.Nfts {
+		if nftID != id {
+			continue
 		}
+		nft.OwnerAddressId = location.OwnerAddressId
+		nft.UtxoId = location.UtxoId
+		nft.Offset = location.Offset
+		return nft
 	}
-
 	return nil
 }
 
@@ -278,22 +270,55 @@ func (p *NftIndexer) GetNfts(start, limit int) ([]int64, int) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
-	end := start + limit
-
-	result := make([]int64, 0)
-	buckDB := NewBuckStore(p.db)
-	idmap := buckDB.BatchGet(int64(start), int64(end))
-	for _, nft := range p.nftAdded {
-		idmap[nft.Base.Id] = &BuckValue{nft.Base.Sat}
+	total := int(p.status.Count)
+	if start < 0 {
+		start = 0
 	}
-	for i := start; i < end; i++ {
-		_, ok := idmap[int64(i)]
-		if ok {
-			result = append(result, int64(i))
+	if limit <= 0 || start >= total {
+		return nil, total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	idSet := make(map[int64]bool, end-start)
+	err := p.db.Scan(common.ScanOptions{
+		Prefix:         []byte(DB_PREFIX_NFT),
+		Start:          []byte(GetNftKey(int64(start))),
+		StartInclusive: true,
+		KeysOnly:       true,
+	}, func(k, _ []byte) error {
+		id, err := ParseNftKey(string(k))
+		if err != nil {
+			return err
+		}
+		if id >= int64(end) {
+			return common.ErrStopScan
+		}
+		if id >= int64(start) {
+			idSet[id] = true
+		}
+		return nil
+	})
+	if err != nil {
+		common.Log.Errorf("scan NFT ids failed: %v", err)
+		return nil, total
+	}
+	for _, nft := range p.nftAdded {
+		id := nft.Base.Id
+		if id >= int64(start) && id < int64(end) {
+			idSet[id] = true
 		}
 	}
 
-	return result, len(idmap)
+	result := make([]int64, 0, len(idSet))
+	for id := start; id < end; id++ {
+		if idSet[int64(id)] {
+			result = append(result, int64(id))
+		}
+	}
+	return result, total
 }
 
 // 按照铸造时间

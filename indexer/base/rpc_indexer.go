@@ -66,11 +66,11 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	}
 
 	output := &common.UtxoValueInDB{}
-	
+
 	key := db.GetUTXODBKey(utxo)
 	//err := db.GetValueFromDB(key, txn, output)
 	err := db.GetValueFromDBWithProto3(key, b.db, output)
-	
+
 	if err != nil {
 		return common.INVALID_ID, nil, err
 	}
@@ -83,7 +83,7 @@ func (b *RpcIndexer) GetOrdinalsWithUtxo(utxo string) (uint64, []*common.Range, 
 	return output.UtxoId, nil, nil
 }
 
-func (b *RpcIndexer) GetUtxoValue(utxo string) (int64) {
+func (b *RpcIndexer) GetUtxoValue(utxo string) int64 {
 	info, err := b.GetUtxoInfo(utxo)
 	if err != nil {
 		return 0
@@ -127,12 +127,12 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	pkScript, err := common.GetPkScriptFromAddress(address)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	info.UtxoId = output.UtxoId
 	info.Value = output.Value
 	info.PkScript = pkScript
@@ -144,18 +144,8 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 // only for api access
 func (b *RpcIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValueV2 {
 	b.mutex.Lock()
-	value, ok := b.addressValueMap[address]
-	if !ok {
-		data, err := db.GetAddressDataFromDBV2(ldb, address)
-		if err == nil {
-			value = common.ToAddressValueV2(data)
-			b.addressValueMap[address] = value
-			ok = true
-		}
-	}
-	b.mutex.Unlock()
-
-	return value
+	defer b.mutex.Unlock()
+	return b.BaseIndexer.getAddressValue2(address, ldb)
 }
 
 // only for RPC interface
@@ -192,27 +182,23 @@ func (b *RpcIndexer) GetAddressByID(id uint64) (string, error) {
 	defer b.mutex.Unlock()
 	b.idToAddressMap[id] = address
 
-
 	return address, err
 }
 
 // only for RPC interface
 func (b *RpcIndexer) GetAddressId(address string) uint64 {
-
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	id, _ := b.getAddressId(address)
-	if id == common.INVALID_ID {
-		data, err := db.GetAddressDataFromDBV2(b.db, address)
-		if err == nil {
-			value := common.ToAddressValueV2(data)
-			id = value.AddressId
-			b.addressValueMap[address] = value
-			b.idToAddressMap[id] = address
-		}
+	if id != common.INVALID_ID {
+		return id
 	}
-
-	return id
+	data, err := db.GetAddressDataFromDBV2(b.db, address)
+	if err != nil {
+		return common.INVALID_ID
+	}
+	b.idToAddressMap[data.AddressId] = address
+	return data.AddressId
 }
 
 func (b *RpcIndexer) GetOrdinalsWithUtxoId(id uint64) (string, []*common.Range, error) {
@@ -256,7 +242,7 @@ func (b *RpcIndexer) GetUTXOs2(address string) []string {
 }
 
 func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValueV2, error) {
-	
+
 	addressValueInDB := b.getAddressValue2(address, b.db)
 	if addressValueInDB == nil {
 		//indexer.Log.Infof("RpcIndexer.getUtxosWithAddress-> No address %s found in db", address)

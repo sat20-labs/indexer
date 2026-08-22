@@ -97,6 +97,11 @@ type TxOutputV2 struct {
 	AddressId   uint64
 	AddressType int
 
+	// persisted is runtime-only. It identifies an output loaded from, or
+	// successfully written to, the durable Base DB. It is used to maintain the
+	// durable UTXO count without issuing one DB lookup per spent output.
+	persisted bool
+
 	// 仅用于编译数据
 	// asset -> 当前 offsets 游标（指向正在消费的 range）
 	base         int64 // 已经切出去的部分，所有剩余offset在切出去时都需要减去这部分
@@ -105,6 +110,16 @@ type TxOutputV2 struct {
 	satKeys map[AssetName][]int
 	// asset -> satKeys 游标
 	satCursor map[AssetName]int
+}
+
+func (p *TxOutputV2) MarkPersisted() {
+	if p != nil {
+		p.persisted = true
+	}
+}
+
+func (p *TxOutputV2) IsPersisted() bool {
+	return p != nil && p.persisted
 }
 
 func (p *TxOutputV2) GetAddress() string {
@@ -149,7 +164,7 @@ func NewCompilingOutput(tx *TxOutput) *TxOutputV2 {
 		satCursor:    make(map[AssetName]int),
 	}
 }
- 
+
 // 为编译数据增加两个新的函数，加快处理速度，小心内存碎片的处理 TODO 测试不充分，很可能有bug，而且初步验证效果不明显，暂时放弃。
 // CompilingAppend 是编译期快路径：
 // - 不做资产合并、不排序

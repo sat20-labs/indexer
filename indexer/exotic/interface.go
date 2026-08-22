@@ -6,44 +6,24 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-
 func (p *ExoticIndexer) HasExoticInUtxo(utxoId uint64) bool {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	info, ok := p.holderInfo[utxoId]
-	if !ok {
-		var err error
-		info, err = p.loadUtxoInfoFromDB(utxoId)
-		if err != nil {
-			return false
-		}
-		p.holderInfo[utxoId] = info
-	}
-
-	return len(info.Tickers) > 0
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	info := p.holderInfoForRead(utxoId)
+	return info != nil && len(info.Tickers) > 0
 }
 
-
 func (p *ExoticIndexer) GetAssetsWithUtxo(utxoId uint64) map[string]common.AssetOffsets {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	info, ok := p.holderInfo[utxoId]
-	if !ok {
-		var err error
-		info, err = p.loadUtxoInfoFromDB(utxoId)
-		if err != nil {
-			return nil
-		}
-		p.holderInfo[utxoId] = info
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	info := p.holderInfoForRead(utxoId)
+	if info == nil {
+		return nil
 	}
-
-	result := make(map[string]common.AssetOffsets)
+	result := make(map[string]common.AssetOffsets, len(info.Tickers))
 	for name, asset := range info.Tickers {
 		result[name] = asset.Offsets.Clone()
 	}
-
 	return result
 }
 
@@ -79,7 +59,7 @@ func (p *ExoticIndexer) getTicker(tickerName string) *common.Ticker {
 	if ok {
 		return ret.Ticker
 	}
-	
+
 	ticker := p.loadTickerFromDB(tickerName)
 	if ticker != nil {
 		p.tickerMap[tickerName] = &TickInfo{
@@ -90,7 +70,6 @@ func (p *ExoticIndexer) getTicker(tickerName string) *common.Ticker {
 
 	return ticker
 }
-
 
 // 获取该ticker的holder和持有的数量
 // return: key, address; value, 资产数量
@@ -103,34 +82,7 @@ func (p *ExoticIndexer) GetHolderAndAmountWithTick(tickerName string) map[uint64
 }
 
 func (p *ExoticIndexer) getHolderAndAmountWithTick(tickerName string) map[uint64]int64 {
-	mp := make(map[uint64]int64, 0)
-
-	utxos, ok := p.utxoMap[tickerName]
-	if !ok {
-		utxos = p.loadTickerToUtxoMapFromDB(tickerName)
-		p.utxoMap[tickerName] = utxos
-	}
-
-	for utxo, amount := range utxos {
-		info, ok := p.holderInfo[utxo]
-		if !ok {
-			var err error
-			info, err = p.loadUtxoInfoFromDB(utxo)
-			if err != nil {
-				continue
-			}
-			p.holderInfo[utxo] = info
-		}
-		mp[info.AddressId] += amount
-		
-		// addressId, err := p.baseIndexer.GetUtxoAddress(utxo)
-		// if err != nil {
-		// 	continue
-		// }
-		// mp[addressId] += amount
-	}
-
-	return mp
+	return p.getTickerHolderAmounts(strings.ToLower(tickerName))
 }
 
 // 获取某个地址下的资产 return: ticker->amount
@@ -138,8 +90,8 @@ func (p *ExoticIndexer) getAssetAmtByAddress(address uint64, tickerName string) 
 	utxos := p.baseIndexer.GetUTXOs(address)
 	var result int64
 	for utxo := range utxos {
-		info, ok := p.holderInfo[utxo]
-		if !ok {
+		info := p.holderInfoForRead(utxo)
+		if info == nil {
 			continue
 		}
 

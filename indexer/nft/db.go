@@ -125,6 +125,17 @@ func GetNftKey(nftId int64) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_NFT, hex.EncodeToString(common.Uint64ToBytes(uint64(nftId))))
 }
 
+func ParseNftKey(input string) (int64, error) {
+	if !strings.HasPrefix(input, DB_PREFIX_NFT) {
+		return 0, fmt.Errorf("invalid NFT key %s", input)
+	}
+	raw, err := hex.DecodeString(strings.TrimPrefix(input, DB_PREFIX_NFT))
+	if err != nil || len(raw) != 8 {
+		return 0, fmt.Errorf("invalid NFT key %s", input)
+	}
+	return int64(common.BytesToUint64(raw)), nil
+}
+
 func GetUtxoKey(UtxoId uint64) string {
 	return fmt.Sprintf("%s%s", DB_PREFIX_UTXO, hex.EncodeToString(common.Uint64ToBytes(UtxoId)))
 }

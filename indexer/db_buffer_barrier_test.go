@@ -1,63 +1,72 @@
 package indexer
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-func TestDBBufferReaderBarrierDrainsRPCAndMempoolReaders(t *testing.T) {
+func TestDBBufferReaderBarrierDrainsReadersAndBlocksAdmission(t *testing.T) {
 	mempool := NewMiniMemPool()
 	mgr := &IndexerMgr{miniMempool: mempool}
 
-	// Keep one mempool reader and one RPC reader active. The barrier must
-	// first drain the mempool reader before it closes RPC admission, then
-	// drain the already-active RPC reader before entering the update.
 	mempool.enterIndexerRead()
-	atomic.StoreInt32(&mgr.rpcProcessing, 1)
+	mgr.rpcEnter()
 
 	updateEntered := make(chan struct{})
+	releaseUpdate := make(chan struct{})
 	barrierDone := make(chan struct{})
 	go func() {
 		mgr.withDBBufferReaderBarrier(func() {
 			close(updateEntered)
+			<-releaseUpdate
 		})
 		close(barrierDone)
 	}()
 
 	select {
 	case <-updateEntered:
-		t.Fatal("update entered while a mempool indexer reader was active")
+		t.Fatal("update entered while mempool and RPC readers were active")
 	case <-time.After(50 * time.Millisecond):
 	}
 
-	// Once the mempool reader drains, the barrier may close RPC admission.
 	mempool.leaveIndexerRead()
-	deadline := time.After(time.Second)
-	for atomic.LoadInt32(&mgr.reloading) == 0 {
-		select {
-		case <-deadline:
-			t.Fatal("barrier did not block new RPC readers after mempool readers drained")
-		default:
-			time.Sleep(time.Millisecond)
-		}
-	}
-
 	select {
 	case <-updateEntered:
 		t.Fatal("update entered while an RPC reader was active")
 	case <-time.After(50 * time.Millisecond):
 	}
 
-	atomic.StoreInt32(&mgr.rpcProcessing, 0)
+	mgr.rpcLeft()
+	select {
+	case <-updateEntered:
+	case <-time.After(time.Second):
+		t.Fatal("barrier did not enter after existing readers drained")
+	}
+
+	newReaderEntered := make(chan struct{})
+	go func() {
+		mgr.rpcEnter()
+		close(newReaderEntered)
+		mgr.rpcLeft()
+	}()
+	select {
+	case <-newReaderEntered:
+		t.Fatal("new RPC reader entered while update held the write barrier")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(releaseUpdate)
 	select {
 	case <-barrierDone:
 	case <-time.After(time.Second):
-		t.Fatal("barrier did not proceed after existing readers drained")
+		t.Fatal("barrier did not exit")
 	}
-
-	if got := atomic.LoadInt32(&mgr.reloading); got != 0 {
-		t.Fatalf("reloading = %d after barrier, want 0", got)
+	select {
+	case <-newReaderEntered:
+	case <-time.After(time.Second):
+		t.Fatal("RPC admission did not reopen after barrier")
 	}
 
 	readerEntered := make(chan struct{})
@@ -77,11 +86,6 @@ func TestDBBufferReaderBarrierDoesNotDeadlockMempoolRPCRead(t *testing.T) {
 	mempool := NewMiniMemPool()
 	mgr := &IndexerMgr{miniMempool: mempool}
 
-	// Reproduce the production lock dependency:
-	// txBroadcasted holds indexerReadBarrier.RLock while rebuildTxOutput may
-	// enter an RPC-gated indexer read. If withDBBufferReaderBarrier sets
-	// reloading before waiting for the write lock, the two goroutines wait on
-	// each other forever.
 	readerHasBarrier := make(chan struct{})
 	allowRPCRead := make(chan struct{})
 	readerDone := make(chan struct{})
@@ -110,32 +114,61 @@ func TestDBBufferReaderBarrierDoesNotDeadlockMempoolRPCRead(t *testing.T) {
 		close(barrierDone)
 	}()
 
-	// Give the writer time to contend on the reader barrier. With the broken
-	// ordering, reloading is already set here and the following rpcEnter will
-	// deadlock. With the fixed ordering, reloading is still zero until this
-	// reader finishes.
+	// The writer must wait for the mempool reader before acquiring the RPC
+	// write lock, so the reader may safely perform an RPC-gated read.
 	time.Sleep(20 * time.Millisecond)
 	close(allowRPCRead)
-
 	select {
 	case <-readerDone:
 	case <-time.After(time.Second):
 		t.Fatal("mempool reader deadlocked entering RPC read while DB barrier was pending")
 	}
-
 	select {
 	case <-updateEntered:
 	case <-time.After(time.Second):
-		t.Fatal("DB barrier did not enter update after mempool reader completed")
+		t.Fatal("DB barrier did not enter after mempool reader completed")
 	}
-
 	select {
 	case <-barrierDone:
 	case <-time.After(time.Second):
 		t.Fatal("DB barrier did not exit")
 	}
+}
 
-	if got := atomic.LoadInt32(&mgr.reloading); got != 0 {
-		t.Fatalf("reloading = %d after barrier, want 0", got)
+func TestRPCBarrierStressNeverOverlapsWriterAndReaders(t *testing.T) {
+	mgr := &IndexerMgr{miniMempool: NewMiniMemPool()}
+	var activeReaders int32
+	var writerActive int32
+	var failed int32
+
+	var readers sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			for j := 0; j < 200; j++ {
+				mgr.rpcEnter()
+				atomic.AddInt32(&activeReaders, 1)
+				if atomic.LoadInt32(&writerActive) != 0 {
+					atomic.StoreInt32(&failed, 1)
+				}
+				atomic.AddInt32(&activeReaders, -1)
+				mgr.rpcLeft()
+			}
+		}()
+	}
+
+	for i := 0; i < 40; i++ {
+		mgr.withDBBufferReaderBarrier(func() {
+			atomic.StoreInt32(&writerActive, 1)
+			if atomic.LoadInt32(&activeReaders) != 0 {
+				atomic.StoreInt32(&failed, 1)
+			}
+			atomic.StoreInt32(&writerActive, 0)
+		})
+	}
+	readers.Wait()
+	if atomic.LoadInt32(&failed) != 0 {
+		t.Fatal("RPC reader overlapped an indexer writer")
 	}
 }

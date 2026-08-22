@@ -50,18 +50,15 @@ func (s *Indexer) GetHoldersWithTick(name string) map[uint64]*common.Decimal {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	result := make(map[uint64]*common.Decimal)
-	for addressId, amount := range s.tickerHolders[strings.ToLower(name)] {
+	for addressID, amount := range s.tickerHoldersLocked(name) {
 		if amount > 0 {
-			result[addressId] = common.NewDefaultDecimal(amount)
+			result[addressID] = common.NewDefaultDecimal(amount)
 		}
 	}
 	return result
 }
 
-func (s *Indexer) GetMintHistory(name string, start, limit int) []*common.MintInfo {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	items := s.mintHistory[strings.ToLower(name)]
+func paginateMintHistory(items []*MintInfo, start, limit int) []*MintInfo {
 	total := len(items)
 	if start < 0 {
 		start = 0
@@ -72,92 +69,62 @@ func (s *Indexer) GetMintHistory(name string, start, limit int) []*common.MintIn
 	if limit <= 0 || start+limit > total {
 		limit = total - start
 	}
-	result := make([]*common.MintInfo, 0, limit)
-	for _, item := range items[start : start+limit] {
+	return items[start : start+limit]
+}
+
+func (s *Indexer) GetMintHistory(name string, start, limit int) []*common.MintInfo {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	items := paginateMintHistory(s.mintHistoryLocked(name, nil), start, limit)
+	result := make([]*common.MintInfo, 0, len(items))
+	for _, item := range items {
 		result = append(result, item.ToCommon(""))
 	}
 	return result
 }
 
-func (s *Indexer) GetMintHistoryWithAddress(addressId uint64, name string, start, limit int) ([]*common.MintInfo, int) {
+func (s *Indexer) GetMintHistoryWithAddress(addressID uint64, name string, start, limit int) ([]*common.MintInfo, int) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	filtered := make([]*MintInfo, 0)
-	for _, item := range s.mintHistory[strings.ToLower(name)] {
-		if item.AddressId == addressId {
-			filtered = append(filtered, item)
-		}
-	}
-	total := len(filtered)
-	if start < 0 {
-		start = 0
-	}
-	if start >= total {
-		return nil, total
-	}
-	if limit <= 0 || start+limit > total {
-		limit = total - start
-	}
-	result := make([]*common.MintInfo, 0, limit)
-	for _, item := range filtered[start : start+limit] {
+	items := s.mintHistoryLocked(name, &addressID)
+	total := len(items)
+	page := paginateMintHistory(items, start, limit)
+	result := make([]*common.MintInfo, 0, len(page))
+	for _, item := range page {
 		result = append(result, item.ToCommon(""))
 	}
 	return result, total
 }
 
-func (s *Indexer) GetAddressAssets(addressId uint64) map[string]int64 {
+func (s *Indexer) GetAddressAssets(addressID uint64) map[string]int64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	result := make(map[string]int64)
-	for ticker, amount := range s.holderBalances[addressId] {
-		if amount > 0 {
-			result[ticker] = amount
-		}
-	}
-	return result
+	return s.holderAssetsLocked(addressID)
 }
 
-func (s *Indexer) GetUtxoAssets(utxoId uint64) map[string]int64 {
+func (s *Indexer) GetUtxoAssets(utxoID uint64) map[string]int64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	result := make(map[string]int64)
-	for _, balance := range s.utxoBalances[utxoId] {
+	for _, balance := range s.allUtxoBalancesLocked(utxoID) {
 		result[balance.Ticker] += balance.Amount
 	}
 	return result
 }
 
 // GetUtxoBalances returns the atomical-level balances for one confirmed UTXO.
-// Mempool transfer classification needs the atomical id, not only the ticker
-// summary, because the protocol assigns each atomical independently.
-func (s *Indexer) GetUtxoBalances(utxoId uint64) []*UtxoBalance {
+// It does not populate the processing cache when called from RPC paths.
+func (s *Indexer) GetUtxoBalances(utxoID uint64) []*UtxoBalance {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-
-	items := s.utxoBalances[utxoId]
-	if len(items) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(items))
-	for atomicalId := range items {
-		ids = append(ids, atomicalId)
-	}
-	sortAtomicalIds(ids)
-
-	result := make([]*UtxoBalance, 0, len(ids))
-	for _, atomicalId := range ids {
-		if balance := items[atomicalId]; balance != nil {
-			result = append(result, balance.Clone())
-		}
-	}
-	return result
+	return s.allUtxoBalancesLocked(utxoID)
 }
 
-func (s *Indexer) GetAssetsWithUtxo(utxoId uint64) map[string]common.AssetOffsets {
+func (s *Indexer) GetAssetsWithUtxo(utxoID uint64) map[string]common.AssetOffsets {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	result := make(map[string]common.AssetOffsets)
-	for _, balance := range s.utxoBalances[utxoId] {
+	for _, balance := range s.allUtxoBalancesLocked(utxoID) {
 		if balance.Amount <= 0 {
 			continue
 		}
@@ -175,8 +142,8 @@ func (s *Indexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]in
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	result := make(map[string]int64)
-	for utxoId := range utxos {
-		for _, balance := range s.utxoBalances[utxoId] {
+	for utxoID := range utxos {
+		for _, balance := range s.allUtxoBalancesLocked(utxoID) {
 			result[balance.Ticker] += balance.Amount
 		}
 	}
@@ -186,35 +153,35 @@ func (s *Indexer) GetAssetSummaryByAddress(utxos map[uint64]int64) map[string]in
 func (s *Indexer) GetUtxoBalancesWithTick(ticker string) map[uint64]int64 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	result := make(map[uint64]int64)
-	for utxoId, amount := range s.tickerUtxos[strings.ToLower(ticker)] {
-		if amount > 0 {
-			result[utxoId] = amount
-		}
-	}
-	return result
+	return s.tickerUtxosLocked(ticker)
 }
 
-func (s *Indexer) HasAssetInUtxo(utxoId uint64) bool {
+func (s *Indexer) HasAssetInUtxo(utxoID uint64) bool {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return len(s.utxoBalances[utxoId]) > 0
+	return len(s.readUtxoBalanceMapLocked(utxoID)) > 0
 }
 
 func (s *Indexer) CheckSelf() bool {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	for ticker, holders := range s.tickerHolders {
+	for ticker, info := range s.tickerMap {
+		holders := s.tickerHoldersLocked(ticker)
 		var holderTotal int64
 		for _, amount := range holders {
 			holderTotal += amount
 		}
+		utxos := s.tickerUtxosLocked(ticker)
 		var utxoTotal int64
-		for _, amount := range s.tickerUtxos[ticker] {
+		for _, amount := range utxos {
 			utxoTotal += amount
 		}
 		if holderTotal != utxoTotal {
 			common.Log.Errorf("atom ticker %s holder total %d != utxo total %d", ticker, holderTotal, utxoTotal)
+			return false
+		}
+		if info != nil && info.HolderCount != len(holders) {
+			common.Log.Errorf("atom ticker %s holder count %d != %d", ticker, info.HolderCount, len(holders))
 			return false
 		}
 	}
