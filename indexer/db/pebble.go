@@ -403,6 +403,10 @@ func (p *pebbleDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v
 	return p.iter(prefix, seekKey, reverse, r)
 }
 
+func (p *pebbleDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
+	return common.ScanWithBatchRead(options, p.BatchRead, r)
+}
+
 // 慢，尽可能不要用
 func (p *pebbleDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error {
 	var (

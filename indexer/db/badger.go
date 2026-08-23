@@ -206,6 +206,10 @@ func (b *badgerDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) er
 	return b.iter(prefix, nil, reverse, r)
 }
 
+func (b *badgerDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
+	return common.ScanWithBatchRead(options, b.BatchRead, r)
+}
+
 func (b *badgerDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error {
 	return b.iter(prefix, seekKey, reverse, r)
 }
