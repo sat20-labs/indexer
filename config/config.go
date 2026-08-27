@@ -13,18 +13,21 @@ import (
 )
 
 type YamlConf struct {
-	Chain      string     `yaml:"chain"`
-	DB         DB         `yaml:"db"`
-	ShareRPC   ShareRPC   `yaml:"share_rpc"`
-	Log        Log        `yaml:"log"`
-	BasicIndex BasicIndex `yaml:"basic_index"`
-	RPCService RPCService `yaml:"rpc_service"`
-	PubKey	   string     `yaml:"pubkey"`
-	CheckValidateFiles bool `yaml:"check_validate_files"`
+	Chain              string     `yaml:"chain"`
+	DB                 DB         `yaml:"db"`
+	ShareRPC           ShareRPC   `yaml:"share_rpc"`
+	Log                Log        `yaml:"log"`
+	BasicIndex         BasicIndex `yaml:"basic_index"`
+	RPCService         RPCService `yaml:"rpc_service"`
+	PubKey             string     `yaml:"pubkey"`
+	CheckValidateFiles bool       `yaml:"check_validate_files"`
 }
 
+const DefaultBadgerBlockCacheTotalMB = 32 * 1024
+
 type DB struct {
-	Path string `yaml:"path"`
+	Path                    string `yaml:"path"`
+	BadgerBlockCacheTotalMB int    `yaml:"badger_block_cache_total_mb"`
 }
 
 type ShareRPC struct {
@@ -193,6 +196,10 @@ func LoadYamlConf(cfgPath string) (*YamlConf, error) {
 		ret.BasicIndex.MaxIndexHeight = -2
 	}
 
+	if ret.DB.BadgerBlockCacheTotalMB <= 0 {
+		ret.DB.BadgerBlockCacheTotalMB = DefaultBadgerBlockCacheTotalMB
+	}
+
 	if ret.DB.Path == "" {
 		ret.DB.Path = "db"
 	}
@@ -225,7 +232,5 @@ func LoadYamlConf(cfgPath string) (*YamlConf, error) {
 		rpcService.Swagger.Schemes = []string{"http"}
 	}
 
-
-	
 	return ret, nil
 }

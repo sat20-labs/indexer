@@ -1,40 +1,30 @@
 # Indexer persistent-value encoding policy
 
-## Decision
+This document records the encoding policy. The measured results and complete benchmark output are in:
 
-Indexer does **not** force every key and value through one physical encoding.
-The persistent format is selected by data shape:
+- `storage-encoding.md`
+- `storage-encoding-size-results.txt`
+- `storage-encoding-benchmark.txt`
+
+## Policy
+
+Indexer does **not** force every key and value through one physical encoding. Encoding is selected by data shape:
 
 | Data shape | Encoding |
 |---|---|
-| Ordered identifiers embedded in keys | fixed-width, big-endian binary |
+| Ordered identifiers embedded in keys | fixed-width big-endian binary |
 | Small scalar values with a fixed schema | raw fixed-width binary or varint |
 | Structured records that evolve over time | Protocol Buffers |
-| Protocol-owned payloads | their original protocol format, such as CBOR, JSON, or opaque bytes |
-| Legacy export/backup streams | Gob may remain until the export format is separately revised |
+| Protocol-owned payloads | native protocol encoding (CBOR, JSON, opaque bytes, etc.) |
+| Legacy backup/export streams | Gob may remain until separately revised |
 
-New online tables must not introduce Gob values. Existing Gob tables are migrated
-when their module schema is rebuilt; a cross-repository, one-shot conversion is
-intentionally avoided because it would combine unrelated protocol migrations in
-one change.
+New online index tables must not introduce Gob values. Existing Gob tables are migrated module-by-module when their storage schema is rebuilt.
 
-A generic custom TLV format is not adopted. Protobuf is already a tagged,
-wire-typed encoding, provides schema tooling and unknown-field compatibility,
-and was materially smaller than the representative generic TLV in the local
-benchmark.
+A generic custom TLV format is not adopted. Protobuf already provides a tagged wire format, schema tooling and compatibility semantics. A hand-written binary codec is reserved for small, fixed and heavily accessed records where an end-to-end Badger benchmark justifies it.
 
-## Reproducible benchmark
+## Verified local benchmark — 2026-08-22
 
-Run:
-
-```bash
-go test ./indexer/db \
-  -run TestRepresentativeCodecSizesAndRoundTrips \
-  -bench 'BenchmarkRepresentativeCodec(Encode|Decode)$' \
-  -benchmem -count=3
-```
-
-Reference run on 2026-08-22:
+Environment:
 
 ```text
 goos: darwin
@@ -42,71 +32,49 @@ goarch: amd64
 cpu: Intel(R) Core(TM) i7-1068NG7 CPU @ 2.30GHz
 ```
 
-Representative logical record:
-
-```text
-utxo_id    = 4,294,967,321,001
-value      = 5,000,000,000
-address_id = 108,033,293
-```
-
-### Encoded size
+Representative value encoded sizes:
 
 | Encoding | Bytes |
 |---|---:|
 | Protobuf | 18 |
-| Gob, new encoder per value | 90 |
-| Raw fixed-width binary | 24 |
-| Generic tag/type/length/value | 33 |
+| Gob (new encoder per value) | 90 |
+| Raw fixed-width | 24 |
+| Generic TLV sample | 33 |
 
-### Encode
+Measured encode ranges across three runs:
 
-| Encoding | Time/op | Bytes allocated/op | Allocations/op |
+| Encoding | ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| Protobuf | 172–175 ns | 88 | 2 |
-| Gob | 2.23–2.31 µs | 1,528 | 20 |
-| Raw fixed-width binary | 26.4–26.7 ns | 24 | 1 |
-| Generic TLV | 33.8–34.3 ns | 48 | 1 |
+| Protobuf | 286-303 | 88 | 2 |
+| Gob | 3744-3881 | 1528 | 20 |
+| Raw fixed-width | 40-42 | 24 | 1 |
+| Generic TLV sample | 50-51 | 48 | 1 |
 
-### Decode
+Measured decode ranges:
 
-| Encoding | Time/op | Bytes allocated/op | Allocations/op |
+| Encoding | ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| Protobuf | 161–165 ns | 64 | 1 |
-| Gob | 15.9–16.6 µs | 7,136 | 159 |
-| Raw fixed-width binary | 3.19–3.28 ns | 0 | 0 |
-| Generic TLV | 9.61–10.65 ns | 0 | 0 |
+| Protobuf | 262-330 | 64 | 1 |
+| Gob | 25,916-27,292 | 7136 | 159 |
+| Raw fixed-width | 5.35-5.53 | 0 | 0 |
+| Generic TLV sample | 16.24-16.37 | 0 | 0 |
 
-The exact timings are machine-dependent. The relative result is the relevant
-one: the project's current per-value Gob usage is substantially slower and
-larger than Protobuf, while raw binary is appropriate for truly fixed scalar
-records. Generic TLV was fast in this deliberately simple benchmark, but it was
-larger than Protobuf and would require a second hand-written schema system.
+The previous draft values in this file were not produced by a successfully executed final benchmark and have been replaced by the measurements above.
 
 ## Schema rules
 
-1. Keys that must sort numerically encode integers as fixed-width big-endian
-   values. Decimal and hexadecimal strings are not used for new hot indexes.
-2. A table owns exactly one codec. Call sites do not choose between `SetDB` and
-   `SetDBWithProto3` ad hoc.
-3. Protobuf messages should use packed repeated numeric fields and `sint64` for
-   frequently negative values.
-4. Large logical collections are split into multiple keys rather than stored as
-   one very large message.
-5. A module format change increments its DB version. Historical index databases
-   are rebuilt rather than carrying permanent dual-read compatibility.
-6. Benchmarks must include encoded bytes, ns/op, B/op, allocs/op, Badger point
-   reads, prefix scans, batch writes, peak RSS, and post-GC disk usage before a
-   custom codec is introduced into production.
+1. Numeric key components that require ordered scans use fixed-width big-endian binary.
+2. A table owns one persistent codec; callers do not choose Gob or Protobuf ad hoc.
+3. Large logical collections are split into prefix-key records instead of one ever-growing value.
+4. Protobuf should use `sint64` for frequently negative values and packed repeated numeric fields where appropriate.
+5. Incompatible module schema changes bump that module's DB version and are handled by rebuilding the index, not permanent dual-read compatibility.
+6. A custom codec requires both micro-benchmark and Badger end-to-end evidence: write throughput, point reads, prefix scans, allocations/RSS and disk size after GC.
 
-## Status in this branch
+## Current branch
 
-- Base address UTXO amounts use compact raw 8-byte values under binary
-  `address_id/utxo_id` keys.
-- Base address metadata and NFT state use Protobuf.
-- Runes continues to use Protobuf typed tables.
-- The new Exotic ticker-holder aggregate uses compact raw 8-byte values.
-- Atom and remaining legacy protocol tables still contain Gob values. Their
-  in-memory full-state problem is removed in this branch; their structured
-  value migration should be performed module-by-module with DB-version bumps
-  and full historical comparison tests.
+- Base address UTXOs use compact per-UTXO records rather than one full address UTXO value.
+- NFT primary structured records use Protobuf; the redundant Gob BuckStore has been removed.
+- Runes keeps Protobuf typed tables and separates pending writes from bounded read cache.
+- Exotic no longer keeps the durable ticker/UTXO state fully resident; holder aggregate values use compact scalar encoding.
+- Atom growing state is queried from DB on demand while Atomicals block processing remains intentionally disabled.
+- FT is intentionally unchanged in this optimization round.

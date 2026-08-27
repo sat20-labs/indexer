@@ -7,10 +7,9 @@ import (
 	"strings"
 
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/config"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
-
-const defaultBadgerBlockCacheTotalMB = 16 * 1024
 
 var badgerBlockCacheWeights = map[string]int{
 	"base":   40,
@@ -25,7 +24,7 @@ var badgerBlockCacheWeights = map[string]int{
 	"atom":   0, // Atomicals indexing is intentionally disabled for now.
 }
 
-func configuredBadgerBlockCacheTotalMB() int {
+func configuredBadgerBlockCacheTotalMB(configuredMB int) int {
 	for _, key := range []string{"INDEXER_BADGER_BLOCK_CACHE_TOTAL_MB", "INDEXER_DB_CACHE_TOTAL_MB"} {
 		raw := os.Getenv(key)
 		if raw == "" {
@@ -33,12 +32,19 @@ func configuredBadgerBlockCacheTotalMB() int {
 		}
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 0 {
-			common.Log.Warnf("invalid %s=%q, use default %dMB", key, raw, defaultBadgerBlockCacheTotalMB)
-			return defaultBadgerBlockCacheTotalMB
+			fallback := configuredMB
+			if fallback <= 0 {
+				fallback = config.DefaultBadgerBlockCacheTotalMB
+			}
+			common.Log.Warnf("invalid %s=%q, use configured/default %dMB", key, raw, fallback)
+			return fallback
 		}
 		return value
 	}
-	return defaultBadgerBlockCacheTotalMB
+	if configuredMB > 0 {
+		return configuredMB
+	}
+	return config.DefaultBadgerBlockCacheTotalMB
 }
 
 func allocateBadgerBlockCache(totalMB int) map[string]int {
@@ -72,7 +78,7 @@ func openDB(filepath string, cacheSizeMB int) (common.KVDB, error) {
 func (p *IndexerMgr) initDB() (err error) {
 	common.Log.Info("InitDB-> start...")
 
-	totalCacheMB := configuredBadgerBlockCacheTotalMB()
+	totalCacheMB := configuredBadgerBlockCacheTotalMB(p.cfg.DB.BadgerBlockCacheTotalMB)
 	cache := allocateBadgerBlockCache(totalCacheMB)
 	common.Log.Infof(
 		"Badger process block-cache plan: total=%dMB base=%d nft=%d brc20=%d runes=%d exotic=%d ns=%d ft=%d local=%d dkvs=%d atom=%d",

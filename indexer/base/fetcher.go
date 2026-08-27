@@ -124,6 +124,41 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 	return bl
 }
 
+func (b *BaseIndexer) setPrefetchedBlock(block *common.Block) {
+	if block == nil {
+		return
+	}
+	b.prefetchedBlocksMu.Lock()
+	if b.prefetchedBlocks == nil {
+		b.prefetchedBlocks = make(map[int]*common.Block, BLOCK_PREFETCH+1)
+	}
+	b.prefetchedBlocks[block.Height] = block
+	b.prefetchedBlocksMu.Unlock()
+}
+
+func (b *BaseIndexer) removePrefetchedBlock(height int) {
+	b.prefetchedBlocksMu.Lock()
+	delete(b.prefetchedBlocks, height)
+	b.prefetchedBlocksMu.Unlock()
+}
+
+// GetPrefetchedBlock returns the already parsed block held by the Base fetcher
+// window. Callers must treat the returned future block as read-only. The main
+// sync loop processes blocks serially, so h+1/h+2 cannot be mutated while the
+// current block's protocol lookahead is reading them.
+func (b *BaseIndexer) GetPrefetchedBlock(height int) *common.Block {
+	b.prefetchedBlocksMu.RLock()
+	block := b.prefetchedBlocks[height]
+	b.prefetchedBlocksMu.RUnlock()
+	return block
+}
+
+func (b *BaseIndexer) clearPrefetchedBlocks() {
+	b.prefetchedBlocksMu.Lock()
+	b.prefetchedBlocks = make(map[int]*common.Block, BLOCK_PREFETCH+1)
+	b.prefetchedBlocksMu.Unlock()
+}
+
 // sendBlockOrStop transfers ownership of a fetched block to the consumer, or
 // returns false immediately when synchronization is cancelled.
 func sendBlockOrStop(blocks chan<- *common.Block, block *common.Block, stop <-chan struct{}) bool {
@@ -145,13 +180,16 @@ func (b *BaseIndexer) spawnBlockFetcher(startHeight int, endHeight int, stopChan
 		}
 
 		block := FetchBlock(currentHeight, b.chaincfgParam)
+		b.setPrefetchedBlock(block)
 		if !sendBlockOrStop(b.blocksChan, block, stopChan) {
+			b.removePrefetchedBlock(currentHeight)
 			return
 		}
 	}
 }
 
 func (b *BaseIndexer) drainBlocksChan() {
+	defer b.clearPrefetchedBlocks()
 	for {
 		select {
 		case <-b.blocksChan:

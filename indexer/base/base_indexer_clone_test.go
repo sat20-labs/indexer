@@ -215,13 +215,15 @@ func TestBaseIndexerUpdateDBCountsOnlyPersistedDeletes(t *testing.T) {
 
 	indexer := newBaseForUpdate(kv)
 	indexer.stats.UtxoCount = 1
-	indexer.delUTXOs = []*common.TxOutputV2{
-		{
-			TxOutput: common.TxOutput{
-				UtxoId:      1,
-				OutPointStr: strings.Repeat("0", 64) + ":0",
-			},
+	persistedOutput := &common.TxOutputV2{
+		TxOutput: common.TxOutput{
+			UtxoId:      1,
+			OutPointStr: strings.Repeat("0", 64) + ":0",
 		},
+	}
+	persistedOutput.MarkPersisted()
+	indexer.delUTXOs = []*common.TxOutputV2{
+		persistedOutput,
 		{
 			TxOutput: common.TxOutput{
 				UtxoId:      2,

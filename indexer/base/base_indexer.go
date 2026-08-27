@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -52,6 +53,12 @@ type BaseIndexer struct {
 
 	blocksChan chan *common.Block
 
+	// spawnBlockFetcher already parses blocks ahead of the consumer. Keep a
+	// bounded pointer index over that same channel window so protocol lookahead
+	// can reuse h+1/h+2 without fetching and parsing the same block again.
+	prefetchedBlocksMu sync.RWMutex
+	prefetchedBlocks   map[int]*common.Block
+
 	// 配置参数
 	periodFlushToDB  int
 	keepBlockHistory int
@@ -77,6 +84,7 @@ func NewBaseIndexer(
 		periodFlushToDB:   periodFlushToDB,
 		keepBlockHistory:  6,
 		blocksChan:        make(chan *common.Block, BLOCK_PREFETCH),
+		prefetchedBlocks:  make(map[int]*common.Block, BLOCK_PREFETCH+1),
 		chaincfgParam:     chaincfgParam,
 		maxIndexHeight:    maxIndexHeight,
 		nullDataAddressId: common.INVALID_ID,
@@ -108,6 +116,9 @@ func (b *BaseIndexer) Init() {
 	}
 
 	b.blocksChan = make(chan *common.Block, BLOCK_PREFETCH)
+	b.prefetchedBlocksMu.Lock()
+	b.prefetchedBlocks = make(map[int]*common.Block, BLOCK_PREFETCH+1)
+	b.prefetchedBlocksMu.Unlock()
 
 	b.blockVector = make([]*common.BlockValueInDB, 0)
 	b.utxoIndex = common.NewUTXOIndex()
@@ -756,6 +767,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			if block.Height != i {
 				common.Log.Panicf("BaseIndexer.SyncToBlock-> expected block height %d, got %d", i, block.Height)
 			}
+			b.removePrefetchedBlock(block.Height)
 
 			// detect reorgs
 			if i > 0 && block.PrevBlockHash != b.lastHash {
