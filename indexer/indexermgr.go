@@ -335,10 +335,15 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 						if b.maxIndexHeight > 0 {
 							if b.maxIndexHeight <= b.base.GetHeight() {
 								b.updateDB()
-								// checkSelf closes the index databases as it verifies them, so
-								// finish Badger GC after the final buffered commit and before
-								// the self-check starts.
-								b.runDBGC(time.Now(), true)
+								// checkSelf closes databases as it verifies them. For fixed-height
+								// historical builds, optionally flatten the LSM before validation so
+								// tombstones/old versions are compacted and the on-disk result is a
+								// realistic service baseline rather than a compaction backlog.
+								if b.cfg.DB.ShouldFlattenBadgerOnFinalize() {
+									b.finalizeDBs()
+								} else {
+									b.runDBGC(time.Now(), true)
+								}
 								if !b.notCheckSelf {
 									b.checkSelf()
 								}
@@ -469,6 +474,26 @@ func (b *IndexerMgr) runDBGC(now time.Time, force bool) {
 	if ran, success := b.dbgc(); ran && success {
 		b.lastDBGC = now
 	}
+}
+
+func (b *IndexerMgr) finalizeDBs() {
+	databases := []common.KVDB{
+		b.kvDB, b.localDB, b.baseDB, b.nftDB, b.nsDB,
+		b.exoticDB, b.ftDB, b.brc20DB, b.runesDB, b.atomDB,
+	}
+	workers := b.cfg.DB.BadgerFlattenWorkers
+	for _, database := range databases {
+		err := db.FinalizeDB(database, workers)
+		if errors.Is(err, db.ErrFinalizeUnsupported) {
+			continue
+		}
+		if err != nil {
+			common.Log.Panicf("database finalize failed: %v", err)
+		}
+	}
+	b.lastDBGC = time.Now()
+	b.lastDBGCAttempt = b.lastDBGC
+	common.Log.Infof("database finalize completed")
 }
 
 func (b *IndexerMgr) closeDB() {
@@ -750,6 +775,12 @@ func (b *IndexerMgr) performUpdateDBInBuffer() {
 	b.atomBackupDB.UpdateDB()
 	b.brc20BackupDB.CheckEmptyAddress(wantToDelete)
 	b.brc20BackupDB.UpdateDB()
+
+	// The snapshot may say an address became empty while blocks processed
+	// after prepareDBBuffer have already reused that same address/id. Protect
+	// both newer Base UTXOs and newer BRC-20 state before deleting metadata.
+	b.base.ProtectLiveAddressDeletionCandidates(wantToDelete)
+	b.brc20Indexer.CheckEmptyAddress(wantToDelete)
 	b.baseBackupDB.CleanEmptyAddress(org, wantToDelete)
 
 	b.base.SetSyncStats(b.baseBackupDB.GetSyncStats())

@@ -7,7 +7,10 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-const addressUtxoKeySuffixSize = 16
+const (
+	addressUtxoKeySuffixSize = 16
+	addressUtxoCountPrefix   = "ac-"
+)
 
 // GetAddressValueDBPrefix returns the compact binary prefix for all UTXOs of
 // one stable address id:
@@ -38,6 +41,54 @@ func ParseAddressValueDBKey(key []byte) (addressID, utxoID uint64, err error) {
 	addressID = common.BytesToUint64(key[offset : offset+8])
 	utxoID = common.BytesToUint64(key[offset+8 : offset+16])
 	return addressID, utxoID, nil
+}
+
+// GetAddressUtxoCountKey stores the live UTXO count for one address id. The
+// count key is intentionally absent for zero-count addresses.
+func GetAddressUtxoCountKey(addressID uint64) []byte {
+	key := make([]byte, 0, len(addressUtxoCountPrefix)+8)
+	key = append(key, addressUtxoCountPrefix...)
+	key = append(key, common.Uint64ToBytes(addressID)...)
+	return key
+}
+
+func GetAddressUtxoCountPrefix() []byte {
+	return []byte(addressUtxoCountPrefix)
+}
+
+func ParseAddressUtxoCountKey(key []byte) (uint64, error) {
+	prefix := []byte(addressUtxoCountPrefix)
+	if !bytes.HasPrefix(key, prefix) || len(key) != len(prefix)+8 {
+		return common.INVALID_ID, fmt.Errorf("invalid address UTXO count key %x", key)
+	}
+	return common.BytesToUint64(key[len(prefix):]), nil
+}
+
+func EncodeAddressUtxoCount(count uint64) []byte {
+	return common.Uint64ToBytes(count)
+}
+
+func DecodeAddressUtxoCount(value []byte) (uint64, error) {
+	if len(value) != 8 {
+		return 0, fmt.Errorf("invalid address UTXO count length %d", len(value))
+	}
+	return common.BytesToUint64(value), nil
+}
+
+func GetAddressUtxoCountFromTxn(txn common.ReadBatch, addressID uint64) (uint64, error) {
+	value, err := txn.Get(GetAddressUtxoCountKey(addressID))
+	if err != nil {
+		return 0, err
+	}
+	return DecodeAddressUtxoCount(value)
+}
+
+func GetAddressUtxoCountFromDB(ldb common.KVDB, addressID uint64) (uint64, error) {
+	value, err := ldb.Read(GetAddressUtxoCountKey(addressID))
+	if err != nil {
+		return 0, err
+	}
+	return DecodeAddressUtxoCount(value)
 }
 
 func EncodeAddressUtxoValue(value int64) ([]byte, error) {

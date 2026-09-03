@@ -63,3 +63,39 @@ func TestConfiguredBadgerBlockCacheDefaultsTo32GiB(t *testing.T) {
 		t.Fatalf("configured cache=%dMB, want default %dMB", got, 32*1024)
 	}
 }
+
+func TestAllocateBadgerIndexCacheIsBoundedAndExact(t *testing.T) {
+	const total = 4096
+	plan := allocateBadgerIndexCache(total)
+	got := 0
+	for name, value := range plan {
+		if value <= 0 {
+			t.Fatalf("%s index cache=%dMB; zero means unbounded in Badger", name, value)
+		}
+		got += value
+	}
+	if got != total {
+		t.Fatalf("allocated index cache=%dMB, want %dMB: %v", got, total, plan)
+	}
+}
+
+func TestConfiguredBadgerIndexCacheEnvironmentOverridesYAML(t *testing.T) {
+	t.Setenv("INDEXER_BADGER_INDEX_CACHE_TOTAL_MB", "6144")
+	if got := configuredBadgerIndexCacheTotalMB(4096); got != 6144 {
+		t.Fatalf("index cache=%dMB, want 6144MB", got)
+	}
+}
+
+func TestConfiguredBadgerIndexCacheRejectsZero(t *testing.T) {
+	t.Setenv("INDEXER_BADGER_INDEX_CACHE_TOTAL_MB", "0")
+	if got := configuredBadgerIndexCacheTotalMB(4096); got != 4096 {
+		t.Fatalf("index cache=%dMB, want YAML fallback 4096MB", got)
+	}
+}
+
+func TestConfiguredBadgerNumCompactorsEnvironmentOverridesYAML(t *testing.T) {
+	t.Setenv("INDEXER_BADGER_NUM_COMPACTORS", "6")
+	if got := configuredBadgerNumCompactors(8); got != 6 {
+		t.Fatalf("compactors=%d, want 6", got)
+	}
+}

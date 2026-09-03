@@ -11,3 +11,7 @@ func newKVDB(path string) common.KVDB {
 func newKVDBWithCache(path string, cacheSizeMB int) common.KVDB {
 	return NewBadgerDBWithCache(path, cacheSizeMB)
 }
+
+func newKVDBWithOptions(path string, options OpenOptions) common.KVDB {
+	return NewBadgerDBWithOptions(path, options)
+}

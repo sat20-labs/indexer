@@ -16,46 +16,63 @@ import (
 	"github.com/sat20-labs/indexer/common"
 )
 
-const defaultBadgerBlockCacheMB = 2048
+const (
+	defaultBadgerBlockCacheMB  = 2048
+	defaultBadgerIndexCacheMB  = 512
+	defaultBadgerNumCompactors = 4
+)
 
 type badgerDB struct {
 	path string
 	db   *badger.DB
 }
 
-func openBadgerDB(path string, cacheSizeMB int) (*badger.DB, error) {
+func normalizeBadgerOpenOptions(options OpenOptions) OpenOptions {
+	if options.BlockCacheMB < 0 {
+		options.BlockCacheMB = defaultBadgerBlockCacheMB
+	}
+	if options.IndexCacheMB <= 0 {
+		options.IndexCacheMB = options.BlockCacheMB / 4
+		if options.IndexCacheMB <= 0 {
+			options.IndexCacheMB = defaultBadgerIndexCacheMB
+		}
+	}
+	if options.NumCompactors <= 0 {
+		options.NumCompactors = defaultBadgerNumCompactors
+	}
+	return options
+}
+
+func openBadgerDBWithOptions(path string, options OpenOptions) (*badger.DB, error) {
 	if path == "" {
 		path = "./data/db"
 	}
-	if cacheSizeMB < 0 {
-		cacheSizeMB = defaultBadgerBlockCacheMB
-	}
+	options = normalizeBadgerOpenOptions(options)
 
-	cacheBytes := int64(cacheSizeMB) << 20
-	indexCacheMB := cacheSizeMB / 4
-	if indexCacheMB < 1 {
-		indexCacheMB = 1
-	}
-	indexCacheBytes := int64(indexCacheMB) << 20
-
+	blockCacheBytes := int64(options.BlockCacheMB) << 20
+	indexCacheBytes := int64(options.IndexCacheMB) << 20
 	opt := badger.DefaultOptions(path).
 		WithDir(path).
 		WithValueDir(path).
-		WithBlockCacheSize(cacheBytes).
+		WithBlockCacheSize(blockCacheBytes).
 		WithIndexCacheSize(indexCacheBytes).
+		WithNumCompactors(options.NumCompactors).
 		WithLoggingLevel(badger.WARNING)
-	if cacheSizeMB == 0 {
+	if options.BlockCacheMB == 0 {
 		// Badger requires a block cache when compression is enabled. A DB
-		// with zero cache budget therefore writes new tables uncompressed.
+		// with zero block-cache budget therefore writes new tables uncompressed.
 		opt = opt.WithCompression(badgerOptions.None)
 	}
 
 	common.Log.Infof(
-		"badger cache capacity: path=%s block=%dMB index=%dMB",
-		path, cacheSizeMB, indexCacheMB,
+		"badger options: path=%s block_cache=%dMB index_cache=%dMB compactors=%d",
+		path, options.BlockCacheMB, options.IndexCacheMB, options.NumCompactors,
 	)
-
 	return badger.Open(opt)
+}
+
+func openBadgerDB(path string, cacheSizeMB int) (*badger.DB, error) {
+	return openBadgerDBWithOptions(path, OpenOptions{BlockCacheMB: cacheSizeMB})
 }
 
 func NewBadgerDB(path string) common.KVDB {
@@ -63,7 +80,11 @@ func NewBadgerDB(path string) common.KVDB {
 }
 
 func NewBadgerDBWithCache(path string, cacheSizeMB int) common.KVDB {
-	bdb, err := openBadgerDB(path, cacheSizeMB)
+	return NewBadgerDBWithOptions(path, OpenOptions{BlockCacheMB: cacheSizeMB})
+}
+
+func NewBadgerDBWithOptions(path string, options OpenOptions) common.KVDB {
+	bdb, err := openBadgerDBWithOptions(path, options)
 	if err != nil {
 		common.Log.Errorf("openBadgerDB %s failed: %v", path, err)
 		return nil
@@ -75,6 +96,40 @@ func NewBadgerDBWithCache(path string, cacheSizeMB int) common.KVDB {
 	}
 }
 
+type badgerPhysicalStats struct {
+	LSMBytes      int64
+	VlogBytes     int64
+	StaleBytes    int64
+	L0Tables      int
+	L0Bytes       int64
+	MaxLevelScore float64
+}
+
+func (b *badgerDB) physicalStats() badgerPhysicalStats {
+	lsm, vlog := b.db.Size()
+	stats := badgerPhysicalStats{LSMBytes: lsm, VlogBytes: vlog}
+	for _, level := range b.db.Levels() {
+		stats.StaleBytes += level.StaleDatSize
+		if level.Level == 0 {
+			stats.L0Tables = level.NumTables
+			stats.L0Bytes = level.Size
+		}
+		if level.Score > stats.MaxLevelScore {
+			stats.MaxLevelScore = level.Score
+		}
+	}
+	return stats
+}
+
+func (b *badgerDB) logPhysicalStats(label string) {
+	stats := b.physicalStats()
+	common.Log.Infof(
+		"badger physical stats: path=%s phase=%s lsm=%dMB vlog=%dMB stale=%dMB l0_tables=%d l0=%dMB max_score=%.2f",
+		b.path, label, stats.LSMBytes>>20, stats.VlogBytes>>20, stats.StaleBytes>>20,
+		stats.L0Tables, stats.L0Bytes>>20, stats.MaxLevelScore,
+	)
+}
+
 func (b *badgerDB) RunGC() error {
 	if b == nil || b.db == nil || b.db.IsClosed() {
 		return nil
@@ -82,6 +137,7 @@ func (b *badgerDB) RunGC() error {
 
 	const discardRatio = 0.5
 	start := time.Now()
+	b.logPhysicalStats("before_gc")
 	rewrites := 0
 	for {
 		err := b.db.RunValueLogGC(discardRatio)
@@ -97,10 +153,31 @@ func (b *badgerDB) RunGC() error {
 	if err := b.db.Sync(); err != nil {
 		return fmt.Errorf("sync Badger DB after GC %s: %w", b.path, err)
 	}
+	b.logPhysicalStats("after_gc")
 	common.Log.Infof(
 		"badger value log GC completed: path=%s rewrites=%d elapsed=%v",
 		b.path, rewrites, time.Since(start),
 	)
+	return nil
+}
+
+func (b *badgerDB) Finalize(workers int) error {
+	if b == nil || b.db == nil || b.db.IsClosed() {
+		return nil
+	}
+	if workers <= 0 {
+		workers = 1
+	}
+	start := time.Now()
+	b.logPhysicalStats("before_flatten")
+	if err := b.db.Flatten(workers); err != nil {
+		return fmt.Errorf("flatten Badger DB %s: %w", b.path, err)
+	}
+	b.logPhysicalStats("after_flatten")
+	if err := b.RunGC(); err != nil {
+		return err
+	}
+	common.Log.Infof("badger finalize completed: path=%s workers=%d elapsed=%v", b.path, workers, time.Since(start))
 	return nil
 }
 

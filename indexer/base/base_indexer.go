@@ -16,7 +16,6 @@ import (
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/db"
 	"google.golang.org/protobuf/encoding/protowire"
-	"google.golang.org/protobuf/proto"
 )
 
 type AddressStatus struct {
@@ -520,13 +519,32 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 			if err := db.SetDBWithProto3(db.GetAddressDBKeyV2(address), meta, wb); err != nil {
 				common.Log.Panicf("BaseIndexer.UpdateDB write address metadata %s: %v", address, err)
 			}
-			if err := wb.Put(db.GetAddressDBKey(address), common.Uint64ToBytes(value.AddressId)); err != nil {
-				common.Log.Panicf("BaseIndexer.UpdateDB bind address %s: %v", address, err)
-			}
+			// a2-<address> already contains addressId; do not duplicate the
+			// same mapping under legacy a-<address>. Readers retain the legacy
+			// fallback for old databases, but 1.9+ databases never write it.
 			if err := wb.Put(db.GetAddressIdKey(value.AddressId), []byte(address)); err != nil {
 				common.Log.Panicf("BaseIndexer.UpdateDB bind address id %d: %v", value.AddressId, err)
 			}
 		}
+		if value.UtxoCount == 0 && len(value.Utxos) != 0 {
+			common.Log.Panicf("address %s has zero UTXO count but %d pending additions", address, len(value.Utxos))
+		}
+		if value.UtxoCount > 0 {
+			if err := wb.Put(db.GetAddressUtxoCountKey(value.AddressId), db.EncodeAddressUtxoCount(value.UtxoCount)); err != nil {
+				common.Log.Panicf("BaseIndexer.UpdateDB write address UTXO count %d: %v", value.AddressId, err)
+			}
+		} else {
+			if err := wb.Delete(db.GetAddressUtxoCountKey(value.AddressId)); err != nil {
+				common.Log.Panicf("BaseIndexer.UpdateDB delete address UTXO count %d: %v", value.AddressId, err)
+			}
+			// NullData uses one stable synthetic address. All other empty
+			// addresses are candidates for pruning after protocol modules have
+			// removed ids that must remain stable (currently BRC-20).
+			if value.AddressType != int(txscript.NullDataTy) {
+				wantToDeleteMap[address] = value.AddressId
+			}
+		}
+
 		for utxoID, sats := range value.Utxos {
 			encoded, err := db.EncodeAddressUtxoValue(sats)
 			if err != nil {
@@ -583,13 +601,51 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	return wantToDeleteMap
 }
 
-// Address ids are permanent in the prefix schema. Empty addresses keep only
-// their small metadata records, so BRC-20 no longer needs to protect mappings
-// from deletion. The parameters remain for callback compatibility.
+// CleanEmptyAddress removes metadata for addresses that have no live UTXOs
+// and are not retained by a protocol callback. Address ids are monotonic and
+// never reused; if a fully pruned address later reappears it receives a new id,
+// matching the pre-prefix behavior. The legacy a- key is deleted defensively
+// so databases rebuilt from 1.9 do not accumulate the redundant mapping.
+// ProtectLiveAddressDeletionCandidates removes deletion candidates that have
+// newer live UTXO activity after a delayed DB snapshot was taken. It must be
+// called after cleanDBBuffer/Subtract, when addressValueMap contains only the
+// post-snapshot delta.
+func (b *BaseIndexer) ProtectLiveAddressDeletionCandidates(wantToDelete map[string]uint64) {
+	for address, addressID := range wantToDelete {
+		current := b.addressValueMap[address]
+		if current == nil || current.AddressId != addressID {
+			continue
+		}
+		if current.UtxoCount > 0 || len(current.Utxos) > 0 {
+			delete(wantToDelete, address)
+		}
+	}
+}
+
 func (b *BaseIndexer) CleanEmptyAddress(org, wantToDelete map[string]uint64) {
 	_ = org
-	_ = wantToDelete
-	return
+	if len(wantToDelete) == 0 {
+		return
+	}
+	wb := b.db.NewWriteBatch()
+	defer wb.Close()
+	for address, addressID := range wantToDelete {
+		if err := wb.Delete(db.GetAddressDBKeyV2(address)); err != nil {
+			common.Log.Panicf("BaseIndexer.CleanEmptyAddress delete metadata %s: %v", address, err)
+		}
+		if err := wb.Delete(db.GetAddressDBKey(address)); err != nil {
+			common.Log.Panicf("BaseIndexer.CleanEmptyAddress delete legacy address %s: %v", address, err)
+		}
+		if err := wb.Delete(db.GetAddressIdKey(addressID)); err != nil {
+			common.Log.Panicf("BaseIndexer.CleanEmptyAddress delete address id %d: %v", addressID, err)
+		}
+		if err := wb.Delete(db.GetAddressUtxoCountKey(addressID)); err != nil {
+			common.Log.Panicf("BaseIndexer.CleanEmptyAddress delete UTXO count %d: %v", addressID, err)
+		}
+	}
+	if err := wb.Flush(); err != nil {
+		common.Log.Panicf("BaseIndexer.CleanEmptyAddress flush failed: %v", err)
+	}
 }
 
 func (b *BaseIndexer) cleanEmptyAddressLegacy(org, wantToDelete map[string]uint64) {
@@ -999,6 +1055,10 @@ func (b *BaseIndexer) inputUtxo(input *common.TxInput) {
 	// A UTXO created and spent inside the same pending window can be removed
 	// from the addition delta directly. Deleting a non-existent persisted key
 	// is harmless, so all spends are also recorded in the deletion delta.
+	if addrValue.UtxoCount == 0 {
+		common.Log.Panicf("address %s UTXO count underflow while spending %d", address, utxoID)
+	}
+	addrValue.UtxoCount--
 	delete(addrValue.Utxos, utxoID)
 	deleted := b.addressUtxoDeleted[addrValue.AddressId]
 	if deleted == nil {
@@ -1022,6 +1082,9 @@ func (b *BaseIndexer) outputUtxo(output *common.TxOutputV2) {
 	}
 	if addrValue.Utxos == nil {
 		addrValue.Utxos = make(map[uint64]int64)
+	}
+	if _, exists := addrValue.Utxos[utxoID]; !exists {
+		addrValue.UtxoCount++
 	}
 	addrValue.Utxos[utxoID] = output.OutValue.Value
 	if deleted := b.addressUtxoDeleted[addrValue.AddressId]; deleted != nil {
@@ -1207,11 +1270,19 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 					//common.Log.Infof("generateAddressId %d %s", addressId, address)
 					s.AddressId = addressId
 					s.Op = 1
+					s.UtxoCount = 0
 					s.Utxos = make(map[uint64]int64)
 				} else {
 					s.AddressId = data.AddressId
 					s.AddressType = int(data.AddressType)
 					s.Op = 0
+					count, err := db.GetAddressUtxoCountFromTxn(txn, data.AddressId)
+					if err == common.ErrKeyNotFound {
+						count = 0 // valid for protocol-preserved empty addresses
+					} else if err != nil {
+						common.Log.Panicf("load address UTXO count %d failed: %v", data.AddressId, err)
+					}
+					s.UtxoCount = count
 					// Persisted UTXOs are separate prefix records. The in-memory
 					// map contains only additions in the current buffer.
 					s.Utxos = make(map[uint64]int64)
@@ -1260,6 +1331,11 @@ func (b *BaseIndexer) prefetchNullDataAddress(txn common.ReadBatch, address stri
 		value.AddressId = b.nullDataAddressId
 		value.AddressType = int(txscript.NullDataTy)
 		value.Op = 0
+		count, err := db.GetAddressUtxoCountFromTxn(txn, value.AddressId)
+		if err != nil && err != common.ErrKeyNotFound {
+			common.Log.Panicf("load NullData UTXO count %d failed: %v", value.AddressId, err)
+		}
+		value.UtxoCount = count
 		value.Utxos = make(map[uint64]int64)
 		return
 	}
@@ -1279,6 +1355,13 @@ func (b *BaseIndexer) prefetchNullDataAddress(txn common.ReadBatch, address stri
 	b.nullDataAddressId = addrId
 	value.AddressId = addrId
 	value.AddressType = int(txscript.NullDataTy)
+	if value.Op == 0 {
+		count, err := db.GetAddressUtxoCountFromTxn(txn, addrId)
+		if err != nil && err != common.ErrKeyNotFound {
+			common.Log.Panicf("load NullData UTXO count %d failed: %v", addrId, err)
+		}
+		value.UtxoCount = count
+	}
 	value.Utxos = make(map[uint64]int64)
 }
 
@@ -1307,130 +1390,6 @@ func getAddressIdOnlyFromTxnV2(txn common.ReadBatch, address string) (uint64, er
 		data = data[n:]
 	}
 	return common.INVALID_ID, common.ErrKeyNotFound
-}
-
-func (b *BaseIndexer) appendAddressUtxosToDBV2(key []byte, value *common.AddressValueV2, wb common.WriteBatch) error {
-	existing, err := b.db.Read(key)
-	if err != nil {
-		if err != common.ErrKeyNotFound {
-			return err
-		}
-		return db.SetDBWithProto3(key, value.ToAddressValueInDBV2(), wb)
-	}
-	updated, err := appendAddressUtxosToBytes(existing, value.Utxos)
-	if err != nil {
-		return err
-	}
-	return wb.Put(key, updated)
-}
-
-func appendAddressUtxosToBytes(existing []byte, utxos map[uint64]int64) ([]byte, error) {
-	pending := make(map[uint64]int64, len(utxos))
-	for utxoId, utxoValue := range utxos {
-		pending[utxoId] = utxoValue
-	}
-	if err := removePersistedAddressUtxos(existing, pending); err != nil {
-		return nil, err
-	}
-
-	updated := append([]byte(nil), existing...)
-	utxoIds := make([]uint64, 0, len(pending))
-	for utxoId := range pending {
-		utxoIds = append(utxoIds, utxoId)
-	}
-	sort.Slice(utxoIds, func(i, j int) bool {
-		return utxoIds[i] < utxoIds[j]
-	})
-	for _, utxoId := range utxoIds {
-		item, err := proto.Marshal(&common.UtxoIdInDB{
-			UtxoId: utxoId,
-			Value:  pending[utxoId],
-		})
-		if err != nil {
-			return nil, err
-		}
-		updated = protowire.AppendTag(updated, 3, protowire.BytesType)
-		updated = protowire.AppendBytes(updated, item)
-	}
-	return updated, nil
-}
-
-// removePersistedAddressUtxos makes the append-only NullData address update
-// idempotent without decoding the complete historical address record into a
-// second in-memory UTXO map. Only the small pending delta is retained.
-func removePersistedAddressUtxos(existing []byte, pending map[uint64]int64) error {
-	for len(existing) > 0 && len(pending) > 0 {
-		num, typ, n := protowire.ConsumeTag(existing)
-		if n < 0 {
-			return protowire.ParseError(n)
-		}
-		existing = existing[n:]
-
-		if num == 3 && typ == protowire.BytesType {
-			item, n := protowire.ConsumeBytes(existing)
-			if n < 0 {
-				return protowire.ParseError(n)
-			}
-			utxoId, utxoValue, err := decodeAddressUtxo(item)
-			if err != nil {
-				return err
-			}
-			if pendingValue, ok := pending[utxoId]; ok {
-				if pendingValue != utxoValue {
-					return fmt.Errorf(
-						"address UTXO %d value changed from %d to %d",
-						utxoId, utxoValue, pendingValue,
-					)
-				}
-				delete(pending, utxoId)
-			}
-			existing = existing[n:]
-			continue
-		}
-
-		n = protowire.ConsumeFieldValue(num, typ, existing)
-		if n < 0 {
-			return protowire.ParseError(n)
-		}
-		existing = existing[n:]
-	}
-	return nil
-}
-
-func decodeAddressUtxo(data []byte) (uint64, int64, error) {
-	var utxoId uint64
-	var utxoValue int64
-	for len(data) > 0 {
-		num, typ, n := protowire.ConsumeTag(data)
-		if n < 0 {
-			return 0, 0, protowire.ParseError(n)
-		}
-		data = data[n:]
-
-		switch {
-		case num == 1 && typ == protowire.VarintType:
-			value, n := protowire.ConsumeVarint(data)
-			if n < 0 {
-				return 0, 0, protowire.ParseError(n)
-			}
-			utxoId = value
-			data = data[n:]
-		case num == 2 && typ == protowire.VarintType:
-			value, n := protowire.ConsumeVarint(data)
-			if n < 0 {
-				return 0, 0, protowire.ParseError(n)
-			}
-			utxoValue = int64(value)
-			data = data[n:]
-		default:
-			n = protowire.ConsumeFieldValue(num, typ, data)
-			if n < 0 {
-				return 0, 0, protowire.ParseError(n)
-			}
-			data = data[n:]
-		}
-	}
-	return utxoId, utxoValue, nil
 }
 
 func (b *BaseIndexer) loadSyncStatsFromDB() {
@@ -1559,6 +1518,7 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("%s table takes %v", common.DB_KEY_UTXO, time.Since(startTime2))
 	common.Log.Infof("1. utxo: %d(%d), sats %d, address %d", utxoCount, nonZeroUtxo, satsInUtxo, addressInUtxo)
 
+	result := true
 	satsInAddress := int64(0)
 	allAddressCount := 0
 	allutxoInAddress := 0
@@ -1594,6 +1554,30 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("%s table takes %v", common.DB_KEY_ADDRESSVALUE, time.Since(startTime2))
 	common.Log.Infof("2. utxo: %d(%d), sats %d, address %d", allutxoInAddress, nonZeroUtxoInAddress, satsInAddress, allAddressCount)
 
+	var countKeyTotal uint64
+	countKeyAddresses := 0
+	if err := b.db.Scan(common.ScanOptions{Prefix: db.GetAddressUtxoCountPrefix()}, func(k, v []byte) error {
+		if _, err := db.ParseAddressUtxoCountKey(k); err != nil {
+			return err
+		}
+		count, err := db.DecodeAddressUtxoCount(v)
+		if err != nil {
+			return err
+		}
+		if count == 0 {
+			return fmt.Errorf("zero address UTXO count persisted for key %x", k)
+		}
+		countKeyTotal += count
+		countKeyAddresses++
+		return nil
+	}); err != nil {
+		common.Log.Panicf("scan address UTXO counts failed: %v", err)
+	}
+	if countKeyTotal != uint64(allutxoInAddress) || countKeyAddresses != allAddressCount {
+		common.Log.Errorf("address UTXO count index different: count=%d/%d addresses=%d/%d", countKeyTotal, allutxoInAddress, countKeyAddresses, allAddressCount)
+		result = false
+	}
+
 	common.Log.Infof("utxos not in table %s", common.DB_KEY_ADDRESSVALUE)
 	utxos1 := findDifferentItems(utxosInT1, utxosInT2)
 	if len(utxos1) > 0 {
@@ -1626,7 +1610,6 @@ func (b *BaseIndexer) CheckSelf() bool {
 		return nil
 	})
 
-	result := true
 	if len(utxos1) > 0 || len(utxos2) > 0 || len(addresses1) > 0 || len(addresses2) > 0 {
 		common.Log.Errorf("utxos or address differents")
 		result = false

@@ -46,6 +46,7 @@ func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2 {
 		AddressId:   p.AddressId,
 		AddressType: int(p.AddressType),
 		Op:          0,
+		UtxoCount:   uint64(len(p.Utxos)),
 		Utxos:       make(map[uint64]int64),
 	}
 	for _, id := range p.Utxos {
@@ -58,7 +59,8 @@ type AddressValueV2 struct {
 	AddressId   uint64
 	AddressType int
 	Op          int              // -1 deleted; 0 read from db; 1 added/modified
-	Utxos       map[uint64]int64 // utxoid，全量数据
+	UtxoCount   uint64           // logical current UTXO count; persisted separately as a compact scalar
+	Utxos       map[uint64]int64 // only unflushed additions in the prefix schema
 }
 
 // Clone returns a fully independent copy. AddressType is persistence metadata:
@@ -72,6 +74,7 @@ func (p *AddressValueV2) Clone() *AddressValueV2 {
 		AddressId:   p.AddressId,
 		AddressType: p.AddressType,
 		Op:          p.Op,
+		UtxoCount:   p.UtxoCount,
 		Utxos:       make(map[uint64]int64, len(p.Utxos)),
 	}
 	for id, value := range p.Utxos {

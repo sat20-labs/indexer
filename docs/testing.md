@@ -97,7 +97,29 @@ Configure it in YAML under `db`:
 db:
   path: ./db/mainnet
   badger_block_cache_total_mb: 32768
+  badger_index_cache_total_mb: 4096
+  badger_num_compactors: 8
+  badger_flatten_on_finalize: true
+  badger_flatten_workers: 4
 ```
+
+`badger_block_cache_total_mb` and `badger_index_cache_total_mb` are separate
+process-wide budgets. Badger treats a zero index-cache size as **unbounded**
+(all table indices remain resident), so the index-cache setting must stay
+positive. `badger_num_compactors` is applied to each opened Badger sub-DB,
+not divided process-wide; lower it if the host becomes I/O-bound. Historical
+fixed-height builds flatten the LSM before final self-check by default;
+service-mode runs rely on normal online compaction.
+
+Each hourly Badger GC now logs physical storage diagnostics per sub-DB:
+`lsm`, `vlog`, `stale`, `l0_tables`, `l0`, and `max_score`. This is the primary
+signal for distinguishing live-schema growth from an LSM compaction backlog.
+
+Base DB schema 1.9 adds a compact active-address UTXO count and restores pruning
+of empty address metadata after protocol retention checks. It deliberately does
+not open Base 1.8 as 1.9; rebuild the experimental 1.8 database or use a future
+explicit offline migration tool rather than silently treating missing counts as
+zero.
 
 `INDEXER_BADGER_BLOCK_CACHE_TOTAL_MB` (legacy alias
 `INDEXER_DB_CACHE_TOTAL_MB`) has higher priority than YAML and is intended for

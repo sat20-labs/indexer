@@ -40,6 +40,7 @@ func TestBaseIndexerCloneCopiesAddressDeltas(t *testing.T) {
 		AddressId:   41,
 		AddressType: int(txscript.NullDataTy),
 		Op:          1,
+		UtxoCount:   2,
 		Utxos: map[uint64]int64{
 			1001: 25,
 			1002: 50,
@@ -54,6 +55,9 @@ func TestBaseIndexerCloneCopiesAddressDeltas(t *testing.T) {
 	}
 	if got.Op != 1 {
 		t.Fatalf("clone Op = %d, want snapshot value 1", got.Op)
+	}
+	if got.UtxoCount != 2 {
+		t.Fatalf("clone UtxoCount=%d, want 2", got.UtxoCount)
 	}
 	if source.addressValueMap["OP_RETURN"].Op != 0 {
 		t.Fatalf("source Op = %d, want stored marker 0", source.addressValueMap["OP_RETURN"].Op)
@@ -104,6 +108,7 @@ func addPendingBaseUtxo(indexer *BaseIndexer, address string, addressID, utxoID 
 		AddressId:   addressID,
 		AddressType: int(txscript.WitnessV1TaprootTy),
 		Op:          op,
+		UtxoCount:   1,
 		Utxos:       map[uint64]int64{utxoID: value},
 	}
 	indexer.idToAddressMap[addressID] = address
@@ -138,6 +143,13 @@ func TestBaseIndexerUpdateDBStoresAddressUtxosByPrefix(t *testing.T) {
 	if err != nil || got != value {
 		t.Fatalf("address UTXO = %d, %v; want %d", got, err, value)
 	}
+	count, err := indexdb.GetAddressUtxoCountFromDB(kv, addressID)
+	if err != nil || count != 1 {
+		t.Fatalf("address UTXO count=%d,%v want 1", count, err)
+	}
+	if _, err := kv.Read(indexdb.GetAddressDBKey(address)); err != common.ErrKeyNotFound {
+		t.Fatalf("legacy a-<address> mapping was written, err=%v", err)
+	}
 
 	utxos, err := indexer.loadAddressUtxos(kv, addressID)
 	if err != nil {
@@ -148,7 +160,7 @@ func TestBaseIndexerUpdateDBStoresAddressUtxosByPrefix(t *testing.T) {
 	}
 }
 
-func TestBaseIndexerUpdateDBDeletesUtxoButKeepsAddressMetadata(t *testing.T) {
+func TestBaseIndexerEmptyAddressBecomesCleanupCandidate(t *testing.T) {
 	kv := openBaseTestDB(t)
 	const (
 		address   = "bc1ptestaddress"
@@ -165,20 +177,67 @@ func TestBaseIndexerUpdateDBDeletesUtxoButKeepsAddressMetadata(t *testing.T) {
 		AddressId:   addressID,
 		AddressType: int(txscript.WitnessV1TaprootTy),
 		Op:          0,
+		UtxoCount:   0,
 		Utxos:       make(map[uint64]int64),
 	}
 	remove.addressUtxoDeleted[addressID] = map[uint64]bool{utxoID: true}
-	remove.UpdateDB()
-
-	if _, err := kv.Read(indexdb.GetAddressValueDBKey(addressID, utxoID)); err != common.ErrKeyNotFound {
-		t.Fatalf("deleted address UTXO read error = %v, want ErrKeyNotFound", err)
+	candidates := remove.UpdateDB()
+	if candidates[address] != addressID {
+		t.Fatalf("cleanup candidates=%v, want %s:%d", candidates, address, addressID)
 	}
+	if _, err := kv.Read(indexdb.GetAddressUtxoCountKey(addressID)); err != common.ErrKeyNotFound {
+		t.Fatalf("zero count key retained, err=%v", err)
+	}
+
+	remove.CleanEmptyAddress(candidates, candidates)
+	if _, err := kv.Read(indexdb.GetAddressDBKeyV2(address)); err != common.ErrKeyNotFound {
+		t.Fatalf("address metadata retained after cleanup, err=%v", err)
+	}
+	if _, err := kv.Read(indexdb.GetAddressIdKey(addressID)); err != common.ErrKeyNotFound {
+		t.Fatalf("address id mapping retained after cleanup, err=%v", err)
+	}
+	if _, err := kv.Read(indexdb.GetAddressValueDBKey(addressID, utxoID)); err != common.ErrKeyNotFound {
+		t.Fatalf("spent address UTXO retained, err=%v", err)
+	}
+}
+
+func TestBaseIndexerProtocolCanPreserveEmptyAddressMetadata(t *testing.T) {
+	kv := openBaseTestDB(t)
+	const (
+		address   = "bc1ppreserved"
+		addressID = uint64(11)
+	)
+	indexer := newBaseForUpdate(kv)
+	indexer.addressValueMap[address] = &common.AddressValueV2{
+		AddressId: addressID, AddressType: int(txscript.WitnessV1TaprootTy), Op: 1,
+		UtxoCount: 0, Utxos: make(map[uint64]int64),
+	}
+	candidates := indexer.UpdateDB()
+	delete(candidates, address) // same contract as BRC20Indexer.CheckEmptyAddress
+	indexer.CleanEmptyAddress(nil, candidates)
+
 	var meta common.AddressValueInDBV2
 	if err := indexdb.GetValueFromDBWithProto3(indexdb.GetAddressDBKeyV2(address), kv, &meta); err != nil {
-		t.Fatalf("address metadata was deleted: %v", err)
+		t.Fatalf("protocol-preserved metadata missing: %v", err)
 	}
 	if meta.AddressId != addressID {
-		t.Fatalf("address id = %d, want %d", meta.AddressId, addressID)
+		t.Fatalf("preserved address id=%d want %d", meta.AddressId, addressID)
+	}
+}
+
+func TestProtectLiveAddressDeletionCandidates(t *testing.T) {
+	indexer := NewBaseIndexer(nil, &chaincfg.TestNet4Params, 0, 10)
+	const address = "bc1preused"
+	indexer.addressValueMap[address] = &common.AddressValueV2{
+		AddressId: 9, UtxoCount: 1, Utxos: map[uint64]int64{100: 20},
+	}
+	candidates := map[string]uint64{address: 9, "other": 10}
+	indexer.ProtectLiveAddressDeletionCandidates(candidates)
+	if _, ok := candidates[address]; ok {
+		t.Fatal("live reused address was not protected")
+	}
+	if candidates["other"] != 10 {
+		t.Fatalf("unrelated candidate changed: %v", candidates)
 	}
 }
 
@@ -188,6 +247,7 @@ func TestBaseIndexerSubtractKeepsOnlyNewAddressDeltas(t *testing.T) {
 	source.addressValueMap["address"] = &common.AddressValueV2{
 		AddressId: 7,
 		Op:        1,
+		UtxoCount: 1,
 		Utxos:     map[uint64]int64{1001: 25},
 	}
 	source.addressUtxoDeleted[7] = map[uint64]bool{900: true}
@@ -195,12 +255,16 @@ func TestBaseIndexerSubtractKeepsOnlyNewAddressDeltas(t *testing.T) {
 	flushed := source.Clone(true)
 	current := source.addressValueMap["address"]
 	current.Utxos[1002] = 20
+	current.UtxoCount = 2
 	source.addressUtxoDeleted[7][901] = true
 
 	source.Subtract(flushed)
 	got := source.addressValueMap["address"]
 	if got == nil || len(got.Utxos) != 1 || got.Utxos[1002] != 20 {
 		t.Fatalf("pending additions = %#v", got)
+	}
+	if got.UtxoCount != 2 {
+		t.Fatalf("logical UTXO count=%d, want 2", got.UtxoCount)
 	}
 	if source.addressUtxoDeleted[7][900] || !source.addressUtxoDeleted[7][901] {
 		t.Fatalf("pending deletions = %v", source.addressUtxoDeleted[7])

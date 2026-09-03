@@ -49,6 +49,7 @@ func (b *BaseIndexer) loadAddressMeta(address string, ldb common.KVDB) *common.A
 			AddressId:   pending.AddressId,
 			AddressType: pending.AddressType,
 			Op:          pending.Op,
+			UtxoCount:   pending.UtxoCount,
 			Utxos:       make(map[uint64]int64),
 		}
 	}
@@ -56,10 +57,15 @@ func (b *BaseIndexer) loadAddressMeta(address string, ldb common.KVDB) *common.A
 	if err != nil {
 		return nil
 	}
+	count, err := db.GetAddressUtxoCountFromDB(ldb, data.AddressId)
+	if err != nil && err != common.ErrKeyNotFound {
+		return nil
+	}
 	return &common.AddressValueV2{
 		AddressId:   data.AddressId,
 		AddressType: int(data.AddressType),
 		Op:          0,
+		UtxoCount:   count,
 		Utxos:       make(map[uint64]int64),
 	}
 }

@@ -39,6 +39,7 @@ func TestBaseSnapshotFlushMarksSpentLiveOutputPersisted(t *testing.T) {
 	delete(live.utxoIndex.Index, output.OutPointStr)
 	live.delUTXOs = append(live.delUTXOs, output)
 	delete(live.addressValueMap[address].Utxos, utxoID)
+	live.addressValueMap[address].UtxoCount--
 	live.addressValueMap[address].AddressType = int(txscript.WitnessV1TaprootTy)
 	live.addressUtxoDeleted[addressID] = map[uint64]bool{utxoID: true}
 

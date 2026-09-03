@@ -47,6 +47,55 @@ func configuredBadgerBlockCacheTotalMB(configuredMB int) int {
 	return config.DefaultBadgerBlockCacheTotalMB
 }
 
+func configuredBadgerIndexCacheTotalMB(configuredMB int) int {
+	if raw := os.Getenv("INDEXER_BADGER_INDEX_CACHE_TOTAL_MB"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		// Badger IndexCacheSize=0 means unbounded/all indices in memory, not
+		// disabled. Reject non-positive values so memory remains bounded.
+		if err != nil || value <= 0 {
+			common.Log.Warnf("invalid INDEXER_BADGER_INDEX_CACHE_TOTAL_MB=%q, use configured/default %dMB", raw, configuredMB)
+		} else {
+			return value
+		}
+	}
+	if configuredMB > 0 {
+		return configuredMB
+	}
+	return config.DefaultBadgerIndexCacheTotalMB
+}
+
+func configuredBadgerNumCompactors(configured int) int {
+	if raw := os.Getenv("INDEXER_BADGER_NUM_COMPACTORS"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			common.Log.Warnf("invalid INDEXER_BADGER_NUM_COMPACTORS=%q, use configured/default %d", raw, configured)
+		} else {
+			return value
+		}
+	}
+	if configured > 0 {
+		return configured
+	}
+	return config.DefaultBadgerNumCompactors
+}
+
+func allocateBadgerIndexCache(totalMB int) map[string]int {
+	if totalMB <= 0 {
+		totalMB = config.DefaultBadgerIndexCacheTotalMB
+	}
+	plan := allocateBadgerBlockCache(totalMB)
+	// Badger IndexCacheSize=0 is unbounded. Atom is disabled but its DB is
+	// still opened, so give it a minimal bounded cache and take that MiB from
+	// Base to keep the process-wide total exact.
+	if plan["atom"] == 0 {
+		plan["atom"] = 1
+		if plan["base"] > 1 {
+			plan["base"]--
+		}
+	}
+	return plan
+}
+
 func allocateBadgerBlockCache(totalMB int) map[string]int {
 	plan := make(map[string]int, len(badgerBlockCacheWeights))
 	if totalMB <= 0 {
@@ -67,8 +116,12 @@ func allocateBadgerBlockCache(totalMB int) map[string]int {
 	return plan
 }
 
-func openDB(filepath string, cacheSizeMB int) (common.KVDB, error) {
-	ldb := db.NewKVDBWithCache(filepath, cacheSizeMB)
+func openDB(filepath string, blockCacheMB, indexCacheMB, numCompactors int) (common.KVDB, error) {
+	ldb := db.NewKVDBWithOptions(filepath, db.OpenOptions{
+		BlockCacheMB:  blockCacheMB,
+		IndexCacheMB:  indexCacheMB,
+		NumCompactors: numCompactors,
+	})
 	if ldb == nil {
 		return nil, fmt.Errorf("NewKVDB failed")
 	}
@@ -78,52 +131,58 @@ func openDB(filepath string, cacheSizeMB int) (common.KVDB, error) {
 func (p *IndexerMgr) initDB() (err error) {
 	common.Log.Info("InitDB-> start...")
 
-	totalCacheMB := configuredBadgerBlockCacheTotalMB(p.cfg.DB.BadgerBlockCacheTotalMB)
-	cache := allocateBadgerBlockCache(totalCacheMB)
+	blockTotalMB := configuredBadgerBlockCacheTotalMB(p.cfg.DB.BadgerBlockCacheTotalMB)
+	indexTotalMB := configuredBadgerIndexCacheTotalMB(p.cfg.DB.BadgerIndexCacheTotalMB)
+	numCompactors := configuredBadgerNumCompactors(p.cfg.DB.BadgerNumCompactors)
+	blockCache := allocateBadgerBlockCache(blockTotalMB)
+	indexCache := allocateBadgerIndexCache(indexTotalMB)
 	common.Log.Infof(
-		"Badger process block-cache plan: total=%dMB base=%d nft=%d brc20=%d runes=%d exotic=%d ns=%d ft=%d local=%d dkvs=%d atom=%d",
-		totalCacheMB,
-		cache["base"], cache["nft"], cache["brc20"], cache["runes"], cache["exotic"],
-		cache["ns"], cache["ft"], cache["local"], cache["dkvs"], cache["atom"],
+		"Badger process cache plan: block_total=%dMB index_total=%dMB compactors=%d; base=%d/%d nft=%d/%d brc20=%d/%d runes=%d/%d exotic=%d/%d ns=%d/%d ft=%d/%d local=%d/%d dkvs=%d/%d atom=%d/%d",
+		blockTotalMB, indexTotalMB, numCompactors,
+		blockCache["base"], indexCache["base"], blockCache["nft"], indexCache["nft"],
+		blockCache["brc20"], indexCache["brc20"], blockCache["runes"], indexCache["runes"],
+		blockCache["exotic"], indexCache["exotic"], blockCache["ns"], indexCache["ns"],
+		blockCache["ft"], indexCache["ft"], blockCache["local"], indexCache["local"],
+		blockCache["dkvs"], indexCache["dkvs"], blockCache["atom"], indexCache["atom"],
 	)
 
-	p.baseDB, err = openDB(p.dbDir+"base", cache["base"])
+	p.baseDB, err = openDB(p.dbDir+"base", blockCache["base"], indexCache["base"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.nftDB, err = openDB(p.dbDir+"nft", cache["nft"])
+	p.nftDB, err = openDB(p.dbDir+"nft", blockCache["nft"], indexCache["nft"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.nsDB, err = openDB(p.dbDir+"ns", cache["ns"])
+	p.nsDB, err = openDB(p.dbDir+"ns", blockCache["ns"], indexCache["ns"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.exoticDB, err = openDB(p.dbDir+"exotic", cache["exotic"])
+	p.exoticDB, err = openDB(p.dbDir+"exotic", blockCache["exotic"], indexCache["exotic"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.ftDB, err = openDB(p.dbDir+"ft", cache["ft"])
+	p.ftDB, err = openDB(p.dbDir+"ft", blockCache["ft"], indexCache["ft"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.brc20DB, err = openDB(p.dbDir+"brc20", cache["brc20"])
+	p.brc20DB, err = openDB(p.dbDir+"brc20", blockCache["brc20"], indexCache["brc20"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.runesDB, err = openDB(p.dbDir+"runes", cache["runes"])
+	p.runesDB, err = openDB(p.dbDir+"runes", blockCache["runes"], indexCache["runes"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.atomDB, err = openDB(p.dbDir+"atom", cache["atom"])
+	p.atomDB, err = openDB(p.dbDir+"atom", blockCache["atom"], indexCache["atom"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.localDB, err = openDB(p.dbDir+"local", cache["local"])
+	p.localDB, err = openDB(p.dbDir+"local", blockCache["local"], indexCache["local"], numCompactors)
 	if err != nil {
 		return err
 	}
-	p.kvDB, err = openDB(p.dbDir+"dkvs", cache["dkvs"])
+	p.kvDB, err = openDB(p.dbDir+"dkvs", blockCache["dkvs"], indexCache["dkvs"], numCompactors)
 	if err != nil {
 		return err
 	}
