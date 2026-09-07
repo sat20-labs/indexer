@@ -98,6 +98,7 @@ Height: 29bit 0x1fffffff  	< 536870911
 tx: 	17bit 0x1ffff 		< 131071
 vout:	18bit 0x3ffff 		< 262143
 */
+// L2 DB 兼容约束：SatoshiNet indexer 持久化此 UTXO ID，禁止修改 height/tx/vout 的 29/17/18 位布局。
 func ToUtxoId(height int, tx int, vout int) uint64 {
 	if height > 0x1fffffff || tx > 0x1ffff || vout > 0x3ffff {
 		Log.Panicf("parameters too big %x %x %x", height, tx, vout)
@@ -106,6 +107,7 @@ func ToUtxoId(height int, tx int, vout int) uint64 {
 	return (uint64(height)<<35 | uint64(tx)<<18 | uint64(vout))
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 用此接口读取已落盘的 UTXO ID，禁止修改位布局和解码含义。
 func FromUtxoId(id uint64) (int, int, int) {
 	return (int)(id >> 35), (int)((id >> 18) & 0x1ffff), (int)((id) & 0x3ffff)
 }
@@ -244,12 +246,14 @@ func RemoveIndex[T any](slice []T, index int) []T {
 
 // 大端序下，高位字节先比较 → 字节序比较行为与整数比较行为一致。
 // 如果采用pebble数据库，所有数据库的KEY，如果是键值是整数，都转换为这个格式
+// L2 DB 兼容约束：SatoshiNet indexer 的 a- 地址 ID 映射使用此编码，禁止修改 8 字节大端格式。
 func Uint64ToBytes(value uint64) []byte {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, value)
 	return bytes
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 用此接口读取 a- 地址 ID 映射，禁止修改 8 字节大端格式。
 func BytesToUint64(bytes []byte) uint64 {
 	return binary.BigEndian.Uint64(bytes)
 }

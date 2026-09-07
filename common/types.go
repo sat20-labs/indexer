@@ -7,6 +7,7 @@ import (
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用其中的 u-/a-/a2-/ui-/ai-/b- 表前缀，禁止修改这些前缀。
 const (
 	DB_KEY_UTXO         = "u-"  // utxo -> UtxoValueInDB
 	DB_KEY_ADDRESS      = "a-"  // address -> addressId
@@ -21,6 +22,7 @@ const (
 
 type UtxoValueInDB = pb.PbUtxoValueInDB
 
+// L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表使用此消息，禁止修改底层 protobuf 定义。
 type UtxoIdInDB = pb.PbUtxoIdInDB
 
 type UtxoValue struct {
@@ -39,8 +41,10 @@ type AddressValue struct {
 	Utxos     map[uint64]int64 // utxoid -> value
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表直接持久化此消息，禁止修改底层 protobuf 定义。
 type AddressValueInDBV2 = pb.PbAddressValueInDB
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此转换读取地址表，禁止改变持久化字段的映射和含义。
 func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2 {
 	r := &AddressValueV2{
 		AddressId:   p.AddressId,
@@ -54,6 +58,7 @@ func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2 {
 	return r
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此地址缓存及其读写转换，禁止改变对应持久化字段的含义。
 type AddressValueV2 struct {
 	AddressId   uint64
 	AddressType int
@@ -80,6 +85,7 @@ func (p *AddressValueV2) Clone() *AddressValueV2 {
 	return clone
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此转换写入地址表，禁止改变持久化字段的映射和含义。
 func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
 	n := &AddressValueInDBV2{
 		AddressId:   p.AddressId,

@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此接口写入 a2- 地址表，禁止修改 protobuf 编码或增加格式封装。
 func SetDBWithProto3(key []byte, data protoreflect.ProtoMessage, wb common.WriteBatch) error {
     dataBytes, err := proto.Marshal(data)
     if err != nil {
@@ -30,6 +31,7 @@ func GetValueFromDBWithProto3(key []byte, ldb common.KVDB, target protoreflect.P
     return proto.Unmarshal(data, target)
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 的地址表读取路径使用此接口，禁止修改 protobuf 记录格式。
 func GetValueFromTxnWithProto3(key []byte, txn common.ReadBatch, target protoreflect.ProtoMessage) error {
     data, err := txn.Get(key)
     if err != nil {
@@ -48,11 +50,13 @@ func GetValueFromDBWithTypeWithProto3[T protoreflect.ProtoMessage](key []byte, d
     return ret, err
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此接口解码 a2- 地址表，禁止修改 protobuf 记录格式。
 func DecodeBytesWithProto3(data []byte, target protoreflect.ProtoMessage) error {
     return proto.Unmarshal(data, target)
 }
 
 
+// L2 DB 兼容约束：SatoshiNet indexer 直接使用此读取接口，禁止修改 a2- 键格式和地址 protobuf 定义。
 func GetAddressDataFromDBV2(db common.KVDB, address string) (*common.AddressValueInDBV2, error) {
 	var result common.AddressValueInDBV2
 
@@ -67,6 +71,7 @@ func GetAddressDataFromDBV2(db common.KVDB, address string) (*common.AddressValu
 }
 
 
+// L2 DB 兼容约束：SatoshiNet indexer 直接使用此读取接口，禁止修改 a2- 键格式和地址 protobuf 定义。
 func GetAddressDataFromDBTxnV2(txn common.ReadBatch, address string) (*common.AddressValueInDBV2, error) {
 	var result common.AddressValueInDBV2
 	err := GetValueFromTxnWithProto3(GetAddressDBKeyV2(address), txn, &result)

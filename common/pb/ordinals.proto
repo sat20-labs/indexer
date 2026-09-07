@@ -15,11 +15,15 @@ message PbUtxoValueInDB {
     uint64 addressId = 3;
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表直接使用此消息。
+// 禁止修改字段定义、编号、类型和含义；L1 如需演进，应另定义消息。
 message PbUtxoIdInDB {
    uint64 utxo_id = 1;
    int64 value = 2;
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表直接持久化此消息。
+// 禁止修改字段定义、编号、类型和含义；L1 如需演进，应另定义消息。
 message PbAddressValueInDB {
    uint64 AddressId = 1;
    int32  AddressType = 2;

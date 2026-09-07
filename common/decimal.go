@@ -52,6 +52,8 @@ func (d *Decimal) Validate() error {
 }
 
 // Decimal represents a fixed-point decimal number with 18 decimal places
+// L2 DB 兼容约束：SatoshiNet indexer 的资产和 ticker 记录以 Gob 持久化此类型。
+// 禁止修改 Precision/Value 的字段定义、含义或 Gob 格式；L1 如需演进，应另定义类型。
 type Decimal struct {
 	Precision int
 	Value     *big.Int
@@ -185,6 +187,7 @@ func (d *Decimal) String() string {
 	return fmt.Sprintf("%s%s.%s", sign, quotient.String(), decimalPart)
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此接口读取 th- 持仓表，禁止改变现有金额字符串格式。
 func NewDecimalFromFormatString(s string) (*Decimal, error) {
 	if len(s) == 0 || len(s) > MaxProtocolDecimalTextLength {
 		return nil, fmt.Errorf("invalid decimal text length %d", len(s))
@@ -207,6 +210,7 @@ func NewDecimalFromFormatString(s string) (*Decimal, error) {
 	}
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 将此结果写入 th- 持仓表，禁止修改“金额:精度”格式。
 func (d *Decimal) ToFormatString() string {
 	if d == nil {
 		return "0:0"

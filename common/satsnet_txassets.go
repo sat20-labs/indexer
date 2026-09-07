@@ -9,6 +9,8 @@ import (
 
 // //////////////////////////////////////////////////////////////
 // 定义在聪网中
+// L2 DB 兼容约束：SatoshiNet wire.AssetName 是此类型的别名，被 L2 indexer 的资产和 ticker 记录持久化。
+// 禁止修改字段定义、含义或序列化格式；L1 如需演进，应另定义类型。
 type AssetName struct {
 	Protocol string // 必填，比如ordx, ordinals, brc20，runes，eth，等等
 	Type     string // 可选，默认是ft，参考indexer的定义
@@ -52,10 +54,13 @@ func NewAssetNameFromString(name string) *AssetName {
 	}
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此字符串构造 t-/th- 等数据库键，禁止修改名称格式。
 func (p *AssetName) String() string {
 	return p.Protocol + ":" + p.Type + ":" + p.Ticker
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 的 u-/xa-/xd-/cl- 记录通过 wire.TxAssets 持久化此类型。
+// 禁止修改字段定义、嵌套类型、含义或 Gob 格式；L1 如需演进，应另定义类型。
 type AssetInfo struct {
 	Name       AssetName
 	Amount     Decimal // 资产数量
@@ -107,6 +112,7 @@ func (p *AssetInfo) GetBindingSatNum() int64 {
 }
 
 // 有序数组，根据名字排序
+// L2 DB 兼容约束：SatoshiNet wire.TxAssets 是此类型的别名，禁止修改切片类型、元素定义或序列化格式。
 type TxAssets []AssetInfo
 
 func (p *TxAssets) Clone() TxAssets {
