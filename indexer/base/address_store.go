@@ -5,6 +5,59 @@ import (
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
+type addressUtxoScanSummary struct {
+	AllUtxos         int
+	AllAddresses     int
+	NonZeroUtxos     int
+	TotalSats        int64
+	NonZeroAddresses map[uint64]bool
+	NonZeroUtxoIDs   map[uint64]bool
+}
+
+// scanPersistedAddressUtxos summarizes the compact av- table. Keys are ordered
+// as av-|addressID(big endian)|utxoID(big endian), so addresses are contiguous
+// and the all-address count can be computed without allocating another map for
+// tens of millions of address ids. Zero-sat UTXOs count toward AllUtxos and
+// AllAddresses, but not toward the non-zero consistency sets used for sats.
+func scanPersistedAddressUtxos(ldb common.KVDB) (*addressUtxoScanSummary, error) {
+	summary := &addressUtxoScanSummary{
+		NonZeroAddresses: make(map[uint64]bool),
+		NonZeroUtxoIDs:   make(map[uint64]bool),
+	}
+	var lastAddressID uint64
+	hasLastAddressID := false
+	err := ldb.Scan(common.ScanOptions{Prefix: []byte(common.DB_KEY_ADDRESSVALUE)}, func(k, v []byte) error {
+		addressID, utxoID, err := db.ParseAddressValueDBKey(k)
+		if err != nil {
+			return err
+		}
+		value, err := db.DecodeAddressUtxoValue(v)
+		if err != nil {
+			return err
+		}
+
+		summary.AllUtxos++
+		if !hasLastAddressID || addressID != lastAddressID {
+			summary.AllAddresses++
+			lastAddressID = addressID
+			hasLastAddressID = true
+		}
+		if value == 0 {
+			return nil
+		}
+
+		summary.NonZeroUtxos++
+		summary.TotalSats += value
+		summary.NonZeroUtxoIDs[utxoID] = true
+		summary.NonZeroAddresses[addressID] = true
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return summary, nil
+}
+
 func (b *BaseIndexer) loadAddressUtxos(ldb common.KVDB, addressID uint64) (map[uint64]int64, error) {
 	result := make(map[uint64]int64)
 	prefix := db.GetAddressValueDBPrefix(addressID)

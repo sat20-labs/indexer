@@ -1519,40 +1519,25 @@ func (b *BaseIndexer) CheckSelf() bool {
 	common.Log.Infof("1. utxo: %d(%d), sats %d, address %d", utxoCount, nonZeroUtxo, satsInUtxo, addressInUtxo)
 
 	result := true
-	satsInAddress := int64(0)
-	allAddressCount := 0
-	allutxoInAddress := 0
-	nonZeroUtxoInAddress := 0
-	addressesInT2 := make(map[uint64]bool)
-	utxosInT2 := make(map[uint64]bool)
-
 	startTime2 = time.Now()
 	common.Log.Infof("calculating in %s table ...", common.DB_KEY_ADDRESSVALUE)
-	if err := b.db.Scan(common.ScanOptions{Prefix: []byte(common.DB_KEY_ADDRESSVALUE)}, func(k, v []byte) error {
-		addressID, utxoID, err := db.ParseAddressValueDBKey(k)
-		if err != nil {
-			return err
-		}
-		value, err := db.DecodeAddressUtxoValue(v)
-		if err != nil {
-			return err
-		}
-		allutxoInAddress++
-		if value == 0 {
-			return nil
-		}
-		satsInAddress += value
-		utxosInT2[utxoID] = true
-		addressesInT2[addressID] = true
-		return nil
-	}); err != nil {
+	addressSummary, err := scanPersistedAddressUtxos(b.db)
+	if err != nil {
 		common.Log.Panicf("scan address UTXOs failed: %v", err)
 	}
-	allAddressCount = len(addressesInT2)
-	nonZeroUtxoInAddress = len(utxosInT2)
+	satsInAddress := addressSummary.TotalSats
+	allAddressCount := len(addressSummary.NonZeroAddresses)
+	allAddressesWithUtxo := addressSummary.AllAddresses
+	allutxoInAddress := addressSummary.AllUtxos
+	nonZeroUtxoInAddress := addressSummary.NonZeroUtxos
+	addressesInT2 := addressSummary.NonZeroAddresses
+	utxosInT2 := addressSummary.NonZeroUtxoIDs
 
 	common.Log.Infof("%s table takes %v", common.DB_KEY_ADDRESSVALUE, time.Since(startTime2))
-	common.Log.Infof("2. utxo: %d(%d), sats %d, address %d", allutxoInAddress, nonZeroUtxoInAddress, satsInAddress, allAddressCount)
+	common.Log.Infof(
+		"2. utxo: %d(%d), sats %d, address %d(nonzero)/%d(all)",
+		allutxoInAddress, nonZeroUtxoInAddress, satsInAddress, allAddressCount, allAddressesWithUtxo,
+	)
 
 	var countKeyTotal uint64
 	countKeyAddresses := 0
@@ -1573,8 +1558,11 @@ func (b *BaseIndexer) CheckSelf() bool {
 	}); err != nil {
 		common.Log.Panicf("scan address UTXO counts failed: %v", err)
 	}
-	if countKeyTotal != uint64(allutxoInAddress) || countKeyAddresses != allAddressCount {
-		common.Log.Errorf("address UTXO count index different: count=%d/%d addresses=%d/%d", countKeyTotal, allutxoInAddress, countKeyAddresses, allAddressCount)
+	if countKeyTotal != uint64(allutxoInAddress) || countKeyAddresses != allAddressesWithUtxo {
+		common.Log.Errorf(
+			"address UTXO count index different: count=%d/%d addresses=%d/%d (all UTXO addresses; nonzero=%d)",
+			countKeyTotal, allutxoInAddress, countKeyAddresses, allAddressesWithUtxo, allAddressCount,
+		)
 		result = false
 	}
 
