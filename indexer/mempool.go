@@ -59,7 +59,8 @@ type MiniMemPool struct {
 	indexerReadBarrier sync.RWMutex
 
 	// Lifecycle state. Stop closes admission, disconnects the peer and waits
-	// for all owned workers instead of relying on a fixed sleep.
+	// for all owned workers and admitted peer callbacks instead of relying on
+	// a fixed sleep.
 	lifecycleMutex sync.Mutex
 	running        bool
 	syncing        bool
@@ -130,6 +131,24 @@ func (p *MiniMemPool) startWorker(stop chan struct{}, fn func()) bool {
 	return true
 }
 
+// beginPeerCallback atomically checks lifecycle admission and accounts for the
+// callback before Stop can close admission and start waiting. This closes the
+// race where a btcd/peer callback passed a stop check but entered classification
+// only after Stop had already drained processingMutex.
+func (p *MiniMemPool) beginPeerCallback(stop <-chan struct{}) bool {
+	p.lifecycleMutex.Lock()
+	defer p.lifecycleMutex.Unlock()
+	if !p.running || p.stopChan == nil || p.stopChan != stop {
+		return false
+	}
+	p.workerWG.Add(1)
+	return true
+}
+
+func (p *MiniMemPool) endPeerCallback() {
+	p.workerWG.Done()
+}
+
 func (p *MiniMemPool) traceThread(stop <-chan struct{}) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -151,7 +170,7 @@ func (p *MiniMemPool) traceThread(stop <-chan struct{}) {
 }
 
 // Stop closes all new work, disconnects P2P and waits until every owned worker
-// and in-flight classifier has exited before indexer databases may be closed.
+// and admitted peer callback has exited before indexer databases may be closed.
 func (p *MiniMemPool) Stop() {
 	p.lifecycleMutex.Lock()
 	if !p.running {
@@ -173,8 +192,9 @@ func (p *MiniMemPool) Stop() {
 	}
 	p.workerWG.Wait()
 
-	// Peer callbacks are owned by btcd/peer, not workerWG. Drain any callback
-	// that entered classification before Disconnect returned.
+	// workerWG accounts for every callback admitted before running was cleared.
+	// Keep this final classifier drain as a defensive invariant for direct
+	// callers that are not lifecycle-owned.
 	p.processingMutex.Lock()
 	p.processingMutex.Unlock()
 
@@ -327,11 +347,15 @@ func DecodeMsgTx(txHex string) (*wire.MsgTx, error) {
 }
 
 func (p *MiniMemPool) txBroadcasted(tx *wire.MsgTx) {
-	p.processingMutex.Lock()
-	defer p.processingMutex.Unlock()
-
+	// Keep the global lock order consistent with reorg/reload:
+	// indexerReadBarrier -> processingMutex -> mempool mutex. In particular,
+	// never hold processingMutex while waiting for the reader barrier because
+	// the reorg writer calls init(), which also needs processingMutex.
 	p.enterIndexerRead()
 	defer p.leaveIndexerRead()
+
+	p.processingMutex.Lock()
+	defer p.processingMutex.Unlock()
 
 	txID := tx.TxID()
 	p.mutex.Lock()
@@ -701,17 +725,19 @@ func (p *MiniMemPool) listenP2PTx(addr string, stop <-chan struct{}) {
 			ChainParams:      instance.GetChainParam(),
 			Listeners: peer.MessageListeners{
 				OnTx: func(_ *peer.Peer, msg *wire.MsgTx) {
-					if p.shouldStop(stop) {
+					if !p.beginPeerCallback(stop) {
 						return
 					}
+					defer p.endPeerCallback()
 					common.Log.Debugf("OnTx %s", msg.TxID())
 					p.txBroadcasted(msg)
 					p.retryPendingTransactions(mempoolRetryMaxPasses)
 				},
 				OnBlock: func(_ *peer.Peer, msg *wire.MsgBlock, _ []byte) {
-					if p.shouldStop(stop) {
+					if !p.beginPeerCallback(stop) {
 						return
 					}
+					defer p.endPeerCallback()
 					common.Log.Infof("OnBlock %s", msg.BlockHash().String())
 					p.ProcessBlock(msg)
 				},
