@@ -23,10 +23,10 @@ func GetAddressValueDBPrefix(addressID uint64) []byte {
 	return key
 }
 
-// GetAddressValueDBKey stores one address UTXO per Badger key:
+// GetAddressValueDBKeyCompact stores one address UTXO per Badger key:
 //
 //	av- | address_id(big endian uint64) | utxo_id(big endian uint64)
-func GetAddressValueDBKey(addressID, utxoID uint64) []byte {
+func GetAddressValueDBKeyCompact(addressID, utxoID uint64) []byte {
 	key := GetAddressValueDBPrefix(addressID)
 	key = append(key, common.Uint64ToBytes(utxoID)...)
 	return key

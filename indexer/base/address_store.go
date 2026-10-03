@@ -96,9 +96,9 @@ func (b *BaseIndexer) loadAddressUtxos(ldb common.KVDB, addressID uint64) (map[u
 	return result, nil
 }
 
-func (b *BaseIndexer) loadAddressMeta(address string, ldb common.KVDB) *common.AddressValueV2 {
+func (b *BaseIndexer) loadAddressMeta(address string, ldb common.KVDB) *common.AddressValue {
 	if pending := b.addressValueMap[address]; pending != nil {
-		return &common.AddressValueV2{
+		return &common.AddressValue{
 			AddressId:   pending.AddressId,
 			AddressType: pending.AddressType,
 			Op:          pending.Op,
@@ -114,7 +114,7 @@ func (b *BaseIndexer) loadAddressMeta(address string, ldb common.KVDB) *common.A
 	if err != nil && err != common.ErrKeyNotFound {
 		return nil
 	}
-	return &common.AddressValueV2{
+	return &common.AddressValue{
 		AddressId:   data.AddressId,
 		AddressType: int(data.AddressType),
 		Op:          0,

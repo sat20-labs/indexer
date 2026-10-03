@@ -25,7 +25,7 @@ func TestScanPersistedAddressUtxosCountsZeroOnlyAddress(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := wb.Put(indexdb.GetAddressValueDBKey(entry.addressID, entry.utxoID), encoded); err != nil {
+		if err := wb.Put(indexdb.GetAddressValueDBKeyCompact(entry.addressID, entry.utxoID), encoded); err != nil {
 			t.Fatal(err)
 		}
 	}

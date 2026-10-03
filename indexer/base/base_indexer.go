@@ -39,7 +39,7 @@ type BaseIndexer struct {
 
 	// addressValueMap contains only metadata and unflushed UTXO additions.
 	// Persisted address UTXOs live under compact address-id prefixes.
-	addressValueMap    map[string]*common.AddressValueV2
+	addressValueMap    map[string]*common.AddressValue
 	addressUtxoDeleted map[uint64]map[uint64]bool
 	idToAddressMap     map[uint64]string
 
@@ -93,7 +93,7 @@ func NewBaseIndexer(
 		indexer.keepBlockHistory = 72 // testnet4的分岔很多也很长
 	}
 
-	indexer.addressValueMap = make(map[string]*common.AddressValueV2, 0)
+	indexer.addressValueMap = make(map[string]*common.AddressValue, 0)
 	indexer.addressUtxoDeleted = make(map[uint64]map[uint64]bool)
 	indexer.idToAddressMap = make(map[uint64]string)
 	indexer.prevBlockHashMap = make(map[int]string)
@@ -122,7 +122,7 @@ func (b *BaseIndexer) Init() {
 	b.blockVector = make([]*common.BlockValueInDB, 0)
 	b.utxoIndex = common.NewUTXOIndex()
 	b.delUTXOs = make([]*common.TxOutputV2, 0)
-	b.addressValueMap = make(map[string]*common.AddressValueV2)
+	b.addressValueMap = make(map[string]*common.AddressValue)
 	b.addressUtxoDeleted = make(map[uint64]map[uint64]bool)
 	b.idToAddressMap = make(map[uint64]string)
 }
@@ -151,7 +151,7 @@ func (b *BaseIndexer) Clone(setStoredFlag bool) *BaseIndexer {
 	newInst.delUTXOs = make([]*common.TxOutputV2, len(b.delUTXOs))
 	copy(newInst.delUTXOs, b.delUTXOs)
 
-	newInst.addressValueMap = make(map[string]*common.AddressValueV2)
+	newInst.addressValueMap = make(map[string]*common.AddressValue)
 	for key, value := range b.addressValueMap {
 		n := value.Clone()
 		if setStoredFlag {
@@ -433,7 +433,7 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 			}
 			addressID = addrvalue.AddressId
 		}
-		// addrkey := db.GetAddressValueDBKey(addrvalue.AddressId, utxoId)
+		// addrkey := db.GetAddressValueDBKeyCompact(addrvalue.AddressId, utxoId)
 		// err := db.SetRawDB(addrkey, common.Uint64ToBytes(uint64(v.OutValue.Value)), wb)
 		// if err != nil {
 		// 	common.Log.Panicf("Error setting in db %v", err)
@@ -492,7 +492,7 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 		//for i, address := range value.Address.Addresses {
 		// addrvalue, ok := b.addressValueMap[value.PkScript]
 		// if ok {
-		// 	addrkey := db.GetAddressValueDBKey(addrvalue.AddressId, value.UtxoId)
+		// 	addrkey := db.GetAddressValueDBKeyCompact(addrvalue.AddressId, value.UtxoId)
 		// 	err := wb.Delete(addrkey)
 		// 	if err != nil {
 		// 		common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
@@ -550,14 +550,14 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 			if err != nil {
 				common.Log.Panicf("BaseIndexer.UpdateDB encode address UTXO %d: %v", utxoID, err)
 			}
-			if err := wb.Put(db.GetAddressValueDBKey(value.AddressId, utxoID), encoded); err != nil {
+			if err := wb.Put(db.GetAddressValueDBKeyCompact(value.AddressId, utxoID), encoded); err != nil {
 				common.Log.Panicf("BaseIndexer.UpdateDB write address UTXO %d: %v", utxoID, err)
 			}
 		}
 	}
 	for addressID, deleted := range b.addressUtxoDeleted {
 		for utxoID := range deleted {
-			if err := wb.Delete(db.GetAddressValueDBKey(addressID, utxoID)); err != nil {
+			if err := wb.Delete(db.GetAddressValueDBKeyCompact(addressID, utxoID)); err != nil {
 				common.Log.Panicf("BaseIndexer.UpdateDB delete address UTXO %d: %v", utxoID, err)
 			}
 		}
@@ -594,7 +594,7 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	b.blockVector = make([]*common.BlockValueInDB, 0)
 	b.utxoIndex = common.NewUTXOIndex()
 	b.delUTXOs = make([]*common.TxOutputV2, 0)
-	b.addressValueMap = make(map[string]*common.AddressValueV2)
+	b.addressValueMap = make(map[string]*common.AddressValue)
 	b.addressUtxoDeleted = make(map[uint64]map[uint64]bool)
 	b.idToAddressMap = make(map[uint64]string)
 
@@ -1059,6 +1059,7 @@ func (b *BaseIndexer) inputUtxo(input *common.TxInput) {
 		common.Log.Panicf("address %s UTXO count underflow while spending %d", address, utxoID)
 	}
 	addrValue.UtxoCount--
+	addrValue.Op = 1
 	delete(addrValue.Utxos, utxoID)
 	deleted := b.addressUtxoDeleted[addrValue.AddressId]
 	if deleted == nil {
@@ -1087,6 +1088,7 @@ func (b *BaseIndexer) outputUtxo(output *common.TxOutputV2) {
 		addrValue.UtxoCount++
 	}
 	addrValue.Utxos[utxoID] = output.OutValue.Value
+	addrValue.Op = 1
 	if deleted := b.addressUtxoDeleted[addrValue.AddressId]; deleted != nil {
 		delete(deleted, utxoID)
 		if len(deleted) == 0 {
@@ -1168,7 +1170,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			_, ok := b.addressValueMap[address]
 			if !ok {
 				addressMapToLoad[address] = common.INVALID_ID
-				b.addressValueMap[address] = &common.AddressValueV2{
+				b.addressValueMap[address] = &common.AddressValue{
 					AddressId:   common.INVALID_ID,
 					AddressType: output.AddressType,
 					// 其他数据，在后面加载时填
@@ -1253,7 +1255,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 			s, ok := b.addressValueMap[address]
 			if !ok {
 				// input
-				s = &common.AddressValueV2{
+				s = &common.AddressValue{
 					AddressId: common.INVALID_ID,
 				}
 				b.addressValueMap[address] = s
@@ -1326,7 +1328,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 
 }
 
-func (b *BaseIndexer) prefetchNullDataAddress(txn common.ReadBatch, address string, value *common.AddressValueV2) {
+func (b *BaseIndexer) prefetchNullDataAddress(txn common.ReadBatch, address string, value *common.AddressValue) {
 	if b.nullDataAddressId != common.INVALID_ID {
 		value.AddressId = b.nullDataAddressId
 		value.AddressType = int(txscript.NullDataTy)
@@ -1854,7 +1856,7 @@ func (p *BaseIndexer) getAddressById(addressId uint64) string {
 }
 
 // only for api access
-func (b *BaseIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValueV2 {
+func (b *BaseIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValue {
 	value := b.loadAddressMeta(address, ldb)
 	if value == nil {
 		return nil

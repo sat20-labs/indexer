@@ -142,7 +142,7 @@ func (b *RpcIndexer) GetUtxoInfo(utxo string) (*common.UtxoInfo, error) {
 }
 
 // only for api access
-func (b *RpcIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValueV2 {
+func (b *RpcIndexer) getAddressValue2(address string, ldb common.KVDB) *common.AddressValue {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return b.BaseIndexer.getAddressValue2(address, ldb)
@@ -241,7 +241,7 @@ func (b *RpcIndexer) GetUTXOs2(address string) []string {
 	return utxos
 }
 
-func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValueV2, error) {
+func (b *RpcIndexer) getUtxosWithAddress(address string) (*common.AddressValue, error) {
 
 	addressValueInDB := b.getAddressValue2(address, b.db)
 	if addressValueInDB == nil {

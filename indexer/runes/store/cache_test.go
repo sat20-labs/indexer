@@ -114,11 +114,79 @@ func TestDeleteOfNewPendingWriteIsNetNoop(t *testing.T) {
 	if previous := cache.Delete([]byte("new")); previous == nil {
 		t.Fatal("delete did not return pending value")
 	}
-	if owner.pending.Count() != 0 {
-		t.Fatalf("new put followed by delete left pending state")
-	}
 	if got := cache.Get([]byte("new")); got != nil {
 		t.Fatalf("deleted pending value still visible: %v", got)
+	}
+	owner.FlushToDB()
+	if owner.pending.Count() != 0 {
+		t.Fatalf("flushed deletion retained pending state")
+	}
+	if _, err := kv.Read([]byte("new")); err != common.ErrKeyNotFound {
+		t.Fatalf("new put followed by delete changed durable state: %v", err)
+	}
+}
+
+func TestDeleteNewKeyAfterSnapshot(t *testing.T) {
+	kv := openRunesStoreTestDB(t)
+	live := NewDbWrite(kv)
+	cache := NewCache[pb.RuneId](live)
+	key := []byte("new")
+	cache.Set(key, &pb.RuneId{Block: 1, Tx: 1})
+	snapshot := NewDbWrite(kv)
+	live.Clone(snapshot)
+	cache.Delete(key)
+
+	// A later block spends the new output while its creation is still in
+	// the delayed snapshot. The deletion must survive that snapshot's flush.
+	snapshot.Subtract(live)
+	snapshot.FlushToDB()
+	if _, err := kv.Read(key); err != nil {
+		t.Fatalf("snapshot did not persist its creation: %v", err)
+	}
+	if got := cache.Get(key); got != nil {
+		t.Fatalf("snapshot resurrected a live deletion: %v", got)
+	}
+	live.FlushToDB()
+	if _, err := kv.Read(key); err != common.ErrKeyNotFound {
+		t.Fatalf("next flush did not delete snapshot-created key: %v", err)
+	}
+}
+
+func TestSnapshotFlushInvalidatesLiveReadCache(t *testing.T) {
+	t.Setenv("INDEXER_RUNES_READ_CACHE_MB", "1")
+	kv := openRunesStoreTestDB(t)
+	writeRuneID(t, kv, "existing", 1, 1)
+	live := NewDbWrite(kv)
+	cache := NewCache[pb.RuneId](live)
+	key := []byte("existing")
+	if got := cache.Get(key); got == nil || got.Block != 1 {
+		t.Fatalf("initial read: %v", got)
+	}
+	cache.Set(key, &pb.RuneId{Block: 2, Tx: 2})
+	snapshot := NewDbWrite(kv)
+	live.Clone(snapshot)
+	snapshot.Subtract(live)
+	snapshot.FlushToDB()
+	if got := cache.Get(key); got == nil || got.Block != 2 || got.Tx != 2 {
+		t.Fatalf("live cache did not observe snapshot commit: %v", got)
+	}
+
+	// Further updates must use the committed value rather than the old
+	// cached value, so accumulation remains correct across snapshots.
+	got := cache.Get(key)
+	got.Block++
+	cache.Set(key, got)
+	live.FlushToDB()
+	var durable pb.RuneId
+	raw, err := kv.Read(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := proto.Unmarshal(raw, &durable); err != nil {
+		t.Fatal(err)
+	}
+	if durable.Block != 3 {
+		t.Fatalf("subsequent update accumulated from stale state: %v", &durable)
 	}
 }
 

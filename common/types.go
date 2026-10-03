@@ -7,6 +7,7 @@ import (
 	"github.com/sat20-labs/indexer/common/pb"
 )
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用其中的 u-/a-/a2-/ui-/ai-/b- 表前缀，禁止修改这些前缀。
 const (
 	DB_KEY_UTXO         = "u-"  // utxo -> UtxoValueInDB
 	DB_KEY_ADDRESS      = "a-"  // address -> addressId
@@ -21,6 +22,7 @@ const (
 
 type UtxoValueInDB = pb.PbUtxoValueInDB
 
+// L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表使用此消息，禁止修改底层 protobuf 定义。
 type UtxoIdInDB = pb.PbUtxoIdInDB
 
 type UtxoValue struct {
@@ -34,19 +36,44 @@ type AddressValueInDB struct {
 	Utxos     map[uint64]*UtxoValue // utxoid -> value
 }
 
+// AddressValue is the L1 compact address state. Utxos contains pending
+// additions; persisted UTXOs are stored under individual compact keys.
 type AddressValue struct {
-	AddressId uint64
-	Utxos     map[uint64]int64 // utxoid -> value
+	AddressId   uint64
+	AddressType int
+	Op          int    // -1 deleted; 0 read from db; 1 added/modified
+	UtxoCount   uint64 // logical current UTXO count; persisted separately as a compact scalar
+	Utxos       map[uint64]int64
 }
 
+// Clone returns a fully independent copy of the pending address state.
+func (p *AddressValue) Clone() *AddressValue {
+	if p == nil {
+		return nil
+	}
+
+	clone := &AddressValue{
+		AddressId:   p.AddressId,
+		AddressType: p.AddressType,
+		Op:          p.Op,
+		UtxoCount:   p.UtxoCount,
+		Utxos:       make(map[uint64]int64, len(p.Utxos)),
+	}
+	for id, value := range p.Utxos {
+		clone.Utxos[id] = value
+	}
+	return clone
+}
+
+// L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表直接持久化此消息，禁止修改底层 protobuf 定义。
 type AddressValueInDBV2 = pb.PbAddressValueInDB
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此转换读取地址表，禁止改变持久化字段的映射和含义。
 func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2 {
 	r := &AddressValueV2{
 		AddressId:   p.AddressId,
 		AddressType: int(p.AddressType),
 		Op:          0,
-		UtxoCount:   uint64(len(p.Utxos)),
 		Utxos:       make(map[uint64]int64),
 	}
 	for _, id := range p.Utxos {
@@ -55,12 +82,12 @@ func ToAddressValueV2(p *AddressValueInDBV2) *AddressValueV2 {
 	return r
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此地址缓存及其读写转换，禁止改变对应持久化字段的含义。
 type AddressValueV2 struct {
 	AddressId   uint64
 	AddressType int
 	Op          int              // -1 deleted; 0 read from db; 1 added/modified
-	UtxoCount   uint64           // logical current UTXO count; persisted separately as a compact scalar
-	Utxos       map[uint64]int64 // only unflushed additions in the prefix schema
+	Utxos       map[uint64]int64 // utxoid，全量数据
 }
 
 // Clone returns a fully independent copy. AddressType is persistence metadata:
@@ -74,7 +101,6 @@ func (p *AddressValueV2) Clone() *AddressValueV2 {
 		AddressId:   p.AddressId,
 		AddressType: p.AddressType,
 		Op:          p.Op,
-		UtxoCount:   p.UtxoCount,
 		Utxos:       make(map[uint64]int64, len(p.Utxos)),
 	}
 	for id, value := range p.Utxos {
@@ -83,6 +109,7 @@ func (p *AddressValueV2) Clone() *AddressValueV2 {
 	return clone
 }
 
+// L2 DB 兼容约束：SatoshiNet indexer 使用此转换写入地址表，禁止改变持久化字段的映射和含义。
 func (p *AddressValueV2) ToAddressValueInDBV2() *AddressValueInDBV2 {
 	n := &AddressValueInDBV2{
 		AddressId:   p.AddressId,

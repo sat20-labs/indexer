@@ -1,45 +1,37 @@
 package common
 
-import "errors"
+import (
+	"bytes"
+	"errors"
+)
 
 var (
 	ErrKeyNotFound = errors.New("key not found")
-	// ErrStopScan lets a scan callback stop successfully without converting
-	// normal control flow into a database error.
-	ErrStopScan = errors.New("stop scan")
+	ErrStopScan    = errors.New("stop scan")
 )
+
+type ScanOptions struct {
+	PrefetchSize   int // Runtime iterator tuning; not a persisted field.
+	Prefix         []byte
+	Start          []byte
+	StartInclusive bool
+	Reverse        bool
+	Limit          int
+	KeysOnly       bool
+	CopyKey        bool
+	CopyValue      bool
+}
 
 type ReadBatch interface {
 	Get(key []byte) ([]byte, error)    // 获得数据的新copy
 	GetRef(key []byte) ([]byte, error) // 数据的引用，不能持久使用
 }
 
-// BulkWriteBatch is optimized for throughput. A backend may split one logical
-// batch into multiple physical transactions. Flush guarantees that queued
-// operations have completed, but it does not promise rollback of the entire
-// logical batch after a partial failure. Indexer failures invalidate the DB and
-// require a rebuild.
-type BulkWriteBatch interface {
+type WriteBatch interface {
 	Put(key, value []byte) error
 	Delete(key []byte) error
 	Flush() error
 	Close()
-}
-
-// WriteBatch remains as a source-compatible name for existing indexers. New
-// storage code should use BulkWriteBatch so the non-atomic semantics are clear.
-type WriteBatch = BulkWriteBatch
-
-type ScanOptions struct {
-	Prefix         []byte
-	Start          []byte
-	Reverse        bool
-	StartInclusive bool
-	Limit          int
-	KeysOnly       bool
-	CopyKey        bool
-	CopyValue      bool
-	PrefetchSize   int
 }
 
 // 每个调用都是完整的transaction
@@ -53,15 +45,50 @@ type KVDB interface {
 	Close() error
 
 	NewWriteBatch() WriteBatch
-
-	// Scan is the canonical iterator contract. Unless CopyKey/CopyValue are
-	// requested, key/value bytes are valid only during the callback.
 	Scan(options ScanOptions, r func(k, v []byte) error) error
 
-	// Compatibility wrappers. New code should use Scan.
+	// 遍历读
 	BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error
-	BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error
+	BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error // 只用于非客户端模式下
 
 	// 随机读
 	View(func(ReadBatch) error) error
+}
+
+func ScanWithBatchRead(
+	options ScanOptions,
+	batchRead func(prefix []byte, reverse bool, r func(k, v []byte) error) error,
+	r func(k, v []byte) error,
+) error {
+	count := 0
+	err := batchRead(options.Prefix, options.Reverse, func(k, v []byte) error {
+		if len(options.Start) > 0 {
+			cmp := bytes.Compare(k, options.Start)
+			if (!options.Reverse && (cmp < 0 || (cmp == 0 && !options.StartInclusive))) ||
+				(options.Reverse && (cmp > 0 || (cmp == 0 && !options.StartInclusive))) {
+				return nil
+			}
+		}
+
+		if options.CopyKey {
+			k = append([]byte(nil), k...)
+		}
+		if options.KeysOnly {
+			v = nil
+		} else if options.CopyValue {
+			v = append([]byte(nil), v...)
+		}
+		if err := r(k, v); err != nil {
+			return err
+		}
+		count++
+		if options.Limit > 0 && count >= options.Limit {
+			return ErrStopScan
+		}
+		return nil
+	})
+	if errors.Is(err, ErrStopScan) {
+		return nil
+	}
+	return err
 }

@@ -498,7 +498,7 @@ func TestHistoricalFreezeReplayAndBurn(t *testing.T) {
 	attachTestDeployNft(p, 99, 7)
 	setPrivateField(p.nftIndexer, "baseIndexer", &base.BaseIndexer{})
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
-	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValueV2{
+	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValue{
 		"tb1pfreeze": {AddressId: 88, Utxos: map[uint64]int64{}},
 	})
 
@@ -571,7 +571,7 @@ func TestHandleTxFreezeAndUnfreezeTickerTotals(t *testing.T) {
 	attachTestDeployNft(p, 99, 7)
 	setPrivateField(p.nftIndexer, "baseIndexer", &base.BaseIndexer{})
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
-	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValueV2{
+	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValue{
 		"tb1pfreeze": {AddressId: 88, Utxos: map[uint64]int64{}},
 	})
 
@@ -629,7 +629,7 @@ func TestHandleTxFreezeProcessesUnfreezeOutput(t *testing.T) {
 	attachTestDeployNft(p, 99, 7)
 	setPrivateField(p.nftIndexer, "baseIndexer", &base.BaseIndexer{})
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
-	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValueV2{
+	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValue{
 		"tb1pfreeze": {AddressId: 88, Utxos: map[uint64]int64{}},
 	})
 
@@ -723,7 +723,7 @@ func TestBackdatedFreezeRequestsReload(t *testing.T) {
 	attachTestDeployNft(p, 99, 7)
 	setPrivateField(p.nftIndexer, "baseIndexer", &base.BaseIndexer{})
 	baseIndexer := p.nftIndexer.GetBaseIndexer()
-	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValueV2{
+	setPrivateField(baseIndexer, "addressValueMap", map[string]*common.AddressValue{
 		"tb1pfreeze": {AddressId: 88, Utxos: map[uint64]int64{}},
 	})
 

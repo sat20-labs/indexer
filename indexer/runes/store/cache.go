@@ -251,6 +251,9 @@ func (s *DbWrite) Clone(clone *DbWrite) *DbWrite {
 // should be treated as updating an existing database key.
 func (s *DbWrite) Subtract(live *DbWrite) {
 	for item := range s.pending.IterBuffered() {
+		// The snapshot writes through its own cache. Invalidate the live copy
+		// before pending state is removed so later reads see the committed value.
+		live.readCache.Delete(item.Key)
 		current, ok := live.pending.Get(item.Key)
 		if !ok {
 			common.Log.Panicf("pending log %s not found", item.Key)
@@ -315,11 +318,8 @@ func (s *Cache[T]) Delete(key []byte) *T {
 	}
 
 	if existing, ok := s.dbWrite.pending.Get(keyStr); ok {
-		if existing.Type == PUT && !existing.ExistInDb {
-			s.dbWrite.pending.Remove(keyStr)
-			s.dbWrite.readCache.Delete(keyStr)
-			return previous
-		}
+		// Even a new key may already be captured by a delayed snapshot. Keep
+		// its tombstone for Subtract; FlushToDB skips deletes that never reach DB.
 		s.dbWrite.pending.Set(keyStr, &DbLog{
 			Type:      DEL,
 			ExistInDb: existing.ExistInDb,
