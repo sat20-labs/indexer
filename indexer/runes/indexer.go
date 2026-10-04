@@ -673,15 +673,29 @@ func (s *Indexer) CheckSelf() bool {
 		common.Log.Infof("address %s checked!", address2)
 	}
 
-	// 下面这个方式极慢，需要参考nft模块的方案 TODO
-	// check all runes minted amount
+	// Check all rune holder amounts from one merged DB/pending traversal.
 	allRunes := s.GetAllRuneInfos()
 	common.Log.Infof("total runes: %d", len(allRunes))
 	startTime := time.Now()
+	totals, holders, err := s.collectHolderTotals()
+	if err != nil {
+		common.Log.Errorf("rune holder scan failed: %v", err)
+		return false
+	}
+	allHolders = holders
 	for _, rune := range allRunes {
-		if !checkHolders(rune.Name, false) {
-			common.Log.Errorf("rune %s checkHolders failed", rune.Name)
+		total := totals[rune.Id]
+		holderAmount := common.NewDecimalFromUint128(total.amount, int(rune.Divisibility))
+		if rune.HolderCount != total.count {
+			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, total.count)
 			return false
+		}
+		if rune.TotalHolderAmt().Cmp(holderAmount) != 0 {
+			common.Log.Errorf("rune ticker %s holder amount different. %s %s", rune.Name, rune.TotalHolderAmt(), holderAmount)
+			return false
+		}
+		if rune.Number < 10 {
+			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), total.count)
 		}
 	}
 	common.Log.Infof("rune check amount took %v.", time.Since(startTime))

@@ -408,6 +408,34 @@ func (s *Cache[T]) IsExist(keyPrefix []byte, cb func(key []byte, value *T) bool)
 	return found
 }
 
+// ForEach visits the merged DB and pending state without materializing all rows.
+// Pending updates replace DB rows, and pending deletes hide them. Key bytes are
+// valid only during the callback. Any callback error stops the traversal.
+func (s *Cache[T]) ForEach(keyPrefix []byte, visit func(key []byte, value *T) error) error {
+	puts, deletes := s.pendingForPrefix(keyPrefix)
+	var callbackErr error
+	err := s.dbWrite.Db.Scan(common.ScanOptions{Prefix: keyPrefix}, func(key, value []byte) error {
+		keyStr := string(key)
+		if deletes[keyStr] || puts[keyStr] != nil {
+			return nil
+		}
+		callbackErr = visit(key, decodeProto[T](value))
+		return callbackErr
+	})
+	if err != nil {
+		return err
+	}
+	if callbackErr != nil {
+		return callbackErr
+	}
+	for key, log := range puts {
+		if err := visit([]byte(key), decodeProto[T](log.Val)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Cache[T]) GetList(keyPrefix []byte, needValue bool) map[string]*T {
 	result := make(map[string]*T)
 	if err := s.dbWrite.Db.Scan(common.ScanOptions{Prefix: keyPrefix, KeysOnly: !needValue}, func(key, value []byte) error {
