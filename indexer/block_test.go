@@ -1,3 +1,5 @@
+//go:build live
+
 package indexer
 
 import (
@@ -6,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -66,7 +70,6 @@ func GetRawData(txID string, network string) ([][]byte, error) {
 	return rawData, nil
 }
 
-
 func GetTxHexData(txID string, network string) (string, error) {
 	url := ""
 	switch network {
@@ -98,33 +101,28 @@ func GetTxHexData(txID string, network string) (string, error) {
 	return string(respBytes), nil
 }
 
-
 func GetBlock(height int, isMainnet bool) (*common.Block, error) {
-	var err error
-	var param *chaincfg.Params
+	prefix := "INDEXER_LIVE_TESTNET4_RPC_"
+	param := &chaincfg.TestNet4Params
 	if isMainnet {
-		err = bitcoin_rpc.InitBitconRpc(
-			"192.168.1.102",
-			8332,
-			"jacky",
-			"_RZekaGRgKQJSIOYi6vq0_CkJtjoCootamy81J2cDn0",
-			false,
-		)
+		prefix = "INDEXER_LIVE_MAINNET_RPC_"
 		param = &chaincfg.MainNetParams
-	} else {
-		err = bitcoin_rpc.InitBitconRpc(
-			"192.168.1.102",
-			28332,
-			"jacky",
-			"123456",
-			false,
-		)
-		param = &chaincfg.TestNet4Params
 	}
-	if err != nil {
+
+	host := os.Getenv(prefix + "HOST")
+	portText := os.Getenv(prefix + "PORT")
+	user := os.Getenv(prefix + "USER")
+	password := os.Getenv(prefix + "PASSWORD")
+	if host == "" || portText == "" || user == "" || password == "" {
+		return nil, fmt.Errorf("live RPC requires %s{HOST,PORT,USER,PASSWORD}", prefix)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port <= 0 || port > 65535 {
+		return nil, fmt.Errorf("invalid %sPORT=%q", prefix, portText)
+	}
+	if err := bitcoin_rpc.InitBitconRpc(host, port, user, password, false); err != nil {
 		return nil, err
 	}
-
 	return base.FetchBlock(height, param), nil
 }
 
@@ -160,11 +158,10 @@ func TestParser_block(t *testing.T) {
 
 }
 
-
 func TestParseTxFromUtxoId(t *testing.T) {
 	// input 0, output 0
 	//utxoId := uint64(27031631197372416)
-	utxoId := common.ToUtxoId(788753,48,2)
+	utxoId := common.ToUtxoId(788753, 48, 2)
 	height, txIndex, vout := common.FromUtxoId(utxoId)
 	block, err := GetBlock(height, true)
 	if err != nil {
@@ -235,6 +232,5 @@ func TestProcessTx(t *testing.T) {
 			}
 		}
 	}
-	
 
 }

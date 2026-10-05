@@ -10,12 +10,12 @@ import (
 const (
 	STATUS_KEY = "s-"
 
-	DB_VERSION = "1.0.0"
+	DB_VERSION = "1.2.0"
 )
 
 type Status struct {
-	Version          string
-	Count            int64
+	Version string
+	Count   int64
 }
 
 func (p *Status) Clone() *Status {
@@ -44,7 +44,8 @@ func initStatusFromDB(ldb common.KVDB) *Status {
 func (p *ExoticIndexer) initTickInfoFromDB(tickerName string) *TickInfo {
 	tickinfo := newTickerInfo(tickerName)
 	tickinfo.Ticker = p.loadTickerFromDB(tickerName)
-	p.loadMintInfoFromDB(tickinfo)
+	// Mint history is immutable query data and is no longer loaded into an
+	// unused process-wide InscriptionMap.
 	return tickinfo
 }
 
@@ -156,27 +157,27 @@ func (p *ExoticIndexer) loadTickerToUtxoMapFromDB(tickerName string) map[uint64]
 	startTime := time.Now()
 	common.Log.Debug("loadTickerToUtxoMapFromDB ...")
 	result := make(map[uint64]int64, 0)
-	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO+tickerName+"-"), 
+	err := p.db.BatchRead([]byte(DB_PREFIX_TICKER_UTXO+tickerName+"-"),
 		false, func(k, v []byte) error {
 
-		key := string(k)
-		_, utxoId, err := parseTickUtxoKey(key)
-		if err != nil {
-			common.Log.Errorln(key + " " + err.Error())
-		} else {
-			var amount int64
-
-			err = db.DecodeBytes(v, &amount)
-			if err == nil {
-				result[utxoId] = amount
+			key := string(k)
+			_, utxoId, err := parseTickUtxoKey(key)
+			if err != nil {
+				common.Log.Errorln(key + " " + err.Error())
 			} else {
-				common.Log.Errorln("DecodeBytes " + err.Error())
-			}
-		}
-		count++
+				var amount int64
 
-		return nil
-	})
+				err = db.DecodeBytes(v, &amount)
+				if err == nil {
+					result[utxoId] = amount
+				} else {
+					common.Log.Errorln("DecodeBytes " + err.Error())
+				}
+			}
+			count++
+
+			return nil
+		})
 
 	if err != nil {
 		common.Log.Panicf("Error prefetching HolderInfo from db: %v", err)

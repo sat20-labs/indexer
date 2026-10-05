@@ -55,13 +55,12 @@ func GetRawValueFromDB(key []byte, db common.KVDB) ([]byte, error) {
 	return db.Read(key)
 }
 
-
 func GetRawValueFromTxn(key []byte, db common.ReadBatch) ([]byte, error) {
 	return db.Get(key)
 }
 
 // L2 DB 兼容约束：SatoshiNet indexer 使用此接口读取已有 Gob 记录，禁止修改记录格式。
-func GetValueFromDB(key []byte, v interface{}, db common.KVDB) (error) {
+func GetValueFromDB(key []byte, v interface{}, db common.KVDB) error {
 	buf, err := db.Read(key)
 	if err != nil {
 		return err
@@ -73,7 +72,7 @@ func GetValueFromDB(key []byte, v interface{}, db common.KVDB) (error) {
 }
 
 // L2 DB 兼容约束：SatoshiNet indexer 使用此接口读取已有 Gob 记录，禁止修改记录格式。
-func GetValueFromTxn(key []byte, v interface{}, db common.ReadBatch) (error) {
+func GetValueFromTxn(key []byte, v interface{}, db common.ReadBatch) error {
 	buf, err := db.Get(key)
 	if err != nil {
 		return err
@@ -213,7 +212,6 @@ func GetAddressIdFromDB(db common.KVDB, address string) (uint64, error) {
 	return common.BytesToUint64(key), nil
 }
 
-
 // L2 DB 兼容约束：SatoshiNet indexer 的地址表读取路径使用此接口，禁止修改 8 字节大端 ID 格式。
 func GetAddressIdFromTxn(db common.ReadBatch, address string) (uint64, error) {
 	key, err := db.Get(GetAddressDBKey(address))
@@ -274,5 +272,3 @@ func RestoreDB(backupFile string, db common.KVDB) error {
 	}
 	return wb.Flush()
 }
-
-

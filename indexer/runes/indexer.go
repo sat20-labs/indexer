@@ -5,7 +5,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/sat20-labs/indexer/common"
 	"github.com/sat20-labs/indexer/indexer/base"
 	"github.com/sat20-labs/indexer/indexer/runes/pb"
@@ -16,15 +15,15 @@ import (
 )
 
 type Indexer struct {
-	dbWrite                    *store.DbWrite
-	baseIndexer                *base.BaseIndexer
-	chaincfgParam              *chaincfg.Params
-	enableHeight               int
-	height                     int
-	blockTime                  uint64
-	Status                     *table.RunesStatus
-	minimumRune                *runestone.Rune
-	
+	dbWrite       *store.DbWrite
+	baseIndexer   *base.BaseIndexer
+	chaincfgParam *chaincfg.Params
+	enableHeight  int
+	height        int
+	blockTime     uint64
+	Status        *table.RunesStatus
+	minimumRune   *runestone.Rune
+
 	// TODO 不要共用cache，会导致检索效率下降
 	idToEntryTbl               *table.RuneIdToEntryTable           // RuneId->RuneEntry
 	runeToIdTbl                *table.RuneToIdTable                // Rune->RuneId
@@ -37,17 +36,16 @@ type Indexer struct {
 	//addressOutpointToBalancesTbl  *table.AddressOutpointToBalancesTable // addressId+utxoId -> runeId+balance  TODO 这个没用
 
 	// transferUpdate 临时使用
-	burnedMap                  table.RuneIdLotMap
-	HolderUpdateCount          int
-	HolderRemoveCount          int
+	burnedMap         table.RuneIdLotMap
+	HolderUpdateCount int
+	HolderRemoveCount int
 
 	// checkpoint 临时使用
 	holderMapInPrevBlock map[uint64]*common.Decimal
 }
 
 func NewIndexer(db common.KVDB, param *chaincfg.Params, bCheckValidateFile bool) *Indexer {
-	logs := cmap.New[*store.DbLog]()
-	dbWrite := store.NewDbWrite(db, &logs)
+	dbWrite := store.NewDbWrite(db)
 	enableHeight := 840000
 	if !common.IsMainnet() {
 		enableHeight = 30562
@@ -220,7 +218,7 @@ func (s *Indexer) CheckSelf() bool {
 
 		if rune.Number < 10 {
 			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), len(holdermap))
-		} 
+		}
 
 		if checkUtxo {
 			//startTime2 = time.Now()
@@ -278,7 +276,7 @@ func (s *Indexer) CheckSelf() bool {
 			common.Log.Infof("runes %s checked.", r)
 		}
 		return true
-	}	
+	}
 
 	if s.chaincfgParam.Net == wire.MainNet && s.height == 919482 {
 		expectedmap1 := map[string]string{
@@ -675,15 +673,29 @@ func (s *Indexer) CheckSelf() bool {
 		common.Log.Infof("address %s checked!", address2)
 	}
 
-	// 下面这个方式极慢，需要参考nft模块的方案 TODO
-	// check all runes minted amount
+	// Check all rune holder amounts from one merged DB/pending traversal.
 	allRunes := s.GetAllRuneInfos()
 	common.Log.Infof("total runes: %d", len(allRunes))
 	startTime := time.Now()
+	totals, holders, err := s.collectHolderTotals()
+	if err != nil {
+		common.Log.Errorf("rune holder scan failed: %v", err)
+		return false
+	}
+	allHolders = holders
 	for _, rune := range allRunes {
-		if !checkHolders(rune.Name, false) {
-			common.Log.Errorf("rune %s checkHolders failed", rune.Name)
+		total := totals[rune.Id]
+		holderAmount := common.NewDecimalFromUint128(total.amount, int(rune.Divisibility))
+		if rune.HolderCount != total.count {
+			common.Log.Errorf("rune ticker %s holder count different. %d %d", rune.Name, rune.HolderCount, total.count)
 			return false
+		}
+		if rune.TotalHolderAmt().Cmp(holderAmount) != 0 {
+			common.Log.Errorf("rune ticker %s holder amount different. %s %s", rune.Name, rune.TotalHolderAmt(), holderAmount)
+			return false
+		}
+		if rune.Number < 10 {
+			common.Log.Infof("rune %s amount: %s, holders: %d", rune.Name, holderAmount.String(), total.count)
 		}
 	}
 	common.Log.Infof("rune check amount took %v.", time.Since(startTime))

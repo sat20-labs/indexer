@@ -148,6 +148,9 @@ func (s *Indexer) UpdateDB() {
 		if err := db.SetDB([]byte(GetMintHistoryKey(mint.Ticker, mint.Id)), mint, wb); err != nil {
 			common.Log.Panicf("atom write mint history failed: %v", err)
 		}
+		if err := db.SetDB([]byte(GetAddressMintHistoryKey(mint.Ticker, mint.AddressId, mint.Id)), mint, wb); err != nil {
+			common.Log.Panicf("atom write address mint history failed: %v", err)
+		}
 	}
 	for _, action := range s.actionsAdded {
 		if err := db.SetDB([]byte(GetActionKey(action.Height, action.TxIndex, action.Id)), action, wb); err != nil {
@@ -166,6 +169,14 @@ func (s *Indexer) UpdateDB() {
 	s.holderTouched = make(map[string]int64)
 	s.mintsAdded = nil
 	s.actionsAdded = nil
+
+	// Release all lazily loaded state after the durable write. None of these
+	// maps are process-wide authority.
+	s.utxoBalances = make(map[uint64]map[string]*UtxoBalance)
+	s.holderBalances = make(map[uint64]map[string]int64)
+	s.tickerHolders = make(map[string]map[uint64]int64)
+	s.tickerUtxos = make(map[string]map[uint64]int64)
+	s.mintHistory = make(map[string][]*MintInfo)
 }
 
 func (s *Indexer) logDebugMemoryLocked() {

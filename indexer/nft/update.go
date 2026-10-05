@@ -499,9 +499,8 @@ func (p *NftIndexer) UpdateDB() {
 
 	startTime := time.Now()
 
-	//nftmap := p.prefetchNftsFromDB()
-	buckDB := NewBuckStore(p.db)
-	buckNfts := make(map[int64]*BuckValue)
+	// NFT id -> sat is already present in the primary NFT record. The former
+	// BuckStore duplicated this index and rewrote 10,000-entry Gob buckets.
 
 	wb := p.db.NewWriteBatch()
 	defer wb.Close()
@@ -553,7 +552,6 @@ func (p *NftIndexer) UpdateDB() {
 			common.Log.Panicf("NftIndexer->UpdateDB Error setting %s in db %v", key, err)
 		}
 
-		buckNfts[nft.Base.Id] = &BuckValue{Sat: nft.Base.Sat}
 	}
 	//common.Log.Debugf("NftIndexer->UpdateDB add %d nft takes %v", len(p.nftAdded), time.Since(startTime))
 	//startTime = time.Now()
@@ -602,19 +600,7 @@ func (p *NftIndexer) UpdateDB() {
 	//common.Log.Debugf("write %d utxo...", len(p.utxoMap))
 	for utxoId, sats := range p.utxoMap {
 		utxokey := GetUtxoKey(utxoId)
-		satv := make([]*SatOffset, len(sats))
-		i := 0
-		for sat, offset := range sats {
-			if sat == 0 {
-				common.Log.Infof("zero sat find in utxo %d", utxoId)
-				continue
-			}
-			satv[i] = &SatOffset{
-				Sat:    sat,
-				Offset: offset,
-			}
-			i++
-		}
+		satv := satOffsetsForPersistence(utxoId, sats)
 		utxoValue := NftsInUtxo{Sats: satv}
 		// err := db.SetDB([]byte(utxokey), &utxoValue, wb)
 		err := db.SetDBWithProto3([]byte(utxokey), &utxoValue, wb)
@@ -678,11 +664,6 @@ func (p *NftIndexer) UpdateDB() {
 	err = wb.Flush()
 	if err != nil {
 		common.Log.Panicf("NftIndexer->UpdateDB Error wb flushing writes to db %v", err)
-	}
-
-	err = buckDB.BatchPut(buckNfts)
-	if err != nil {
-		common.Log.Panicf("NftIndexer->UpdateDB BatchPut %v", err)
 	}
 
 	// reset memory buffer

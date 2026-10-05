@@ -1,3 +1,5 @@
+//go:build live
+
 package main
 
 import (
@@ -226,8 +228,8 @@ func TestRuneCheckAllRuneInfos(t *testing.T) {
 			continue
 		}
 		if runeInfo.Number != runeData.Entry.Number {
-			common.Log.Errorf("GetRuneInfoWithName %s err: number not equal %d %d", 
-			runeData.Entry.SpacedRune, runeData.Entry.Number, runeInfo.Number)
+			common.Log.Errorf("GetRuneInfoWithName %s err: number not equal %d %d",
+				runeData.Entry.SpacedRune, runeData.Entry.Number, runeInfo.Number)
 		}
 		count++
 		//t.Logf("number: %d, rune: %s\n", i, runeData.Entry.SpacedRune)
@@ -238,7 +240,7 @@ func TestRuneCheckAllRuneInfos(t *testing.T) {
 	common.Log.Infof("checking %d runes, not found %d", count, notFound)
 }
 
-//const RuneOrdinalRpcURL = "http://192.168.1.104:81" // mainnet
+// const RuneOrdinalRpcURL = "http://192.168.1.104:81" // mainnet
 const RuneOrdinalRpcURL = "http://192.168.1.104:82" // testnet4
 
 type RuneData struct {

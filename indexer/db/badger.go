@@ -12,46 +12,83 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	badgerOptions "github.com/dgraph-io/badger/v4/options"
 	"github.com/sat20-labs/indexer/common"
 )
 
-const defaultBadgerBlockCacheMB = 2048
+const (
+	defaultBadgerBlockCacheMB  = 2048
+	defaultBadgerIndexCacheMB  = 512
+	defaultBadgerNumCompactors = 4
+)
 
 type badgerDB struct {
 	path string
 	db   *badger.DB
 }
 
-func openBadgerDB(path string, cacheSizeMB int) (*badger.DB, error) {
+func normalizeBadgerOpenOptions(options OpenOptions) OpenOptions {
+	if options.BlockCacheMB < 0 {
+		options.BlockCacheMB = defaultBadgerBlockCacheMB
+	}
+	if options.IndexCacheMB == 0 {
+		// Badger treats zero as unbounded. Keep a zero allocation minimal
+		// instead of expanding it from the block-cache budget.
+		options.IndexCacheMB = 1
+	} else if options.IndexCacheMB < 0 {
+		options.IndexCacheMB = options.BlockCacheMB / 4
+		if options.IndexCacheMB <= 0 {
+			options.IndexCacheMB = defaultBadgerIndexCacheMB
+		}
+	}
+	if options.NumCompactors <= 0 {
+		options.NumCompactors = defaultBadgerNumCompactors
+	}
+	return options
+}
+
+func openBadgerDBWithOptions(path string, options OpenOptions) (*badger.DB, error) {
 	if path == "" {
 		path = "./data/db"
 	}
-	if cacheSizeMB <= 0 {
-		cacheSizeMB = defaultBadgerBlockCacheMB
-	}
+	options = normalizeBadgerOpenOptions(options)
 
-	cacheBytes := int64(cacheSizeMB) << 20
-
+	blockCacheBytes := int64(options.BlockCacheMB) << 20
+	indexCacheBytes := int64(options.IndexCacheMB) << 20
 	opt := badger.DefaultOptions(path).
 		WithDir(path).
 		WithValueDir(path).
-		WithBlockCacheSize(cacheBytes).
+		WithBlockCacheSize(blockCacheBytes).
+		WithIndexCacheSize(indexCacheBytes).
+		WithNumCompactors(options.NumCompactors).
 		WithLoggingLevel(badger.WARNING)
+	if options.BlockCacheMB == 0 {
+		// Badger requires a block cache when compression is enabled. A DB
+		// with zero block-cache budget therefore writes new tables uncompressed.
+		opt = opt.WithCompression(badgerOptions.None)
+	}
 
 	common.Log.Infof(
-		"badger block cache capacity: %dMB",
-		cacheSizeMB,
+		"badger options: path=%s block_cache=%dMB index_cache=%dMB compactors=%d",
+		path, options.BlockCacheMB, options.IndexCacheMB, options.NumCompactors,
 	)
-
 	return badger.Open(opt)
 }
 
+func openBadgerDB(path string, cacheSizeMB int) (*badger.DB, error) {
+	return openBadgerDBWithOptions(path, OpenOptions{BlockCacheMB: cacheSizeMB})
+}
+
 func NewBadgerDB(path string) common.KVDB {
-	return NewBadgerDBWithCache(path, 0)
+	return NewBadgerDBWithCache(path, defaultBadgerBlockCacheMB)
 }
 
 func NewBadgerDBWithCache(path string, cacheSizeMB int) common.KVDB {
-	bdb, err := openBadgerDB(path, cacheSizeMB)
+	return NewBadgerDBWithOptions(path, OpenOptions{BlockCacheMB: cacheSizeMB})
+}
+
+func NewBadgerDBWithOptions(path string, options OpenOptions) common.KVDB {
+	bdb, err := openBadgerDBWithOptions(path, options)
 	if err != nil {
 		common.Log.Errorf("openBadgerDB %s failed: %v", path, err)
 		return nil
@@ -63,6 +100,40 @@ func NewBadgerDBWithCache(path string, cacheSizeMB int) common.KVDB {
 	}
 }
 
+type badgerPhysicalStats struct {
+	LSMBytes      int64
+	VlogBytes     int64
+	StaleBytes    int64
+	L0Tables      int
+	L0Bytes       int64
+	MaxLevelScore float64
+}
+
+func (b *badgerDB) physicalStats() badgerPhysicalStats {
+	lsm, vlog := b.db.Size()
+	stats := badgerPhysicalStats{LSMBytes: lsm, VlogBytes: vlog}
+	for _, level := range b.db.Levels() {
+		stats.StaleBytes += level.StaleDatSize
+		if level.Level == 0 {
+			stats.L0Tables = level.NumTables
+			stats.L0Bytes = level.Size
+		}
+		if level.Score > stats.MaxLevelScore {
+			stats.MaxLevelScore = level.Score
+		}
+	}
+	return stats
+}
+
+func (b *badgerDB) logPhysicalStats(label string) {
+	stats := b.physicalStats()
+	common.Log.Infof(
+		"badger physical stats: path=%s phase=%s lsm=%dMB vlog=%dMB stale=%dMB l0_tables=%d l0=%dMB max_score=%.2f",
+		b.path, label, stats.LSMBytes>>20, stats.VlogBytes>>20, stats.StaleBytes>>20,
+		stats.L0Tables, stats.L0Bytes>>20, stats.MaxLevelScore,
+	)
+}
+
 func (b *badgerDB) RunGC() error {
 	if b == nil || b.db == nil || b.db.IsClosed() {
 		return nil
@@ -70,6 +141,7 @@ func (b *badgerDB) RunGC() error {
 
 	const discardRatio = 0.5
 	start := time.Now()
+	b.logPhysicalStats("before_gc")
 	rewrites := 0
 	for {
 		err := b.db.RunValueLogGC(discardRatio)
@@ -85,10 +157,31 @@ func (b *badgerDB) RunGC() error {
 	if err := b.db.Sync(); err != nil {
 		return fmt.Errorf("sync Badger DB after GC %s: %w", b.path, err)
 	}
+	b.logPhysicalStats("after_gc")
 	common.Log.Infof(
 		"badger value log GC completed: path=%s rewrites=%d elapsed=%v",
 		b.path, rewrites, time.Since(start),
 	)
+	return nil
+}
+
+func (b *badgerDB) Finalize(workers int) error {
+	if b == nil || b.db == nil || b.db.IsClosed() {
+		return nil
+	}
+	if workers <= 0 {
+		workers = 1
+	}
+	start := time.Now()
+	b.logPhysicalStats("before_flatten")
+	if err := b.db.Flatten(workers); err != nil {
+		return fmt.Errorf("flatten Badger DB %s: %w", b.path, err)
+	}
+	b.logPhysicalStats("after_flatten")
+	if err := b.RunGC(); err != nil {
+		return err
+	}
+	common.Log.Infof("badger finalize completed: path=%s workers=%d elapsed=%v", b.path, workers, time.Since(start))
 	return nil
 }
 
@@ -126,11 +219,6 @@ func (b *badgerDB) close() error {
 	return b.db.Close()
 }
 
-func (b *badgerDB) commit() error {
-	// Badger 写事务自动 commit，这里保持接口一致
-	return nil
-}
-
 func (b *badgerDB) Read(key []byte) ([]byte, error) {
 	return b.get(key)
 }
@@ -155,47 +243,87 @@ func (b *badgerDB) Close() error {
 	return b.close()
 }
 
-func (b *badgerDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) error) error {
+func badgerPrefixSuccessor(prefix []byte) []byte {
+	if len(prefix) == 0 {
+		return nil
+	}
+	result := append([]byte(nil), prefix...)
+	for i := len(result) - 1; i >= 0; i-- {
+		if result[i] != 0xff {
+			result[i]++
+			return result[:i+1]
+		}
+	}
+	return nil
+}
+
+func scanCallbackResult(err error) error {
+	if errors.Is(err, common.ErrStopScan) {
+		return nil
+	}
+	return err
+}
+
+func (b *badgerDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
 	opt := badger.DefaultIteratorOptions
-	opt.PrefetchValues = true
-	opt.Reverse = reverse
+	opt.PrefetchValues = !options.KeysOnly
+	if options.PrefetchSize > 0 {
+		opt.PrefetchSize = options.PrefetchSize
+	}
+	opt.Reverse = options.Reverse
+	opt.Prefix = options.Prefix
 
 	return b.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(opt)
 		defer it.Close()
 
-		var seekKey []byte
-		if len(start) > 0 {
-			seekKey = start
-		} else if len(prefix) > 0 {
-			seekKey = prefix
-		}
-
-		if seekKey != nil {
-			it.Seek(seekKey)
-		} else {
-			if reverse {
-				it.Rewind()
-				if !it.Valid() {
-					return nil
-				}
-				it.Seek([]byte{0xFF, 0xFF, 0xFF, 0xFF})
+		if len(options.Start) > 0 {
+			it.Seek(options.Start)
+			if it.Valid() && !options.StartInclusive && bytes.Equal(it.Item().Key(), options.Start) {
+				it.Next()
+			}
+		} else if options.Reverse && len(options.Prefix) > 0 {
+			if upper := badgerPrefixSuccessor(options.Prefix); upper != nil {
+				it.Seek(upper)
 			} else {
 				it.Rewind()
 			}
+			if it.Valid() && !bytes.HasPrefix(it.Item().Key(), options.Prefix) {
+				it.Next()
+			}
+		} else {
+			it.Rewind()
 		}
 
+		count := 0
 		for ; it.Valid(); it.Next() {
 			item := it.Item()
-			k := item.Key()
-			if len(prefix) > 0 && !bytes.HasPrefix(k, prefix) {
+			key := item.Key()
+			if len(options.Prefix) > 0 && !bytes.HasPrefix(key, options.Prefix) {
 				break
 			}
-			err := item.Value(func(v []byte) error {
-				return r(append([]byte{}, k...), append([]byte{}, v...))
-			})
+			if options.CopyKey {
+				key = item.KeyCopy(nil)
+			}
+
+			var err error
+			if options.KeysOnly {
+				err = r(key, nil)
+			} else {
+				err = item.Value(func(value []byte) error {
+					if options.CopyValue {
+						value = append([]byte(nil), value...)
+					}
+					return r(key, value)
+				})
+			}
 			if err != nil {
-				return err
+				return scanCallbackResult(err)
+			}
+
+			count++
+			if options.Limit > 0 && count >= options.Limit {
+				break
 			}
 		}
 		return nil
@@ -203,15 +331,25 @@ func (b *badgerDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) 
 }
 
 func (b *badgerDB) BatchRead(prefix []byte, reverse bool, r func(k, v []byte) error) error {
-	return b.iter(prefix, nil, reverse, r)
-}
-
-func (b *badgerDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
-	return common.ScanWithBatchRead(options, b.BatchRead, r)
+	return b.Scan(common.ScanOptions{
+		Prefix:       prefix,
+		Reverse:      reverse,
+		CopyKey:      true,
+		CopyValue:    true,
+		PrefetchSize: badger.DefaultIteratorOptions.PrefetchSize,
+	}, r)
 }
 
 func (b *badgerDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error {
-	return b.iter(prefix, seekKey, reverse, r)
+	return b.Scan(common.ScanOptions{
+		Prefix:         prefix,
+		Start:          seekKey,
+		Reverse:        reverse,
+		StartInclusive: true,
+		CopyKey:        true,
+		CopyValue:      true,
+		PrefetchSize:   badger.DefaultIteratorOptions.PrefetchSize,
+	}, r)
 }
 
 type badgerReadBatch struct {
@@ -295,21 +433,21 @@ func (b *badgerDB) RestoreFromFile(fname string) error {
 	}
 	defer f.Close()
 	dec := gob.NewDecoder(f)
-	return b.db.Update(func(txn *badger.Txn) error {
-		for {
-			var kv [2][]byte
-			if err := dec.Decode(&kv); err != nil {
-				if err == io.EOF {
-					break
-				}
-				return err
+	wb := b.db.NewWriteBatch()
+	defer wb.Cancel()
+	for {
+		var kv [2][]byte
+		if err := dec.Decode(&kv); err != nil {
+			if err == io.EOF {
+				break
 			}
-			if err := txn.Set(kv[0], kv[1]); err != nil {
-				return err
-			}
+			return err
 		}
-		return nil
-	})
+		if err := wb.Set(kv[0], kv[1]); err != nil {
+			return err
+		}
+	}
+	return wb.Flush()
 }
 
 type badgerWriteBatch struct {

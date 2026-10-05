@@ -175,7 +175,7 @@ func TestParser_specialmetadata(t *testing.T) {
 
 	// TODO 无法解析出body
 	for _, field := range fields {
-		fmt.Printf(string(field.Inscription.Body))
+		fmt.Print(string(field.Inscription.Body))
 	}
 
 }
@@ -262,7 +262,7 @@ func TestParser_specialcase2(t *testing.T) {
 	}
 
 	for _, field := range fields {
-		fmt.Printf(string(field.Inscription.Body))
+		fmt.Print(string(field.Inscription.Body))
 	}
 
 }
@@ -409,7 +409,7 @@ func TestParser_ord7(t *testing.T) {
 		assert.True(t, field.IsCursed)
 	}
 
-	fmt.Printf(string(fields[0].Inscription.ContentType))
+	fmt.Print(string(fields[0].Inscription.ContentType))
 }
 
 func TestParser_ord8(t *testing.T) {
@@ -713,14 +713,14 @@ func BrotliDecompress(data []byte) ([]byte, error) {
 }
 
 func ParseProperties(data []byte) (*common.Properties, error) {
-    var p common.Properties
+	var p common.Properties
 
-    err := cbor.Unmarshal(data, &p)
-    if err != nil {
-        return nil, err
-    }
+	err := cbor.Unmarshal(data, &p)
+	if err != nil {
+		return nil, err
+	}
 
-    return &p, nil
+	return &p, nil
 }
 
 func TestParser_ord23(t *testing.T) {
@@ -766,7 +766,6 @@ func TestParser_ord23(t *testing.T) {
 
 }
 
-
 func TestParser_ord23_2(t *testing.T) {
 	// the first on-chain gallery: 883390
 	rawData, err := GetRawData("663f3e53321913088d1639575841810514c18170961c74a3786732e99d044e20", "mainnet")
@@ -806,19 +805,18 @@ func TestParser_ord23_2(t *testing.T) {
 
 }
 
-
 func TestParser_ord24(t *testing.T) {
 	/* on-chain collection
 	To create a child inscription C with parent inscription P:
 		1. Create an inscribe transaction T as usual for C.
 		2. Spend the parent P in one of the inputs of T.
-		3. Include tag 3, i.e. OP_PUSH 3, in C, with the value of the serialized 
-			binary inscription ID of P, serialized as the 32-byte TXID, followed by 
+		3. Include tag 3, i.e. OP_PUSH 3, in C, with the value of the serialized
+			binary inscription ID of P, serialized as the 32-byte TXID, followed by
 			the four-byte little-endian INDEX, with trailing zeroes omitted.
-	A collection can be closed by burning the collection's parent inscription, 
+	A collection can be closed by burning the collection's parent inscription,
 	which guarantees that no more items in the collection can be issued.
 	meta data: parent的meta data是collection的名称，child的Meta data是该nft的名称 （惯例，非协议）
-	*/	
+	*/
 
 	{
 
@@ -856,8 +854,8 @@ func TestParser_ord24(t *testing.T) {
 	}
 
 	{
-	
-		// child 1: 
+
+		// child 1:
 		rawData, err := GetRawData("f7ae2453bde443c3b89b076435a6378806d438b6b6012e33ea8418eaa804f0f6", "mainnet")
 		if err != nil {
 			fmt.Printf("%v\n", err)
@@ -893,7 +891,6 @@ func TestParser_ord24(t *testing.T) {
 
 }
 
-
 func TestParser_ord24_2(t *testing.T) {
 
 	{
@@ -916,7 +913,7 @@ func TestParser_ord24_2(t *testing.T) {
 	}
 
 	{
-	
+
 		// child 1: 780813
 		rawData, err := GetRawData("7cfbcd1290d7e7a5c31e8524b40ab606043ff0de1b58915ec7e3726a4991222f", "mainnet")
 		if err != nil {
@@ -938,4 +935,3 @@ func TestParser_ord24_2(t *testing.T) {
 	}
 
 }
-

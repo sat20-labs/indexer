@@ -254,13 +254,13 @@ func CheckInscriptionId(lastOrdUrl, oldOrdUrl string, height_limit int) error {
 				return err
 			}
 			cur_inscriptin_number++
-			common.Log.Infof(printStr)
+			common.Log.Info(printStr)
 			continue
 		}
 
 		format := "id:%s，num:%d, 09Num:%d, brc:%s"
 		printStr := fmt.Sprintf(format, lastOrdVersionServiceInscription.ID, lastOrdVersionServiceInscription.Number, oldVersionOrdServiceInscription.Number, brc.Ticker)
-		common.Log.Infof(printStr)
+		common.Log.Info(printStr)
 
 		if oldVersionOrdServiceInscription.Number < 0 {
 			format := "curse, id:%s，num:%d, address:%s, 09Num:%d, tick:%s, op:%s"
@@ -279,7 +279,6 @@ func CheckInscriptionId(lastOrdUrl, oldOrdUrl string, height_limit int) error {
 	return nil
 }
 
-
 func OrdNumDiff_Test() {
 	yamlcfg := config.InitConfig("../mainnet.env")
 	config.InitLog(yamlcfg)
@@ -291,9 +290,9 @@ func OrdNumDiff_Test() {
 
 	const (
 		url_0_23_0 = "192.168.1.104:81"
-		url_ordx = "192.168.1.103:8009"
+		url_ordx   = "192.168.1.103:8009"
 
-		out_dir  = "./cmd/number_diff.txt"
+		out_dir = "./cmd/number_diff.txt"
 	)
 
 	numberDiffFile, err := os.OpenFile((out_dir), os.O_APPEND|os.O_WRONLY|os.O_CREATE /*|os.O_TRUNC*/, 0644)
@@ -311,8 +310,8 @@ func OrdNumDiff_Test() {
 }
 
 func CheckInscriptionNum(ordUrl string, indexer *indexer.IndexerMgr, start, end int64, outfile *os.File) error {
-	
-	for num := start; num < end; num++{
+
+	for num := start; num < end; num++ {
 		ord, err := getInscription_ord(ordUrl, strconv.FormatInt(int64(num), 10))
 		if err != nil {
 			common.Log.Info(err)
@@ -328,7 +327,7 @@ func CheckInscriptionNum(ordUrl string, indexer *indexer.IndexerMgr, start, end 
 			if err != nil {
 				return err
 			}
-			common.Log.Infof(printStr)
+			common.Log.Info(printStr)
 			continue
 		}
 
@@ -348,7 +347,6 @@ func CheckInscriptionNum(ordUrl string, indexer *indexer.IndexerMgr, start, end 
 
 	return nil
 }
-
 
 func InitOrdx(yamcfg *config.YamlConf) *indexer.IndexerMgr {
 	indexerMgr := indexer.NewIndexerMgr(yamcfg)

@@ -21,7 +21,9 @@ var FirstTransactionRanges = []*common.Range{
 		Size:  1000000000,
 	},
 }
+
 const FirstTxValue = 1000000000
+
 var FirstTxHeight = 170
 
 var HitmanRanges = SatingRangesToOrdinalsRanges(hitmanSatingRanges)
@@ -70,23 +72,26 @@ func (s Sat) EpochPosition() int64 {
 }
 
 func (s Sat) Height() int64 {
-	// v, ok := getExoticIndexer().firstSatInBlock.FindFirstSmaller(int64(s))
-	// if ok {
-	// 	return int64(v.(int))
-	// }
-	// r := int64(s.Epoch()) * HalvingInterval
-	// sub := s.Epoch().GetSubsidy()
-	// p := s.EpochPosition() / sub
-	// return p + r
-	return 0
+	if s < FirstSat || s > LastSat {
+		return -1
+	}
+	epoch := s.Epoch()
+	subsidy := epoch.GetSubsidy()
+	if subsidy <= 0 {
+		return -1
+	}
+	return int64(epoch)*HalvingInterval + s.EpochPosition()/subsidy
 }
 
 func (s Sat) IsFirstSatInBlock() bool {
-	// v := getExoticIndexer().firstSatInBlock.FindNode(int64(s))
-	// return v != nil
-	// sub := s.Epoch().GetSubsidy()
-	// return int64(s)%sub == 0
-	return false
+	if s < FirstSat || s > LastSat {
+		return false
+	}
+	subsidy := s.Epoch().GetSubsidy()
+	if subsidy <= 0 {
+		return false
+	}
+	return s.EpochPosition()%subsidy == 0
 }
 
 func (s Sat) GetRodarmorRarity() string {

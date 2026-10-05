@@ -11,6 +11,7 @@ var (
 )
 
 type ScanOptions struct {
+	PrefetchSize   int // Runtime iterator tuning; not a persisted field.
 	Prefix         []byte
 	Start          []byte
 	StartInclusive bool

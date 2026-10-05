@@ -113,7 +113,7 @@ func (p *FTIndexer) GetMint(inscriptionId string) *common.Mint {
 
 	tickerName, err := p.getTickerWithInscriptionId(inscriptionId)
 	if err != nil {
-		common.Log.Errorf(err.Error())
+		common.Log.Error(err)
 		return nil
 	}
 

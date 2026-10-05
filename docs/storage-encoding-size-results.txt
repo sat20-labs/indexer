@@ -1,0 +1,12 @@
+Command:
+go test ./indexer/db -run TestRepresentativeCodecSizesAndRoundTrips -v -count=1
+
+Result:
+=== RUN   TestRepresentativeCodecSizesAndRoundTrips
+    codec_benchmark_test.go:151: protobuf encoded size: 18 bytes
+    codec_benchmark_test.go:151: gob encoded size: 90 bytes
+    codec_benchmark_test.go:151: raw-fixed encoded size: 24 bytes
+    codec_benchmark_test.go:151: generic-tlv encoded size: 33 bytes
+--- PASS: TestRepresentativeCodecSizesAndRoundTrips (0.00s)
+PASS
+ok  	github.com/sat20-labs/indexer/indexer/db	0.615s

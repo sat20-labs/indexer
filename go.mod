@@ -9,6 +9,9 @@ replace github.com/btcsuite/btcd => github.com/sat20-labs/btcd v0.24.3
 
 replace github.com/btcsuite/btcwallet => github.com/sat20-labs/btcwallet v0.16.11
 
+// SAT20 fork: protect pre-existing deletions during value-log GC rewrites.
+replace github.com/dgraph-io/badger/v4 => ../badger
+
 require (
 	github.com/OLProtocol/go-bitcoind v0.0.0-20250426075321-9b4dd47b435f
 	github.com/andybalholm/brotli v1.1.0

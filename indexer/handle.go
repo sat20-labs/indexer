@@ -87,7 +87,11 @@ func (s *IndexerMgr) prepareFreezeLookahead(height int, freezeAuthority map[stri
 
 	for h := height + 1; h <= height+2; h++ {
 		if _, ok := s.freezeLookaheadCache[h]; !ok {
-			s.freezeLookaheadCache[h] = base_indexer.FetchBlock(h, s.GetChainParam())
+			block := s.base.GetPrefetchedBlock(h)
+			if block == nil {
+				block = base_indexer.FetchBlock(h, s.GetChainParam())
+			}
+			s.freezeLookaheadCache[h] = block
 		}
 	}
 	delete(s.freezeLookaheadCache, height-1)

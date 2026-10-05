@@ -12,12 +12,12 @@ func TestTxAssets(t *testing.T) {
 		{
 			{
 				Name: AssetName{
-					Protocol: "runes",
-					Type: "f",
-					Ticker: "65103_1",
+					Protocol: "ordx",
+					Type:     "f",
+					Ticker:   "dogcoin",
 				},
-				Amount: *NewDecimal(200, 0),
-				BindingSat: 0,
+				Amount:     *NewDecimal(10000, 0),
+				BindingSat: 1,
 			},
 		},
 		nil,
@@ -30,10 +30,10 @@ func TestTxAssets(t *testing.T) {
 			{
 				Name: AssetName{
 					Protocol: "ordx",
-					Type: "f",
-					Ticker: "dogcoin",
+					Type:     "f",
+					Ticker:   "dogcoin",
 				},
-				Amount: *NewDecimal(10000, 0),
+				Amount:     *NewDecimal(10000, 0),
 				BindingSat: 1,
 			},
 		},
@@ -43,7 +43,6 @@ func TestTxAssets(t *testing.T) {
 	}
 
 	outputValues := []int64{3084, 10, 2413, 0}
-
 
 	var totalInTxAssets TxAssets
 	var totalSatoshiIn int64
@@ -56,7 +55,7 @@ func TestTxAssets(t *testing.T) {
 	}
 
 	var totalSatoshiOut int64
-	for i, out := range outputAssets{
+	for i, out := range outputAssets {
 		err := totalInTxAssets.Split(out)
 		if err != nil {
 			t.Fatalf("invalid TxOut asset with index %d, (%s)", i, err.Error())
@@ -72,8 +71,8 @@ func TestTxAssets(t *testing.T) {
 
 func TestRangeMerge(t *testing.T) {
 	dest := []*Range{
-		{Start: 10, Size: 5},  // [10, 14]
-		{Start: 20, Size: 5},  // [20, 24]
+		{Start: 10, Size: 5}, // [10, 14]
+		{Start: 20, Size: 5}, // [20, 24]
 	}
 	newRange := &Range{Start: 13, Size: 10} // [13, 22]
 
@@ -97,7 +96,7 @@ func TestMergeRange(t *testing.T) {
 		{
 			name: "non-overlapping insert at end",
 			input: []*Range{
-				{Start: 0, Size: 3}, // [0,2]
+				{Start: 0, Size: 3},  // [0,2]
 				{Start: 10, Size: 2}, // [10,11]
 			},
 			newRange: &Range{Start: 20, Size: 5}, // [20,24]
@@ -201,7 +200,6 @@ func equalRanges(a, b []*Range) bool {
 	return true
 }
 
-
 func TestAssetOffsets_Cat(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -286,7 +284,7 @@ func TestAssetOffsets_Insert(t *testing.T) {
 		{
 			name:     "insert with overlap (caller responsibility)",
 			initial:  AssetOffsets{{Start: 0, End: 5}},
-			input:   &OffsetRange{Start: 4, End: 10},
+			input:    &OffsetRange{Start: 4, End: 10},
 			expected: AssetOffsets{{Start: 4, End: 10}}, // <- this is how your code behaves
 		},
 	}
@@ -352,13 +350,11 @@ func TestAssetOffsets_Append(t *testing.T) {
 	}
 }
 
-
-
 func TestAssetOffsets_Cut(t *testing.T) {
 	tests := []struct {
-		name     string
-		offsets  AssetOffsets
-		value    int64
+		name      string
+		offsets   AssetOffsets
+		value     int64
 		expectedL AssetOffsets
 		expectedR AssetOffsets
 	}{
@@ -421,9 +417,9 @@ func TestAssetOffsets_Cut(t *testing.T) {
 
 func TestAssetOffsets_Split(t *testing.T) {
 	tests := []struct {
-		name     string
-		offsets  AssetOffsets
-		amt      int64
+		name      string
+		offsets   AssetOffsets
+		amt       int64
 		expectedL AssetOffsets
 		expectedR AssetOffsets
 	}{
@@ -483,7 +479,6 @@ func TestAssetOffsets_Split(t *testing.T) {
 		})
 	}
 }
-
 
 func TestAssetOffsets_Merge(t *testing.T) {
 	tests := []struct {

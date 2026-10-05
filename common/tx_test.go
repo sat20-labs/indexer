@@ -382,7 +382,7 @@ func TestTxOutputV2_Cut_Ord_CrossBoundary(t *testing.T) {
 	}
 	requireNoAsset(t, left, "ord", "ord-3")
 
-	right, err := v2.CompilingCut(3)
+	right, err := v2.CompilingCut(2)
 	if err != nil {
 		t.Fatal(err)
 	}

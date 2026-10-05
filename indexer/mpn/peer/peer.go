@@ -1433,7 +1433,7 @@ out:
 			if p.shouldHandleReadError(err) {
 				errMsg := fmt.Sprintf("Can't read message from %s: %v", p, err)
 				if err != io.ErrUnexpectedEOF {
-					common.Log.Errorf(errMsg)
+					common.Log.Error(errMsg)
 				}
 
 				// Push a reject message for the malformed message and wait for

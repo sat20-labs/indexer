@@ -323,6 +323,81 @@ func nextPrefix(prefix []byte) []byte {
 	return nil
 }
 
+func (p *pebbleDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
+	iterOptions := &pebble.IterOptions{}
+	if len(options.Prefix) > 0 {
+		iterOptions.LowerBound = options.Prefix
+		iterOptions.UpperBound = nextPrefix(options.Prefix)
+	}
+
+	iter, err := p.db.NewIter(iterOptions)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	var valid bool
+	if options.Reverse {
+		if len(options.Start) == 0 {
+			valid = iter.Last()
+		} else if options.StartInclusive {
+			valid = iter.SeekGE(options.Start)
+			if !valid {
+				valid = iter.Last()
+			} else if bytes.Compare(iter.Key(), options.Start) > 0 {
+				valid = iter.Prev()
+			}
+		} else {
+			valid = iter.SeekLT(options.Start)
+		}
+	} else if len(options.Start) == 0 {
+		valid = iter.First()
+	} else {
+		valid = iter.SeekGE(options.Start)
+		if valid && !options.StartInclusive && bytes.Equal(iter.Key(), options.Start) {
+			valid = iter.Next()
+		}
+	}
+
+	count := 0
+	for valid {
+		key := iter.Key()
+		if len(options.Prefix) > 0 && !bytes.HasPrefix(key, options.Prefix) {
+			break
+		}
+		if options.CopyKey {
+			key = append([]byte(nil), key...)
+		}
+
+		var value []byte
+		if !options.KeysOnly {
+			value = iter.Value()
+			if options.CopyValue {
+				value = append([]byte(nil), value...)
+			}
+		}
+
+		err = r(key, value)
+		if err != nil {
+			if errors.Is(err, common.ErrStopScan) {
+				return nil
+			}
+			return err
+		}
+		count++
+		if options.Limit > 0 && count >= options.Limit {
+			break
+		}
+		if options.Reverse {
+			valid = iter.Prev()
+		} else {
+			valid = iter.Next()
+		}
+	}
+
+	return iter.Error()
+}
+
 // 统一的迭代器入口：支持前缀、起始键、正/反向
 func (p *pebbleDB) iter(prefix, start []byte, reverse bool, r func(k, v []byte) error) error {
 	var lower, upper []byte
@@ -401,10 +476,6 @@ func (p *pebbleDB) ScanPrefixAll(prefix []byte, reverse bool, r func(k, v []byte
 func (p *pebbleDB) BatchReadV2(prefix, seekKey []byte, reverse bool, r func(k, v []byte) error) error {
 	// seekKey 可在 prefix 内/外；iter() 会自动 clamp 到边界范围
 	return p.iter(prefix, seekKey, reverse, r)
-}
-
-func (p *pebbleDB) Scan(options common.ScanOptions, r func(k, v []byte) error) error {
-	return common.ScanWithBatchRead(options, p.BatchRead, r)
 }
 
 // 慢，尽可能不要用

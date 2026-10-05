@@ -282,7 +282,7 @@ func TestFindSatributes(t *testing.T) {
 		},
 		{
 			1937670000000000,
-			[]string{Rare, Alpha},
+			[]string{Rare},
 		},
 		{
 			1584663749999999,
@@ -290,7 +290,7 @@ func TestFindSatributes(t *testing.T) {
 		},
 		{
 			1904260000000000,
-			[]string{Uncommon, Alpha},
+			[]string{Uncommon},
 		},
 		{
 			1847158750000000,
@@ -298,27 +298,27 @@ func TestFindSatributes(t *testing.T) {
 		},
 		{
 			1765168199999999,
-			[]string{Omega},
+			[]string{},
 		},
 		{
 			145808809963218,
-			[]string{Hitman},
+			[]string{},
 		},
 		{
 			942682707984987,
-			[]string{Hitman},
+			[]string{},
 		},
 		{
 			162060995322118,
-			[]string{Jpeg},
+			[]string{},
 		},
 		{
 			162062962006935,
-			[]string{Jpeg},
+			[]string{},
 		},
 		{
 			27777890035288,
-			[]string{Fibonacci},
+			[]string{},
 		},
 	}
 

@@ -36,9 +36,33 @@ type AddressValueInDB struct {
 	Utxos     map[uint64]*UtxoValue // utxoid -> value
 }
 
+// AddressValue is the L1 compact address state. Utxos contains pending
+// additions; persisted UTXOs are stored under individual compact keys.
 type AddressValue struct {
-	AddressId uint64
-	Utxos     map[uint64]int64 // utxoid -> value
+	AddressId   uint64
+	AddressType int
+	Op          int    // -1 deleted; 0 read from db; 1 added/modified
+	UtxoCount   uint64 // logical current UTXO count; persisted separately as a compact scalar
+	Utxos       map[uint64]int64
+}
+
+// Clone returns a fully independent copy of the pending address state.
+func (p *AddressValue) Clone() *AddressValue {
+	if p == nil {
+		return nil
+	}
+
+	clone := &AddressValue{
+		AddressId:   p.AddressId,
+		AddressType: p.AddressType,
+		Op:          p.Op,
+		UtxoCount:   p.UtxoCount,
+		Utxos:       make(map[uint64]int64, len(p.Utxos)),
+	}
+	for id, value := range p.Utxos {
+		clone.Utxos[id] = value
+	}
+	return clone
 }
 
 // L2 DB 兼容约束：SatoshiNet indexer 的 a2- 地址表直接持久化此消息，禁止修改底层 protobuf 定义。

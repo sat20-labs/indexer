@@ -711,8 +711,10 @@ func TestDftDeployAndMint(t *testing.T) {
 	}
 
 	ticker := idx.getTickerLocked("dftx")
-	ticker.MintedTimes = 0
-	ticker.MintedAmount = 0
+	// The ticker aggregate, not a process-wide mint history slice, is the
+	// authoritative max_mints counter.
+	ticker.MintedTimes = 2
+	ticker.MintedAmount = 1200
 	overflowCommit := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccd"
 	overflowMintTx := "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"
 	idx.UpdateTransfer(&common.Block{
@@ -725,7 +727,7 @@ func TestDftDeployAndMint(t *testing.T) {
 		}},
 	})
 	if got := idx.GetUtxoAssets(8)["dftx"]; got != 0 {
-		t.Fatalf("dft mint over max_mints should be rejected by mint history count, got %d", got)
+		t.Fatalf("dft mint over max_mints should be rejected by ticker aggregate, got %d", got)
 	}
 }
 

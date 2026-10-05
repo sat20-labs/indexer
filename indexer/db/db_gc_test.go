@@ -50,3 +50,30 @@ func TestRunDBGCReportsUnsupportedBackend(t *testing.T) {
 type fakeUnsupportedDB struct {
 	common.KVDB
 }
+
+type fakeFinalizeDB struct {
+	common.KVDB
+	workers int
+	err     error
+}
+
+func (f *fakeFinalizeDB) Finalize(workers int) error {
+	f.workers = workers
+	return f.err
+}
+
+func TestFinalizeDBDispatchesToBackend(t *testing.T) {
+	database := &fakeFinalizeDB{}
+	if err := FinalizeDB(database, 3); err != nil {
+		t.Fatalf("FinalizeDB returned error: %v", err)
+	}
+	if database.workers != 3 {
+		t.Fatalf("workers=%d, want 3", database.workers)
+	}
+}
+
+func TestFinalizeDBReportsUnsupportedBackend(t *testing.T) {
+	if err := FinalizeDB(&fakeUnsupportedDB{}, 1); !errors.Is(err, ErrFinalizeUnsupported) {
+		t.Fatalf("FinalizeDB error=%v, want ErrFinalizeUnsupported", err)
+	}
+}

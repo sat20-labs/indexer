@@ -6,14 +6,12 @@ import (
 	"time"
 
 	"github.com/sat20-labs/indexer/common"
-	"github.com/sat20-labs/indexer/indexer/db"
 	inCommon "github.com/sat20-labs/indexer/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
-
 
 func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.Range) {
 	p.mutex.Lock()
-	
 
 	// 生成所有当前区块的稀有聪
 	startTime := time.Now()
@@ -42,7 +40,7 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 		change := p.TxInputProcess(i+1, tx, block, coinbase)
 		// 处理testnet4中fee聪丢失的情况
 		if change != nil {
-			if newSize + change.Value() <= coinbaseSize {
+			if newSize+change.Value() <= coinbaseSize {
 				coinbaseInput.Append(change)
 				newSize += change.Value()
 			} else {
@@ -78,36 +76,53 @@ func (p *ExoticIndexer) UpdateTransfer(block *common.Block, coinbase []*common.R
 	}
 }
 
-func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxo uint64) {
-	utxos, ok := p.utxoMap[ticker]
-	if ok {
-		delete(utxos, utxo)
+func (p *ExoticIndexer) deleteUtxoMap(ticker string, utxoID uint64) {
+	ticker = strings.ToLower(ticker)
+	if pending := p.utxoMap[ticker]; pending != nil {
+		delete(pending, utxoID)
+		if len(pending) == 0 {
+			delete(p.utxoMap, ticker)
+		}
 	}
+	deleted := p.utxoDeleted[ticker]
+	if deleted == nil {
+		deleted = make(map[uint64]bool)
+		p.utxoDeleted[ticker] = deleted
+	}
+	deleted[utxoID] = true
 }
 
 // 增加该utxo下的资产数据，该资产为ticker，持有人，
 func (p *ExoticIndexer) addHolder(utxo *common.TxOutputV2, ticker string, assetInfo *common.AssetAbbrInfo) {
-	var amt int64
-	info, ok := p.holderInfo[utxo.UtxoId]
-	if !ok {
-		tickers := make(map[string]*common.AssetAbbrInfo, 0)
-		assets := assetInfo.Clone()
-		tickers[ticker] = assets
+	ticker = strings.ToLower(ticker)
+	info := p.holderInfo[utxo.UtxoId]
+	if info == nil {
 		info = &HolderInfo{
-			AddressId: utxo.AddressId, 
-			Tickers: tickers}
+			AddressId: utxo.AddressId,
+			Tickers:   make(map[string]*common.AssetAbbrInfo),
+		}
 		p.holderInfo[utxo.UtxoId] = info
-		amt = assetInfo.AssetAmt()
-	} else {
-		amt = info.AddTickerAsset(ticker, assetInfo)
 	}
 
-	utxovalue, ok := p.utxoMap[ticker]
-	if !ok {
-		utxovalue = make(map[uint64]int64, 0)
-		p.utxoMap[ticker] = utxovalue
+	before := int64(0)
+	if existing := info.Tickers[ticker]; existing != nil {
+		before = existing.AssetAmt()
 	}
-	utxovalue[utxo.UtxoId] = amt
+	after := info.AddTickerAsset(ticker, assetInfo)
+	p.adjustTickerHolderAmount(ticker, info.AddressId, after-before)
+
+	utxos := p.utxoMap[ticker]
+	if utxos == nil {
+		utxos = make(map[uint64]int64)
+		p.utxoMap[ticker] = utxos
+	}
+	utxos[utxo.UtxoId] = after
+	if deleted := p.utxoDeleted[ticker]; deleted != nil {
+		delete(deleted, utxo.UtxoId)
+		if len(deleted) == 0 {
+			delete(p.utxoDeleted, ticker)
+		}
+	}
 }
 
 func (p *ExoticIndexer) innerUpdateTransfer(tx *common.Transaction,
@@ -230,6 +245,22 @@ func (p *ExoticIndexer) UpdateDB() {
 	}
 	//common.Log.Infof("ExoticIndexer->UpdateDB->SetDB(ticker.HolderActionList(%d), cost: %v",len(p.holderActionList), time.Since(startTime))
 
+	for key, amount := range p.holderBalanceTouched {
+		if amount == 0 {
+			if err := wb.Delete([]byte(key)); err != nil {
+				common.Log.Panicf("delete exotic holder balance: %v", err)
+			}
+			continue
+		}
+		encoded, err := encodeHolderBalance(amount)
+		if err != nil {
+			common.Log.Panicf("encode exotic holder balance: %v", err)
+		}
+		if err := wb.Put([]byte(key), encoded); err != nil {
+			common.Log.Panicf("write exotic holder balance: %v", err)
+		}
+	}
+
 	err := db.SetDB([]byte(STATUS_KEY), p.status, wb)
 	if err != nil {
 		common.Log.Panicf("ExoticIndexer->UpdateDB Error setting in db %v", err)
@@ -242,7 +273,9 @@ func (p *ExoticIndexer) UpdateDB() {
 
 	// reset memory buffer
 	p.holderInfo = make(map[uint64]*HolderInfo)
-	//p.utxoMap = make(map[string]map[uint64]int64)
+	p.utxoMap = make(map[string]map[uint64]int64)
+	p.utxoDeleted = make(map[string]map[uint64]bool)
+	p.holderBalanceTouched = make(map[string]int64)
 	p.holderActionList = make([]*HolderAction, 0)
 	p.tickerAdded = make(map[string]*common.Ticker)
 	for _, info := range p.tickerMap {
@@ -251,7 +284,6 @@ func (p *ExoticIndexer) UpdateDB() {
 
 	common.Log.Infof("ExoticIndexer->UpdateDB takes %v", time.Since(startTime))
 }
-
 
 // 实现新的区块处理接口
 func (p *ExoticIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*common.Range) {
@@ -287,7 +319,7 @@ func (p *ExoticIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*c
 					}
 					continue
 				}
-				
+
 				utxoToLoad = append(utxoToLoad, &pair{
 					key:       GetHolderInfoKey(input.UtxoId),
 					utxoId:    input.UtxoId,
@@ -316,9 +348,6 @@ func (p *ExoticIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*c
 			if _, ok := p.tickerMap[k]; !ok {
 				tickerKeys = append(tickerKeys, k)
 			}
-			if _, ok := p.utxoMap[k]; !ok {
-				p.utxoMap[k] = p.loadTickerToUtxoMapFromDB(k)
-			}
 		}
 		sort.Slice(tickerKeys, func(i, j int) bool {
 			return tickerKeys[i] < tickerKeys[j]
@@ -338,7 +367,7 @@ func (p *ExoticIndexer) PrepareUpdateTransfer(block *common.Block, coinbase []*c
 		return nil
 	})
 }
-func (p *ExoticIndexer) TxInputProcess(txIndex int, tx *common.Transaction, 
+func (p *ExoticIndexer) TxInputProcess(txIndex int, tx *common.Transaction,
 	block *common.Block, coinbase []*common.Range,
 ) *common.TxOutput {
 	var allInput *common.TxOutput
@@ -375,7 +404,8 @@ func (p *ExoticIndexer) TxInputProcess(txIndex int, tx *common.Transaction,
 			p.holderActionList = append(p.holderActionList, &action)
 
 			delete(p.holderInfo, utxo)
-			for name := range holder.Tickers {
+			for name, assetInfo := range holder.Tickers {
+				p.adjustTickerHolderAmount(name, holder.AddressId, -assetInfo.AssetAmt())
 				p.deleteUtxoMap(name, utxo)
 			}
 		}
@@ -393,5 +423,5 @@ func (p *ExoticIndexer) TxInputProcess(txIndex int, tx *common.Transaction,
 }
 
 func (p *ExoticIndexer) UpdateTransferFinished(block *common.Block) {
-	
+
 }
