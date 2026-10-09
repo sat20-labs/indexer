@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -51,7 +52,11 @@ func (b *IndexerMgr) IsSupportedKey(pubkey []byte) bool {
 // admission token. Keeping the gate at the public boundary avoids nested
 // rpcEnter deadlocks during DB reload admission changes.
 func (b *IndexerMgr) isSupportedKey(pubkey []byte) bool {
-	// TODO 以后可以配置增加更多的pubkey，或者注册的地址
+	indexerPubKey, err := hex.DecodeString(b.indexerPubKey())
+	if err == nil && bytes.Equal(pubkey, indexerPubKey) {
+		return true
+	}
+
 	pkStr := hex.EncodeToString(pubkey)
 	if pkStr == common.GetBootstrapPubKey() || pkStr == common.GetCoreNodePubKey() {
 		return true
@@ -61,7 +66,7 @@ func (b *IndexerMgr) isSupportedKey(pubkey []byte) bool {
 	key := getRegisterKey(pkStr)
 	var value RegisterPubKeyInfo
 
-	err := db.GobGetDB([]byte(key), &value, b.kvDB)
+	err = db.GobGetDB([]byte(key), &value, b.kvDB)
 	if err != nil {
 		common.Log.Infof("GobGetDB %s failed, %v", key, err)
 		return false
@@ -88,6 +93,15 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 	if err != nil {
 		return err
 	}
+	indexerPubKey, err := hex.DecodeString(b.indexerPubKey())
+	if err != nil {
+		return fmt.Errorf("invalid indexer pubkey: %w", err)
+	}
+	for _, value := range kvs {
+		if !bytes.Equal(value.PubKey, indexerPubKey) {
+			return fmt.Errorf("only indexer pubkey may write KV")
+		}
+	}
 	if err := b.ensureKVKeyQuota(keysByPubKey); err != nil {
 		return err
 	}
@@ -95,17 +109,8 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 	wb := b.kvDB.NewWriteBatch()
 	defer wb.Close()
 
-	checkedPubKey := make(map[string]bool)
 	for _, value := range kvs {
 		pkStr := hex.EncodeToString(value.PubKey)
-		_, ok := checkedPubKey[pkStr]
-		if !ok {
-			if !b.isSupportedKey(value.PubKey) {
-				common.Log.Errorf("unsupport pubkey")
-				return fmt.Errorf("unsupport pubkey")
-			}
-			checkedPubKey[pkStr] = true
-		}
 
 		if len(value.Value) > maxKVValueBytes {
 			return fmt.Errorf("too large data %d", len(value.Value))
@@ -137,43 +142,6 @@ func (b *IndexerMgr) PutKVs(kvs []*common.KeyValue) error {
 	}
 
 	err = wb.Flush()
-	if err != nil {
-		common.Log.Errorf("flushing writes to db %v", err)
-		return err
-	}
-
-	return nil
-}
-
-func (b *IndexerMgr) DelKVs(pubkey []byte, keys []string) error {
-	b.rpcEnter()
-	defer b.rpcLeft()
-	b.kvMutex.Lock()
-	defer b.kvMutex.Unlock()
-
-	if len(keys) > maxKVKeysPerPubKey {
-		return fmt.Errorf("too many keys in one request: %d (max %d)", len(keys), maxKVKeysPerPubKey)
-	}
-	if kvKeyRequestSize(keys) > maxKVRequestBytes {
-		return fmt.Errorf("delete request too large (max %d bytes)", maxKVRequestBytes)
-	}
-
-	wb := b.kvDB.NewWriteBatch()
-	defer wb.Close()
-
-	pkStr := hex.EncodeToString(pubkey)
-
-	for _, k := range keys {
-		key := getKvKey(pkStr, k)
-		err := wb.Delete([]byte(key))
-		if err != nil {
-			common.Log.Errorf("deleting key %s failed, %v", key, err)
-			return err
-		}
-		common.Log.Infof("keyValue deleted. %s", key)
-	}
-
-	err := wb.Flush()
 	if err != nil {
 		common.Log.Errorf("flushing writes to db %v", err)
 		return err
@@ -239,8 +207,8 @@ func (b *IndexerMgr) ensureKVKeyQuota(keysByPubKey map[string]map[string]struct{
 			newKeys++
 		}
 
-		// Legacy data may predate this limit.  Allow it to be updated or
-		// deleted, but never permit another key to be added.
+		// Legacy data may predate this limit. Allow existing keys to be
+		// updated, but never permit another key to be added.
 		if existingKeys > maxKVKeysPerPubKey && newKeys == 0 {
 			continue
 		}
@@ -267,14 +235,6 @@ func (b *IndexerMgr) countKVKeys(pubkey string) (int, error) {
 		return 0, fmt.Errorf("counting KV keys failed: %w", err)
 	}
 	return count, nil
-}
-
-func kvKeyRequestSize(keys []string) int {
-	total := 0
-	for _, key := range keys {
-		total += len(key)
-	}
-	return total
 }
 
 func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, error) {
@@ -305,60 +265,14 @@ func (b *IndexerMgr) GetKVs(pubkey []byte, keys []string) ([]*common.KeyValue, e
 	return result, nil
 }
 
-// 为矿机提供L1索引服务，返回本地公钥，以便矿机生成挖矿地址
-// 默认以引导节点为服务节点，如果不是，需要修改索引器配置
-func (b *IndexerMgr) RegisterPubKey(minerPubKey string) (string, error) {
-	b.rpcEnter()
-	defer b.rpcLeft()
-
-	// TODO
-	// 暂时保留该pubkey，但是如果在一定时间内没有挖矿所得进入该地址，就可能删除
-	// 暂时只支持保留100个地址
-
-	var indexerPubkey string
-	if b.cfg.PubKey != "" {
-		indexerPubkey = b.cfg.PubKey
-	} else {
-		indexerPubkey = common.GetBootstrapPubKey()
-	}
-
-	key := getRegisterKey(minerPubKey)
-	var value RegisterPubKeyInfo
-	err := db.GobGetDB([]byte(key), &value, b.kvDB)
-	if err == nil && string(value.PubKey) == minerPubKey {
-		return indexerPubkey, nil
-	}
-
-	pk1, err := hex.DecodeString(indexerPubkey)
-	if err != nil {
-		return "", err
-	}
-	pk2, err := hex.DecodeString(minerPubKey)
-	if err != nil {
-		return "", err
-	}
-	channelAddr, err := common.GetChannelAddress(pk1, pk2, b.chaincfgParam)
-	if err != nil {
-		return "", err
-	}
-
-	value = RegisterPubKeyInfo{
-		PubKey:      []byte(minerPubKey),
-		ChannelAddr: channelAddr,
-		RefreshTime: time.Now().Unix(),
-	}
-	err = db.GobSetDB([]byte(key), &value, b.kvDB)
-	if err != nil {
-		return "", err
-	}
-
-	return indexerPubkey, nil
-}
-
 func (b *IndexerMgr) GetIndexerPubKey() string {
 	b.rpcEnter()
 	defer b.rpcLeft()
 
+	return b.indexerPubKey()
+}
+
+func (b *IndexerMgr) indexerPubKey() string {
 	if b.cfg.PubKey != "" {
 		return b.cfg.PubKey
 	}

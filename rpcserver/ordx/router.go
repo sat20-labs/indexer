@@ -113,12 +113,9 @@ func (s *Service) InitRouter(r *gin.Engine, proxy string) {
 	// // 某条铸造记录
 	// r.GET(proxy+"/v3/mint/details/:ticker/:id", s.handle.getMintDetailInfo)
 
-	// kv记录
+	// kv记录：仅支持配置的公钥可写入
 	r.POST(proxy+"/kv/nonce", s.handle.getNonce)
 	r.GET(proxy+"/kv/get/:pubkey/:key", s.handle.getkv)
 	r.POST(proxy+"/kv/put", s.handle.putKVs)
-	r.POST(proxy+"/kv/del", s.handle.delKVs)
-	// 注册公钥，并返回索引器公钥
-	r.POST(proxy+"/kv/register", s.handle.registerPubKey)
 	r.GET(proxy+"/v3/indexer/pubkey", s.handle.getIndexerPubKey)
 }

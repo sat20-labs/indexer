@@ -1,6 +1,7 @@
 package ordx
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -63,6 +64,13 @@ func (s *Model) GetKVs(keys []string) ([]*rpcwire.KeyValue, error) {
 }
 
 func (s *Model) PutKVs(req *rpcwire.PutKValueReq) error {
+	indexerPubKey, err := hex.DecodeString(s.indexer.GetIndexerPubKey())
+	if err != nil {
+		return fmt.Errorf("invalid indexer pubkey: %w", err)
+	}
+	if !bytes.Equal(req.PubKey, indexerPubKey) {
+		return fmt.Errorf("only indexer pubkey may write KV")
+	}
 
 	now := time.Now().UnixMicro()
 	pkHex := hex.EncodeToString(req.PubKey)
@@ -87,36 +95,6 @@ func (s *Model) PutKVs(req *rpcwire.PutKValueReq) error {
 	}
 
 	return s.indexer.PutKVs(req.Values)
-}
-
-func (s *Model) DelKVs(req *rpcwire.DelKValueReq) error {
-	now := time.Now().UnixMicro()
-	pkHex := hex.EncodeToString(req.PubKey)
-	t, ok := s.nonceMap[pkHex]
-	if ok {
-		if t-now > time.Hour.Microseconds() {
-			return fmt.Errorf("nonce expired")
-		}
-	}
-
-	sig := req.Signature
-	req.Signature = nil
-	msg, err := json.Marshal(req)
-	if err != nil {
-		return err
-	}
-
-	err = common.VerifySignOfMessage(msg, sig, req.PubKey)
-	if err != nil {
-		common.Log.Errorf("verify signature failed, %v", err)
-		return fmt.Errorf("verify signature failed, %v", err)
-	}
-
-	return s.indexer.DelKVs(req.PubKey, req.Keys)
-}
-
-func (s *Model) RegisterPubKey(req *rpcwire.RegisterPubKeyReq) (string, error) {
-	return s.indexer.RegisterPubKey(req.PubKey)
 }
 
 func (s *Model) GetIndexerPubKey() string {

@@ -81,58 +81,6 @@ func (s *Handle) putKVs(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s *Handle) delKVs(c *gin.Context) {
-	resp := &rpcwire.DelKValueResp{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-	}
-
-	var req rpcwire.DelKValueReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	err := s.model.DelKVs(&req)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-	}
-
-	c.JSON(http.StatusOK, resp)
-}
-
-func (s *Handle) registerPubKey(c *gin.Context) {
-	resp := &rpcwire.RegisterPubKeyResp{
-		BaseResp: rpcwire.BaseResp{
-			Code: 0,
-			Msg:  "ok",
-		},
-	}
-
-	var req rpcwire.RegisterPubKeyReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	result, err := s.model.RegisterPubKey(&req)
-	if err != nil {
-		resp.Code = -1
-		resp.Msg = err.Error()
-	} else {
-		resp.PubKey = result
-	}
-
-	c.JSON(http.StatusOK, resp)
-}
-
 func (s *Handle) getIndexerPubKey(c *gin.Context) {
 	resp := &rpcwire.IndexerPubKeyResp{
 		BaseResp: rpcwire.BaseResp{
