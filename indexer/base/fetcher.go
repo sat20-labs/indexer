@@ -38,6 +38,10 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 		return nil
 		//common.Log.Panicf("BaseIndexer.fetchBlock-> Failed to parse block: %v", err)
 	}
+	if block.Hash().String() != hash {
+		common.Log.Errorf("FetchBlock %d returned a different block hash", height)
+		return nil
+	}
 
 	transactions := block.Transactions()
 	txs := make([]*common.Transaction, len(transactions))
@@ -46,6 +50,9 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 		outputs := []*common.TxOutputV2{}
 
 		msgTx := tx.MsgTx()
+		// Cache the original identity before the historical Base normalization
+		// of empty output scripts. SilentPay never hashes normalized transactions.
+		originalTxID := tx.Hash().String()
 		for index, txIn := range msgTx.TxIn {
 			input := &common.TxInput{
 				TxOutputV2: common.TxOutputV2{
@@ -58,6 +65,7 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 					},
 					TxOutIndex: int(txIn.PreviousOutPoint.Index),
 				},
+				SignatureScript: append([]byte(nil), txIn.SignatureScript...),
 				Witness:   txIn.Witness,
 				TxId:      txIn.PreviousOutPoint.Hash.String(),
 				InHeight:  height,
@@ -96,6 +104,9 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 
 			output := common.GenerateTxOutput(msgTx, j)
 			output.UtxoId = common.ToUtxoId(height, txIndex, j)
+			// GenerateTxOutput may observe the normalized MsgTx. Restore the
+			// authoritative outpoint, including for non-SP outputs in this tx.
+			output.OutPointStr = originalTxID + ":" + spVoutString(uint32(j))
 			outputs = append(outputs, &common.TxOutputV2{
 				TxOutput:    *output,
 				OutTxIndex:  txIndex,
@@ -106,7 +117,7 @@ func FetchBlock(height int, chaincfgParam *chaincfg.Params) *common.Block {
 		}
 
 		txs[txIndex] = &common.Transaction{
-			TxId:    tx.Hash().String(),
+			TxId:    originalTxID,
 			Inputs:  inputs,
 			Outputs: outputs,
 		}

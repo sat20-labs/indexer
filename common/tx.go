@@ -46,6 +46,9 @@ type Output struct {
 type TxInput struct {
 	TxOutputV2 // 作为输入的utxo的信息
 	Witness    wire.TxWitness
+	// Runtime-only original input script for BIP352 public-key extraction.
+	// It is not added to the UTXO database or copied into asset state.
+	SignatureScript []byte `json:"-"`
 	// 当前交易的输入信息
 	TxId      string // 作为输入时的交易
 	InHeight  int
@@ -226,7 +229,7 @@ func (p *TxOutputV2) CompilingAppend(another *TxOutput) error {
 
 // CompilingCut 使用 offsetCursor / satCursor 实现 O(n) 线性切分
 // 前提：
-// - 对同一个 TxOutputV2，CompilingCut 只能按 value 单调递增调用
+// - 同一个 TxOutputV2，CompilingCut 只能按 value 单调递增调用
 // - builder.Build() 是保证 Assets 正确性的步骤
 func (p *TxOutputV2) CompilingCut(offset int64) (*TxOutput, error) {
 	if p == nil {

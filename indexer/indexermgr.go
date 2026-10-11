@@ -85,7 +85,7 @@ type IndexerMgr struct {
 	mutex   sync.RWMutex                           // 保护下面的数据
 	kvMutex sync.Mutex                             // 串行化 KV 配额检查及写入
 	clmap   map[common.TickerName]map[string]int64 // collections map, ticker -> inscriptionId -> asset amount
-	//registerPubKey map[string]int64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
+	//registerPubKey map[string]uint64  // pubkey -> refresh time (注册时间， 挖矿地址刷新时间)
 	// 接收前端api访问的实例，隔离内存访问
 	rpcService *base_indexer.RpcIndexer
 	// 本地缓存，在区块更新时清空
@@ -498,6 +498,9 @@ func (b *IndexerMgr) finalizeDBs() {
 
 func (b *IndexerMgr) closeDB() {
 	common.Log.Infof("IndexerMgr->closeDB ")
+	// Callers have drained RPC readers. All Base/RPC clones share this pool.
+	// Release pinned snapshots before GC, shutdown or reorg database reopen.
+	b.base.CloseSilentPayViews()
 	_, _ = b.dbgc()
 
 	if b.atomDB != nil {
@@ -601,6 +604,9 @@ func (b *IndexerMgr) checkSelf() {
 		if !ok {
 			break
 		}
+		// Fixed-height build verification has no public HTTP service. The
+		// audit finished; no read view may outlive the database it pins.
+		b.base.CloseSilentPayViews()
 		b.baseDB.Close()
 		b.baseDB = nil
 

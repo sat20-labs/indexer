@@ -2,6 +2,7 @@ package base
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -30,6 +31,8 @@ type PostUpdateDBCallback func()
 type BaseIndexer struct {
 	db    common.KVDB
 	stats *SyncStats // 数据库状态
+	// silentpay is a Base-owned derived index sharing this DB and lifecycle.
+	silentpay *silentPayState
 	//reCheck bool
 
 	// 需要clone的数据
@@ -125,6 +128,9 @@ func (b *BaseIndexer) Init() {
 	b.addressValueMap = make(map[string]*common.AddressValue)
 	b.addressUtxoDeleted = make(map[uint64]map[uint64]bool)
 	b.idToAddressMap = make(map[uint64]string)
+	if err := b.initSilentPay(); err != nil {
+		common.Log.Panicf("BaseIndexer SilentPay initialization failed: %v", err)
+	}
 }
 
 func (b *BaseIndexer) SetUpdateDBCallback(cb2 UpdateDBCallback) {
@@ -181,6 +187,7 @@ func (b *BaseIndexer) Clone(setStoredFlag bool) *BaseIndexer {
 	newInst.lastSats = b.lastSats
 	newInst.nullDataAddressId = b.nullDataAddressId
 	newInst.stats = b.stats.Clone()
+	newInst.silentpay = b.silentpay.clone()
 	newInst.blockprocCB = b.blockprocCB
 	newInst.updateDBCB = b.updateDBCB
 
@@ -226,6 +233,7 @@ func (b *BaseIndexer) Subtract(another *BaseIndexer) {
 	l = len(another.blockVector)
 	// b.blockVector = b.blockVector[l:]
 	b.blockVector = append([]*common.BlockValueInDB(nil), b.blockVector[l:]...)
+	b.silentpay.subtract(another.silentpay)
 }
 
 func needMerge(rngs []*common.Range) bool {
@@ -362,6 +370,9 @@ func (b *BaseIndexer) prefechAddressV2() map[string]*common.AddressValueInDB {
 
 func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	common.Log.Infof("BaseIndexer->updateBasicDB %d start...", b.lastHeight)
+	if b.lastHeight < 0 {
+		return make(map[string]uint64)
+	}
 
 	// 拿到所有的addressId
 	// addressValueMap := b.prefechAddressV2()
@@ -376,6 +387,9 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 		}
 	}
 	/////
+	if err := b.beginSilentPayCommit(); err != nil {
+		common.Log.Panicf("BaseIndexer SilentPay commit fence failed: %v", err)
+	}
 
 	wb := b.db.NewWriteBatch()
 	defer wb.Close()
@@ -482,11 +496,11 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 		key := db.GetUTXODBKey(value.OutPointStr)
 		err := wb.Delete([]byte(key))
 		if err != nil {
-			common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			common.Log.Panicf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
 		}
 		err = db.UnBindUtxoId(value.UtxoId, wb)
 		if err != nil {
-			common.Log.Errorf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
+			common.Log.Panicf("BaseIndexer.updateBasicDB-> Error deleting db: %v\n", err)
 		}
 
 		//for i, address := range value.Address.Addresses {
@@ -563,6 +577,14 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 		}
 	}
 
+	if err := b.writeSilentPay(wb); err != nil {
+		common.Log.Panicf("BaseIndexer SilentPay batch failed: %v", err)
+	}
+	if b.silentpay != nil {
+		if err := wb.Put([]byte(BaseDBVerKey), []byte(common.BASE_DB_VERSION)); err != nil {
+			common.Log.Panicf("BaseIndexer version write failed: %v", err)
+		}
+	}
 	if b.stats.UtxoCount < uint64(persistedDeleted) {
 		common.Log.Panicf(
 			"BaseIndexer.UpdateDB UTXO count underflow: current=%d persisted_deleted=%d",
@@ -584,6 +606,9 @@ func (b *BaseIndexer) UpdateDB() map[string]uint64 {
 	err = wb.Flush()
 	if err != nil {
 		common.Log.Panicf("BaseIndexer.updateBasicDB-> Error satwb flushing writes to db %v", err)
+	}
+	if err := b.finishSilentPayCommit(); err != nil {
+		common.Log.Panicf("BaseIndexer SilentPay commit completion failed: %v", err)
 	}
 	for _, output := range outputsPersistedByBatch {
 		output.MarkPersisted()
@@ -838,6 +863,10 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			localStartTime = time.Now()
 			coinbase := b.assignOrdinals_sat20(block)
 			common.Log.Infof("BaseIndexer.SyncToBlock-> assignOrdinals: cost: %v", time.Since(localStartTime))
+			if err := b.processSilentPay(block); err != nil {
+				close(stopBlockFetcherChan)
+				common.Log.Panicf("BaseIndexer SilentPay block %d failed: %v", block.Height, err)
+			}
 
 			// Update the sync stats
 			b.lastHeight = block.Height
@@ -855,7 +884,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 				height-block.Height == b.keepBlockHistory {
 				//localStartTime = time.Now()
 				b.forceUpdateDB()
-				//common.Log.Infof("BaseIndexer.SyncToBlock-> forceUpdateDB: cost: %v", time.Since(localStartTime))
+				//common.Log.Infof("BaseIndexer.SyncToBlock-> forceUpdateDB: cost: %v", time.Since(startTime))
 			}
 
 			if i%logProgressPeriod == 0 {
@@ -1121,7 +1150,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 	2025-08-21 10:09:02 [info] default: BaseIndexer.prefetchIndexesFromDB-> prefetched 8338 in 2.779987657s
 	2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> prefetchIndexesFromDB: cost: 2.780052419s
 	2025-08-21 10:09:02 [info] default: BaseIndexer.SyncToBlock-> assignOrdinals: cost: 42.401982ms
-	2025-08-21 10:09:02 [info] default: updateExoticTicker in 404.766µs
+	2025-08-21 10:09:03 [info] default: updateExoticTicker in 404.766µs
 	2025-08-21 10:09:03 [info] default: NftIndexer.UpdateTransfer loop 3339 in 1.103972964s
 	2025-08-21 10:09:03 [info] default: OrdxIndexer->UpdateTransfer loop 3339 in 1.800919ms
 	2025-08-21 10:09:03 [info] default: OrdxIndexer->CheckSelf took 70.940899ms.
@@ -1297,7 +1326,7 @@ func (b *BaseIndexer) prefetchIndexesFromDB(block *common.Block) {
 		for _, utxo := range inputsToLoad {
 			output := b.utxoIndex.Index[utxo.utxo]
 			if output == nil {
-				// 该utxo在当前生成，数据在后续处理
+				// 该utxo在当前block中生成，数据在后续处理
 				continue
 			}
 			addrId := utxoToAddressIdMap[utxo.utxo]
@@ -1626,10 +1655,13 @@ func (b *BaseIndexer) CheckSelf() bool {
 		common.Log.Errorf("sats wrong %d %d", satsInAddress, b.stats.TotalSats)
 		result = false
 	}
+	if err := b.CheckSilentPay(context.Background()); err != nil {
+		common.Log.Panicf("BaseIndexer SilentPay CheckSelf failed: %v", err)
+	}
 
 	if result {
 		common.Log.Infof("DB checked successfully, %v", time.Since(startTime))
-		b.setDBVersion()
+		// Version is committed with Base data, not changed by read-only audits.
 	} else {
 		common.Log.Infof("DB checked failed, %v", time.Since(startTime))
 	}
@@ -1784,6 +1816,7 @@ func (b *BaseIndexer) SetReorgHeight(height int) {
 	if len(b.stats.ReorgsDetected) > 100 {
 		b.stats.ReorgsDetected = b.stats.ReorgsDetected[len(b.stats.ReorgsDetected)-50:]
 	}
+
 	err := db.GobSetDB([]byte(SyncStatsKey), b.stats, b.db)
 	if err != nil {
 		common.Log.Panicf("Error setting in db %v", err)
@@ -1909,7 +1942,7 @@ func (b *BaseIndexer) GetUtxoAddress(utxoId uint64) (uint64, error) {
 
 	value := &common.UtxoValueInDB{}
 	key := db.GetUTXODBKey(utxo)
-	//err := db.GetValueFromDB(key, txn, value)
+	//err = db.GetValueFromDB(key, txn, value)
 	err = db.GetValueFromDBWithProto3(key, b.db, value)
 	if err != nil {
 		return common.INVALID_ID, err

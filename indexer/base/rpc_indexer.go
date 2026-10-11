@@ -35,6 +35,13 @@ func NewRpcIndexer(base *BaseIndexer) *RpcIndexer {
 		addedUtxoMap:       make(map[uint64]string),
 		satSearchingStatus: make(map[int64]*SatSearchingStatus),
 	}
+	if indexer.silentpay != nil {
+		// SP queries use committed DB views only. This read-only clone must
+		// not pin pending records after the compiling/commit Base releases
+		// them. The clone owns these maps; DB and view-pool sharing is kept.
+		indexer.silentpay.blocks = nil
+		indexer.silentpay.live = nil
+	}
 
 	return indexer
 }
