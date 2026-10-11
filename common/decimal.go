@@ -223,10 +223,22 @@ func (d *Decimal) MarshalJSON() ([]byte, error) {
 	if err := d.Validate(); err != nil {
 		return nil, err
 	}
+	// Both fields contain only decimal digits and an optional minus sign, so
+	// they need no JSON escaping. Preserve the existing field order and bytes.
+	value := d.Value.String()
+	encoded := make([]byte, 0, len(value)+27)
+	encoded = append(encoded, `{"Precision":`...)
+	encoded = strconv.AppendInt(encoded, int64(d.Precision), 10)
+	encoded = append(encoded, `,"Value":"`...)
+	encoded = append(encoded, value...)
+	encoded = append(encoded, '"', '}')
+	return encoded, nil
+	/*
 	return json.Marshal(map[string]interface{}{
 		"Precision": d.Precision,
 		"Value":     d.Value.String(),
 	})
+	*/
 }
 
 // 实现自定义反序列化逻辑
