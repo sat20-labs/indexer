@@ -1,6 +1,7 @@
 package base
 
 import (
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
 
@@ -16,6 +17,10 @@ func (p *BaseIndexer) GetAddressId(address string) uint64 {
 
 func (b *BaseIndexer) IsMainnet() bool {
 	return b.chaincfgParam.Name == "mainnet"
+}
+
+func (b *BaseIndexer) IsTestnet4() bool {
+	return b.chaincfgParam.Net == wire.TestNet4
 }
 
 func (b *BaseIndexer) GetAddressByUtxo(utxo string) (string, error) {

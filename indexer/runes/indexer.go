@@ -50,6 +50,9 @@ func NewIndexer(db common.KVDB, param *chaincfg.Params, bCheckValidateFile bool)
 	if !common.IsMainnet() {
 		enableHeight = 30562
 	}
+	if param != nil && param.Net == chaincfg.RegressionNetParams.Net {
+		enableHeight = int(runestone.FirstRuneHeight(param.Net))
+	}
 	_enable_checking_more_files = bCheckValidateFile
 	return &Indexer{
 		dbWrite:                    dbWrite,
@@ -166,35 +169,39 @@ func (s *Indexer) CheckSelf() bool {
 		if s.height < 840000 {
 			return true
 		}
+	case chaincfg.RegressionNetParams.Net:
+		// No public-network reference rune; validate actual balances below.
 	default:
 		common.Log.Panicf("RuneIndexer.CheckSelf-> unknown net:%d", s.chaincfgParam.Net)
 	}
-	runeId, err := s.GetRuneIdWithName(firstRuneName)
-	if err != nil {
-		common.Log.Panicf("GetRuneIdWithName err:%s", err.Error())
-	}
-	common.Log.Debugf("rune: %s\n", firstRuneName)
+	if firstRuneName != "" {
+		runeId, err := s.GetRuneIdWithName(firstRuneName)
+		if err != nil {
+			common.Log.Panicf("GetRuneIdWithName err:%s", err.Error())
+		}
+		common.Log.Debugf("rune: %s\n", firstRuneName)
 
-	runeInfo := s.GetRuneInfoWithId(runeId.String())
-	_, total := s.GetAllAddressBalances(runeId.String(), 0, 0)
-	addressBalances, _ := s.GetAllAddressBalances(runeId.String(), 0, total)
-	var addressBalance uint128.Uint128
-	for _, v := range addressBalances {
-		addressBalance = v.Balance.Add(addressBalance)
-	}
+		runeInfo := s.GetRuneInfoWithId(runeId.String())
+		_, total := s.GetAllAddressBalances(runeId.String(), 0, 0)
+		addressBalances, _ := s.GetAllAddressBalances(runeId.String(), 0, total)
+		var addressBalance uint128.Uint128
+		for _, v := range addressBalances {
+			addressBalance = v.Balance.Add(addressBalance)
+		}
 
-	totalAddressBalance := addressBalance.Add(runeInfo.Burned)
-	if addressBalance.Add(runeInfo.Burned).Cmp(totalAddressBalance) != 0 {
-		common.Log.Errorf("all address(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalAddressBalance.String(), runeInfo.Supply.String())
-		return false
-	}
+		totalAddressBalance := addressBalance.Add(runeInfo.Burned)
+		if addressBalance.Add(runeInfo.Burned).Cmp(totalAddressBalance) != 0 {
+			common.Log.Errorf("all address(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalAddressBalance.String(), runeInfo.Supply.String())
+			return false
+		}
 
-	_, total = s.GetAllUtxoBalances(runeId.String(), 0, 0)
-	utxoBalances, _ := s.GetAllUtxoBalances(runeId.String(), 0, total)
-	totalUtxoBalance := utxoBalances.Total.Add(runeInfo.Burned)
-	if utxoBalances.Total.Add(runeInfo.Burned).Cmp(totalUtxoBalance) != 0 {
-		common.Log.Errorf("all utxo(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
-		return false
+		_, total = s.GetAllUtxoBalances(runeId.String(), 0, 0)
+		utxoBalances, _ := s.GetAllUtxoBalances(runeId.String(), 0, total)
+		totalUtxoBalance := utxoBalances.Total.Add(runeInfo.Burned)
+		if utxoBalances.Total.Add(runeInfo.Burned).Cmp(totalUtxoBalance) != 0 {
+			common.Log.Errorf("all utxo(%d)'s total balance(%s) + burned is not equal to supply(%s)", total, totalUtxoBalance.String(), runeInfo.Supply.String())
+			return false
+		}
 	}
 
 	allHolders := make(map[uint64]bool)

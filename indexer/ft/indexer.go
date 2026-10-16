@@ -63,7 +63,9 @@ type FTIndexer struct {
 
 func NewOrdxIndexer(db common.KVDB) *FTIndexer {
 	enableHeight := 827307
-	if !common.IsMainnet() {
+	if common.CHAIN == common.ChainRegtest {
+		enableHeight = 0
+	} else if !common.IsMainnet() {
 		enableHeight = 28883
 	}
 	return &FTIndexer{

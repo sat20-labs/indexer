@@ -21,6 +21,7 @@ const (
 	ChainTestnet  = "testnet"
 	ChainTestnet4 = "testnet4"
 	ChainMainnet  = "mainnet"
+	ChainRegtest  = "regtest"
 )
 
 func PkScriptToAddr(pkScript []byte, chainParams *chaincfg.Params) (string, error) {
@@ -52,6 +53,8 @@ func IsValidAddr(addr string, chain string) (bool, error) {
 		chainParams = &chaincfg.TestNet4Params
 	case ChainMainnet:
 		chainParams = &chaincfg.MainNetParams
+	case ChainRegtest:
+		chainParams = &chaincfg.RegressionNetParams
 	default:
 		return false, nil
 	}
@@ -71,6 +74,8 @@ func AddrToPkScriptV2(addr string, chain string) ([]byte, error) {
 		chainParams = &chaincfg.TestNet4Params
 	case ChainMainnet:
 		chainParams = &chaincfg.MainNetParams
+	case ChainRegtest:
+		chainParams = &chaincfg.RegressionNetParams
 	default:
 		return nil, fmt.Errorf("invalid chain: %s", chain)
 	}

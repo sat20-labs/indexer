@@ -219,6 +219,9 @@ var mainnet_checkpoint = map[int]*CheckPoint{
 }
 
 func (p *FTIndexer) CheckPointWithBlockHeight(height int) {
+	if !p.nftIndexer.GetBaseIndexer().IsMainnet() && !p.nftIndexer.GetBaseIndexer().IsTestnet4() {
+		return
+	}
 
 	startTime := time.Now()
 	var checkpoint *CheckPoint

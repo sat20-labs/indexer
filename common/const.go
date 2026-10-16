@@ -64,7 +64,7 @@ func GetBootstrapPubKey() string {
 	switch CHAIN {
 	case "mainnet":
 		return _bootstrapPubKey
-	case "testnet": 
+	case "testnet", ChainRegtest:
 		return _bootstrapPubKey_testnet
 	}
 	return _bootstrapPubKey
@@ -77,7 +77,7 @@ func GetCoreNodePubKey() string {
 	switch CHAIN {
 	case "mainnet":
 		return _coreNodePubKey
-	case "testnet": 
+	case "testnet", ChainRegtest:
 		return _coreNodePubKey_testnet
 	}
 	return _coreNodePubKey

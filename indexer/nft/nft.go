@@ -89,7 +89,9 @@ type NftIndexer struct {
 
 func NewNftIndexer(db common.KVDB) *NftIndexer {
 	enableHeight := 767430
-	if !common.IsMainnet() {
+	if common.CHAIN == common.ChainRegtest {
+		enableHeight = 0
+	} else if !common.IsMainnet() {
 		enableHeight = 27228
 	}
 	ns := &NftIndexer{

@@ -108,7 +108,9 @@ type BRC20Indexer struct {
 
 func NewIndexer(db common.KVDB, bCheckValidateFiles bool) *BRC20Indexer {
 	enableHeight := 779832
-	if !common.IsMainnet() {
+	if common.CHAIN == common.ChainRegtest {
+		enableHeight = 0
+	} else if !common.IsMainnet() {
 		enableHeight = 27228
 	}
 	_enable_checking_more_files = bCheckValidateFiles
@@ -546,6 +548,7 @@ func (s *BRC20Indexer) CheckSelf() bool {
 	height := s.nftIndexer.GetBaseIndexer().GetHeight()
 
 	isMainnet := s.nftIndexer.GetBaseIndexer().IsMainnet()
+	isTestnet4 := s.nftIndexer.GetBaseIndexer().IsTestnet4()
 	//var names []string
 
 	//s.CheckPointWithBlockHeight(height)
@@ -665,7 +668,7 @@ func (s *BRC20Indexer) CheckSelf() bool {
 
 	// 需要高度到达一定高度才需要检查
 	if (isMainnet && height >= 828800) ||
-		(!isMainnet && height >= 28865) {
+		(isTestnet4 && height >= 28865) {
 		// 需要区分主网和测试网
 		name := "ordi"
 		ticker := s.GetTicker(name)
@@ -853,7 +856,7 @@ func (s *BRC20Indexer) CheckSelf() bool {
 			},
 		}
 		specialTickers[0] = &tickerInfo1
-	} else {
+	} else if isTestnet4 {
 		checkHeight = 108237
 		tickerInfo1 := &TickerInfo{
 			Name:               "ordi",

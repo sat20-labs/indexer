@@ -3,8 +3,12 @@ package bitcoind
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	bitcoindrpc "github.com/OLProtocol/go-bitcoind"
@@ -56,6 +60,163 @@ func (s *bitcoinEvidenceRPCStub) GetMemPoolEntry(string) (*bitcoindrpc.MemPoolEn
 func (s *bitcoinEvidenceRPCStub) GetMemPool() ([]string, error) { return nil, nil }
 func (s *bitcoinEvidenceRPCStub) EstimateSmartFeeWithMode(blocks int, _ string) (*bitcoindrpc.EstimateSmartFeeResult, error) {
 	return &bitcoindrpc.EstimateSmartFeeResult{FeeRate: float64(7-blocks) / 100000}, nil
+}
+
+// A pending spender known to the Bitcoin backend must reach the evidence API.
+// The additional backend capability remains optional for existing stubs.
+type bitcoinPendingSpenderRPCStub struct {
+	bitcoinEvidenceRPCStub
+	spender string
+	err     error
+}
+
+func (s *bitcoinPendingSpenderRPCStub) GetTxSpendingPrevout(txid string, vout uint32) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+	if txid == s.txid && vout == 0 {
+		return s.spender, nil
+	}
+	return "", nil
+}
+
+func TestBitcoinOutspendsSpenderErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	txid := "0000000000000000000000000000000000000000000000000000000000000001"
+	for _, tc := range []struct {
+		name      string
+		err       error
+		wantError bool
+	}{
+		{"unsupported", fmt.Errorf("RPC: %w", &bitcoindrpc.RPCError{Code: -32601, Message: "unsupported"}), false},
+		{"ordinary RPC error", &bitcoindrpc.RPCError{Code: -32603, Message: "backend failure"}, true},
+		{"network error", fmt.Errorf("connection refused"), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			previous := bitcoin_rpc.ShareBitconRpc
+			bitcoin_rpc.ShareBitconRpc = &bitcoinPendingSpenderRPCStub{
+				bitcoinEvidenceRPCStub: bitcoinEvidenceRPCStub{txid: txid, unspent: false}, err: tc.err,
+			}
+			t.Cleanup(func() { bitcoin_rpc.ShareBitconRpc = previous })
+			router := gin.New()
+			(&Service{}).InitRouter(router, "/btc/regtest")
+			var response rpcwire.BitcoinOutspendsResp
+			postBitcoinEvidenceJSON(t, router, "/btc/regtest/v3/bitcoin/outspends/batch",
+				map[string]interface{}{"outpoints": []string{txid + ":0"}}, &response)
+			if response.Code != 0 || len(response.Data) != 1 {
+				t.Fatalf("unexpected response: %+v", response)
+			}
+			item := response.Data[0]
+			if !item.Exists || !item.Spent || item.SpendingTx != "" || (item.Error != "") != tc.wantError {
+				t.Fatalf("spent evidence/error changed: %+v", item)
+			}
+		})
+	}
+}
+
+func TestBitcoinOutspendsWithUnifiedBackend(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	txid := strings.Repeat("1", 64)
+	spender := strings.Repeat("2", 64)
+	for _, tc := range []struct {
+		name      string
+		code      bitcoindrpc.RPCErrorCode
+		wantError bool
+	}{
+		{"known spender", 0, false},
+		{"unsupported", -32601, false},
+		{"ordinary RPC error", -32603, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var request struct {
+					Method string `json:"method"`
+					ID     int64  `json:"id"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Error(err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				var result interface{}
+				var rpcErr *bitcoindrpc.RPCError
+				switch request.Method {
+				case "getrawtransaction":
+					result = &bitcoindrpc.RawTransaction{Txid: txid, Vout: []bitcoindrpc.Vout{{N: 0, Value: 0.00001234}}}
+				case "gettxout":
+					result = nil
+				case "gettxspendingprevout":
+					result = []bitcoindrpc.SpendingPrevout{{TxID: txid, Vout: 0, SpendingTxID: spender}}
+					if tc.code != 0 {
+						rpcErr = &bitcoindrpc.RPCError{Code: tc.code, Message: tc.name}
+						w.WriteHeader(http.StatusInternalServerError)
+					}
+				default:
+					t.Errorf("unexpected RPC method %s", request.Method)
+				}
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": request.ID, "result": result, "error": rpcErr})
+			}))
+			defer server.Close()
+			newTestSpendingBackend(t, server.URL)
+			router := gin.New()
+			(&Service{}).InitRouter(router, "/btc/regtest")
+			var response rpcwire.BitcoinOutspendsResp
+			postBitcoinEvidenceJSON(t, router, "/btc/regtest/v3/bitcoin/outspends/batch",
+				map[string]interface{}{"outpoints": []string{txid + ":0"}}, &response)
+			if response.Code != 0 || len(response.Data) != 1 {
+				t.Fatalf("unexpected response: %+v", response)
+			}
+			item := response.Data[0]
+			if !item.Exists || !item.Spent || (item.Error != "") != tc.wantError {
+				t.Fatalf("spent evidence changed: %+v", item)
+			}
+			if tc.code == 0 && item.SpendingTx != spender || tc.code != 0 && item.SpendingTx != "" {
+				t.Fatalf("unexpected spender: %+v", item)
+			}
+		})
+	}
+}
+
+func TestBitcoinSpenderRejectsInvalidTxIDs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("invalid txid reached the RPC backend")
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer server.Close()
+	backend := newTestSpendingBackend(t, server.URL)
+	for _, txid := range []string{"", "bad", strings.Repeat("z", 64)} {
+		if _, err := backend.GetTxSpendingPrevout(txid, 0); err == nil {
+			t.Errorf("accepted invalid txid %q", txid)
+		}
+	}
+	if _, err := (&bitcoin_rpc.BitcoindRPC{}).GetTxSpendingPrevout(strings.Repeat("1", 64), 0); err == nil {
+		t.Fatal("accepted unavailable backend")
+	}
+}
+
+func TestBitcoinOutspendsReturnsKnownMempoolSpender(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	txid := "0000000000000000000000000000000000000000000000000000000000000001"
+	spender := "0000000000000000000000000000000000000000000000000000000000000003"
+	stub := &bitcoinPendingSpenderRPCStub{
+		bitcoinEvidenceRPCStub: bitcoinEvidenceRPCStub{txid: txid, unspent: false},
+		spender:                spender,
+	}
+	previous := bitcoin_rpc.ShareBitconRpc
+	bitcoin_rpc.ShareBitconRpc = stub
+	t.Cleanup(func() { bitcoin_rpc.ShareBitconRpc = previous })
+	router := gin.New()
+	(&Service{}).InitRouter(router, "/btc/regtest")
+	var response rpcwire.BitcoinOutspendsResp
+	postBitcoinEvidenceJSON(t, router, "/btc/regtest/v3/bitcoin/outspends/batch",
+		map[string]interface{}{"outpoints": []string{txid + ":0"}}, &response)
+	if response.Code != 0 || len(response.Data) != 1 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+	item := response.Data[0]
+	if !item.Exists || !item.Spent || item.Error != "" || item.SpendingTx != spender {
+		t.Fatalf("known pending spender was omitted: got %+v, want spending_tx=%s", item, spender)
+	}
 }
 
 func TestParseEvidenceOutpoint(t *testing.T) {
@@ -193,4 +354,85 @@ func decodeBitcoinEvidenceResponse(t *testing.T, recorder *httptest.ResponseReco
 	if err := json.Unmarshal(recorder.Body.Bytes(), response); err != nil {
 		t.Fatalf("decode response %s: %v", recorder.Body.String(), err)
 	}
+}
+
+func TestBitcoinSpenderBackendValidation(t *testing.T) {
+	origin := strings.Repeat("1", 64)
+	spender := strings.Repeat("2", 64)
+	cases := []struct {
+		name     string
+		result   interface{}
+		rpcError interface{}
+		want     string
+		wantErr  bool
+	}{
+		{"known", []interface{}{map[string]interface{}{"txid": origin, "vout": 7, "spendingtxid": spender}}, nil, spender, false},
+		{"unknown", []interface{}{map[string]interface{}{"txid": origin, "vout": 7}}, nil, "", false},
+		{"wrong outpoint", []interface{}{map[string]interface{}{"txid": origin, "vout": 8, "spendingtxid": spender}}, nil, "", true},
+		{"invalid spender", []interface{}{map[string]interface{}{"txid": origin, "vout": 7, "spendingtxid": "bad"}}, nil, "", true},
+		{"RPC error", nil, map[string]interface{}{"code": -32601, "message": "unsupported"}, "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var request struct {
+					Method string            `json:"method"`
+					Params []json.RawMessage `json:"params"`
+					ID     json.RawMessage   `json:"id"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Error(err)
+					w.WriteHeader(400)
+					return
+				}
+				var points []struct {
+					TxID string `json:"txid"`
+					Vout uint32 `json:"vout"`
+				}
+				if request.Method != "gettxspendingprevout" || len(request.Params) != 1 {
+					t.Error("unexpected RPC request")
+					w.WriteHeader(400)
+					return
+				}
+				if err := json.Unmarshal(request.Params[0], &points); err != nil || len(points) != 1 || points[0].TxID != origin || points[0].Vout != 7 {
+					t.Error("wrong RPC outpoint")
+					w.WriteHeader(400)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"id": request.ID, "result": tc.result, "error": tc.rpcError})
+			}))
+			defer server.Close()
+			backend := newTestSpendingBackend(t, server.URL)
+			got, err := backend.GetTxSpendingPrevout(origin, 7)
+			if tc.wantErr && err != nil {
+				wantMessage := map[string]string{"wrong outpoint": "mismatched outpoint", "invalid spender": "invalid spending txid", "RPC error": "unsupported"}[tc.name]
+				if !strings.Contains(err.Error(), wantMessage) {
+					t.Fatalf("unexpected error %v; want %s", err, wantMessage)
+				}
+			}
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("got %q, %v; want %q error=%v", got, err, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
+func newTestSpendingBackend(t *testing.T, serverURL string) *bitcoin_rpc.BitcoindRPC {
+	t.Helper()
+	host, portString, err := net.SplitHostPort(strings.TrimPrefix(serverURL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portString)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := bitcoin_rpc.ShareBitconRpc
+	t.Cleanup(func() { bitcoin_rpc.ShareBitconRpc = previous })
+	if err := bitcoin_rpc.InitBitconRpc(host, port, "test", "test", false); err != nil {
+		t.Fatal(err)
+	}
+	backend := bitcoin_rpc.ShareBitconRpc.(*bitcoin_rpc.BitcoindRPC)
+	return backend
 }

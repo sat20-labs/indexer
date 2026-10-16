@@ -2,6 +2,7 @@ package bitcoind
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	bitcoindrpc "github.com/OLProtocol/go-bitcoind"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/common"
@@ -283,12 +285,29 @@ func (s *Service) getBitcoinOutspends(c *gin.Context) {
 	data := make([]*rpcwire.BitcoinOutspend, 0, len(req.Outpoints))
 	for _, outpoint := range req.Outpoints {
 		status := getBitcoinUTXOStatus(outpoint)
-		data = append(data, &rpcwire.BitcoinOutspend{
+		item := &rpcwire.BitcoinOutspend{
 			Outpoint: outpoint,
 			Exists:   status.Exists,
 			Spent:    status.Exists && !status.Unspent,
 			Error:    status.Error,
-		})
+		}
+		if item.Spent && item.Error == "" {
+			if backend, ok := bitcoin_rpc.ShareBitconRpc.(interface {
+				GetTxSpendingPrevout(string, uint32) (string, error)
+			}); ok {
+				txid, vout, err := parseEvidenceOutpoint(outpoint)
+				if err == nil {
+					item.SpendingTx, err = backend.GetTxSpendingPrevout(txid, vout)
+				}
+				if err != nil {
+					var rpcErr *bitcoindrpc.RPCError
+					if !errors.As(err, &rpcErr) || rpcErr.Code != -32601 {
+						item.Error = err.Error()
+					}
+				}
+			}
+		}
+		data = append(data, item)
 	}
 	c.JSON(http.StatusOK, &rpcwire.BitcoinOutspendsResp{BaseResp: evidenceOK(), Data: data})
 }

@@ -134,6 +134,8 @@ func (p *TxOutputV2) GetAddress() string {
 	var chainParams *chaincfg.Params
 	if IsMainnet() {
 		chainParams = &chaincfg.MainNetParams
+	} else if CHAIN == ChainRegtest {
+		chainParams = &chaincfg.RegressionNetParams
 	} else {
 		chainParams = &chaincfg.TestNet4Params
 	}
@@ -413,6 +415,8 @@ func GetPkScriptFromAddress(address string) ([]byte, error) {
 	var chainParams *chaincfg.Params
 	if IsMainnet() {
 		chainParams = &chaincfg.MainNetParams
+	} else if CHAIN == ChainRegtest {
+		chainParams = &chaincfg.RegressionNetParams
 	} else {
 		chainParams = &chaincfg.TestNet4Params
 	}

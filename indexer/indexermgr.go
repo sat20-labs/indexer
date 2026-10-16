@@ -123,6 +123,8 @@ func NewIndexerMgr(
 		chainParam = &chaincfg.TestNet4Params
 	case common.ChainMainnet:
 		chainParam = &chaincfg.MainNetParams
+	case common.ChainRegtest:
+		chainParam = &chaincfg.RegressionNetParams
 	default:
 		chainParam = &chaincfg.MainNetParams
 	}
@@ -150,6 +152,12 @@ func NewIndexerMgr(
 		instance.ordFirstHeight = 2413343
 		instance.ordxFirstHeight = 2570589
 		common.CHAIN = "testnet"
+		common.Jubilee_Height = 0
+		common.SELFMINT_ENABLE_HEIGHT = 0
+	case "regtest":
+		instance.ordFirstHeight = 0
+		instance.ordxFirstHeight = 0
+		common.CHAIN = common.ChainRegtest
 		common.Jubilee_Height = 0
 		common.SELFMINT_ENABLE_HEIGHT = 0
 	default: // testnet4

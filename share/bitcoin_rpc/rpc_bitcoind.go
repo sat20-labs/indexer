@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/OLProtocol/go-bitcoind"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
@@ -22,14 +23,12 @@ func InitBitconRpc(host string, port int, user, passwd string, useSSL bool) erro
 			user,
 			passwd,
 			useSSL,
-			120, // server timeout is 1 hour for debug
+			120, // existing go-bitcoind timeout in seconds
 		)
 		if err != nil {
 			return err
 		}
-		ShareBitconRpc = &BitcoindRPC{
-			bitcoind: rpc,
-		}
+		ShareBitconRpc = &BitcoindRPC{bitcoind: rpc}
 	}
 
 	// tx := "02000000000101262a56b370b1782444e289d0dcf7328e66267a521072044f6e46191246052b700000000000ffffffff02180600000000000022002071f5786fd95a6b2c0008a53462d61a85ba513d512f6ff7ae1f87183a2e966be61335000000000000220020130562c58bb8a98f8da75563061f6407c344f5a4a86628aaaf06837d7cc9b1c7040048304502210099758a0c30bc73fff4127afb06593486cf876bd063b104cdb80ede0fdb07338402202d9bcd0d6bc1f4eef616b13896d387c413c7b12500cab39909efda5ea251d09f010047522102148cbe135aea8ee9b72f18ca6ddf0efc052e54b6d723cc473a0cc6011766d776210367f26af23dc40fdad06752c38264fe621b7bbafb1d41ab436b87ded192f1336e52ae00000000"
@@ -145,6 +144,36 @@ func (p *BitcoindRPC) GetTxOut(txid string, vout uint32, includeMempool bool) (*
 		return nil, nil
 	}
 	return &out, nil
+}
+
+// GetTxSpendingPrevout returns Core's current mempool spender, if known.
+func (p *BitcoindRPC) GetTxSpendingPrevout(txid string, vout uint32) (string, error) {
+	if p.bitcoind == nil {
+		return "", fmt.Errorf("Bitcoin spending RPC is unavailable")
+	}
+	if len(txid) != chainhash.MaxHashStringSize {
+		return "", fmt.Errorf("invalid outpoint txid")
+	}
+	if _, err := chainhash.NewHashFromStr(txid); err != nil {
+		return "", err
+	}
+	result, err := p.bitcoind.GetTxSpendingPrevout([]bitcoind.Prevout{{TxID: txid, Vout: vout}})
+	if err != nil {
+		return "", err
+	}
+	if len(result) != 1 || result[0].TxID != txid || result[0].Vout != vout {
+		return "", fmt.Errorf("Bitcoin spending RPC returned a mismatched outpoint")
+	}
+	spender := result[0].SpendingTxID
+	if spender != "" {
+		if len(spender) != chainhash.MaxHashStringSize {
+			return "", fmt.Errorf("invalid spending txid")
+		}
+		if _, err := chainhash.NewHashFromStr(spender); err != nil {
+			return "", err
+		}
+	}
+	return spender, nil
 }
 
 func (p *BitcoindRPC) GetBlockCount() (uint64, error) {

@@ -1,0 +1,25 @@
+# Local Bitcoin Core regtest. Supply the local RPC credentials before starting.
+chain: regtest
+db:
+  path: ./db/regtest
+  badger_block_cache_total_mb: 64
+  badger_index_cache_total_mb: 16
+  badger_num_compactors: 2
+  badger_flatten_workers: 1
+share_rpc:
+  bitcoin:
+    host: 127.0.0.1
+    port: 18443
+    user: your_rpc_name
+    password: your_rpc_password
+log:
+  level: info
+  path: ./log/regtest
+basic_index:
+  max_index_height: 0
+  period_flush_to_db: 12
+rpc_service:
+  addr: 127.0.0.1:8019
+  proxy: btc/regtest
+  log_path: ./log/regtest
+pubkey:

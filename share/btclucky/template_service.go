@@ -298,9 +298,7 @@ func (s *TemplateService) SubmitSolution(solution *MiningSolution) (*FoundBlockR
 		s.rememberFound(record)
 		return &record, err
 	}
-	err = client.SubmitBlock(block, &btcbtcjson.SubmitBlockOptions{
-		WorkID: cached.template.WorkID,
-	})
+	err = client.SubmitBlock(block, nil)
 	if err != nil {
 		record.SubmitResult = err.Error()
 		s.setSubmitResult(record.SubmitResult, err)
