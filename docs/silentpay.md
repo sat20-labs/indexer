@@ -159,13 +159,15 @@ SP handler 沿用现有 Service 和 BaseResp 错误字段，保留 4 个并发 S
 
 ## 5. CheckSelf
 
-`BaseIndexer.CheckSelf()` 默认调用 `CheckSilentPay`；发现 SP 数据不一致、独立证据不可用或审计失败立即 panic，不再仅返回 false。不加 SP 专用跳过开关或 build tag。检查固定已提交 H，只读、不写版本号、不清理坏记录。
+`BaseIndexer.CheckSelf()` 默认执行纯数据库 `CheckSilentPay`。所有读取均来自同一已提交 Base/SP 快照，**不访问 Bitcoin Core、其他网络服务或外部历史交易数据**；不新增配置、持久化编码或后台服务。审计失败、数据损坏或取消仍立即 panic，不把失败伪装为通过。
 
-检查源不是 Archive 自己的 txid 列表，而是原始区块：验证区块标识、txid Merkle root、witness commitment，取得真实父交易输出并重新计算候选/T/输出，流式与每块 Archive 精确比较。父交易输出使用有界缓存。当前共享 RPC 层的缺失父交易读取仍按 txid 调用已有内部 GetRawTx，不宣称已实现底层 RPC 批处理。
+Archive 按固定键顺序以每批最多 1024 条、约 8 MiB 分页核验；分批处理后再读取相关 Base 数据，避免在迭代器回调内嵌套读取造成死锁，且不把全部 Archive/UTXO 装入内存。核验 `sp/b/` 区块目录连续覆盖、与 Archive 交易位置精确一致、原始紧凑 SP 记录完整可解析、无多余或遗漏已登记的候选。检查起点、所有已登记区块的目录和已提交末块锚点；对没有 SP 初始化数据的旧 Base DB 则沿用前述禁用行为。
 
-Live 同时按每个真实 outpoint 对照 Base UTXO 与 Archive，包括零金额输出。检查多项、少项、错误位图、悬空行和全量已花费的历史候选。Archive/Live/目录同时缺失也必须由独立原块枚举发现。数据源不可用或中途取消时不得报告通过。
+逐个候选输出从现存 `u-` Base UTXO 与 `ai-` 地址资料推导应有的 Live 位图，验证 UTXO 创建位置 ID、P2TR 输出公钥，并与 `sp/l/` 精确比对；同时检查多余 Live 行、孤立 Archive 行及无效键。整个过程只读、不清理坏记录、不重新生成 `T`。
 
-密码学计算器可以复用，因此全链自检不能独自发现计算器中的共同错误；需要独立 golden vectors、发送方/扫描方交叉验证和 E2E。
+**已确认的校验边界：** Base DB 未保存所有原始交易 Witness 和历史 Prevout，纯 DB 自检不能独立重新计算 BIP352 `T`、验证原始区块 Merkle/Witness Commitment，亦无法找出目录和 Archive 双方同时遗漏的历史候选（尤其已完全花费的交易）。格式合法但数值错误的 `T` 不能仅凭 DB 判断；这部分由独立 BIP352 向量及真实 Bitcoin Core E2E 负责，不能宣称日常自检涵盖。DB 中某项数据缺失或不一致时仍一律报错；没有以计数替代已登记记录与 Base UTXO 的逐项校验。
+
+2026-10-20 的 testnet4 日志显示旧版自检在 155027 高度消耗约 4 小时 20 分，主要时间消耗在原始区块和父交易 RPC 及逐项数据库查找。新方案消除了网络依赖，已通过全仓测试和构建，但**尚未在该真实数据目录上实测耗时**；不能根据小型夹具的执行时间推断生产耗时。
 
 ## 6. 新库与发布
 

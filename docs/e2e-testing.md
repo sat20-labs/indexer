@@ -41,9 +41,9 @@ go test ./indexer/base -run '^TestSilentPayE2E' -count=1
 | --- | --- |
 | `TestSilentPayE2EReceiveLiveRecoverAndSpend` | 从头同步小链；真实 HTTP/CBOR 分页；错误 scan key 不匹配；同交易 k=0 花费后仍能恢复 k=1；旧快照不漂移；固定快照 outpoints 状态；按位置获得 txid；复用 rawtx/batch 及逐项错误；扫描派生私钥能签名花费；最后花费删除 Live 但保留 Archive |
 | `TestSilentPayE2EReorgReloadRestoresLive` | 未提交分支消费后发生重组；真实 Base 检测分叉、重新 Init 并重放；原输出重新出现在 Live；旧快照不可复用；CheckSelf 通过 |
-| `TestSilentPayE2ECheckSelfDetectsCorruptionWithoutRepair` | 同时删除 Archive/Live、错误位图和错误 T 均使默认 Base.CheckSelf 直接 panic；原始数据源不可用也 panic；检查不得修复损坏数据 |
+| `TestSilentPayE2ECheckSelfDetectsCorruptionWithoutRepair` | 同时缺失 Archive/Live、错误 Live 位图及畸形 T 编码仍使 CheckSelf panic；Bitcoin RPC 不可用时纯 DB 自检仍正常进行；检查不得修改数据 |
 | `TestSilentPayE2EDatabaseReopen` | 真实关闭数据库并重新打开；新 Base 恢复持久化 Live；旧 token 失效；重新扫描获得私钥并验证花费签名 |
-| `TestSilentPayE2ESameBlockSpendAndFullySpentHistoryAudit` | 创建与全部 SP 花费在同一块；Live 为空而 Archive 保留；删除已花费候选及块目录后，独立原始块枚举仍发现漏项 |
+| `TestSilentPayE2ESameBlockSpendAndFullySpentHistoryAudit` | 创建与全部 SP 花费在同一块；Live 为空而 Archive 保留；已确认纯 DB 自检无法发现 Archive 与目录同时遗漏的已完全花费候选（不再伪称独立读取原始区块） |
 | `TestSilentPayE2EBaseBufferedCloneSubtractCommit` | Base Clone(true) 冻结、处理后续花费、Subtract、先提交冻结批次、SetSyncStats、提交后续增量，并重复空提交；核验 Archive、Live 与 Base.CheckSelf |
 
 生产扫描组件不会取得测试钱包的私钥。发送端使用独立公式生成输出，接收测试用公共 T 和本地 scan/spend 私钥匹配；最终签名由生产 Bitcoin 脚本引擎验证，不能只断言“算出了相同字符串”。
@@ -70,6 +70,20 @@ HTTP 测试改为直接使用 `rpcserver/base.NewService(...).InitRouter()` 和�
 内存优化保持磁盘 schema 和 HTTP 字段不变。数据库 value 仍整行读取；按需处理指只读取实际使用的来源，并流式遍历其紧凑数据，不建立全量输出对象缓存。测试不将其描述为底层支持字节范围读取。
 
 `indexer/base/silentpay_batch_query_test.go` 使用现有临时 Base 数据库和实际 Pebble/Badger 只读视图，附加只读计数包装器，覆盖：同一来源大量输出的稀疏 outpoint 查询（混合 spent/unspent、重复请求、错误链 hash、错误 txid、非法范围和缺失 vout），多来源混排仍按原输入顺序返回，以及 txid 批量定位不展开不必要的输出。额外破坏紧凑记录尾部，确保即使命中前部 vout 也会因整条记录校验失败。红灯时同批 outpoints 查询读 Archive 7 次、200 项 txid 查询读 200 次；修复后各仅按两笔来源读取 2 次，Live 每个来源最多一次。没有新的 E2E 架构或特殊 build tag。
+
+## SP 数据库只读 CheckSelf（2026-10-20）
+
+遵照已确认的约束，默认 `BaseIndexer.CheckSelf()` 在 SP 部分仅检查**现有 Base/SP 数据库**，不调用 Bitcoin Core 网络 RPC，不读取区块或历史父交易。审计在固定已提交快照上按键序遍历 Archive，批次上限为 1024 条或约 8 MiB；每条记录只使用同一快照中的 Base UTXO/地址数据重建 Live 位图，避免在数据库迭代器持锁时嵌套读取。
+
+新增默认测试：
+
+- `silentpay_checkself_perf_test.go`：模拟数据源封锁全部 Bitcoin RPC，验证 CheckSelf 不请求区块、交易或父交易。
+- `silentpay_checkself_paging_test.go`：2500 条 Archive 记录跨页、顺序/无重复、相同快照数据读取与中途取消。
+- `silentpay_db_corrupt_e2e_test.go`：孤立 Live/Archive、缺少 SP block、缺 Base UTXO、错误地址公钥和损坏 Archive 仍必须失败；测试后数据库恢复可重新通过。
+
+这一版**不**重新计算 `T`，不验证原始区块的 Merkle/Witness Commitment，也不能发现 SP block 目录和 Archive 双方同时漏掉的已花费历史候选。正常 `CheckSelf` 的数据库一致性校验仍全面执行，不能把缺失 UTXO 解释为成功而忽略与 Live 的矛盾。
+
+默认 `go test ./...` 和 `go build ./...` 已通过；尚未使用用户的 testnet4 155027 高度原始数据库测量耗时，也没有运行 Badger-tag 和 race 专项。不能仅凭小型测试夹具给出分钟级性能承诺。
 
 ## 更低层的故障测试
 
@@ -99,7 +113,7 @@ HTTP 测试改为直接使用 `rpcserver/base.NewService(...).InitRouter()` 和�
 
 `rpcserver/base/silentpay_fatal_test.go` 改用标准 `NewService` 路由，验证 HTTP 使用 Gin 原有 Recovery：请求处理中的 panic 返回 500，但进程保持运行并可以处理后续请求。BaseIndexer 的持久化失败仍 panic，不在 HTTP 层增加强制退出中间件。所有 E2E 随默认 `go test ./...` 运行，不使用特殊 build tag。
 
-按确认范围，只注明 P2PK/裸多签的 prevout 还原缺口，不修改 Base 地址表示或放宽原始交易 CheckSelf；不增加 SyncStats 意外丢失的异常处理。测试通过不表示这些已明确排除的场景获得支持。
+按确认范围，P2PK/裸多签的原始脚本还原缺口仍然存在，不修改 Base 地址表示；纯 DB CheckSelf 不再调用 Bitcoin Core 或独立重算 BIP352 `T`，因此不再覆盖原始交易 Witness/Merkle 验证或双方同时遗漏的候选。它仍严格检查库内一致性，所有独立密码学正确性由现有发送/接收向量与 E2E 负责。不增加 SyncStats 意外丢失的异常处理。测试通过不表示已排除的场景获得支持。
 
 下列命令是后续验证入口，本次尚未执行，不能写入“已通过”清单：
 

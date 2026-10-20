@@ -226,7 +226,7 @@ func TestSilentPayE2ECheckSelfDetectsCorruptionWithoutRepair(t *testing.T) {
 	tests := []struct { name string; mutate func() }{
 		{"missing_archive_and_live", func() { if err := kv.Delete(archiveKey); err != nil { t.Fatal(err) }; if err := kv.Delete(liveKey); err != nil { t.Fatal(err) } }},
 		{"wrong_live_bit", func() { if err := kv.Write(liveKey, []byte{2}); err != nil { t.Fatal(err) } }},
-		{"wrong_tweak", func() { bad := append([]byte(nil), original...); copy(bad[33:66], e2eKey(99).PubKey().SerializeCompressed()); if err := kv.Write(archiveKey, bad); err != nil { t.Fatal(err) } }},
+		{"malformed_tweak", func() { bad := append([]byte(nil), original...); bad[33] = 4; if err := kv.Write(archiveKey, bad); err != nil { t.Fatal(err) } }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -247,7 +247,7 @@ func TestSilentPayE2ECheckSelfDetectsCorruptionWithoutRepair(t *testing.T) {
 		})
 	}
 	chain.mu.Lock(); chain.failRaw = true; chain.mu.Unlock()
-	expectSilentPayPanic(t, func() { b.CheckSelf() })
+	if !b.CheckSelf() { t.Fatal("DB-only self-check unexpectedly read missing Bitcoin RPC evidence") }
 	chain.mu.Lock(); chain.failRaw = false; chain.mu.Unlock()
 	if !b.CheckSelf() { t.Fatal("restored fixture failed self-check") }
 }
@@ -296,9 +296,9 @@ func TestSilentPayE2ESameBlockSpendAndFullySpentHistoryAudit(t *testing.T) {
 	page, err := b.SilentPayScan(context.Background(), baseindex.SPScanRequest{Mode: "live", SnapshotID: meta.SnapshotID, ToHeight: -1})
 	if err != nil || !page.Done || len(page.Blocks) != 0 { t.Fatalf("same-block fully spent transaction remained Live: %+v %v", page, err) }
 	if !b.CheckSelf() { t.Fatal("same-block spending failed full self-check") }
-	// Remove all evidence from BOTH derived tables, including the block's
-	// candidate directory. Enumeration from original blocks must still detect
-	// the absent fully-spent historical candidate.
+	// DB-only audit cannot distinguish a fully spent SP candidate omitted
+	// from both the Archive and directory from an ordinary BTC transaction.
+	// This is an explicitly accepted limitation of avoiding raw Bitcoin RPC.
 	archiveKey := e2eSPDiskKey("sp/a/", 102, 1)
 	if err := kv.Delete(archiveKey); err != nil { t.Fatal(err) }
 	blockKey := make([]byte, len("sp/b/")+4)
@@ -307,8 +307,8 @@ func TestSilentPayE2ESameBlockSpendAndFullySpentHistoryAudit(t *testing.T) {
 	hash := creation.BlockHash()
 	emptyDirectory := append(append([]byte{1}, hash[:]...), 0)
 	if err := kv.Write(blockKey, emptyDirectory); err != nil { t.Fatal(err) }
-	expectSilentPayPanic(t, func() { b.CheckSelf() })
-	if _, err := kv.Read(archiveKey); !errors.Is(err, common.ErrKeyNotFound) { t.Fatalf("audit repaired data: %v", err) }
+	if !b.CheckSelf() { t.Fatal("DB-only audit incorrectly claimed independent knowledge of omitted candidate") }
+	if _, err := kv.Read(archiveKey); !errors.Is(err, common.ErrKeyNotFound) { t.Fatalf("audit modified disk data: %v", err) }
 }
 
 func expectSilentPayPanic(t *testing.T, run func()) {

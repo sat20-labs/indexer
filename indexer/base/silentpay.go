@@ -94,9 +94,10 @@ func (b *BaseIndexer) CheckSilentPay(ctx context.Context) error {
 	if b.silentpay == nil {
 		return ErrSPNotInitialized
 	}
-	err := b.silentpay.audit(ctx, SPAnchor{Height: b.stats.SyncHeight, BlockHash: b.stats.SyncBlockHash}, spRPCAuditSource{})
-	// A full self-check cannot be considered successful or retryable on
-	// unavailable independent evidence or damaged index data.
+	err := b.silentpay.audit(ctx, SPAnchor{Height: b.stats.SyncHeight, BlockHash: b.stats.SyncBlockHash})
+	// Database corruption or cancelled audits are still fatal. The routine
+	// intentionally never consults Bitcoin Core; independent T recomputation
+	// belongs to E2E, not this local consistency check.
 	if err != nil {
 		panic(fmt.Errorf("BaseIndexer SilentPay CheckSelf failed: %w", err))
 	}
