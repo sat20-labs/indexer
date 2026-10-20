@@ -13,7 +13,7 @@ replace github.com/btcsuite/btcwallet => github.com/sat20-labs/btcwallet v0.16.1
 replace github.com/dgraph-io/badger/v4 => ../badger
 
 require (
-	github.com/OLProtocol/go-bitcoind v0.0.0-20250426075321-9b4dd47b435f
+	github.com/OLProtocol/go-bitcoind v0.1.0
 	github.com/andybalholm/brotli v1.1.0
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcutil v1.1.6
