@@ -56,7 +56,7 @@ Base 已在调用 SP 前按交易顺序解析合法区块的输入。SP 先按�
 
 ### 提交和重组
 
-提交顺序：写入并同步 pending 标记；写 Base/Archive/Live/schema/SyncStats 批次；Flush 并同步数据；删除并同步 pending 标记；清理已提交增量。重复空提交时仅在确有未落库新区块的情况下核对 pending 末块 hash；连续高度校验仍保留。即使后端拆分 WriteBatch，也不能将未完成状态发布为新基线。**任何阶段持久化失败：保留可检测的保护状态，然后立即 panic，不能继续同步。** 启动发现 pending 标记或已提交数据缺少 SP schema 时直接 panic，不自动清除、修复或在线回填。
+提交顺序：写入并同步 pending 标记；写 Base/Archive/Live/schema/SyncStats 批次；Flush 并同步数据；删除并同步 pending 标记；清理已提交增量。重复空提交时仅在确有未落库新区块的情况下核对 pending 末块 hash；连续高度校验仍保留。即使后端拆分 WriteBatch，也不能将未完成状态发布为新基线。**任何阶段持久化失败：保留可检测的保护状态，然后立即 panic，不能继续同步。** 启动发现 pending 标记、已存在 SP 记录却缺少 schema，或已初始化 SP 的锚点/版本不一致时直接 panic，不自动清除、修复或在线回填。**唯一兼容路径**：已有 Base 已提交高度，但 `sp/schema` 不存在且 `sp/` 前缀完全无数据，视为从未初始化 SP 的旧库；此次运行跳过 SP 处理、落盘及自检，普通 Base 和其他资产索引继续运行。五个 SP RPC 均返回 HTTP 503（`code=-1`、`msg=silentpay_not_initialized`）。重新启动仍保持此状态，不从当前高度自动开始生成不完整 SP 历史。新建 Base DB 继续从头启用 SP；需要在旧库启用完整 SP 时必须另行从头重建。没有新增配置项、持久化标记或在线迁移。
 
 关闭、重组重载和自检退出前释放 SP read views，再关闭 Base DB。重组仍使用现有 Base 持久化安全基线；不新增独立的 SP undo 数据库，不承诺越过 Base 安全范围的任意深度重组可自动恢复。
 

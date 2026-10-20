@@ -54,11 +54,33 @@ func (s *silentPayState) validateInitialState(stats *SyncStats) error {
 		return err
 	}
 	schema, err := s.db.Read(spSchemaKey)
-	if errors.Is(err, common.ErrKeyNotFound) && stats.SyncHeight < 0 {
-		return nil
+	if errors.Is(err, common.ErrKeyNotFound) {
+		if stats.SyncHeight < 0 {
+			return nil // fresh Base database: start SP together with Base
+		}
+		// A legacy Base database may have been indexed before SP existed.
+		// Only disable SP when there are no SP records whatsoever. If a
+		// previously initialized SP schema was lost, do not hide corruption.
+		view, viewErr := s.db.(common.SnapshotDB).NewReadView()
+		if viewErr != nil {
+			return viewErr
+		}
+		defer view.Close()
+		found := false
+		if scanErr := view.Scan(common.ScanOptions{Prefix: []byte("sp/"), KeysOnly: true, Limit: 1},
+			func(_, _ []byte) error { found = true; return nil }); scanErr != nil {
+			return scanErr
+		}
+		if found {
+			return fmt.Errorf("%w: SP records exist without a schema", ErrSPCorrupt)
+		}
+		return ErrSPNotInitialized
 	}
-	if err != nil || !bytes.Equal(schema, s.schemaBytes()) {
-		return fmt.Errorf("%w: rebuild Base with SilentPay schema", ErrSPNotReady)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(schema, s.schemaBytes()) {
+		return fmt.Errorf("%w: unexpected SP schema", ErrSPCorrupt)
 	}
 	if stats.SyncHeight >= s.startHeight {
 		raw, err := s.db.Read(spBlockKey(stats.SyncHeight))

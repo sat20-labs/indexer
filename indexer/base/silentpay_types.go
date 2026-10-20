@@ -16,6 +16,7 @@ const SPSchemaVersion = 1
 
 var (
 	ErrSPNotReady         = errors.New("silentpay_not_ready")
+	ErrSPNotInitialized  = errors.New("silentpay_not_initialized")
 	ErrSPIncompleteCommit = errors.New("silentpay_incomplete_base_commit: rebuild from a complete baseline")
 	ErrSPCorrupt          = errors.New("silentpay_corrupt_data")
 	ErrSPSnapshotExpired  = errors.New("snapshot_expired")

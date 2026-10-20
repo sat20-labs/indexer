@@ -1655,8 +1655,10 @@ func (b *BaseIndexer) CheckSelf() bool {
 		common.Log.Errorf("sats wrong %d %d", satsInAddress, b.stats.TotalSats)
 		result = false
 	}
-	if err := b.CheckSilentPay(context.Background()); err != nil {
-		common.Log.Panicf("BaseIndexer SilentPay CheckSelf failed: %v", err)
+	if b.silentpay != nil {
+		if err := b.CheckSilentPay(context.Background()); err != nil {
+			common.Log.Panicf("BaseIndexer SilentPay CheckSelf failed: %v", err)
+		}
 	}
 
 	if result {

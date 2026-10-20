@@ -19,6 +19,7 @@ func panicOnSilentPayDataFailure(operation string, err error) {
 		errors.Is(err, ErrSPSnapshotExpired),
 		errors.Is(err, ErrSPSnapshotLimit),
 		errors.Is(err, ErrSPNotReady),
+		errors.Is(err, ErrSPNotInitialized),
 		errors.Is(err, context.Canceled),
 		errors.Is(err, context.DeadlineExceeded):
 		return
@@ -30,10 +31,15 @@ func panicOnSilentPayDataFailure(operation string, err error) {
 func (b *BaseIndexer) initSilentPay() error {
 	if b.silentpay != nil {
 		b.silentpay.views.close()
+		b.silentpay = nil
 	}
 	state := newSilentPayState(b.db, b.chaincfgParam)
 	if err := state.validateInitialState(b.stats); err != nil {
 		state.views.close()
+		if errors.Is(err, ErrSPNotInitialized) {
+			common.Log.Warnf("SilentPay is not initialized for existing Base DB at height %d; other indexing continues without SP", b.stats.SyncHeight)
+			return nil
+		}
 		return err
 	}
 	b.silentpay = state
@@ -42,7 +48,7 @@ func (b *BaseIndexer) initSilentPay() error {
 
 func (b *BaseIndexer) processSilentPay(block *common.Block) error {
 	if b.silentpay == nil {
-		return ErrSPNotReady
+		return nil // existing Base without SP history continues to index normally
 	}
 	if block == nil || block.Height != b.lastHeight+1 {
 		return fmt.Errorf("%w: non-contiguous Base/SP processing", ErrSPCorrupt)
@@ -86,7 +92,7 @@ func (b *BaseIndexer) CloseSilentPayViews() {
 
 func (b *BaseIndexer) CheckSilentPay(ctx context.Context) error {
 	if b.silentpay == nil {
-		return ErrSPNotReady
+		return ErrSPNotInitialized
 	}
 	err := b.silentpay.audit(ctx, SPAnchor{Height: b.stats.SyncHeight, BlockHash: b.stats.SyncBlockHash}, spRPCAuditSource{})
 	// A full self-check cannot be considered successful or retryable on
@@ -99,7 +105,7 @@ func (b *BaseIndexer) CheckSilentPay(ctx context.Context) error {
 
 func (b *BaseIndexer) SilentPayStatus(ctx context.Context) (SPStatus, error) {
 	if b.silentpay == nil {
-		return SPStatus{}, ErrSPNotReady
+		return SPStatus{}, ErrSPNotInitialized
 	}
 	result, err := b.silentpay.status(ctx)
 	panicOnSilentPayDataFailure("status", err)
@@ -108,7 +114,7 @@ func (b *BaseIndexer) SilentPayStatus(ctx context.Context) (SPStatus, error) {
 
 func (b *BaseIndexer) SilentPayCreateSnapshot(ctx context.Context) (SPSnapshot, error) {
 	if b.silentpay == nil {
-		return SPSnapshot{}, ErrSPNotReady
+		return SPSnapshot{}, ErrSPNotInitialized
 	}
 	result, err := b.silentpay.createSnapshot(ctx)
 	panicOnSilentPayDataFailure("create snapshot", err)
@@ -117,7 +123,7 @@ func (b *BaseIndexer) SilentPayCreateSnapshot(ctx context.Context) (SPSnapshot, 
 
 func (b *BaseIndexer) SilentPayScan(ctx context.Context, req SPScanRequest) (SPScanPage, error) {
 	if b.silentpay == nil {
-		return SPScanPage{}, ErrSPNotReady
+		return SPScanPage{}, ErrSPNotInitialized
 	}
 	result, err := b.silentpay.scan(ctx, req)
 	panicOnSilentPayDataFailure("scan", err)
@@ -126,7 +132,7 @@ func (b *BaseIndexer) SilentPayScan(ctx context.Context, req SPScanRequest) (SPS
 
 func (b *BaseIndexer) SilentPayLookup(ctx context.Context, positions []SPPosition) ([]SPPositionResult, error) {
 	if b.silentpay == nil {
-		return nil, ErrSPNotReady
+		return nil, ErrSPNotInitialized
 	}
 	result, err := b.silentpay.lookup(ctx, positions)
 	panicOnSilentPayDataFailure("lookup", err)
@@ -137,7 +143,7 @@ func (b *BaseIndexer) SilentPayLookup(ctx context.Context, positions []SPPositio
 // It never substitutes current bitcoind/mempool state for that snapshot.
 func (b *BaseIndexer) SilentPayOutpoints(ctx context.Context, snapshotID string, positions []SPPosition) (SPAnchor, []SPPositionResult, error) {
 	if b.silentpay == nil {
-		return SPAnchor{}, nil, ErrSPNotReady
+		return SPAnchor{}, nil, ErrSPNotInitialized
 	}
 	anchor, result, err := b.silentpay.snapshotOutpoints(ctx, snapshotID, positions)
 	panicOnSilentPayDataFailure("outpoints", err)

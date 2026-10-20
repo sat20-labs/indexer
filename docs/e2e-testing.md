@@ -10,6 +10,7 @@
 
 - `silentpay_e2e_fixture_test.go`：确定性小链、交易生成/签名、临时数据库、真实 Base 同步辅助函数。
 - `silentpay_e2e_test.go`：真实 SP HTTP 接口、已有 rawtx/batch 接口、现有核心场景与 Base 缓冲提交闭环。
+- `silentpay_legacy_test.go`、`silentpay_legacy_e2e_test.go`：旧 Base DB 没有 SP 历史时正常继续同步、提交与 `CheckSelf`；五个 SP API 返回 503 `silentpay_not_initialized`，重启不生成局部 SP 索引；已有 SP 键、异常 schema 和未完成提交仍中止。
 
 外部依赖仅替换 `bitcoin_rpc.ShareBitconRpc` 的数据源；其余使用生产代码。所有数据写入 `t.TempDir()`，HTTP 使用 `httptest.NewServer` 的本机临时端口，测试结束关闭服务、释放快照并删除临时目录。全局 RPC/网络变量测试后恢复，涉及这些全局变量的场景不得 `t.Parallel()`。
 

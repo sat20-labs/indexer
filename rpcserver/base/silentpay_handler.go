@@ -61,6 +61,8 @@ func (s *Service) spFail(c *gin.Context, err error) {
 		status, message = http.StatusConflict, baseindex.ErrSPSnapshotExpired.Error()
 	case errors.Is(err, baseindex.ErrSPSnapshotLimit):
 		status, message = http.StatusTooManyRequests, baseindex.ErrSPSnapshotLimit.Error()
+	case errors.Is(err, baseindex.ErrSPNotInitialized):
+		status, message = http.StatusServiceUnavailable, baseindex.ErrSPNotInitialized.Error()
 	case errors.Is(err, baseindex.ErrSPNotReady):
 		status, message = http.StatusServiceUnavailable, "silentpay_not_ready"
 	case errors.Is(err, baseindex.ErrSPCorrupt):
