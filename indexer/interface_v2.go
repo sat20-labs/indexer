@@ -206,6 +206,9 @@ func (b *IndexerMgr) GetTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *
 
 func (b *IndexerMgr) getTxOutputWithUtxoV3(utxo string, excludingInvalid bool) *common.AssetsInUtxo {
 	output := b.getTxOutputWithUtxoV2(utxo, excludingInvalid)
+	if output == nil && b.miniMempool != nil {
+		output = b.miniMempool.getUnspentKnownPlainUtxo(utxo)
+	}
 	if output == nil {
 		return nil
 	}

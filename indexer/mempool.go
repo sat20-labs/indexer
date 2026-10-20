@@ -76,6 +76,33 @@ func NewMiniMemPool() *MiniMemPool {
 	return p
 }
 
+// getUnspentKnownPlainUtxo returns only an already classified, currently
+// unspent plain output. Clone it before releasing the read lock so callers
+// cannot mutate the mempool's cached state.
+func (p *MiniMemPool) getUnspentKnownPlainUtxo(outpoint string) *common.TxOutput {
+	if p == nil || outpoint == "" {
+		return nil
+	}
+
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	if p.utxoStateMap[outpoint] != mempoolUtxoPlain || p.spentByOutpoint[outpoint] != "" {
+		return nil
+	}
+	if _, spent := p.confirmedSpent[outpoint]; spent {
+		return nil
+	}
+	output := p.knownPlainUtxoMap[outpoint]
+	if output == nil {
+		return nil
+	}
+
+	clone := output.Clone()
+	clone.OutValue.PkScript = append([]byte(nil), output.OutValue.PkScript...)
+	return clone
+}
+
 func (p *MiniMemPool) resetStateLocked() {
 	p.txMap = make(map[string]*wire.MsgTx)
 	p.spentUtxoMap = make(map[string]*common.TxOutput)
