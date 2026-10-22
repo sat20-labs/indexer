@@ -473,3 +473,17 @@ func (bw *badgerWriteBatch) Close() {
 func (b *badgerDB) NewWriteBatch() common.WriteBatch {
 	return &badgerWriteBatch{wb: b.db.NewWriteBatch()}
 }
+
+// Badger's bulk WriteBatch commits early at size thresholds. A writable Txn
+// instead returns ErrTxnTooBig without publishing a partial ledger.
+type badgerAtomicWriteBatch struct {
+	txn *badger.Txn
+}
+
+func (b *badgerAtomicWriteBatch) Put(key, value []byte) error { return b.txn.Set(key, value) }
+func (b *badgerAtomicWriteBatch) Delete(key []byte) error     { return b.txn.Delete(key) }
+func (b *badgerAtomicWriteBatch) Flush() error                { return b.txn.Commit() }
+func (b *badgerAtomicWriteBatch) Close()                      { b.txn.Discard() }
+func (b *badgerDB) NewAtomicWriteBatch() common.WriteBatch {
+	return &badgerAtomicWriteBatch{txn: b.db.NewTransaction(true)}
+}
