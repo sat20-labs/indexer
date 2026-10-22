@@ -120,6 +120,9 @@ func (s *Indexer) GetUtxoBalances(utxoID uint64) []*UtxoBalance {
 	return s.allUtxoBalancesLocked(utxoID)
 }
 
+// GetAssetsWithUtxo is the legacy quantity-as-range view. ARC20 has no ordinal
+// offsets: callers planning transfers must use GetUtxoAssets/GetUtxoBalances and
+// the coloring package. The generic V3 UTXO view deliberately omits these ranges.
 func (s *Indexer) GetAssetsWithUtxo(utxoID uint64) map[string]common.AssetOffsets {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
