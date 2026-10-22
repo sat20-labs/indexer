@@ -1,10 +1,12 @@
 package atom
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/atom/coloring"
 	"github.com/sat20-labs/indexer/indexer/db"
 )
 
@@ -27,7 +29,13 @@ func seedAtomState(t *testing.T, kv common.KVDB) {
 	wb := kv.NewWriteBatch()
 	defer wb.Close()
 
-	status := &Status{Version: DB_VERSION, Height: 100, TickerCount: 1, MintCount: 1}
+	// This fixture represents indexed Atomicals state, so its height must be
+	// active under the same network rules as the indexer that reads it.
+	heights, err := coloring.HeightsForNetwork(chaincfg.TestNet4Params.Net)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := &Status{Version: DB_VERSION, Height: heights.Activation, TickerCount: 1, MintCount: 1}
 	ticker := &Ticker{
 		Id:           0,
 		Name:         "atom",
@@ -133,5 +141,25 @@ func TestAtomProcessingLoadsOnlyTouchedUtxoAndUpdateDBReleasesIt(t *testing.T) {
 	if len(indexer.utxoBalances) != 0 || len(indexer.holderBalances) != 0 ||
 		len(indexer.tickerHolders) != 0 || len(indexer.tickerUtxos) != 0 || len(indexer.mintHistory) != 0 {
 		t.Fatalf("UpdateDB retained lazy processing state")
+	}
+}
+
+func TestAtomUpdateDBPreservesActivationBoundary(t *testing.T) {
+	kv := openAtomStateTestDB(t)
+	indexer := NewIndexer(kv, &chaincfg.TestNet4Params)
+	indexer.Init(nil)
+	indexer.status.Height = indexer.heights.Activation - 1
+	indexer.UpdateDB()
+	if _, err := kv.Read([]byte(DB_STATUS_KEY)); !errors.Is(err, common.ErrKeyNotFound) {
+		t.Fatalf("pre-activation status write: %v", err)
+	}
+	indexer.status.Height = indexer.heights.Activation
+	indexer.UpdateDB()
+	var status Status
+	if err := db.GetValueFromDB([]byte(DB_STATUS_KEY), &status, kv); err != nil {
+		t.Fatal(err)
+	}
+	if status.Height != indexer.heights.Activation {
+		t.Fatalf("persisted activation height = %d, want %d", status.Height, indexer.heights.Activation)
 	}
 }
