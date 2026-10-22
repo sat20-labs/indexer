@@ -70,21 +70,21 @@ func (s *Indexer) writeCompareSnapshotLocked(path string) error {
 		sortKey  string
 	}
 	rows := make([]utxoRow, 0)
-	for _, balances := range s.utxoBalances {
-		for _, balance := range balances {
-			if balance.Amount <= 0 {
-				continue
-			}
-			row := utxoRow{
-				ticker:   balance.Ticker,
-				outpoint: balance.Outpoint,
-				utxoId:   balance.UtxoId,
-				amount:   balance.Amount,
-				atomical: balance.AtomicalId,
-			}
-			row.sortKey = row.ticker + "|" + row.outpoint + "|" + row.atomical
-			rows = append(rows, row)
+	if err := s.forEachCurrentUtxoBalanceLocked(func(balance *UtxoBalance) {
+		if balance.Amount <= 0 {
+			return
 		}
+		row := utxoRow{
+			ticker:   balance.Ticker,
+			outpoint: balance.Outpoint,
+			utxoId:   balance.UtxoId,
+			amount:   balance.Amount,
+			atomical: balance.AtomicalId,
+		}
+		row.sortKey = row.ticker + "|" + row.outpoint + "|" + row.atomical
+		rows = append(rows, row)
+	}); err != nil {
+		return fmt.Errorf("atom scan snapshot UTXOs: %w", err)
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i].sortKey < rows[j].sortKey

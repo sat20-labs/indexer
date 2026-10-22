@@ -1414,12 +1414,16 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 				common.Log.Panicf("atom %s utxo amount different at %d: %d %d", name, height, amount, tickerStatus.UtxoAmount)
 			}
 		}
+		var holders map[uint64]int64
+		if len(tickerStatus.Holders) > 0 {
+			holders = s.tickerHoldersLocked(name)
+		}
 		for address, amount := range tickerStatus.Holders {
 			addressId := s.baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
 				common.Log.Panicf("atom %s can't find holder address %s at %d", name, address, height)
 			}
-			holderAmount := s.tickerHolders[name][addressId]
+			holderAmount := holders[addressId]
 			if holderAmount != amount {
 				common.Log.Panicf("atom %s holder %s amount different at %d: %d %d", name, address, height, holderAmount, amount)
 			}
@@ -1573,6 +1577,7 @@ func (s *Indexer) validateHolderDataLocked(height int) {
 
 	var failed []string
 	for ticker, holders := range tickerToHolders {
+		currentHolders := s.tickerHoldersLocked(ticker)
 		verified := true
 		expectedTotal := int64(0)
 		for address, record := range holders {
@@ -1583,14 +1588,14 @@ func (s *Indexer) validateHolderDataLocked(height int) {
 				verified = false
 				continue
 			}
-			amount := s.tickerHolders[ticker][addressId]
+			amount := currentHolders[addressId]
 			if amount != record.Amount {
 				common.Log.Errorf("AtomIndexer.validateHolderData %s %s amount different %d %d",
 					address, ticker, record.Amount, amount)
 				verified = false
 			}
 		}
-		holderCount, holderAmount := s.tickerHolderSummaryLocked(ticker)
+		holderCount, holderAmount := holderSummary(currentHolders)
 		if holderCount != len(holders) || holderAmount != expectedTotal {
 			common.Log.Errorf("AtomIndexer.validateHolderData %s summary different count %d %d amount %d %d",
 				ticker, len(holders), holderCount, expectedTotal, holderAmount)
@@ -1625,6 +1630,7 @@ func (s *Indexer) logHolderCheckpointDiffLocked(height int, ticker string) {
 	}
 
 	const limit = 20
+	currentHolders := s.tickerHoldersLocked(ticker)
 	expectedByAddressId := make(map[uint64]*atomValidate.HolderCSVRecord, len(expected))
 	diffCount := 0
 	addresses := make([]string, 0, len(expected))
@@ -1644,7 +1650,7 @@ func (s *Indexer) logHolderCheckpointDiffLocked(height int, ticker string) {
 			continue
 		}
 		expectedByAddressId[addressId] = record
-		amount := s.tickerHolders[ticker][addressId]
+		amount := currentHolders[addressId]
 		if amount != record.Amount {
 			diffCount++
 			if diffCount <= limit {
@@ -1654,8 +1660,8 @@ func (s *Indexer) logHolderCheckpointDiffLocked(height int, ticker string) {
 		}
 	}
 
-	localHolderIds := make([]uint64, 0, len(s.tickerHolders[ticker]))
-	for addressId := range s.tickerHolders[ticker] {
+	localHolderIds := make([]uint64, 0, len(currentHolders))
+	for addressId := range currentHolders {
 		localHolderIds = append(localHolderIds, addressId)
 	}
 	sort.Slice(localHolderIds, func(i, j int) bool {
@@ -1665,7 +1671,7 @@ func (s *Indexer) logHolderCheckpointDiffLocked(height int, ticker string) {
 		if _, ok := expectedByAddressId[addressId]; ok {
 			continue
 		}
-		amount := s.tickerHolders[ticker][addressId]
+		amount := currentHolders[addressId]
 		if amount == 0 {
 			continue
 		}
@@ -1680,7 +1686,7 @@ func (s *Indexer) logHolderCheckpointDiffLocked(height int, ticker string) {
 		}
 	}
 	common.Log.Errorf("AtomIndexer.holderCheckpointDiff %s %d total_diff_or_extra %d official_holders %d local_holders %d",
-		ticker, height, diffCount, len(expected), len(s.tickerHolders[ticker]))
+		ticker, height, diffCount, len(expected), len(currentHolders))
 }
 
 func (s *Indexer) validateHolderAddressId(address string) uint64 {
@@ -1827,7 +1833,7 @@ func (s *Indexer) validateUtxoDataLocked(height int) {
 func (s *Indexer) tickerAmountInUtxoLocked(utxoId uint64, ticker string) int64 {
 	ticker = strings.ToLower(ticker)
 	var amount int64
-	for _, balance := range s.utxoBalances[utxoId] {
+	for _, balance := range s.readUtxoBalanceMapLocked(utxoId) {
 		if strings.ToLower(balance.Ticker) == ticker && balance.Amount > 0 {
 			amount += balance.Amount
 		}
@@ -1854,23 +1860,22 @@ func (s *Indexer) tickerUtxoSummaryLocked(ticker string) (int, int64) {
 	ticker = strings.ToLower(ticker)
 	var count int
 	var amount int64
-	for _, balances := range s.utxoBalances {
-		for _, balance := range balances {
-			if strings.ToLower(balance.Ticker) != ticker || balance.Amount <= 0 {
-				continue
-			}
-			count++
-			amount += balance.Amount
+	if err := s.forEachCurrentUtxoBalanceLocked(func(balance *UtxoBalance) {
+		if strings.ToLower(balance.Ticker) != ticker || balance.Amount <= 0 {
+			return
 		}
+		count++
+		amount += balance.Amount
+	}); err != nil {
+		common.Log.Panicf("atom scan UTXO summary %s failed: %v", ticker, err)
 	}
 	return count, amount
 }
 
-func (s *Indexer) tickerHolderSummaryLocked(ticker string) (int, int64) {
-	ticker = strings.ToLower(ticker)
+func holderSummary(holders map[uint64]int64) (int, int64) {
 	var count int
 	var amount int64
-	for _, balance := range s.tickerHolders[ticker] {
+	for _, balance := range holders {
 		if balance <= 0 {
 			continue
 		}
@@ -1882,12 +1887,12 @@ func (s *Indexer) tickerHolderSummaryLocked(ticker string) (int, int64) {
 
 func (s *Indexer) assetUtxoCountLocked() int {
 	var count int
-	for _, balances := range s.utxoBalances {
-		for _, balance := range balances {
-			if balance.Amount > 0 {
-				count++
-			}
+	if err := s.forEachCurrentUtxoBalanceLocked(func(balance *UtxoBalance) {
+		if balance.Amount > 0 {
+			count++
 		}
+	}); err != nil {
+		common.Log.Panicf("atom scan asset UTXO count failed: %v", err)
 	}
 	return count
 }

@@ -135,6 +135,36 @@ func (s *Indexer) allUtxoBalancesLocked(utxoID uint64) []*UtxoBalance {
 	return balancesToSortedSlice(s.readUtxoBalanceMapLocked(utxoID))
 }
 
+// forEachCurrentUtxoBalanceLocked reads durable balances with pending writes
+// overlaid, without filling the processing cache. The caller holds s.mutex;
+// visit must not mutate balances or the pending maps.
+func (s *Indexer) forEachCurrentUtxoBalanceLocked(visit func(*UtxoBalance)) error {
+	if s.db != nil {
+		if err := s.db.Scan(common.ScanOptions{Prefix: []byte(DB_PREFIX_UTXO_BALANCE)}, func(key, value []byte) error {
+			if _, deleted := s.utxoDeleted[string(key)]; deleted {
+				return nil
+			}
+			if _, replaced := s.utxoTouched[string(key)]; replaced {
+				return nil
+			}
+			var balance UtxoBalance
+			if err := db.DecodeBytes(value, &balance); err != nil {
+				return err
+			}
+			visit(&balance)
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	for key, balance := range s.utxoTouched {
+		if _, deleted := s.utxoDeleted[key]; !deleted {
+			visit(balance)
+		}
+	}
+	return nil
+}
+
 func (s *Indexer) holderAssetsLocked(addressID uint64) map[string]int64 {
 	result := make(map[string]int64)
 	if s.db != nil {
