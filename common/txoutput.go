@@ -722,6 +722,14 @@ func (p *TxOutput) SizeOfBindingSats() int64 {
 	for _, assetOffset := range p.Offsets {
 		size += assetOffset.Size()
 	}
+	// Native ARC20 quantities do not have ordinal offsets. Include their
+	// capacity conservatively when this output also contains ordinal assets;
+	// an ordinary offset operation cannot decide whether the colors overlap.
+	for _, asset := range p.Assets {
+		if IsAtomicalsFT(&asset.Name) && len(p.Offsets[asset.Name]) == 0 {
+			size += GetBindingSatNum(&asset.Amount, asset.BindingSat)
+		}
+	}
 	n := int64(len(p.SatBindingMap))
 	// 每个brc20的transfer nft，都看作是占用330聪
 
@@ -802,6 +810,11 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 	}
 	if p.Value() == offset {
 		return p.Clone(), nil, nil
+	}
+	for _, asset := range p.Assets {
+		if IsAtomicalsFT(&asset.Name) {
+			return nil, nil, fmt.Errorf("ARC20 requires whole-transaction coloring, not ordinal offset cutting")
+		}
 	}
 
 	var value1, value2 int64
@@ -924,6 +937,11 @@ func (p *TxOutput) Cut(offset int64) (*TxOutput, *TxOutput, error) {
 // 根据value或者amt切分
 // 主网utxo，在处理过程中只允许处理一种资产，所以这里最多只有一种资产
 func (p *TxOutput) Split(name *AssetName, value int64, amt *Decimal) (*TxOutput, *TxOutput, error) {
+	for _, asset := range p.Assets {
+		if IsAtomicalsFT(&asset.Name) {
+			return nil, nil, fmt.Errorf("ARC20 requires whole-transaction coloring, not ordinal offset splitting")
+		}
+	}
 
 	if value == 0 && amt.Sign() == 0 {
 		return nil, nil, fmt.Errorf("should provide at least one asset amount")
@@ -1180,6 +1198,9 @@ func (p *TxOutput) RemoveAssetWithAmt(name *AssetName, amt *Decimal) (*Decimal, 
 
 // 只用于计算ordx资产的偏移，其他资产直接返回0
 func (p *TxOutput) GetAssetOffset(name *AssetName, amt *Decimal) (int64, error) {
+	if IsAtomicalsFT(name) {
+		return 0, fmt.Errorf("ARC20 has no ordinal asset offset")
+	}
 
 	if !IsBindingSat(name) {
 		return 0, fmt.Errorf("not ordx asset")
@@ -1280,7 +1301,7 @@ func IsBindingSat(name *AssetName) bool {
 		return true // ordx asset
 	}
 	if name.Protocol == PROTOCOL_NAME_ORDX ||
-		name.Protocol == "" {
+		name.Protocol == "" || IsAtomicalsFT(name) {
 		return true
 	}
 	return false
@@ -1300,6 +1321,12 @@ func IsOrdxFT(name *AssetName) bool {
 	}
 
 	return name.Protocol == PROTOCOL_NAME_ORDX && name.Type == ASSET_TYPE_FT
+}
+
+// IsAtomicalsFT identifies ARC20. Other Atomicals asset types are not supported
+// by the fungible-asset bridge or its one-token-per-satoshi capacity contract.
+func IsAtomicalsFT(name *AssetName) bool {
+	return name != nil && name.Protocol == PROTOCOL_NAME_ATOM && name.Type == ASSET_TYPE_FT
 }
 
 // amt的资产需要多少聪(聪网上，不足一聪的资产，不占用聪)
