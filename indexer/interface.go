@@ -107,6 +107,9 @@ func (b *IndexerMgr) HasAssetInUtxo(utxoId uint64, excludingExotic bool) bool {
 
 // return: utxoId->asset amount
 func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *common.TickerName) (map[uint64]int64, error) {
+	if ticker != nil && ticker.Protocol == common.PROTOCOL_NAME_ATOM && !common.IsAtomicalsFT(ticker) {
+		return nil, fmt.Errorf("unsupported Atomicals asset type %q", ticker.Type)
+	}
 	utxos, err := b.GetUTXOsWithAddress(address)
 	if err != nil {
 		common.Log.Errorf("GetUTXOs %s failed. %v", address, err)
@@ -191,7 +194,17 @@ func (b *IndexerMgr) GetAssetUTXOsInAddressWithTick(address string, ticker *comm
 		}
 
 	case common.ASSET_TYPE_FT:
-		result = b.ftIndexer.GetAssetUtxosWithTicker(b.rpcService.GetAddressId(address), ticker.Ticker)
+		if common.IsAtomicalsFT(ticker) {
+			for utxoId := range utxos {
+				for name, amount := range b.atomIndexer.GetUtxoAssets(utxoId) {
+					if ticker.Ticker == common.ALL_TICKERS || name == ticker.Ticker {
+						result[utxoId] += amount
+					}
+				}
+			}
+		} else {
+			result = b.ftIndexer.GetAssetUtxosWithTicker(b.rpcService.GetAddressId(address), ticker.Ticker)
+		}
 	}
 
 	return result, nil

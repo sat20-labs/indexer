@@ -1,18 +1,15 @@
 package indexer
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	atomidx "github.com/sat20-labs/indexer/indexer/atom"
+	"github.com/sat20-labs/indexer/indexer/atom/coloring"
 	"github.com/sat20-labs/indexer/indexer/ord"
 	"github.com/sat20-labs/indexer/indexer/ord/ord0_14_1"
 	"github.com/sat20-labs/indexer/indexer/runes/runestone"
@@ -361,16 +358,12 @@ func allocateMempoolAtom(tx *wire.MsgTx, inputs []*mempoolResolvedInput) ([]bool
 	}
 
 	height := instance.GetSyncHeight() + 1
-	densityHeight := atomidx.AtomicalsActivationDensityMainnet
-	dmintHeight := atomidx.AtomicalsActivationDmintMainnet
-	coloringHeight := atomidx.AtomicalsActivationColoringMainnet
-	if instance.GetChainParam().Net != wire.MainNet {
-		densityHeight = atomidx.AtomicalsActivationTestnet4
-		dmintHeight = atomidx.AtomicalsActivationTestnet4
-		coloringHeight = atomidx.AtomicalsActivationTestnet4
+	heights, err := coloring.HeightsForNetwork(instance.GetChainParam().Net)
+	if err != nil {
+		return occupied, false
 	}
 	atomTx := mempoolCommonTransaction(tx, inputs)
-	op := atomidx.ParseOperation(atomTx, height >= densityHeight)
+	op := atomidx.ParseOperation(atomTx, height >= heights.Density)
 
 	if op != nil && len(tx.TxOut) > 0 && (op.Op == atomidx.OpDirectFT || op.Op == atomidx.OpMintDFT) {
 		occupied[0] = true
@@ -390,7 +383,7 @@ func allocateMempoolAtom(tx *wire.MsgTx, inputs []*mempoolResolvedInput) ([]bool
 	}
 
 	ids := make([]string, 0, len(grouped))
-	if height >= dmintHeight {
+	if height >= heights.Dmint {
 		seen := make(map[string]bool)
 		for _, item := range spent {
 			if !seen[item.atomicalID] {
@@ -405,41 +398,43 @@ func allocateMempoolAtom(tx *wire.MsgTx, inputs []*mempoolResolvedInput) ([]bool
 		sort.Slice(ids, func(i, j int) bool { return mempoolCompareAtomicalIDs(ids[i], ids[j]) < 0 })
 	}
 
-	customActivated := height >= coloringHeight
-	assignmentsByID := make(map[string][]mempoolAtomAssignment, len(ids))
-	startOutput := 0
-	clean := true
+	customActivated := height >= heights.CustomColoring
 	isSplit := op != nil && op.Op == atomidx.OpSplit
 	isCustom := op != nil && op.Op == atomidx.OpCustomColor && customActivated
+	if !isSplit && !isCustom {
+		assets := make([]coloring.Asset, 0, len(ids))
+		for _, id := range ids {
+			assets = append(assets, coloring.Asset{AtomicalID: id, Amount: grouped[id]})
+		}
+		result, err := coloring.AllocateRegular(assets, tx.TxOut, customActivated)
+		if err != nil {
+			return occupied, false
+		}
+		for _, assignments := range result.Assignments {
+			for _, assignment := range assignments {
+				occupied[assignment.OutputIndex] = true
+			}
+		}
+		return occupied, true
+	}
+	assignmentsByID := make(map[string][]mempoolAtomAssignment, len(ids))
+	startOutput := 0
 
 	for _, id := range ids {
 		amount := grouped[id]
-		assignments, ok := mempoolAtomAssignRegular(tx, startOutput, amount, customActivated)
+		assignments, _ := mempoolAtomAssignRegular(tx, startOutput, amount, customActivated)
 		if isSplit && fromInput[id][op.InputIndex] {
 			assignments = mempoolAtomAssignSplit(tx, id, amount, op, customActivated)
-			ok = len(assignments) > 0 || amount == 0
 		}
 		if isCustom {
 			assignments = mempoolAtomAssignCustom(tx, id, amount, op)
 			if len(assignments) == 0 {
-				assignments, ok = mempoolAtomAssignRegular(tx, startOutput, amount, customActivated)
+				assignments, _ = mempoolAtomAssignRegular(tx, startOutput, amount, customActivated)
 			}
-		}
-		if !ok && (!customActivated || len(assignments) == 0) && !isSplit && !isCustom {
-			clean = false
-			break
 		}
 		assignmentsByID[id] = assignments
 		if len(assignments) > 0 {
 			startOutput = assignments[len(assignments)-1].output + 1
-		}
-	}
-
-	if !clean {
-		assignmentsByID = make(map[string][]mempoolAtomAssignment, len(ids))
-		for _, id := range ids {
-			assignments, _ := mempoolAtomAssignRegular(tx, 0, grouped[id], customActivated)
-			assignmentsByID[id] = assignments
 		}
 	}
 
@@ -483,31 +478,12 @@ func mempoolCommonTransaction(tx *wire.MsgTx, inputs []*mempoolResolvedInput) *c
 }
 
 func mempoolAtomAssignRegular(tx *wire.MsgTx, start int, amount int64, customActivated bool) ([]mempoolAtomAssignment, bool) {
-	result := make([]mempoolAtomAssignment, 0)
-	remaining := amount
-	for i := start; i < len(tx.TxOut) && remaining > 0; i++ {
-		output := tx.TxOut[i]
-		if mempoolOutputUnspendable(output) {
-			continue
-		}
-		value := output.Value
-		if value <= 0 {
-			continue
-		}
-		if !customActivated && value > remaining {
-			return result, false
-		}
-		assign := value
-		if assign > remaining {
-			assign = remaining
-		}
-		result = append(result, mempoolAtomAssignment{output: i, amount: assign})
-		remaining -= assign
-		if !customActivated && assign < value {
-			return nil, false
-		}
+	assignments, complete := coloring.AssignRegular(tx.TxOut, start, amount, customActivated)
+	result := make([]mempoolAtomAssignment, 0, len(assignments))
+	for _, assignment := range assignments {
+		result = append(result, mempoolAtomAssignment{output: assignment.OutputIndex, amount: assignment.Amount})
 	}
-	return result, remaining == 0
+	return result, complete
 }
 
 func mempoolAtomAssignSplit(tx *wire.MsgTx, atomicalID string, amount int64, op *atomidx.Operation, customActivated bool) []mempoolAtomAssignment {
@@ -592,39 +568,7 @@ func mempoolAtomIntArg(args map[string]any, name string) (int64, bool) {
 }
 
 func mempoolCompareAtomicalIDs(a, b string) int {
-	aKey, aOK := mempoolAtomicalIDSortKey(a)
-	bKey, bOK := mempoolAtomicalIDSortKey(b)
-	if aOK && bOK {
-		return bytes.Compare(aKey, bKey)
-	}
-	if aOK != bOK {
-		if aOK {
-			return -1
-		}
-		return 1
-	}
-	return strings.Compare(a, b)
-}
-
-func mempoolAtomicalIDSortKey(id string) ([]byte, bool) {
-	index := strings.IndexByte(id, 'i')
-	if index != 64 {
-		return nil, false
-	}
-	rawHash, err := hex.DecodeString(id[:64])
-	if err != nil || len(rawHash) != 32 {
-		return nil, false
-	}
-	output, err := strconv.ParseUint(id[index+1:], 10, 32)
-	if err != nil {
-		return nil, false
-	}
-	key := make([]byte, 36)
-	for i := 0; i < 32; i++ {
-		key[i] = rawHash[31-i]
-	}
-	binary.LittleEndian.PutUint32(key[32:], uint32(output))
-	return key, true
+	return coloring.CompareAtomicalIDs(a, b)
 }
 
 func markMempoolInscriptionOutputs(tx *wire.MsgTx, inputs []*mempoolResolvedInput, occupied []bool) {

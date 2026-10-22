@@ -250,7 +250,7 @@ func (s *Model) GetMintHistoryV3(tickName string, start, limit int) (*rpcwire.Mi
 		}
 		result.Items = append(result.Items, ordxMintInfo)
 	}
-	_, times := s.indexer.GetMintAmount(tickName)
+	_, times := s.indexer.GetMintAmountV2(assetName)
 	result.Total = int(times)
 
 	return &result, nil

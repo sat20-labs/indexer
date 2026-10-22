@@ -34,6 +34,13 @@ type WriteBatch interface {
 	Close()
 }
 
+// AtomicWriteBatchDB is an optional capability for financial journals and
+// ledgers. Put/Delete must never publish data; Flush commits every operation
+// together, and Close before Flush discards every operation.
+type AtomicWriteBatchDB interface {
+	NewAtomicWriteBatch() WriteBatch
+}
+
 // 每个调用都是完整的transaction
 type KVDB interface {
 	DropAll() error

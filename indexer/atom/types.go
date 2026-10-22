@@ -1,15 +1,11 @@
 package atom
 
-import "github.com/sat20-labs/indexer/common"
+import (
+	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/atom/coloring"
+)
 
-type ActivationHeights struct {
-	Activation     int
-	Dmint          int
-	Commitz        int
-	Density        int
-	Rollover       int
-	CustomColoring int
-}
+type ActivationHeights = coloring.ActivationHeights
 
 type Status struct {
 	Version     string

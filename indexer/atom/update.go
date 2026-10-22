@@ -1,17 +1,14 @@
 package atom
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/atom/coloring"
 )
 
 func (s *Indexer) UpdateTransfer(block *common.Block) {
@@ -436,69 +433,24 @@ func sortAtomicalIds(ids []string) {
 }
 
 func compareAtomicalIds(a, b string) int {
-	aKey, aOK := atomicalIdSortKey(a)
-	bKey, bOK := atomicalIdSortKey(b)
-	if aOK && bOK {
-		return bytes.Compare(aKey, bKey)
-	}
-	if aOK != bOK {
-		if aOK {
-			return -1
-		}
-		return 1
-	}
-	return strings.Compare(a, b)
-}
-
-func atomicalIdSortKey(id string) ([]byte, bool) {
-	index := strings.IndexByte(id, 'i')
-	if index != 64 {
-		return nil, false
-	}
-	rawHash, err := hex.DecodeString(id[:64])
-	if err != nil || len(rawHash) != 32 {
-		return nil, false
-	}
-	output, err := strconv.ParseUint(id[index+1:], 10, 32)
-	if err != nil {
-		return nil, false
-	}
-	key := make([]byte, 36)
-	for i := 0; i < 32; i++ {
-		key[i] = rawHash[31-i]
-	}
-	binary.LittleEndian.PutUint32(key[32:], uint32(output))
-	return key, true
+	return coloring.CompareAtomicalIDs(a, b)
 }
 
 func (s *Indexer) applyRegularTransfer(block *common.Block, txIndex int, tx *common.Transaction, grouped map[string][]*UtxoBalance, atomicalIds []string) {
-	customActivated := block.Height >= s.heights.CustomColoring
-	assignmentsByAtomical := make(map[string][]assignment)
-	startOutput := 0
-	clean := true
+	assets := make([]coloring.Asset, 0, len(atomicalIds))
 	for _, atomicalId := range atomicalIds {
 		amount, _ := groupedAmount(grouped[atomicalId])
-		assignments, ok := s.assignRegular(tx, startOutput, amount, customActivated)
-		if !ok && (!customActivated || len(assignments) == 0) {
-			clean = false
-			break
-		}
-		assignmentsByAtomical[atomicalId] = assignments
-		if len(assignments) > 0 {
-			startOutput = assignments[len(assignments)-1].OutputIndex + 1
-		}
+		assets = append(assets, coloring.Asset{AtomicalID: atomicalId, Amount: amount})
 	}
-	if !clean {
-		assignmentsByAtomical = make(map[string][]assignment)
-		for _, atomicalId := range atomicalIds {
-			amount, _ := groupedAmount(grouped[atomicalId])
-			assignments, _ := s.assignRegular(tx, 0, amount, customActivated)
-			assignmentsByAtomical[atomicalId] = assignments
-		}
+	result, err := coloring.AllocateRegular(assets, coloringOutputs(tx), block.Height >= s.heights.CustomColoring)
+	if err != nil {
+		// Invalid persisted balances or Bitcoin outputs must stop indexing rather
+		// than silently deleting assets after collectInputBalances spent them.
+		panic(fmt.Errorf("ARC20 regular transfer %s: %w", tx.TxId, err))
 	}
 	for _, atomicalId := range atomicalIds {
 		_, ticker := groupedAmount(grouped[atomicalId])
-		s.addAssignments(block, txIndex, tx, atomicalId, ticker, grouped[atomicalId], assignmentsByAtomical[atomicalId])
+		s.addAssignments(block, txIndex, tx, atomicalId, ticker, grouped[atomicalId], result.Assignments[atomicalId])
 	}
 }
 
@@ -541,37 +493,20 @@ func actionSource(sources []*UtxoBalance) (uint64, uint64) {
 	return sources[0].UtxoId, sources[0].AddressId
 }
 
-type assignment struct {
-	OutputIndex int
-	Amount      int64
-}
+type assignment = coloring.Assignment
 
 func (s *Indexer) assignRegular(tx *common.Transaction, start int, amount int64, customActivated bool) ([]assignment, bool) {
-	result := make([]assignment, 0)
-	remaining := amount
-	for i := start; i < len(tx.Outputs) && remaining > 0; i++ {
-		output := tx.Outputs[i]
-		if isUnspendable(output) {
-			continue
-		}
-		value := output.OutValue.Value
-		if value <= 0 {
-			continue
-		}
-		if !customActivated && value > remaining {
-			return result, false
-		}
-		assign := value
-		if assign > remaining {
-			assign = remaining
-		}
-		result = append(result, assignment{OutputIndex: i, Amount: assign})
-		remaining -= assign
-		if !customActivated && assign < value {
-			return nil, false
+	return coloring.AssignRegular(coloringOutputs(tx), start, amount, customActivated)
+}
+
+func coloringOutputs(tx *common.Transaction) []*wire.TxOut {
+	outputs := make([]*wire.TxOut, len(tx.Outputs))
+	for i, output := range tx.Outputs {
+		if output != nil {
+			outputs[i] = &output.OutValue
 		}
 	}
-	return result, remaining == 0
+	return outputs
 }
 
 func (s *Indexer) assignSplit(tx *common.Transaction, atomicalId string, amount int64, op *Operation, customActivated bool) []assignment {
@@ -633,11 +568,10 @@ func (s *Indexer) assignCustom(tx *common.Transaction, atomicalId string, amount
 }
 
 func isUnspendable(output *common.TxOutputV2) bool {
-	if output == nil || len(output.OutValue.PkScript) == 0 {
+	if output == nil {
 		return false
 	}
-	script := output.OutValue.PkScript
-	return script[0] == txscript.OP_RETURN || (len(script) >= 2 && script[0] == txscript.OP_FALSE && script[1] == txscript.OP_RETURN)
+	return coloring.IsUnspendable(&output.OutValue)
 }
 
 func (s *Indexer) prepareTickerRegistration(name string, input *common.TxInput, commitIndex int) (int64, bool) {

@@ -1,47 +1,46 @@
-name: Test Workflow
+name: ARC20 interface compatibility
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: indexer
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Echo Hello World
-      run: echo "Hello, World!"
-
-    - name: Print GitHub context
-      run: echo '${{ toJson(github) }}'
-
-    - name: List files in the repository
-      run: ls -R
-
-    - name: Print environment variables
-      run: env
-
-    - name: Check GitHub Actions runner
-      run: |
-        echo "GitHub Actions Runner Info:"
-        echo "OS: ${{ runner.os }}"
-        echo "Architecture: ${{ runner.arch }}"
-
-    - name: Test simple command
-      run: |
-        current_date=$(date)
-        echo "Current date and time: $current_date"
-
-    - name: Check GitHub API
-      run: |
-        response=$(curl -s -o /dev/null -w "%{http_code}" https://api.github.com)
-        echo "GitHub API response code: $response"
-
-    - name: Final step
-      run: echo "Workflow execution completed"
+      - name: Checkout indexer
+        uses: actions/checkout@v4
+        with:
+          path: indexer
+          persist-credentials: false
+      # indexer/go.mod replaces the SAT20 Badger fork with ../badger.
+      - name: Checkout Badger dependency
+        uses: actions/checkout@v4
+        with:
+          repository: sat20-labs/badger
+          ref: main
+          path: badger
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: false
+      - name: Test ARC20 parsing and native coloring
+        run: go test ./indexer/atom/... -count=1 -timeout=10m
+      - name: Test Atomicals through existing asset interfaces
+        run: go test ./common ./indexer ./rpcserver/ordx -run 'TestAtomicals|TestMempoolAtom|TestTxOutput_(Cut|Split)|TestRegtest' -count=1 -timeout=10m
+      - name: Test atomic writes with Pebble
+        run: go test ./indexer/db -run '^TestAtomicWriteBatch' -count=1 -timeout=5m
+      - name: Test atomic writes with Badger
+        run: go test -tags badger ./indexer/db -run '^TestAtomicWriteBatch' -count=1 -timeout=5m

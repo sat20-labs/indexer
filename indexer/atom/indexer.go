@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
+	"github.com/sat20-labs/indexer/indexer/atom/coloring"
 	"github.com/sat20-labs/indexer/indexer/base"
 )
 
@@ -36,23 +36,12 @@ type Indexer struct {
 }
 
 func NewIndexer(db common.KVDB, param *chaincfg.Params) *Indexer {
-	heights := ActivationHeights{
-		Activation:     AtomicalsActivationMainnet,
-		Dmint:          AtomicalsActivationDmintMainnet,
-		Commitz:        AtomicalsActivationCommitzMainnet,
-		Density:        AtomicalsActivationDensityMainnet,
-		Rollover:       AtomicalsActivationRolloverMainnet,
-		CustomColoring: AtomicalsActivationColoringMainnet,
+	if param == nil {
+		panic("ARC20 indexer requires chain parameters")
 	}
-	if param.Net != wire.MainNet {
-		heights = ActivationHeights{
-			Activation:     AtomicalsActivationTestnet4,
-			Dmint:          AtomicalsActivationTestnet4,
-			Commitz:        AtomicalsActivationTestnet4,
-			Density:        AtomicalsActivationTestnet4,
-			Rollover:       AtomicalsActivationTestnet4,
-			CustomColoring: AtomicalsActivationTestnet4,
-		}
+	heights, err := coloring.HeightsForNetwork(param.Net)
+	if err != nil {
+		panic(err)
 	}
 	return &Indexer{
 		db:             db,

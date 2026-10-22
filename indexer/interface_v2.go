@@ -155,6 +155,11 @@ func (b *IndexerMgr) getTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 	assetmap2 := b.GetUnbindingAssetsWithUtxoV2(info.UtxoId)
 	builder := common.NewTxAssetsBuilder(len(assetmap) + len(assetmap2))
 	for k, v := range assetmap {
+		if common.IsAtomicalsFT(&k) {
+			// The legacy range API projects ARC20 quantities as ranges. These
+			// are not ordinal locations and must not enter transaction planning.
+			continue
+		}
 		offsets := v
 		value := v.Size()
 
@@ -174,6 +179,21 @@ func (b *IndexerMgr) getTxOutputWithUtxoV2(utxo string, excludingInvalid bool) *
 		}
 		builder.Add(&asset)
 		output.Offsets[k] = offsets
+	}
+
+	for ticker, amount := range b.atomIndexer.GetUtxoAssets(info.UtxoId) {
+		if amount <= 0 {
+			continue
+		}
+		builder.Add(&common.AssetInfo{
+			Name: common.AssetName{
+				Protocol: common.PROTOCOL_NAME_ATOM,
+				Type:     common.ASSET_TYPE_FT,
+				Ticker:   ticker,
+			},
+			Amount:     *common.NewDefaultDecimal(amount),
+			BindingSat: 1,
+		})
 	}
 
 	for k, v := range assetmap2 {
@@ -238,7 +258,9 @@ func (b *IndexerMgr) GetTickerInfo(tickerName *common.TickerName) *common.Ticker
 	case common.PROTOCOL_NAME_RUNES:
 		return b.GetRunesTickerV2(tickerName.Ticker)
 	case common.PROTOCOL_NAME_ATOM:
-		return b.GetAtomTickerV2(tickerName.Ticker)
+		if common.IsAtomicalsFT(tickerName) {
+			return b.GetAtomTickerV2(tickerName.Ticker)
+		}
 	case "":
 		if tickerName.Ticker == "" {
 			result = genBTCTicker()
@@ -535,7 +557,7 @@ func (b *IndexerMgr) GetBindingSat(tickerName *common.TickerName) int {
 		return 1
 	} else if tickerName.Protocol == "" {
 		return 1
-	} else if tickerName.Protocol == common.PROTOCOL_NAME_ATOM {
+	} else if common.IsAtomicalsFT(tickerName) {
 		return 1
 	}
 	return 0

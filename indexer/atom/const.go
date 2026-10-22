@@ -1,5 +1,7 @@
 package atom
 
+import "github.com/sat20-labs/indexer/indexer/atom/coloring"
+
 const DB_VERSION = "1.1.0"
 const DB_VER_KEY = "dbver"
 const DB_STATUS_KEY = "status"
@@ -25,13 +27,13 @@ const (
 )
 
 const (
-	AtomicalsActivationMainnet         = 808080
-	AtomicalsActivationDmintMainnet    = 819181
-	AtomicalsActivationCommitzMainnet  = 822800
-	AtomicalsActivationDensityMainnet  = 828128
-	AtomicalsActivationRolloverMainnet = 828628
-	AtomicalsActivationColoringMainnet = 848484
-	AtomicalsActivationTestnet4        = 27000
+	AtomicalsActivationMainnet         = coloring.ActivationMainnet
+	AtomicalsActivationDmintMainnet    = coloring.DmintMainnet
+	AtomicalsActivationCommitzMainnet  = coloring.CommitzMainnet
+	AtomicalsActivationDensityMainnet  = coloring.DensityMainnet
+	AtomicalsActivationRolloverMainnet = coloring.RolloverMainnet
+	AtomicalsActivationColoringMainnet = coloring.CustomColoringMainnet
+	AtomicalsActivationTestnet4        = coloring.ActivationTestnet4
 )
 
 const (

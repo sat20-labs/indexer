@@ -733,6 +733,7 @@ type pebbleWriteBatch struct {
 	db     *pebble.DB
 	batch  *pebble.Batch
 	closed bool
+	atomic bool
 }
 
 var PrintLog = false
@@ -748,7 +749,7 @@ func (p *pebbleWriteBatch) Put(key, value []byte) error {
 	}
 
 	// 单条记录过大，单独提交
-	if itemSize >= maxItemSize {
+	if !p.atomic && itemSize >= maxItemSize {
 		b := p.db.NewBatch()
 		defer b.Close()
 		if err := b.Set(key, value, nil); err != nil {
@@ -794,6 +795,9 @@ func (p *pebbleWriteBatch) ensureCapacity(extra int) error {
 	if p.closed {
 		return errors.New("writebatch closed")
 	}
+	if p.atomic {
+		return nil
+	}
 
 	// 如果再写入 extra 后会超过阈值，先提交
 	batchSize := p.batch.Len()
@@ -810,4 +814,8 @@ func (p *pebbleWriteBatch) ensureCapacity(extra int) error {
 
 func (p *pebbleDB) NewWriteBatch() common.WriteBatch {
 	return &pebbleWriteBatch{db: p.db, batch: p.db.NewBatch()}
+}
+
+func (p *pebbleDB) NewAtomicWriteBatch() common.WriteBatch {
+	return &pebbleWriteBatch{db: p.db, batch: p.db.NewBatch(), atomic: true}
 }
