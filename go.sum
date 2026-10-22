@@ -238,6 +238,8 @@ github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoG
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
+github.com/sat20-labs/badger/v4 v4.9.7-sat20.1 h1:uwe80P45pRCuouqwu+nyxckrSik6ny7BGWnu4MNpAaE=
+github.com/sat20-labs/badger/v4 v4.9.7-sat20.1/go.mod h1:Xa9dAupjbwAacupWFCpa6YEn9E1PjBXkfZYr2I/8aWg=
 github.com/sat20-labs/btcd v0.24.3 h1:ABlVuhtHQcHw/zBgwy+F91YY1OYc757atWFVqQDVrFo=
 github.com/sat20-labs/btcd v0.24.3/go.mod h1:zHK7t7sw8XbsCkD64WePHE3r3k9/XoGAcf6mXV14c64=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
