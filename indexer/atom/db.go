@@ -15,6 +15,20 @@ func (s *Indexer) setDBVersion() {
 	}
 }
 
+func (s *Indexer) initDBVersion() {
+	value, err := db.GetRawValueFromDB([]byte(DB_VER_KEY), s.db)
+	if err == common.ErrKeyNotFound {
+		s.setDBVersion()
+		return
+	}
+	if err != nil {
+		common.Log.Panicf("atom read db version failed: %v", err)
+	}
+	if string(value) != DB_VERSION {
+		common.Log.Panicf("atom db version inconsistent %s != %s", string(value), DB_VERSION)
+	}
+}
+
 func (s *Indexer) getDBVersion() string {
 	value, err := db.GetRawValueFromDB([]byte(DB_VER_KEY), s.db)
 	if err != nil {
@@ -98,10 +112,14 @@ func sortMintHistory(items []*MintInfo) {
 }
 
 func (s *Indexer) UpdateDB() {
+	// Avoid metadata-only writes before Atomicals activation.
+	if s.status.Height < s.heights.Activation {
+		return
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.setDBVersion()
 	wb := s.db.NewWriteBatch()
 	defer wb.Close()
 	if err := db.SetDB([]byte(DB_STATUS_KEY), s.status, wb); err != nil {

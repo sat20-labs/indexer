@@ -76,6 +76,7 @@ func NewIndexer(db common.KVDB, param *chaincfg.Params) *Indexer {
 
 func (s *Indexer) Init(baseIndexer *base.BaseIndexer) {
 	s.baseIndexer = baseIndexer
+	s.initDBVersion()
 	s.status = s.loadStatusFromDB()
 	s.loadTickersFromDB()
 	// Durable balances and history remain authoritative in Badger. Runtime
