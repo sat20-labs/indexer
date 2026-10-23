@@ -8,56 +8,105 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/sat20-labs/indexer/common"
 	indexdb "github.com/sat20-labs/indexer/indexer/db"
 )
 
-// spAuditEach scans a single pinned database version in bounded pages. Read
-// views serialize Read and Scan, so the callback runs after the Scan releases
-// its iterator lock and can safely read Base UTXOs, addresses and SP rows.
-// The local slice owns its bytes; no iterator-owned slice escapes its callback.
-func spAuditEach(ctx context.Context, view common.DBReadView, prefix []byte,
-	visit func(key, value []byte) error) error {
+// spAuditPager copies bounded pages out of one pinned view. Offsets into a
+// reusable byte buffer avoid two allocations per row. Returned slices remain
+// valid until the next call to next; no database iterator stays open between
+// calls, so another pager or a Base point read can safely use the same view.
+type spAuditPager struct {
+	view                 common.DBReadView
+	prefix, cursor, data []byte
+	rows                 []spAuditRow
+	index                int
+	done                 bool
+}
 
+type spAuditRow struct{ key, value, end int }
+
+func (p *spAuditPager) next(ctx context.Context) ([]byte, []byte, error) {
 	const maxRecords = 1024
 	const maxPageBytes = 8 << 20
-	var cursor []byte
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	if p.index == len(p.rows) {
+		if p.done {
+			return nil, nil, nil
 		}
-		type row struct{ key, value []byte }
-		page := make([]row, 0, maxRecords)
-		size := 0
-		err := view.Scan(common.ScanOptions{
-			Prefix: prefix, Start: cursor, StartInclusive: false,
+		if p.rows == nil {
+			p.rows = make([]spAuditRow, 0, maxRecords)
+		}
+		p.rows, p.data, p.index = p.rows[:0], p.data[:0], 0
+		err := p.view.Scan(common.ScanOptions{
+			Prefix: p.prefix, Start: p.cursor, StartInclusive: false,
 		}, func(key, value []byte) error {
-			page = append(page, row{
-				key: append([]byte(nil), key...), value: append([]byte(nil), value...),
-			})
-			size += len(key) + len(value)
-			if len(page) >= maxRecords || size >= maxPageBytes {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if p.data == nil {
+				// Estimate the first page from its first row, capped by the
+				// existing byte budget, to avoid repeated initial buffer growth.
+				p.data = make([]byte, 0, min(maxRecords*(len(key)+len(value)), maxPageBytes))
+			}
+			row := spAuditRow{key: len(p.data)}
+			p.data = append(p.data, key...)
+			row.value = len(p.data)
+			p.data = append(p.data, value...)
+			row.end = len(p.data)
+			p.rows = append(p.rows, row)
+			if len(p.rows) >= maxRecords || len(p.data) >= maxPageBytes {
 				return common.ErrStopScan
 			}
 			return nil
 		})
 		if err != nil {
+			return nil, nil, err
+		}
+		p.done = len(p.rows) < maxRecords && len(p.data) < maxPageBytes
+		if len(p.rows) == 0 {
+			return nil, nil, nil
+		}
+		last := p.rows[len(p.rows)-1]
+		// Keep the seek key separate: the next page overwrites data.
+		p.cursor = append(p.cursor[:0], p.data[last.key:last.value]...)
+	}
+	row := p.rows[p.index]
+	p.index++
+	return p.data[row.key:row.value:row.value], p.data[row.value:row.end:row.end], nil
+}
+
+// The callback borrows page bytes only for its duration, after Scan releases
+// its lock. Associated reads and another paged scan use the same snapshot.
+func spAuditEach(ctx context.Context, view common.DBReadView, prefix []byte,
+	visit func(key, value []byte) error) error {
+	pager := spAuditPager{view: view, prefix: prefix}
+	for {
+		key, value, err := pager.next(ctx)
+		if err != nil {
 			return err
 		}
-		for _, item := range page {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			if err := visit(item.key, item.value); err != nil {
-				return err
-			}
-		}
-		if len(page) == 0 || (len(page) < maxRecords && size < maxPageBytes) {
+		if key == nil {
 			return nil
 		}
-		cursor = page[len(page)-1].key
+		if err := visit(key, value); err != nil {
+			return err
+		}
 	}
+}
+
+// Preserve GetUTXODBKey's exact bytes: prefix + display-order txid bytes +
+// decimal vout. Archive stores the hash in internal order. Reserve suffix
+// space once per transaction; callers append each vout to this same prefix.
+func spAuditUTXOPrefix(hash []byte) []byte {
+	key := make([]byte, len(common.DB_KEY_UTXO)+32, len(common.DB_KEY_UTXO)+32+10)
+	copy(key, common.DB_KEY_UTXO)
+	for i := 0; i < 32; i++ {
+		key[len(common.DB_KEY_UTXO)+i] = hash[31-i]
+	}
+	return key
 }
 
 // spAuditCandidate derives its expected Live bitmap exclusively from the
@@ -65,7 +114,7 @@ func spAuditEach(ctx context.Context, view common.DBReadView, prefix []byte,
 // nor query bitcoind. Without the original witness/prevouts stored in Base,
 // the BIP352 tweak cannot be independently recomputed here.
 func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
-	raw []byte) (uint64, uint64, error) {
+	raw, live []byte, hasLive bool) (uint64, uint64, error) {
 
 	reader, count, err := spRecordHeader(raw)
 	if err != nil {
@@ -74,9 +123,7 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 	if height < 0 || height > 0x1fffffff || txIndex == 0 || txIndex > 0x1ffff {
 		return 0, 0, fmt.Errorf("%w: invalid SP creation position %d/%d", ErrSPCorrupt, height, txIndex)
 	}
-	var hash chainhash.Hash
-	copy(hash[:], raw[1:33])
-	txid := hash.String()
+	utxoPrefix := spAuditUTXOPrefix(raw[1:33])
 	bits := make([]byte, (count+7)/8)
 	var liveOutputs uint64
 	var previous uint32
@@ -86,8 +133,8 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 			return 0, 0, fmt.Errorf("%w: invalid SP output %d/%d/%d", ErrSPCorrupt, height, txIndex, i)
 		}
 		previous = vout
-		outpoint := txid + ":" + strconv.FormatUint(uint64(vout), 10)
-		encoded, e := view.Read(indexdb.GetUTXODBKey(outpoint))
+		utxoKey := strconv.AppendUint(utxoPrefix, uint64(vout), 10)
+		encoded, e := view.Read(utxoKey)
 		if errors.Is(e, common.ErrKeyNotFound) {
 			continue
 		}
@@ -99,6 +146,7 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 			return 0, 0, e
 		}
 		if utxo.UtxoId != common.ToUtxoId(height, int(txIndex), int(vout)) {
+			outpoint, _ := indexdb.GetUtxoByDBKey(utxoKey)
 			return 0, 0, fmt.Errorf("%w: Base UTXO ID %s", ErrSPCorrupt, outpoint)
 		}
 		address, e := view.Read(indexdb.GetAddressIdKey(utxo.AddressId))
@@ -107,6 +155,7 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 		}
 		script, e := common.GetPkScriptFromAddress(string(address))
 		if e != nil || !common.SPP2TROutput(script) || !bytes.Equal(script[2:], key) {
+			outpoint, _ := indexdb.GetUtxoByDBKey(utxoKey)
 			return 0, 0, fmt.Errorf("%w: Base P2TR output %s", ErrSPCorrupt, outpoint)
 		}
 		bits[i/8] |= 1 << uint(i%8)
@@ -115,14 +164,13 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 	if reader.Len() != 0 {
 		return 0, 0, ErrSPCorrupt
 	}
-	live, err := view.Read(spPositionKey(spLivePrefix, height, txIndex))
 	if liveOutputs == 0 {
-		if !errors.Is(err, common.ErrKeyNotFound) {
+		if hasLive {
 			return 0, 0, fmt.Errorf("%w: fully spent SP transaction remains Live %d/%d", ErrSPCorrupt, height, txIndex)
 		}
 		return 0, 0, nil
 	}
-	if err != nil || !bytes.Equal(live, bits) {
+	if !hasLive || !bytes.Equal(live, bits) {
 		return 0, 0, fmt.Errorf("%w: SP Live/Base bitmap mismatch %d/%d", ErrSPCorrupt, height, txIndex)
 	}
 	return 1, liveOutputs, nil
@@ -169,6 +217,13 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 	var expectedLiveTx, expectedLiveOutputs, archiveTx uint64
 	started := time.Now()
 	nextProgress := start + 10000
+	// Both prefixes have the same position ordering. Merge their bounded
+	// pages instead of point-reading every Live row and then scanning it again.
+	livePager := spAuditPager{view: view, prefix: spLivePrefix}
+	liveKey, liveValue, err := livePager.next(ctx)
+	if err != nil {
+		return err
+	}
 
 	err = spAuditEach(ctx, view, spArchivePrefix, func(key, raw []byte) error {
 		height, txIndex, e := spParsePosition(spArchivePrefix, key)
@@ -200,12 +255,30 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 		}
 		directoryCursor++
 		archiveTx++
-		liveTx, liveOutputs, e := spAuditCandidate(view, height, txIndex, raw)
+		hasLive := false
+		if liveKey != nil {
+			liveHeight, liveIndex, e := spParsePosition(spLivePrefix, liveKey)
+			if e != nil || liveHeight < start || liveHeight > anchor.Height || liveIndex == 0 {
+				return fmt.Errorf("%w: invalid SP Live position", ErrSPCorrupt)
+			}
+			order := bytes.Compare(liveKey[len(spLivePrefix):], key[len(spArchivePrefix):])
+			if order < 0 {
+				return fmt.Errorf("%w: orphan SP Live row %d/%d", ErrSPCorrupt, liveHeight, liveIndex)
+			}
+			hasLive = order == 0
+		}
+		liveTx, liveOutputs, e := spAuditCandidate(view, height, txIndex, raw, liveValue, hasLive)
 		if e != nil {
 			return e
 		}
 		expectedLiveTx += liveTx
 		expectedLiveOutputs += liveOutputs
+		if hasLive {
+			liveKey, liveValue, e = livePager.next(ctx)
+			if e != nil {
+				return e
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -213,6 +286,9 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 	}
 	if previousHeight >= start && directoryCursor != len(directoryIndices) {
 		return fmt.Errorf("%w: missing trailing SP Archive row in block %d", ErrSPCorrupt, previousHeight)
+	}
+	if liveKey != nil {
+		return fmt.Errorf("%w: trailing orphan SP Live row", ErrSPCorrupt)
 	}
 
 	nextHeight := start
@@ -250,26 +326,6 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 		return fmt.Errorf("%w: SP block directory ends at %d, expected %d", ErrSPCorrupt, nextHeight-1, anchor.Height)
 	}
 
-	// Every expected live row was checked by exact position and bitmap above;
-	// a full prefix count plus key validation catches orphan extra Live rows.
-	var liveCount uint64
-	err = view.Scan(common.ScanOptions{Prefix: spLivePrefix, KeysOnly: false}, func(key, value []byte) error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		height, index, e := spParsePosition(spLivePrefix, key)
-		if e != nil || height < start || height > anchor.Height || index == 0 || spBitmapEmpty(value) {
-			return fmt.Errorf("%w: invalid or orphan SP Live position", ErrSPCorrupt)
-		}
-		liveCount++
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	if liveCount != expectedLiveTx {
-		return fmt.Errorf("%w: unexpected SP Live rows %d != %d", ErrSPCorrupt, liveCount, expectedLiveTx)
-	}
 	common.Log.Infof("SP DB CheckSelf passed through %d: Archive tx=%d Live tx=%d outputs=%d, elapsed=%v (no Bitcoin RPC)",
 		anchor.Height, archiveTx, expectedLiveTx, expectedLiveOutputs, time.Since(started))
 	return nil

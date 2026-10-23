@@ -78,12 +78,17 @@ HTTP 测试改为直接使用 `rpcserver/base.NewService(...).InitRouter()` 和�
 新增默认测试：
 
 - `silentpay_checkself_perf_test.go`：模拟数据源封锁全部 Bitcoin RPC，验证 CheckSelf 不请求区块、交易或父交易。
-- `silentpay_checkself_paging_test.go`：2500 条 Archive 记录跨页、顺序/无重复、相同快照数据读取与中途取消。
+- `silentpay_checkself_paging_test.go`：2500 条 Archive/Live 记录交错跨页、顺序/无重复、固定快照之后写入不影响两个游标、中途取消、大记录触发字节上限分页、底层扫描错误不能发布半页数据。
+- `silentpay_checkself_merge_test.go`：2500 笔交易混合完全花费、部分花费与未花费状态，Archive/Live 在不同位置跨页，Live 点查次数必须为零；缺失、孤立、空或错误位图、非法曲线点、截断/尾随字节、缺失 Archive/目录仍失败且不修复数据；空 Archive 的孤立 Live 检测；直接构造的 UTXO key 与既有编码逐字节一致。`BenchmarkSilentPayDBAuditPaging` 在真实后端上单独测量 4096 条记录的分页耗时和分配，不代表完整主网自检耗时。
 - `silentpay_db_corrupt_e2e_test.go`：孤立 Live/Archive、缺少 SP block、缺 Base UTXO、错误地址公钥和损坏 Archive 仍必须失败；测试后数据库恢复可重新通过。
 
 这一版**不**重新计算 `T`，不验证原始区块的 Merkle/Witness Commitment，也不能发现 SP block 目录和 Archive 双方同时漏掉的已花费历史候选。正常 `CheckSelf` 的数据库一致性校验仍全面执行，不能把缺失 UTXO 解释为成功而忽略与 Live 的矛盾。
 
 默认 `go test ./...` 和 `go build ./...` 已通过；尚未使用用户的 testnet4 155027 高度原始数据库测量耗时，也没有运行 Badger-tag 和 race 专项。不能仅凭小型测试夹具给出分钟级性能承诺。
+
+2026-10-24 顺序合并优化验证：实际部署后端为 Badger。`go test -tags badger ./indexer/base ./indexer/db ./rpcserver/base ./common -count=1` 已通过，包含既有 SilentPay E2E、零 Bitcoin RPC 检查和上述新增回归用例。2500 笔交易夹具的 Live 点查由原实现的 2500 次降为零；完整 Base UTXO/地址、Archive 曲线点与结构、目录及位图校验继续执行。未在生产数据库上测量完整自检耗时，本轮未运行 race 或独立 bitcoind 联调。
+
+同日 Badger 分页微基准：`go test -tags badger ./indexer/base -run '^$' -bench '^BenchmarkSilentPayDBAuditPaging$' -benchtime=1s -count=3`，每轮扫描 4096 条、每条 value 为 100 字节。修改前通过 Go 临时源码 overlay 使用原实现运行相同 benchmark，工作区不回退。三次结果中，分配次数从约 14661 降至 6457（约减少 56%），分配字节从约 1.03 MB 降至 0.407 MB（约减少 61%）；耗时从 2.82–2.96 ms 变为 2.40–2.86 ms，样本不足以宣称稳定的耗时改善。此基准只测分页，不包含取消 Live 点查、UTXO key 构造或完整自检的收益。
 
 ## 更低层的故障测试
 
