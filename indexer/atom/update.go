@@ -363,7 +363,7 @@ func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Tra
 		grouped[balance.balance.AtomicalId] = append(grouped[balance.balance.AtomicalId], balance.balance)
 	}
 	customActivated := block.Height >= s.heights.CustomColoring
-	isSplit := op != nil && op.Op == OpSplit
+	isSplit := op != nil && op.InputIndex == 0 && op.Op == OpSplit
 	isCustom := op != nil && op.Op == OpCustomColor && customActivated
 	if !isSplit && !isCustom {
 		atomicalIds := orderedTransferAtomicalIds(grouped, spent, block.Height >= s.heights.Dmint)
@@ -375,7 +375,7 @@ func (s *Indexer) applyTransfer(block *common.Block, txIndex int, tx *common.Tra
 	for _, atomicalId := range atomicalIds {
 		amount, ticker := groupedAmount(grouped[atomicalId])
 		assignments, _ := s.assignRegular(tx, startOutput, amount, customActivated)
-		if isSplit && spentFromInput(spent, atomicalId, op.InputIndex) {
+		if isSplit {
 			assignments = s.assignSplit(tx, atomicalId, amount, op, customActivated)
 		}
 		if isCustom {
