@@ -16,13 +16,13 @@ import (
 // exactly the same Pebble/Badger read views as the public SP query entrypoints.
 type spBatchReadCounts struct {
 	sync.Mutex
-	archive, directory, live int
+	archive, directory, live, utxo, address int
 }
 
 func (c *spBatchReadCounts) reset() {
 	c.Lock()
 	defer c.Unlock()
-	c.archive, c.directory, c.live = 0, 0, 0
+	c.archive, c.directory, c.live, c.utxo, c.address = 0, 0, 0, 0, 0
 }
 
 func (c *spBatchReadCounts) values() (archive, directory, live int) {
@@ -62,6 +62,10 @@ func (v *spBatchCountView) Read(key []byte) ([]byte, error) {
 		v.counts.directory++
 	case bytes.HasPrefix(key, spLivePrefix):
 		v.counts.live++
+	case bytes.HasPrefix(key, []byte(common.DB_KEY_UTXO)):
+		v.counts.utxo++
+	case bytes.HasPrefix(key, []byte(common.DB_KEY_ADDRESSID)):
+		v.counts.address++
 	}
 	v.counts.Unlock()
 	return v.DBReadView.Read(key)
@@ -89,7 +93,10 @@ func spBatchQueryFixture(t *testing.T) (*silentPayState, *common.Block, *common.
 	// This is a read-path unit fixture, not a fake full Base E2E: seed
 	// actual encoded Base UTXO rows for precisely the queried unspent outputs.
 	wb := s.db.NewWriteBatch()
-	for _, output := range []struct{ block *common.Block; vout uint32 }{
+	for _, output := range []struct {
+		block *common.Block
+		vout  uint32
+	}{
 		{first, 2}, {first, 8190}, {second, 0},
 	} {
 		txid := output.block.Transactions[1].TxId

@@ -82,12 +82,82 @@ func spAuditMergeFixture(t *testing.T) (*silentPayState, SPAnchor, *spBatchReadC
 
 func TestSilentPayDBAuditMergeAvoidsLivePointReads(t *testing.T) {
 	s, anchor, counts := spAuditMergeFixture(t)
-	if err := s.audit(context.Background(), anchor); err != nil {
+	for _, full := range []bool{false, true} {
+		counts.reset()
+		if err := s.audit(context.Background(), anchor, full); err != nil {
+			t.Fatal(err)
+		}
+		_, _, live := counts.values()
+		if live != 0 {
+			t.Fatalf("audit full=%v performed %d Live point reads; want zero", full, live)
+		}
+	}
+}
+
+func TestSilentPayDBAuditCoreSkipsAddressReads(t *testing.T) {
+	s, anchor, counts := spAuditMergeFixture(t)
+	b := &BaseIndexer{silentpay: s, stats: &SyncStats{SyncHeight: anchor.Height, SyncBlockHash: anchor.BlockHash}}
+	counts.reset()
+	if err := b.CheckSilentPay(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	_, _, live := counts.values()
-	if live != 0 {
-		t.Fatalf("audit performed %d Live point reads; want zero", live)
+	counts.Lock()
+	utxo, address, live := counts.utxo, counts.address, counts.live
+	counts.Unlock()
+	if utxo != 5000 || address != 0 || live != 0 {
+		t.Fatalf("core reads: UTXO=%d address=%d Live=%d, want 5000/0/0", utxo, address, live)
+	}
+	counts.reset()
+	if err := b.CheckSilentPayFull(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	counts.Lock()
+	defer counts.Unlock()
+	if counts.utxo != 5000 || counts.address != 2500 || counts.live != 0 {
+		t.Fatalf("full reads: UTXO=%d address=%d Live=%d, want 5000/2500/0", counts.utxo, counts.address, counts.live)
+	}
+}
+
+func TestSilentPayDBAuditEntrypointGuards(t *testing.T) {
+	s, anchor, _ := spAuditMergeFixture(t)
+	b := &BaseIndexer{silentpay: s, stats: &SyncStats{SyncHeight: anchor.Height, SyncBlockHash: anchor.BlockHash}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, full := range []bool{false, true} {
+		check := b.CheckSilentPay
+		checkEmpty := (&BaseIndexer{}).CheckSilentPay
+		if full {
+			check, checkEmpty = b.CheckSilentPayFull, (&BaseIndexer{}).CheckSilentPayFull
+		}
+		if err := checkEmpty(context.Background()); !errors.Is(err, ErrSPNotInitialized) {
+			t.Fatalf("full=%v uninitialized error: %v", full, err)
+		}
+		func() {
+			defer func() {
+				err, ok := recover().(error)
+				if !ok || !errors.Is(err, context.Canceled) {
+					t.Fatalf("full=%v cancelled audit did not panic with cancellation: %v", full, err)
+				}
+			}()
+			_ = check(ctx)
+		}()
+	}
+	if err := s.db.Write(spPendingKey, []byte("unfinished commit")); err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range []func(context.Context) error{b.CheckSilentPay, b.CheckSilentPayFull} {
+		func() {
+			defer func() {
+				err, ok := recover().(error)
+				if !ok || !errors.Is(err, ErrSPIncompleteCommit) {
+					t.Fatalf("incomplete commit accepted: %v", err)
+				}
+			}()
+			_ = check(context.Background())
+		}()
+	}
+	if _, err := s.db.Read(spPendingKey); err != nil {
+		t.Fatalf("audit removed commit fence: %v", err)
 	}
 }
 
@@ -123,20 +193,20 @@ func TestSilentPayDBAuditMergeEmptyArchiveRejectsLive(t *testing.T) {
 	}
 	anchor := SPAnchor{Height: 0, BlockHash: block.Hash}
 	spCommitState(t, s, anchor)
-	if err := s.audit(context.Background(), anchor); err != nil {
+	if err := s.audit(context.Background(), anchor, true); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.db.Write(spPositionKey(spLivePrefix, 0, 1), []byte{1}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.audit(context.Background(), anchor); !errors.Is(err, ErrSPCorrupt) {
+	if err := s.audit(context.Background(), anchor, true); !errors.Is(err, ErrSPCorrupt) {
 		t.Fatalf("orphan in empty Archive: %v", err)
 	}
 }
 
 func TestSilentPayDBAuditMergeRejectsCorruption(t *testing.T) {
 	s, anchor, _ := spAuditMergeFixture(t)
-	if err := s.audit(context.Background(), anchor); err != nil {
+	if err := s.audit(context.Background(), anchor, true); err != nil {
 		t.Fatal(err)
 	}
 	archiveKey := spPositionKey(spArchivePrefix, 0, 1024)
@@ -197,8 +267,15 @@ func TestSilentPayDBAuditMergeRejectsCorruption(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			if err := s.audit(context.Background(), anchor); err == nil {
-				t.Fatal("audit accepted corrupt data")
+			for _, full := range []bool{false, true} {
+				err := s.audit(context.Background(), anchor, full)
+				if tc.name == "invalid_curve_point" && !full {
+					if err != nil {
+						t.Fatalf("core audit performed full curve validation: %v", err)
+					}
+				} else if err == nil {
+					t.Fatalf("audit full=%v accepted corrupt data", full)
+				}
 			}
 			// A failed audit must not repair or delete the offending record.
 			after, afterErr := s.db.Read(tc.key)
@@ -211,7 +288,7 @@ func TestSilentPayDBAuditMergeRejectsCorruption(t *testing.T) {
 			}
 		})
 	}
-	if err := s.audit(context.Background(), anchor); err != nil {
+	if err := s.audit(context.Background(), anchor, true); err != nil {
 		t.Fatalf("restored audit: %v", err)
 	}
 }

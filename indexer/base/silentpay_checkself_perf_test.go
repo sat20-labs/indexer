@@ -1,6 +1,7 @@
 package base_test
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
 	"testing"
@@ -14,12 +15,12 @@ import (
 // RPC method access, including historical block and parent-transaction reads.
 type spDelayedParentSource struct {
 	bitcoin_rpc.BitcoinRPC
-	inFlight atomic.Int32
+	inFlight    atomic.Int32
 	maxInFlight atomic.Int32
-	calls atomic.Int32
-	delay time.Duration
-	failID string
-	blockCalls atomic.Int32
+	calls       atomic.Int32
+	delay       time.Duration
+	failID      string
+	blockCalls  atomic.Int32
 }
 
 func (s *spDelayedParentSource) GetBlockHash(height uint64) (string, error) {
@@ -64,6 +65,9 @@ func TestSilentPayDBOnlyCheckSelfNeverCallsBitcoinRPC(t *testing.T) {
 	if !b.CheckSelf() {
 		t.Fatal("database-only SP self-check failed")
 	}
+	if err := b.CheckSilentPayFull(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if source.calls.Load() != 0 || source.blockCalls.Load() != 0 {
 		t.Fatalf("database-only audit performed %d transaction and %d block RPCs", source.calls.Load(), source.blockCalls.Load())
 	}
@@ -81,11 +85,14 @@ func TestSilentPayDBOnlyAuditWorksWithoutHistoricalRawTransaction(t *testing.T) 
 	e2eSync(t, b, true)
 	source := &spDelayedParentSource{
 		BitcoinRPC: chain,
-		failID: chain.chain[4].Transactions[0].TxHash().String(),
+		failID:     chain.chain[4].Transactions[0].TxHash().String(),
 	}
 	bitcoin_rpc.ShareBitconRpc = source
 	if !b.CheckSelf() {
 		t.Fatal("SP database audit should not request unavailable raw transactions")
+	}
+	if err := b.CheckSilentPayFull(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 	if source.calls.Load() != 0 || source.blockCalls.Load() != 0 {
 		t.Fatal("database audit still consulted unavailable Bitcoin RPC data")

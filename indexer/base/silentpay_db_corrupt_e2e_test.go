@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/sat20-labs/indexer/common"
+	baseindex "github.com/sat20-labs/indexer/indexer/base"
 	indexdb "github.com/sat20-labs/indexer/indexer/db"
+	"google.golang.org/protobuf/proto"
 )
 
 // Exercising the public Base CheckSelf call proves DB-only auditing detects
@@ -46,19 +48,36 @@ func TestSilentPayDBOnlyAuditDetectsLocalInconsistency(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	badPoint := append([]byte(nil), archive...)
+	for i := 34; i < 66; i++ {
+		badPoint[i] = 0xff
+	}
+	badOutput := append([]byte(nil), archive...)
+	badOutput[len(badOutput)-1] ^= 1
+	wrongUTXO := proto.Clone(&utxo).(*common.UtxoValueInDB)
+	wrongUTXO.UtxoId ^= 1
+	badUTXO, err := proto.Marshal(wrongUTXO)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
-		name string
-		key []byte
-		value []byte
-		remove bool
+		name     string
+		key      []byte
+		value    []byte
+		remove   bool
+		fullOnly bool
 	}{
-		{"orphan_live", spLiveOrphan, []byte{1}, false},
-		{"orphan_archive", spArchiveOrphan, archive, false},
-		{"missing_sp_block", spBlock, nil, true},
-		{"missing_base_utxo", utxoKey, nil, true},
-		{"invalid_base_address_script", addressKey, []byte("not-a-bitcoin-address"), false},
-		{"malformed_archive_header", spArchive, []byte{0}, false},
+		{"orphan_live", spLiveOrphan, []byte{1}, false, false},
+		{"orphan_archive", spArchiveOrphan, archive, false, false},
+		{"missing_sp_block", spBlock, nil, true, false},
+		{"missing_base_utxo", utxoKey, nil, true, false},
+		{"wrong_base_utxo_id", utxoKey, badUTXO, false, false},
+		{"invalid_base_address_script", addressKey, []byte("not-a-bitcoin-address"), false, true},
+		{"missing_base_address", addressKey, nil, true, true},
+		{"invalid_curve_point", spArchive, badPoint, false, true},
+		{"mismatched_output_key", spArchive, badOutput, false, true},
+		{"malformed_archive_header", spArchive, []byte{0}, false, false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -70,9 +89,30 @@ func TestSilentPayDBOnlyAuditDetectsLocalInconsistency(t *testing.T) {
 			} else if err := kv.Write(test.key, test.value); err != nil {
 				t.Fatal(err)
 			}
-			// The DB-only self-check must still reject damaged local SP/Base
-			// data even when no Bitcoin Core is available.
-			expectSilentPayPanic(t, func() { b.CheckSelf() })
+			// Daily checks retain the identity/liveness closure; full checks
+			// additionally reject malformed curve points and address/key damage.
+			if test.fullOnly {
+				if !b.CheckSelf() {
+					t.Fatal("content-only damage failed daily check")
+				}
+			} else {
+				expectSilentPayPanic(t, func() { b.CheckSelf() })
+			}
+			expectSilentPayPanic(t, func() { _ = b.CheckSilentPayFull(context.Background()) })
+			if test.name == "invalid_curve_point" {
+				// Public reads must retain strict parsing after a daily check.
+				expectSilentPayPanic(t, func() {
+					_, _ = b.SilentPayLookup(context.Background(), []baseindex.SPPosition{{Height: 102, BlockHash: chain.chain[102].BlockHash().String(), TxIndex: 1, Vout: 0}})
+				})
+			}
+			after, afterErr := kv.Read(test.key)
+			if test.remove {
+				if !errors.Is(afterErr, common.ErrKeyNotFound) {
+					t.Fatalf("audit rewrote missing row: %v", afterErr)
+				}
+			} else if afterErr != nil || !bytes.Equal(after, test.value) {
+				t.Fatalf("audit changed corrupt row: %v", afterErr)
+			}
 			if previousErr == nil {
 				if err := kv.Write(test.key, old); err != nil {
 					t.Fatal(err)
@@ -102,6 +142,9 @@ func TestSilentPayDBOnlyAuditDetectsLocalInconsistency(t *testing.T) {
 	}
 	if !b.CheckSelf() {
 		t.Fatal("DB-only mode unexpectedly claims to independently verify BIP352 T")
+	}
+	if err := b.CheckSilentPayFull(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 	if err := kv.Write(spArchive, archive); err != nil {
 		t.Fatal(err)

@@ -90,11 +90,24 @@ func (b *BaseIndexer) CloseSilentPayViews() {
 	}
 }
 
+// CheckSilentPay is the daily CheckSelf entrypoint. It checks directory
+// completeness and candidate output identity/liveness against Base UTXOs.
 func (b *BaseIndexer) CheckSilentPay(ctx context.Context) error {
+	return b.checkSilentPay(ctx, false)
+}
+
+// CheckSilentPayFull is the manual/test entrypoint for the complete local DB
+// audit, including compressed T curve membership and Base P2TR key agreement.
+// Neither entrypoint recomputes T from Bitcoin transaction input evidence.
+func (b *BaseIndexer) CheckSilentPayFull(ctx context.Context) error {
+	return b.checkSilentPay(ctx, true)
+}
+
+func (b *BaseIndexer) checkSilentPay(ctx context.Context, full bool) error {
 	if b.silentpay == nil {
 		return ErrSPNotInitialized
 	}
-	err := b.silentpay.audit(ctx, SPAnchor{Height: b.stats.SyncHeight, BlockHash: b.stats.SyncBlockHash})
+	err := b.silentpay.audit(ctx, SPAnchor{Height: b.stats.SyncHeight, BlockHash: b.stats.SyncBlockHash}, full)
 	// Database corruption or cancelled audits are still fatal. The routine
 	// intentionally never consults Bitcoin Core; independent T recomputation
 	// belongs to E2E, not this local consistency check.

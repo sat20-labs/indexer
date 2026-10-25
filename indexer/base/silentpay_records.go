@@ -99,7 +99,7 @@ func spCandidateRecord(tx *common.Transaction, index uint32) ([]byte, int, error
 			return nil, 0, fmt.Errorf("%w: input txid", ErrSPCorrupt)
 		}
 		inputs[i] = common.SPInput{
-			Outpoint: wire.OutPoint{Hash: *hash, Index: uint32(in.TxOutIndex)},
+			Outpoint:        wire.OutPoint{Hash: *hash, Index: uint32(in.TxOutIndex)},
 			SignatureScript: in.SignatureScript, Witness: in.Witness, Prevout: &in.OutValue,
 		}
 	}
@@ -136,13 +136,24 @@ func spCandidateRecord(tx *common.Transaction, index uint32) ([]byte, int, error
 // spRecordHeader validates the bounded v1 header. Output walking below borrows
 // key bytes from the record, without allocating an output object for each key.
 func spRecordHeader(raw []byte) (*bytes.Reader, int, error) {
+	r, count, err := spRecordHeaderStructure(raw)
+	if err != nil {
+		return nil, 0, err
+	}
+	if _, err := btcec.ParsePubKey(raw[33:66]); err != nil {
+		return nil, 0, ErrSPCorrupt
+	}
+	return r, count, nil
+}
+
+// Daily consistency checks need framing and output positions, but do not
+// audit T's curve membership. Queries, spending and full audits continue to
+// use spRecordHeader above for strict compressed-public-key validation.
+func spRecordHeaderStructure(raw []byte) (*bytes.Reader, int, error) {
 	if len(raw) < 67 || len(raw) > spMaxRecordBytes || raw[0] != SPSchemaVersion {
 		return nil, 0, ErrSPCorrupt
 	}
 	if raw[33] != 2 && raw[33] != 3 {
-		return nil, 0, ErrSPCorrupt
-	}
-	if _, err := btcec.ParsePubKey(raw[33:66]); err != nil {
 		return nil, 0, ErrSPCorrupt
 	}
 	r := bytes.NewReader(raw[66:])

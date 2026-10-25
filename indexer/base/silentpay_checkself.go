@@ -110,13 +110,18 @@ func spAuditUTXOPrefix(hash []byte) []byte {
 }
 
 // spAuditCandidate derives its expected Live bitmap exclusively from the
-// committed Base UTXO/address data. It does not trust the existing SP bitmap,
+// committed Base UTXO data. Full audits additionally compare address scripts
+// and validate T's curve membership. It does not trust the existing SP bitmap,
 // nor query bitcoind. Without the original witness/prevouts stored in Base,
 // the BIP352 tweak cannot be independently recomputed here.
 func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
-	raw, live []byte, hasLive bool) (uint64, uint64, error) {
+	raw, live []byte, hasLive, full bool) (uint64, uint64, error) {
 
-	reader, count, err := spRecordHeader(raw)
+	readHeader := spRecordHeaderStructure
+	if full {
+		readHeader = spRecordHeader
+	}
+	reader, count, err := readHeader(raw)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -149,14 +154,16 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 			outpoint, _ := indexdb.GetUtxoByDBKey(utxoKey)
 			return 0, 0, fmt.Errorf("%w: Base UTXO ID %s", ErrSPCorrupt, outpoint)
 		}
-		address, e := view.Read(indexdb.GetAddressIdKey(utxo.AddressId))
-		if e != nil {
-			return 0, 0, e
-		}
-		script, e := common.GetPkScriptFromAddress(string(address))
-		if e != nil || !common.SPP2TROutput(script) || !bytes.Equal(script[2:], key) {
-			outpoint, _ := indexdb.GetUtxoByDBKey(utxoKey)
-			return 0, 0, fmt.Errorf("%w: Base P2TR output %s", ErrSPCorrupt, outpoint)
+		if full {
+			address, e := view.Read(indexdb.GetAddressIdKey(utxo.AddressId))
+			if e != nil {
+				return 0, 0, e
+			}
+			script, e := common.GetPkScriptFromAddress(string(address))
+			if e != nil || !common.SPP2TROutput(script) || !bytes.Equal(script[2:], key) {
+				outpoint, _ := indexdb.GetUtxoByDBKey(utxoKey)
+				return 0, 0, fmt.Errorf("%w: Base P2TR output %s", ErrSPCorrupt, outpoint)
+			}
 		}
 		bits[i/8] |= 1 << uint(i%8)
 		liveOutputs++
@@ -176,12 +183,12 @@ func spAuditCandidate(view common.DBReadView, height int, txIndex uint32,
 	return 1, liveOutputs, nil
 }
 
-// audit performs a complete local consistency check at one committed Base/SP
-// database version. It intentionally uses NO Bitcoin RPC data. The database
-// does not retain all original input witness or historical prevout scripts,
-// so it cannot independently rediscover candidates or recompute BIP352 T.
-// Cryptographic agreement remains the responsibility of vectors and E2E.
-func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) error {
+// audit checks directory completeness and Live = Archive intersect Base UTXO
+// at one committed database version. Full audits also validate T's curve
+// membership and compare P2TR keys with Base address scripts. Both modes use
+// NO Bitcoin RPC data and cannot independently recompute BIP352 T or find
+// candidates jointly omitted from the directory and Archive.
+func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor, full bool) error {
 	view, anchor, err := s.freshView(ctx)
 	if err != nil {
 		return err
@@ -216,6 +223,10 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 	directoryCursor := 0
 	var expectedLiveTx, expectedLiveOutputs, archiveTx uint64
 	started := time.Now()
+	mode := "core"
+	if full {
+		mode = "full"
+	}
 	nextProgress := start + 10000
 	// Both prefixes have the same position ordering. Merge their bounded
 	// pages instead of point-reading every Live row and then scanning it again.
@@ -245,8 +256,8 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 			previousHeight, directoryCursor = height, 0
 			covered[height-start] = true
 			if height >= nextProgress {
-				common.Log.Infof("SP DB CheckSelf scanning Archive at %d: tx=%d, live tx=%d, outputs=%d, elapsed=%v",
-					height, archiveTx, expectedLiveTx, expectedLiveOutputs, time.Since(started))
+				common.Log.Infof("SP DB CheckSelf scanning Archive at %d: tx=%d, live tx=%d, outputs=%d, elapsed=%v, mode=%s",
+					height, archiveTx, expectedLiveTx, expectedLiveOutputs, time.Since(started), mode)
 				nextProgress = height + 10000
 			}
 		}
@@ -267,7 +278,7 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 			}
 			hasLive = order == 0
 		}
-		liveTx, liveOutputs, e := spAuditCandidate(view, height, txIndex, raw, liveValue, hasLive)
+		liveTx, liveOutputs, e := spAuditCandidate(view, height, txIndex, raw, liveValue, hasLive, full)
 		if e != nil {
 			return e
 		}
@@ -326,7 +337,7 @@ func (s *silentPayState) audit(ctx context.Context, expectedAnchor SPAnchor) err
 		return fmt.Errorf("%w: SP block directory ends at %d, expected %d", ErrSPCorrupt, nextHeight-1, anchor.Height)
 	}
 
-	common.Log.Infof("SP DB CheckSelf passed through %d: Archive tx=%d Live tx=%d outputs=%d, elapsed=%v (no Bitcoin RPC)",
-		anchor.Height, archiveTx, expectedLiveTx, expectedLiveOutputs, time.Since(started))
+	common.Log.Infof("SP DB CheckSelf passed through %d: Archive tx=%d Live tx=%d outputs=%d, elapsed=%v (mode=%s, no Bitcoin RPC)",
+		anchor.Height, archiveTx, expectedLiveTx, expectedLiveOutputs, time.Since(started), mode)
 	return nil
 }
