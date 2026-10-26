@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 	atomValidate "github.com/sat20-labs/indexer/indexer/atom/validate"
+	"github.com/sat20-labs/indexer/indexer/db"
 )
 
 type CheckPoint struct {
@@ -1421,6 +1422,16 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 		for address, amount := range tickerStatus.Holders {
 			addressId := s.baseIndexer.GetAddressIdFromDB(address)
 			if addressId == common.INVALID_ID {
+				if amount == 0 {
+					// Empty addresses may be pruned; only a confirmed missing key satisfies zero.
+					_, err := db.GetAddressDataFromDBV2(s.baseIndexer.GetBaseDB(), address)
+					if err == common.ErrKeyNotFound {
+						continue
+					}
+					if err != nil {
+						common.Log.Panicf("atom %s read holder address %s at %d failed: %v", name, address, height, err)
+					}
+				}
 				common.Log.Panicf("atom %s can't find holder address %s at %d", name, address, height)
 			}
 			holderAmount := holders[addressId]
