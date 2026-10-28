@@ -18,6 +18,7 @@ const (
 	BTCLuckyBackendHTTPTemplate  = "http-template"
 
 	defaultBTCLuckyTipCheckInterval = 10 * time.Second
+	defaultCoinbaseMaturity         = 100
 )
 
 // BTCLuckyMinerConfig contains the optional Bitcoin lucky mining settings.
@@ -37,15 +38,16 @@ type BTCLuckyMinerConfig struct {
 // BTCLuckyTemplateServiceConfig contains the Bitcoin Core template service
 // settings used by core nodes and local lucky miners.
 type BTCLuckyTemplateServiceConfig struct {
-	Enabled       bool
-	Backend       string
-	RPCConnect    string
-	RPCUser       string
-	RPCPass       string
-	RPCDisableTLS bool
-	Network       string
-	CacheLimit    int
-	FoundBlocksDB common.KVDB
+	Enabled          bool
+	Backend          string
+	RPCConnect       string
+	RPCUser          string
+	RPCPass          string
+	RPCDisableTLS    bool
+	Network          string
+	CacheLimit       int
+	FoundBlocksDB    common.KVDB
+	CoinbaseMaturity uint64
 }
 
 // Normalize fills conservative defaults without enabling any optional module.
@@ -69,6 +71,9 @@ func (c *BTCLuckyMinerConfig) Normalize() {
 
 // Normalize fills conservative defaults without enabling any optional module.
 func (c *BTCLuckyTemplateServiceConfig) Normalize() {
+	if c.CoinbaseMaturity == 0 {
+		c.CoinbaseMaturity = defaultCoinbaseMaturity
+	}
 	if c.Backend == "" {
 		c.Backend = "bitcoin-core"
 	}

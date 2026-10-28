@@ -22,6 +22,23 @@ type InfoResponse struct {
 	FoundBlocks []FoundBlockRecord    `json:"foundBlocks,omitempty"`
 }
 
+func (b *HTTPTemplateBackend) Info() (*InfoResponse, error) {
+	var resp APIResponse[*InfoResponse]
+	if err := b.get("/btc/lucky/info", &resp); err != nil {
+		return nil, err
+	}
+	if resp.Code != 0 {
+		return nil, errors.New(resp.Msg)
+	}
+	if resp.Data == nil {
+		return nil, fmt.Errorf("btc lucky indexer returned empty info")
+	}
+	if resp.Data.Service.CoinbaseMaturity == 0 {
+		resp.Data.Service.CoinbaseMaturity = defaultCoinbaseMaturity
+	}
+	return resp.Data, nil
+}
+
 type bestHeightResponse struct {
 	Code int            `json:"code"`
 	Msg  string         `json:"msg"`

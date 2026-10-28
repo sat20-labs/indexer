@@ -300,25 +300,19 @@ func (s *Indexer) tickerUtxosLocked(ticker string) map[uint64]int64 {
 	return result
 }
 
-func (s *Indexer) mintHistoryLocked(ticker string, addressID *uint64) []*MintInfo {
+// mintHistoryPageLocked is used only by service queries, with s.mutex held.
+// Durable keys already order mint IDs; only pending IDs need sorting. Decode
+// values only for the requested page, and count keys when an exact total is needed.
+func (s *Indexer) mintHistoryPageLocked(ticker string, addressID *uint64, start, limit int, countTotal bool) ([]*MintInfo, int) {
 	ticker = strings.ToLower(ticker)
-	result := make(map[int64]*MintInfo)
+	if start < 0 {
+		start = 0
+	}
 	prefix := getMintHistoryPrefix(ticker)
 	if addressID != nil {
 		prefix = getAddressMintHistoryPrefix(ticker, *addressID)
 	}
-	if s.db != nil {
-		if err := s.db.Scan(common.ScanOptions{Prefix: prefix}, func(_, value []byte) error {
-			var mint MintInfo
-			if err := db.DecodeBytes(value, &mint); err != nil {
-				return err
-			}
-			result[mint.Id] = mint.Clone()
-			return nil
-		}); err != nil {
-			common.Log.Panicf("atom scan mint history %s failed: %v", ticker, err)
-		}
-	}
+	pending := make(map[int64]*MintInfo)
 	for _, mint := range s.mintsAdded {
 		if !strings.EqualFold(mint.Ticker, ticker) {
 			continue
@@ -326,16 +320,73 @@ func (s *Indexer) mintHistoryLocked(ticker string, addressID *uint64) []*MintInf
 		if addressID != nil && mint.AddressId != *addressID {
 			continue
 		}
-		result[mint.Id] = mint.Clone()
+		pending[mint.Id] = mint
 	}
-	ids := make([]int64, 0, len(result))
-	for id := range result {
+	ids := make([]int64, 0, len(pending))
+	for id := range pending {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	items := make([]*MintInfo, 0, len(ids))
-	for _, id := range ids {
-		items = append(items, result[id])
+	var pageIDs []int64
+	total := 0
+	accept := func(id int64) {
+		if total >= start && (limit <= 0 || len(pageIDs) < limit) {
+			pageIDs = append(pageIDs, id)
+		}
+		total++
 	}
-	return items
+	pageComplete := func() bool {
+		return !countTotal && limit > 0 && len(pageIDs) == limit
+	}
+	next := 0
+	if s.db != nil {
+		if err := s.db.Scan(common.ScanOptions{Prefix: prefix, KeysOnly: true}, func(key, _ []byte) error {
+			suffix := string(key[len(prefix):])
+			if len(suffix) != 16 {
+				return fmt.Errorf("invalid mint history key %q", key)
+			}
+			id, err := strconv.ParseInt(suffix, 16, 64)
+			if err != nil || common.Uint64ToString(uint64(id)) != suffix {
+				return fmt.Errorf("invalid mint history ID in key %q", key)
+			}
+			for next < len(ids) && ids[next] <= id {
+				accept(ids[next])
+				next++
+				if pageComplete() {
+					return common.ErrStopScan
+				}
+			}
+			// Pending values replace durable values with the same ID.
+			if _, exists := pending[id]; !exists {
+				accept(id)
+			}
+			if pageComplete() {
+				return common.ErrStopScan
+			}
+			return nil
+		}); err != nil {
+			common.Log.Panicf("atom scan mint history %s failed: %v", ticker, err)
+		}
+	}
+	for next < len(ids) && !pageComplete() {
+		accept(ids[next])
+		next++
+	}
+	items := make([]*MintInfo, 0, len(pageIDs))
+	for _, id := range pageIDs {
+		if mint, exists := pending[id]; exists {
+			items = append(items, mint.Clone())
+			continue
+		}
+		key := string(prefix) + common.Uint64ToString(uint64(id))
+		var mint MintInfo
+		if err := db.GetValueFromDB([]byte(key), &mint, s.db); err != nil {
+			common.Log.Panicf("atom read mint history %s failed: %v", key, err)
+		}
+		if mint.Id != id {
+			common.Log.Panicf("atom mint history ID differs from key %s: %d", key, mint.Id)
+		}
+		items = append(items, mint.Clone())
+	}
+	return items, total
 }

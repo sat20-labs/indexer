@@ -1369,8 +1369,16 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 	if checkpoint.TickerCount != 0 && s.status.TickerCount != checkpoint.TickerCount {
 		common.Log.Panicf("atom ticker count different at %d: %d %d", height, s.status.TickerCount, checkpoint.TickerCount)
 	}
+	var utxoSummaries map[string]checkpointUtxoSummary
+	var assetUtxoCount int
+	getUtxoSummaries := func() (map[string]checkpointUtxoSummary, int) {
+		if utxoSummaries == nil {
+			utxoSummaries, assetUtxoCount = s.checkpointUtxoSummariesLocked()
+		}
+		return utxoSummaries, assetUtxoCount
+	}
 	if checkpoint.AssetUtxoCount != 0 {
-		count := s.assetUtxoCountLocked()
+		_, count := getUtxoSummaries()
 		if count != checkpoint.AssetUtxoCount {
 			common.Log.Panicf("atom asset utxo count different at %d: %d %d", height, count, checkpoint.AssetUtxoCount)
 		}
@@ -1407,7 +1415,9 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 			common.Log.Panicf("atom %s holder count different at %d: %d %d", name, height, ticker.HolderCount, tickerStatus.HolderCount)
 		}
 		if tickerStatus.UtxoCount != 0 || tickerStatus.UtxoAmount != 0 {
-			count, amount := s.tickerUtxoSummaryLocked(name)
+			summaries, _ := getUtxoSummaries()
+			summary := summaries[name]
+			count, amount := summary.count, summary.amount
 			if tickerStatus.UtxoCount != 0 && count != tickerStatus.UtxoCount {
 				common.Log.Panicf("atom %s utxo count different at %d: %d %d", name, height, count, tickerStatus.UtxoCount)
 			}
@@ -1446,9 +1456,9 @@ func (s *Indexer) checkPointWithBlockHeightLocked(height int, startTime time.Tim
 			}
 		}
 	}
-	s.validateTickerDataLocked(height)
+	s.validateTickerDataLocked(height, getUtxoSummaries)
 	s.validateHolderDataLocked(height)
-	s.validateUtxoDataLocked(height)
+	s.validateUtxoDataLocked(height, getUtxoSummaries)
 	common.Log.Infof("AtomIndexer.CheckPointWithBlockHeight %d checked, takes %v", height, time.Since(startTime))
 }
 
@@ -1483,7 +1493,7 @@ func readAtomTickerDataToMap(dir string) (int, int) {
 	return startHeight, endHeight
 }
 
-func (s *Indexer) validateTickerDataLocked(height int) {
+func (s *Indexer) validateTickerDataLocked(height int, getUtxoSummaries func() (map[string]checkpointUtxoSummary, int)) {
 	if s.chaincfgParam == nil || s.chaincfgParam.Net != wire.MainNet {
 		return
 	}
@@ -1502,6 +1512,7 @@ func (s *Indexer) validateTickerDataLocked(height int) {
 		common.Log.Panicf("AtomIndexer.validateTickerData ticker count different at %d: %d %d", height, s.status.TickerCount, len(records))
 	}
 
+	utxoSummaries, _ := getUtxoSummaries()
 	var failed []string
 	for ticker, record := range records {
 		info := s.getTickerLocked(ticker)
@@ -1510,7 +1521,8 @@ func (s *Indexer) validateTickerDataLocked(height int) {
 			failed = append(failed, ticker)
 			continue
 		}
-		utxoCount, utxoAmount := s.tickerUtxoSummaryLocked(ticker)
+		summary := utxoSummaries[strings.ToLower(ticker)]
+		utxoCount, utxoAmount := summary.count, summary.amount
 		verified := true
 		if info.AtomicalId != record.AtomicalId ||
 			utxoCount != record.UtxoCount ||
@@ -1793,7 +1805,7 @@ func readAtomUtxoDataToMap(dir string) (int, int) {
 	return startHeight, endHeight
 }
 
-func (s *Indexer) validateUtxoDataLocked(height int) {
+func (s *Indexer) validateUtxoDataLocked(height int, getUtxoSummaries func() (map[string]checkpointUtxoSummary, int)) {
 	if s.chaincfgParam == nil || s.chaincfgParam.Net != wire.MainNet {
 		return
 	}
@@ -1809,6 +1821,7 @@ func (s *Indexer) validateUtxoDataLocked(height int) {
 		return
 	}
 
+	utxoSummaries, _ := getUtxoSummaries()
 	var failed []string
 	for ticker, utxos := range tickerToUtxos {
 		verified := true
@@ -1822,7 +1835,8 @@ func (s *Indexer) validateUtxoDataLocked(height int) {
 				verified = false
 			}
 		}
-		utxoCount, utxoAmount := s.tickerUtxoSummaryLocked(ticker)
+		summary := utxoSummaries[strings.ToLower(ticker)]
+		utxoCount, utxoAmount := summary.count, summary.amount
 		if utxoCount != len(utxos) || utxoAmount != expectedTotal {
 			common.Log.Errorf("AtomIndexer.validateUtxoData %s summary different count %d %d amount %d %d",
 				ticker, len(utxos), utxoCount, expectedTotal, utxoAmount)
@@ -1896,14 +1910,30 @@ func holderSummary(holders map[uint64]int64) (int, int64) {
 	return count, amount
 }
 
-func (s *Indexer) assetUtxoCountLocked() int {
+type checkpointUtxoSummary struct {
+	count  int
+	amount int64
+}
+
+// checkpointUtxoSummariesLocked computes all checkpoint totals in one pass over
+// the existing durable-plus-pending view. Counts are per positive asset balance
+// record, not per distinct UTXO. The summaries live only for this checkpoint;
+// individual UTXO and holder checks still read through their original paths.
+func (s *Indexer) checkpointUtxoSummariesLocked() (map[string]checkpointUtxoSummary, int) {
+	summaries := make(map[string]checkpointUtxoSummary)
 	var count int
 	if err := s.forEachCurrentUtxoBalanceLocked(func(balance *UtxoBalance) {
-		if balance.Amount > 0 {
-			count++
+		if balance.Amount <= 0 {
+			return
 		}
+		ticker := strings.ToLower(balance.Ticker)
+		summary := summaries[ticker]
+		summary.count++
+		summary.amount += balance.Amount
+		summaries[ticker] = summary
+		count++
 	}); err != nil {
-		common.Log.Panicf("atom scan asset UTXO count failed: %v", err)
+		common.Log.Panicf("atom scan checkpoint UTXO summaries failed: %v", err)
 	}
-	return count
+	return summaries, count
 }

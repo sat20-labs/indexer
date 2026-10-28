@@ -23,15 +23,16 @@ func NewService(cfg *config.YamlConf, localDB common.KVDB) *Service {
 		network = "mainnet"
 	}
 	svc, err := btclucky.NewTemplateService(btclucky.BTCLuckyTemplateServiceConfig{
-		Enabled:       true,
-		Backend:       "bitcoin-core",
-		RPCConnect:    fmt.Sprintf("%s:%d", cfg.ShareRPC.Bitcoin.Host, cfg.ShareRPC.Bitcoin.Port),
-		RPCUser:       cfg.ShareRPC.Bitcoin.User,
-		RPCPass:       cfg.ShareRPC.Bitcoin.Password,
-		RPCDisableTLS: true,
-		Network:       network,
-		CacheLimit:    16,
-		FoundBlocksDB: localDB,
+		Enabled:          true,
+		Backend:          "bitcoin-core",
+		RPCConnect:       fmt.Sprintf("%s:%d", cfg.ShareRPC.Bitcoin.Host, cfg.ShareRPC.Bitcoin.Port),
+		RPCUser:          cfg.ShareRPC.Bitcoin.User,
+		RPCPass:          cfg.ShareRPC.Bitcoin.Password,
+		RPCDisableTLS:    true,
+		Network:          network,
+		CacheLimit:       16,
+		FoundBlocksDB:    localDB,
+		CoinbaseMaturity: cfg.ShareRPC.Bitcoin.CoinbaseMaturity,
 	})
 	if err != nil {
 		common.Log.Warnf("BTC lucky template service disabled: %v", err)

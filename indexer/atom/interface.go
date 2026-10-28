@@ -58,24 +58,10 @@ func (s *Indexer) GetHoldersWithTick(name string) map[uint64]*common.Decimal {
 	return result
 }
 
-func paginateMintHistory(items []*MintInfo, start, limit int) []*MintInfo {
-	total := len(items)
-	if start < 0 {
-		start = 0
-	}
-	if start >= total {
-		return nil
-	}
-	if limit <= 0 || start+limit > total {
-		limit = total - start
-	}
-	return items[start : start+limit]
-}
-
 func (s *Indexer) GetMintHistory(name string, start, limit int) []*common.MintInfo {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	items := paginateMintHistory(s.mintHistoryLocked(name, nil), start, limit)
+	items, _ := s.mintHistoryPageLocked(name, nil, start, limit, false)
 	result := make([]*common.MintInfo, 0, len(items))
 	for _, item := range items {
 		result = append(result, item.ToCommon(""))
@@ -86,9 +72,7 @@ func (s *Indexer) GetMintHistory(name string, start, limit int) []*common.MintIn
 func (s *Indexer) GetMintHistoryWithAddress(addressID uint64, name string, start, limit int) ([]*common.MintInfo, int) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	items := s.mintHistoryLocked(name, &addressID)
-	total := len(items)
-	page := paginateMintHistory(items, start, limit)
+	page, total := s.mintHistoryPageLocked(name, &addressID, start, limit, true)
 	result := make([]*common.MintInfo, 0, len(page))
 	for _, item := range page {
 		result = append(result, item.ToCommon(""))

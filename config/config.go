@@ -52,6 +52,8 @@ type Bitcoin struct {
 	Port     int    `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+	// Public Bitcoin uses 100. Isolated private chains must declare their consensus value.
+	CoinbaseMaturity uint64 `yaml:"coinbase_maturity"`
 }
 
 type Log struct {

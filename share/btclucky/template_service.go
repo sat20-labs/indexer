@@ -46,9 +46,10 @@ func NewTemplateService(cfg BTCLuckyTemplateServiceConfig) (*TemplateService, er
 		params: params,
 		jobs:   make(map[string]*cachedBTCJob),
 		status: TemplateServiceStatus{
-			Enabled:    cfg.Enabled,
-			Backend:    cfg.Backend,
-			BTCNetwork: cfg.Network,
+			CoinbaseMaturity: cfg.CoinbaseMaturity,
+			Enabled:          cfg.Enabled,
+			Backend:          cfg.Backend,
+			BTCNetwork:       cfg.Network,
 		},
 	}
 	if err := svc.loadFoundBlocks(); err != nil {

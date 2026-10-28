@@ -28,6 +28,7 @@ type MinerStatus struct {
 }
 
 type TemplateServiceStatus struct {
+	CoinbaseMaturity  uint64    `json:"coinbaseMaturity"`
 	Enabled           bool      `json:"enabled"`
 	Running           bool      `json:"running"`
 	Backend           string    `json:"backend"`

@@ -1262,9 +1262,10 @@ func (p *TxOutput) GetAsset(assetName *AssetName) *Decimal {
 	return asset.Amount.Clone()
 }
 
+// GetAssetV2 returns the amount and whether the asset is invalid for spending.
 func (p *TxOutput) GetAssetV2(assetName *AssetName) (*Decimal, bool) {
 	if assetName == nil || *assetName == ASSET_PLAIN_SAT {
-		return NewDefaultDecimal(p.GetPlainSat()), true
+		return NewDefaultDecimal(p.GetPlainSat()), false
 	}
 	invalid := p.Invalids[*assetName]
 	asset, err := p.Assets.Find(assetName)
