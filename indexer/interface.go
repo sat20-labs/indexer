@@ -76,33 +76,7 @@ func (b *IndexerMgr) HasAssetInUtxoId(utxoId uint64, excludingExotic bool) bool 
 }
 
 func (b *IndexerMgr) HasAssetInUtxo(utxoId uint64, excludingExotic bool) bool {
-	result := b.nft.HasNftInUtxo(utxoId)
-	if result {
-		return true
-	}
-
-	if b.ns.HasNamesInUtxo(utxoId) {
-		return true
-	}
-
-	result = b.ftIndexer.HasAssetInUtxo(utxoId)
-	if result {
-		return true
-	}
-
-	result = b.RunesIndexer.IsExistAsset(utxoId)
-	if result {
-		return true
-	}
-	if b.atomIndexer.HasAssetInUtxo(utxoId) {
-		return true
-	}
-
-	if !excludingExotic && b.exotic.HasExoticInUtxo(utxoId) {
-		return true
-	}
-
-	return result
+	return b.HasAssetInUtxoId(utxoId, excludingExotic)
 }
 
 // return: utxoId->asset amount
