@@ -178,29 +178,64 @@ func TestSilentPayE2EReceiveLiveRecoverAndSpend(t *testing.T) {
 }
 
 func TestSilentPayE2EReorgReloadRestoresLive(t *testing.T) {
-	chain := newSPTestChain(t)
-	payment, keys := e2ePayment(t, chain.chain[1].Transactions[0], e2eKey(31), e2eKey(32), 1)
-	chain.appendBlock(t, payment)
-	b, _ := e2eBase(t, chain)
-	e2eSync(t, b, true)
-	snapshot, err := b.SilentPayCreateSnapshot(context.Background())
-	if err != nil { t.Fatal(err) }
-	chain.appendBlock(t, e2eSpendSP(t, payment, 0, keys[0]))
-	e2eSync(t, b, false) // old branch is inside Base's uncommitted history window
-	chain.truncate(102)
-	chain.appendBlock(t)
-	chain.appendBlock(t)
-	if fork := b.SyncToChainTip(make(chan struct{})); fork != 103 { t.Fatalf("expected reorg at 103, got %d", fork) }
-	b.CloseSilentPayViews()
-	b.Init() // same operation used by the existing manager after DB reopen
-	b.SetBlockCallback(func(*common.Block, []*common.Range) {})
-	e2eSync(t, b, true)
-	if _, err := b.SilentPayScan(context.Background(), baseindex.SPScanRequest{Mode: "live", SnapshotID: snapshot.SnapshotID, ToHeight: -1}); !errors.Is(err, baseindex.ErrSPSnapshotExpired) { t.Fatalf("old snapshot survived reload: %v", err) }
-	fresh, err := b.SilentPayCreateSnapshot(context.Background())
-	if err != nil { t.Fatal(err) }
-	page, err := b.SilentPayScan(context.Background(), baseindex.SPScanRequest{Mode: "live", SnapshotID: fresh.SnapshotID, ToHeight: -1})
-	if err != nil || len(page.Blocks) != 1 || !bytes.Equal(page.Blocks[0].Transactions[0].UnspentBitmap, []byte{1}) { t.Fatalf("reorg lost original live output: %+v %v", page, err) }
-	if !b.CheckSelf() { t.Fatal("reorg replay CheckSelf failed") }
+	for _, extendTip := range []bool{false, true} {
+		name := "same_height"
+		if extendTip {
+			name = "extended_tip"
+		}
+		t.Run(name, func(t *testing.T) {
+			chain := newSPTestChain(t)
+			payment, keys := e2ePayment(t, chain.chain[1].Transactions[0], e2eKey(31), e2eKey(32), 1)
+			chain.appendBlock(t, payment)
+			b, _ := e2eBase(t, chain)
+			e2eSync(t, b, true)
+			snapshot, err := b.SilentPayCreateSnapshot(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			chain.appendBlock(t, e2eSpendSP(t, payment, 0, keys[0]))
+			e2eSync(t, b, false) // old branch is inside Base's uncommitted history window
+			oldHash := b.GetHash()
+			chain.truncate(102)
+			chain.appendBlock(t)
+			wantHeight := 103
+			if extendTip {
+				chain.appendBlock(t)
+				wantHeight++
+			}
+			wantHash, err := chain.GetBlockHash(uint64(wantHeight))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wantHash == oldHash {
+				t.Fatal("fixture did not change the block hash")
+			}
+			if fork := b.SyncToChainTip(make(chan struct{})); fork != 103 {
+				t.Fatalf("expected reorg at 103, got %d", fork)
+			}
+			b.CloseSilentPayViews()
+			b.Init() // same operation used by the existing manager after DB reopen
+			b.SetBlockCallback(func(*common.Block, []*common.Range) {})
+			e2eSync(t, b, true)
+			if b.GetHeight() != wantHeight || b.GetHash() != wantHash {
+				t.Fatalf("replay tip = %d/%s, want %d/%s", b.GetHeight(), b.GetHash(), wantHeight, wantHash)
+			}
+			if _, err := b.SilentPayScan(context.Background(), baseindex.SPScanRequest{Mode: "live", SnapshotID: snapshot.SnapshotID, ToHeight: -1}); !errors.Is(err, baseindex.ErrSPSnapshotExpired) {
+				t.Fatalf("old snapshot survived reload: %v", err)
+			}
+			fresh, err := b.SilentPayCreateSnapshot(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, err := b.SilentPayScan(context.Background(), baseindex.SPScanRequest{Mode: "live", SnapshotID: fresh.SnapshotID, ToHeight: -1})
+			if err != nil || len(page.Blocks) != 1 || !bytes.Equal(page.Blocks[0].Transactions[0].UnspentBitmap, []byte{1}) {
+				t.Fatalf("reorg lost original live output: %+v %v", page, err)
+			}
+			if !b.CheckSelf() {
+				t.Fatal("reorg replay CheckSelf failed")
+			}
+		})
+	}
 }
 
 func e2eSPDiskKey(prefix string, height, index uint32) []byte {

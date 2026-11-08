@@ -29,8 +29,8 @@ type Miner struct {
 	jobGen  uint64
 }
 
-type tipHeightProvider interface {
-	TipHeight() (int64, error)
+type tipProvider interface {
+	Tip() (int64, string, error)
 }
 
 func NewMiner(cfg BTCLuckyMinerConfig, backend MiningJobBackend) (*Miner, error) {
@@ -87,7 +87,7 @@ func (m *Miner) Start() error {
 
 	m.wg.Add(1)
 	go m.controller()
-	if _, ok := m.backend.(tipHeightProvider); ok {
+	if _, ok := m.backend.(tipProvider); ok {
 		m.wg.Add(1)
 		go m.tipMonitor()
 	}
@@ -169,7 +169,7 @@ func (m *Miner) controller() {
 func (m *Miner) tipMonitor() {
 	defer m.wg.Done()
 
-	provider, ok := m.backend.(tipHeightProvider)
+	provider, ok := m.backend.(tipProvider)
 	if !ok {
 		return
 	}
@@ -178,8 +178,9 @@ func (m *Miner) tipMonitor() {
 	defer ticker.Stop()
 
 	var lastTip int64
+	var lastTipHash string
 	checkTip := func() {
-		height, err := provider.TipHeight()
+		height, blockHash, err := provider.Tip()
 		if err != nil {
 			m.setError(err)
 			return
@@ -194,13 +195,15 @@ func (m *Miner) tipMonitor() {
 
 		if lastTip == 0 {
 			lastTip = height
-			if jobHeight > 0 && height > jobHeight {
+			lastTipHash = blockHash
+			if jobHeight > 0 && height >= jobHeight {
 				m.NotifyBlockUpdated()
 			}
 			return
 		}
-		if height != lastTip || (jobHeight > 0 && height > jobHeight) {
+		if height != lastTip || blockHash != lastTipHash || (jobHeight > 0 && height >= jobHeight) {
 			lastTip = height
+			lastTipHash = blockHash
 			m.NotifyBlockUpdated()
 		}
 	}

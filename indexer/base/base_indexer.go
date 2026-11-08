@@ -773,15 +773,15 @@ func (b *BaseIndexer) addUtxo(addrmap *map[string]*common.AddressValueInDB, outp
 
 }
 
-func (b *BaseIndexer) handleReorg(currentBlock *common.Block) int {
-	common.Log.Warnf("BaseIndexer.handleReorg-> reorg detected at heigh %d", currentBlock.Height)
+func (b *BaseIndexer) handleReorg(height int) int {
+	common.Log.Warnf("BaseIndexer.handleReorg-> reorg detected at heigh %d", height)
 
 	// clean memory and reload stats from DB
 	// b.reset()
-	//b.stats.ReorgsDetected = append(b.stats.ReorgsDetected, currentBlock.Height)
+	//b.stats.ReorgsDetected = append(b.stats.ReorgsDetected, height)
 	b.drainBlocksChan()
 
-	reorgHeight := currentBlock.Height
+	reorgHeight := height
 	for i := b.lastHeight - b.keepBlockHistory + 1; i <= b.lastHeight; i++ {
 		blockHash, ok := b.prevBlockHashMap[i]
 		if ok {
@@ -854,7 +854,7 @@ func (b *BaseIndexer) syncToBlock(height int, stopChan chan struct{}) int {
 			if i > 0 && block.PrevBlockHash != b.lastHash {
 				common.Log.WithField("BaseIndexer.SyncToBlock-> height", i).Warn("reorg detected")
 				close(stopBlockFetcherChan)
-				return b.handleReorg(block)
+				return b.handleReorg(block.Height)
 			}
 
 			localStartTime := time.Now()
@@ -1134,6 +1134,14 @@ func (b *BaseIndexer) SyncToChainTip(stopChan chan struct{}) int {
 	}
 
 	if count == uint64(b.lastHeight) {
+		hash, err := getBlockHash(count)
+		if err != nil {
+			common.Log.Errorf("failed to get block hash at height %d: %v", count, err)
+			return -2
+		}
+		if hash != b.lastHash {
+			return b.handleReorg(b.lastHeight)
+		}
 		return 0
 	}
 

@@ -276,7 +276,11 @@ func (b *IndexerMgr) GetBaseDB() common.KVDB {
 }
 
 func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
+	regtest := b.chaincfgParam != nil && b.chaincfgParam.Net == chaincfg.RegressionNetParams.Net
 	n := 10
+	if regtest {
+		n = 1
+	}
 	if value := os.Getenv("ATOM_DEBUG_POLL_SECONDS"); value != "" {
 		if seconds, err := strconv.Atoi(value); err == nil && seconds > 0 {
 			n = seconds
@@ -333,7 +337,7 @@ func (b *IndexerMgr) StartDaemon(stopChan chan bool) {
 								}
 							}
 
-							if lastHeight == b.base.GetHeight() {
+							if lastHeight == b.base.GetHeight() && (!regtest || inCommon.STEP_RUN_MODE) {
 								// 没有新区块了
 								time.Sleep(10 * time.Second)
 							}

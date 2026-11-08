@@ -39,10 +39,9 @@ func (b *HTTPTemplateBackend) Info() (*InfoResponse, error) {
 	return resp.Data, nil
 }
 
-type bestHeightResponse struct {
-	Code int            `json:"code"`
-	Msg  string         `json:"msg"`
-	Data map[string]int `json:"data"`
+type bitcoinTip struct {
+	Height    int64  `json:"height"`
+	BlockHash string `json:"block_hash"`
 }
 
 type HTTPTemplateBackend struct {
@@ -126,30 +125,29 @@ func (b *HTTPTemplateBackend) SubmitSolution(solution *MiningSolution) (*FoundBl
 	return resp.Data, nil
 }
 
-func (b *HTTPTemplateBackend) TipHeight() (int64, error) {
+func (b *HTTPTemplateBackend) Tip() (int64, string, error) {
 	if b.baseURL == "" {
-		return 0, fmt.Errorf("btc lucky http-template backend missing base url")
+		return 0, "", fmt.Errorf("btc lucky http-template backend missing base url")
 	}
-	var resp bestHeightResponse
-	if err := b.get("/bestheight", &resp); err != nil {
+	var resp APIResponse[*bitcoinTip]
+	if err := b.get("/v3/bitcoin/tip", &resp); err != nil {
 		b.setError(err)
-		return 0, err
+		return 0, "", err
 	}
 	if resp.Code != 0 {
 		err := errors.New(resp.Msg)
 		b.setError(err)
-		return 0, err
+		return 0, "", err
 	}
-	height, ok := resp.Data["height"]
-	if !ok {
-		err := fmt.Errorf("btc lucky indexer bestheight response missing height")
+	if resp.Data == nil || resp.Data.BlockHash == "" {
+		err := fmt.Errorf("btc lucky indexer returned empty tip")
 		b.setError(err)
-		return 0, err
+		return 0, "", err
 	}
 	b.mu.Lock()
 	b.lastErr = ""
 	b.mu.Unlock()
-	return int64(height), nil
+	return resp.Data.Height, resp.Data.BlockHash, nil
 }
 
 func (b *HTTPTemplateBackend) Status() TemplateServiceStatus {
