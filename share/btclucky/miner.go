@@ -236,10 +236,20 @@ func (m *Miner) mineJob(job *CompactMiningJob, jobGen uint64) {
 		close(done)
 	}()
 
-	select {
-	case <-m.quit:
-		workerWg.Wait()
-	case <-done:
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-m.quit:
+			workerWg.Wait()
+			return
+		case <-done:
+			return
+		case <-ticker.C:
+			st := m.Status()
+			log.Infof("BTC lucky miner statistics: running=%v jobs=%d hashrate=%.2f H/s btc_height=%d job_id=%s last_error=%q",
+				st.Running, st.Jobs, st.HashesPerSecond, st.BTCHeight, st.JobID, st.LastError)
+		}
 	}
 }
 
@@ -249,6 +259,25 @@ func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
 		m.setError(fmt.Errorf("invalid btc lucky target %q", job.Target))
 		return
 	}
+
+	header, err := prepareMiningHeader(job, r)
+	if err != nil {
+		m.setError(err)
+		return
+	}
+
+	// Each worker owns its statistics until it reports or leaves the range.
+	var count uint64
+	var best btcchainhash.Hash
+	lastReport := time.Now()
+	flush := func() {
+		if count > 0 {
+			m.speed.Add(count)
+			m.updateBestShare(best.String())
+			count = 0
+		}
+	}
+	defer flush()
 
 	for extraNonce := r.ExtraNonceStart; extraNonce <= r.ExtraNonceEnd; extraNonce++ {
 		for nonce := uint32(0); ; nonce++ {
@@ -261,16 +290,13 @@ func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
 				return
 			}
 
-			hash, err := m.currentWork(job, r, nonce)
-			if err != nil {
-				m.setError(err)
-				return
+			hash := header.hashNonce(nonce)
+			if count == 0 || lessWorkHash(&hash, &best) {
+				best = hash
 			}
-			m.speed.Add(1)
-			m.lowPriorityPause(uint64(nonce))
-			m.updateBestShare(hash.String())
+			count++
 
-			if hashToBig(hash).Cmp(target) <= 0 {
+			if hashToBig(&hash).Cmp(target) <= 0 {
 				solution := &MiningSolution{
 					JobID:         job.JobID,
 					TemplateID:    job.TemplateID,
@@ -305,6 +331,11 @@ func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
 				return
 			}
 
+			if count%256 == 0 && time.Since(lastReport) >= time.Second {
+				flush()
+				lastReport = time.Now()
+			}
+			m.lowPriorityPause(uint64(nonce))
 			if nonce == ^uint32(0) {
 				break
 			}
@@ -315,6 +346,16 @@ func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
 	}
 }
 
+// Bitcoin stores a work hash with its least significant byte first.
+func lessWorkHash(a, b *btcchainhash.Hash) bool {
+	for i := len(a) - 1; i >= 0; i-- {
+		if a[i] != b[i] {
+			return a[i] < b[i]
+		}
+	}
+	return false
+}
+
 func (m *Miner) lowPriorityPause(nonce uint64) {
 	if nonce%lowPriorityYieldEvery == 0 {
 		runtime.Gosched()
@@ -322,14 +363,6 @@ func (m *Miner) lowPriorityPause(nonce uint64) {
 	if m.cfg.LowPriority && nonce%lowPrioritySleepEvery == 0 {
 		time.Sleep(m.cfg.LowPrioritySleep)
 	}
-}
-
-func (m *Miner) currentWork(job *CompactMiningJob, r WorkerRange, nonce uint32) (*btcchainhash.Hash, error) {
-	hash, err := hashCompactJobHeader(job, r, nonce)
-	if err != nil {
-		return nil, err
-	}
-	return &hash, nil
 }
 
 func (m *Miner) setJob(job *CompactMiningJob) {

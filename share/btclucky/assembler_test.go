@@ -129,15 +129,16 @@ func TestCompactJobHeaderHashMatchesAssembledWork(t *testing.T) {
 		Bits:              tpl.Bits,
 		CurTime:           tpl.CurTime,
 	}
-	hash, err := hashCompactJobHeader(job, WorkerRange{
+	header, err := prepareMiningHeader(job, WorkerRange{
 		WorkerID:        0,
 		ExtraNonceStart: 7,
 		ExtraNonceEnd:   7,
 		MerkleRoot:      work.header.MerkleRoot.String(),
-	}, 11)
+	})
 	if err != nil {
-		t.Fatalf("hashCompactJobHeader: %v", err)
+		t.Fatalf("prepareMiningHeader: %v", err)
 	}
+	hash := header.hashNonce(11)
 	if hash != work.blockHash {
 		t.Fatalf("compact hash = %s, want %s", hash, work.blockHash)
 	}

@@ -45,25 +45,27 @@ func makeWorkerRanges(workers int) []WorkerRange {
 	return ranges
 }
 
-func hashCompactJobHeader(job *CompactMiningJob, r WorkerRange, nonce uint32) (btcchainhash.Hash, error) {
-	var zero btcchainhash.Hash
+type miningHeader [btcwire.MaxBlockHeaderPayload]byte
+
+func prepareMiningHeader(job *CompactMiningJob, r WorkerRange) (miningHeader, error) {
+	var data miningHeader
 	if job == nil {
-		return zero, fmt.Errorf("nil compact mining job")
+		return data, fmt.Errorf("nil compact mining job")
 	}
 	if r.MerkleRoot == "" {
-		return zero, fmt.Errorf("compact mining job missing worker merkle root")
+		return data, fmt.Errorf("compact mining job missing worker merkle root")
 	}
 	prevHash, err := btcchainhash.NewHashFromStr(job.PreviousBlockHash)
 	if err != nil {
-		return zero, fmt.Errorf("invalid previous block hash: %w", err)
+		return data, fmt.Errorf("invalid previous block hash: %w", err)
 	}
 	merkleRoot, err := btcchainhash.NewHashFromStr(r.MerkleRoot)
 	if err != nil {
-		return zero, fmt.Errorf("invalid merkle root: %w", err)
+		return data, fmt.Errorf("invalid merkle root: %w", err)
 	}
 	bits64, err := strconv.ParseUint(job.Bits, 16, 32)
 	if err != nil {
-		return zero, fmt.Errorf("invalid template bits %q: %w", job.Bits, err)
+		return data, fmt.Errorf("invalid template bits %q: %w", job.Bits, err)
 	}
 	header := btcwire.BlockHeader{
 		Version:    job.Version,
@@ -71,9 +73,15 @@ func hashCompactJobHeader(job *CompactMiningJob, r WorkerRange, nonce uint32) (b
 		MerkleRoot: *merkleRoot,
 		Timestamp:  time.Unix(job.CurTime, 0),
 		Bits:       uint32(bits64),
-		Nonce:      nonce,
 	}
-	return header.BlockHash(), nil
+	err = header.Serialize(bytes.NewBuffer(data[:0]))
+	return data, err
+}
+
+func (h *miningHeader) hashNonce(nonce uint32) btcchainhash.Hash {
+	// The nonce occupies the last four bytes of the serialized Bitcoin header.
+	binary.LittleEndian.PutUint32(h[len(h)-4:], nonce)
+	return btcchainhash.DoubleHashH(h[:])
 }
 
 func btcPayToAddrScript(addr string, params *btcchaincfg.Params) ([]byte, error) {
