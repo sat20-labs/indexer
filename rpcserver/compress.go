@@ -40,6 +40,12 @@ func (w *gzipResponseWriter) Write(data []byte) (int, error) {
 // CompressionMiddleware handles gzip, brotli, and zstd compression
 func CompressionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// The full, shared Bitcoin template is serialized once. Avoid rerunning
+		// a block-sized compressor (and writing an encoded body on 304) per miner.
+		if strings.HasSuffix(c.FullPath(), "/btc/lucky/template") {
+			c.Next()
+			return
+		}
 		acceptEncoding := c.Request.Header.Get("Accept-Encoding")
 		if strings.Contains(acceptEncoding, "br") {
 			c.Writer.Header().Set("Content-Encoding", "br")

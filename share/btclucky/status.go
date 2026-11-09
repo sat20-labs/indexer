@@ -18,9 +18,9 @@ type MinerStatus struct {
 	HashesPerSecond  float64            `json:"hashesPerSecond"`
 	BestShare        string             `json:"bestShare"`
 	CurrentTarget    string             `json:"currentTarget"`
-	JobID            string             `json:"jobId"`
+	TemplateID       string             `json:"templateId"`
 	BTCHeight        int64              `json:"btcHeight"`
-	LastJobTime      time.Time          `json:"lastJobTime"`
+	LastTemplateTime time.Time          `json:"lastTemplateTime"`
 	LastSubmitTime   time.Time          `json:"lastSubmitTime"`
 	LastSubmitResult string             `json:"lastSubmitResult"`
 	LastError        string             `json:"lastError"`
@@ -36,7 +36,6 @@ type TemplateServiceStatus struct {
 	BTCNetwork        string    `json:"btcNetwork"`
 	BTCHeight         int64     `json:"btcHeight"`
 	TemplateCacheSize int       `json:"templateCacheSize"`
-	ActiveJobs        int       `json:"activeJobs"`
 	LastTemplateTime  time.Time `json:"lastTemplateTime"`
 	LastSubmitTime    time.Time `json:"lastSubmitTime"`
 	LastSubmitResult  string    `json:"lastSubmitResult"`

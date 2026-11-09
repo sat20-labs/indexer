@@ -1,13 +1,18 @@
 package btclucky
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/binary"
+	"errors"
 	"fmt"
-	"math/big"
 	"runtime"
+	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/chaincfg"
 	btcchainhash "github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
@@ -19,21 +24,17 @@ const (
 type Miner struct {
 	mu      sync.Mutex
 	cfg     BTCLuckyMinerConfig
-	backend MiningJobBackend
+	backend MiningBackend
 	jobs    int
 	speed   *speedMonitor
 	status  MinerStatus
 	quit    chan struct{}
 	wg      sync.WaitGroup
 	running bool
-	jobGen  uint64
+	params  *chaincfg.Params
 }
 
-type tipProvider interface {
-	Tip() (int64, string, error)
-}
-
-func NewMiner(cfg BTCLuckyMinerConfig, backend MiningJobBackend) (*Miner, error) {
+func NewMiner(cfg BTCLuckyMinerConfig, backend MiningBackend) (*Miner, error) {
 	cfg.Normalize()
 	if backend == nil {
 		return nil, fmt.Errorf("btc lucky mining backend is required")
@@ -45,7 +46,15 @@ func NewMiner(cfg BTCLuckyMinerConfig, backend MiningJobBackend) (*Miner, error)
 	if err != nil {
 		return nil, err
 	}
+	params, err := BTCChainParams(cfg.Network)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := btcPayToAddrScript(cfg.RewardAddr, params); err != nil {
+		return nil, err
+	}
 	return &Miner{
+		params:  params,
 		cfg:     cfg,
 		backend: backend,
 		jobs:    jobs,
@@ -72,25 +81,9 @@ func (m *Miner) Start() error {
 	m.quit = make(chan struct{})
 	m.running = true
 	m.status.Running = true
-	m.mu.Unlock()
-
-	if !m.backend.IsReady() {
-		if err := m.backend.Start(); err != nil {
-			m.setError(err)
-			m.mu.Lock()
-			m.running = false
-			m.status.Running = false
-			m.mu.Unlock()
-			return err
-		}
-	}
-
 	m.wg.Add(1)
 	go m.controller()
-	if _, ok := m.backend.(tipProvider); ok {
-		m.wg.Add(1)
-		go m.tipMonitor()
-	}
+	m.mu.Unlock()
 	log.Infof("BTC lucky miner started with %d jobs", m.jobs)
 	return nil
 }
@@ -120,15 +113,13 @@ func (m *Miner) HashesPerSecond() float64 {
 	return m.speed.HashesPerSecond()
 }
 
-func (m *Miner) NotifyBlockUpdated() {
-	atomic.AddUint64(&m.jobGen, 1)
-}
-
 func (m *Miner) Status() MinerStatus {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	st := m.status
-	st.HashesPerSecond = m.speed.HashesPerSecond()
+	if m.running {
+		st.HashesPerSecond = m.speed.HashesPerSecond()
+	}
 	if backend, ok := m.backend.(interface {
 		FoundBlocks() []FoundBlockRecord
 	}); ok {
@@ -139,134 +130,155 @@ func (m *Miner) Status() MinerStatus {
 
 func (m *Miner) controller() {
 	defer m.wg.Done()
-
+	updates := make(chan *BlockTemplate)
+	refresh := make(chan struct{}, 1)
+	var monitor sync.WaitGroup
+	monitor.Add(1)
+	go func() { defer monitor.Done(); m.watchTemplates(updates, refresh) }()
+	defer monitor.Wait()
+	var tpl *BlockTemplate
 	for {
-		select {
-		case <-m.quit:
-			return
-		default:
+		if tpl == nil {
+			select {
+			case <-m.quit:
+				return
+			case tpl = <-updates:
+			}
 		}
-
-		job, err := m.backend.CurrentJob(JobRequest{
-			Network:       m.cfg.Network,
-			RewardAddress: m.cfg.RewardAddr,
-			MinerID:       m.cfg.MinerID,
-			Jobs:          m.jobs,
-		})
+		m.setTemplate(tpl)
+		next, candidate, err := m.mineTemplate(tpl, updates)
 		if err != nil {
 			m.setError(err)
-			if !sleepOrDone(m.quit, 10*time.Second) {
-				return
-			}
-			continue
 		}
-		m.setJob(job)
-		jobGen := atomic.LoadUint64(&m.jobGen)
-		m.mineJob(job, jobGen)
+		if len(candidate) > 0 {
+			m.submit(candidate)
+			select {
+			case refresh <- struct{}{}:
+			default:
+			}
+		}
+		tpl = next
 	}
 }
 
-func (m *Miner) tipMonitor() {
-	defer m.wg.Done()
-
-	provider, ok := m.backend.(tipProvider)
-	if !ok {
-		return
-	}
-
+// One outstanding GET per miner. A slow template fetch must never delay
+// publishing a block that another goroutine has already solved.
+func (m *Miner) watchTemplates(updates chan<- *BlockTemplate, refresh <-chan struct{}) {
 	ticker := time.NewTicker(m.cfg.TipCheckInterval)
 	defer ticker.Stop()
-
-	var lastTip int64
-	var lastTipHash string
-	checkTip := func() {
-		height, blockHash, err := provider.Tip()
-		if err != nil {
+	var previous string
+	var fetchFailed bool
+	lastLog := time.Now()
+	for {
+		t, err := m.backend.CurrentTemplate()
+		if err != nil || fetchFailed {
 			m.setError(err)
-			return
 		}
-		if height <= 0 {
-			return
-		}
-
-		m.mu.Lock()
-		jobHeight := m.status.BTCHeight
-		m.mu.Unlock()
-
-		if lastTip == 0 {
-			lastTip = height
-			lastTipHash = blockHash
-			if jobHeight > 0 && height >= jobHeight {
-				m.NotifyBlockUpdated()
+		fetchFailed = err != nil
+		if err == nil && t != nil && t.ID != previous {
+			select {
+			case updates <- t:
+				previous = t.ID
+			case <-m.quit:
+				return
 			}
-			return
 		}
-		if height != lastTip || blockHash != lastTipHash || (jobHeight > 0 && height >= jobHeight) {
-			lastTip = height
-			lastTipHash = blockHash
-			m.NotifyBlockUpdated()
-		}
-	}
-
-	checkTip()
-	for {
-		select {
-		case <-m.quit:
-			return
-		case <-ticker.C:
-			checkTip()
-		}
-	}
-}
-
-func (m *Miner) mineJob(job *CompactMiningJob, jobGen uint64) {
-	var workerWg sync.WaitGroup
-	for _, r := range job.WorkerRanges {
-		workerRange := r
-		workerWg.Add(1)
-		go func() {
-			defer workerWg.Done()
-			m.mineRange(job, workerRange, jobGen)
-		}()
-	}
-
-	done := make(chan struct{})
-	go func() {
-		workerWg.Wait()
-		close(done)
-	}()
-
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-m.quit:
-			workerWg.Wait()
-			return
-		case <-done:
-			return
-		case <-ticker.C:
+		if time.Since(lastLog) >= 30*time.Second {
 			st := m.Status()
-			log.Infof("BTC lucky miner statistics: running=%v jobs=%d hashrate=%.2f H/s btc_height=%d job_id=%s last_error=%q",
-				st.Running, st.Jobs, st.HashesPerSecond, st.BTCHeight, st.JobID, st.LastError)
+			log.Infof("BTC lucky miner: workers=%d hashrate=%.2f H/s height=%d template=%s error=%q", st.Jobs, st.HashesPerSecond, st.BTCHeight, st.TemplateID, st.LastError)
+			lastLog = time.Now()
+		}
+		select {
+		case <-m.quit:
+			return
+		case <-refresh:
+		case <-ticker.C:
 		}
 	}
 }
 
-func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
-	target, ok := new(big.Int).SetString(job.Target, 16)
-	if !ok {
-		m.setError(fmt.Errorf("invalid btc lucky target %q", job.Target))
-		return
+func (m *Miner) submit(raw []byte) {
+	for {
+		record, err := m.backend.SubmitBlock(raw)
+		if err == nil && record != nil {
+			m.setSubmit(record.SubmitResult)
+			log.Infof("BTC lucky block submitted hash=%s result=%s", record.BlockHash, record.SubmitResult)
+			return
+		}
+		if err == nil {
+			err = fmt.Errorf("missing Bitcoin submission result")
+		}
+		m.setSubmit(err.Error())
+		if !errors.Is(err, ErrCoreUnavailable) || !sleepOrDone(m.quit, time.Second) {
+			return
+		}
 	}
+}
 
-	header, err := prepareMiningHeader(job, r)
+// Continue hashing the downloaded template during an indexer outage. Stop
+// workers only after a replacement is in hand, on success, or on shutdown.
+func (m *Miner) mineTemplate(t *BlockTemplate, updates <-chan *BlockTemplate) (*BlockTemplate, []byte, error) {
+	params, err := BTCChainParams(t.Network)
+	if err != nil || params.Net != m.params.Net {
+		return nil, nil, fmt.Errorf("unexpected template network %q", t.Network)
+	}
+	bits, err := strconv.ParseUint(t.Bits, 16, 32)
 	if err != nil {
-		m.setError(err)
-		return
+		return nil, nil, err
 	}
+	difficulty := blockchain.CompactToBig(uint32(bits))
+	if difficulty.Sign() <= 0 || difficulty.Cmp(params.PowLimit) > 0 {
+		return nil, nil, fmt.Errorf("invalid Bitcoin bits %q", t.Bits)
+	}
+	target, err := btcchainhash.NewHashFromStr(fmt.Sprintf("%064x", difficulty))
+	if err != nil || (t.Target != "" && target.String() != t.Target) {
+		return nil, nil, fmt.Errorf("inconsistent Bitcoin target %q", t.Target)
+	}
+	var seed [8]byte
+	if _, err := rand.Read(seed[:]); err != nil {
+		return nil, nil, err
+	}
+	start := binary.LittleEndian.Uint64(seed[:])
+	type result struct {
+		raw []byte
+		err error
+	}
+	found := make(chan result, 1)
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < m.jobs; i++ {
+		wg.Add(1)
+		go func(extra uint64) {
+			defer wg.Done()
+			raw, err := m.mineRange(t, target, extra, stop)
+			if err != nil || raw != nil {
+				select {
+				case found <- result{raw, err}:
+				default:
+				}
+			}
+		}(start + uint64(i))
+	}
+	var next *BlockTemplate
+	var hit result
+	select {
+	case <-m.quit:
+	case hit = <-found:
+	case next = <-updates:
+	}
+	close(stop)
+	wg.Wait()
+	// A worker can find a valid block while the replacement GET is in flight.
+	if hit.raw == nil && hit.err == nil {
+		select {
+		case hit = <-found:
+		default:
+		}
+	}
+	return next, hit.raw, hit.err
+}
 
-	// Each worker owns its statistics until it reports or leaves the range.
+func (m *Miner) mineRange(t *BlockTemplate, target *btcchainhash.Hash, extra uint64, stop <-chan struct{}) ([]byte, error) {
 	var count uint64
 	var best btcchainhash.Hash
 	lastReport := time.Now()
@@ -278,70 +290,42 @@ func (m *Miner) mineRange(job *CompactMiningJob, r WorkerRange, jobGen uint64) {
 		}
 	}
 	defer flush()
-
-	for extraNonce := r.ExtraNonceStart; extraNonce <= r.ExtraNonceEnd; extraNonce++ {
+	for ; ; extra += uint64(m.jobs) {
+		cb, header, err := t.work(m.params, m.cfg.RewardAddr, extra)
+		if err != nil {
+			return nil, err
+		}
+		var data miningHeader
+		if err := header.Serialize(bytes.NewBuffer(data[:0])); err != nil {
+			return nil, err
+		}
 		for nonce := uint32(0); ; nonce++ {
-			select {
-			case <-m.quit:
-				return
-			default:
+			if nonce%256 == 0 {
+				select {
+				case <-stop:
+					return nil, nil
+				case <-m.quit:
+					return nil, nil
+				default:
+				}
+				if time.Since(lastReport) >= time.Second {
+					flush()
+					lastReport = time.Now()
+				}
 			}
-			if atomic.LoadUint64(&m.jobGen) != jobGen {
-				return
-			}
-
-			hash := header.hashNonce(nonce)
+			hash := data.hashNonce(nonce)
 			if count == 0 || lessWorkHash(&hash, &best) {
 				best = hash
 			}
 			count++
-
-			if hashToBig(&hash).Cmp(target) <= 0 {
-				solution := &MiningSolution{
-					JobID:         job.JobID,
-					TemplateID:    job.TemplateID,
-					Network:       job.Network,
-					RewardAddress: job.RewardAddress,
-					WorkerID:      r.WorkerID,
-					ExtraNonce:    extraNonce,
-					NTime:         job.CurTime,
-					Nonce:         nonce,
-					HeaderHash:    hash.String(),
-				}
-				record, err := m.backend.SubmitSolution(solution)
-				if err != nil {
-					if record != nil {
-						log.Infof("BTC lucky miner found block submit failed block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s job_id=%s template_id=%s worker_id=%d submitted=%v result=%q error=%q",
-							record.BlockHash, record.BlockHeight, record.CoinbaseTxID, record.Vout, record.Amount,
-							record.RewardAddress, record.JobID, record.TemplateID, solution.WorkerID,
-							record.Submitted, record.SubmitResult, err.Error())
-					} else {
-						log.Infof("BTC lucky miner found candidate submit failed header_hash=%s reward_address=%s job_id=%s template_id=%s worker_id=%d extra_nonce=%d nonce=%d ntime=%d error=%q",
-							solution.HeaderHash, solution.RewardAddress, solution.JobID, solution.TemplateID,
-							solution.WorkerID, solution.ExtraNonce, solution.Nonce, solution.NTime, err.Error())
-					}
-					m.setSubmit(err.Error())
-					return
-				}
-				log.Infof("BTC lucky miner found block submitted block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s job_id=%s template_id=%s worker_id=%d submitted=%v result=%q",
-					record.BlockHash, record.BlockHeight, record.CoinbaseTxID, record.Vout, record.Amount,
-					record.RewardAddress, record.JobID, record.TemplateID, solution.WorkerID,
-					record.Submitted, record.SubmitResult)
-				m.setSubmit(record.SubmitResult)
-				return
+			if !lessWorkHash(target, &hash) {
+				header.Nonce = nonce
+				return t.blockBytes(cb, header)
 			}
-
-			if count%256 == 0 && time.Since(lastReport) >= time.Second {
-				flush()
-				lastReport = time.Now()
-			}
-			m.lowPriorityPause(uint64(nonce))
+			m.lowPriorityPause(uint64(nonce), stop)
 			if nonce == ^uint32(0) {
 				break
 			}
-		}
-		if extraNonce == ^uint64(0) {
-			return
 		}
 	}
 }
@@ -356,29 +340,36 @@ func lessWorkHash(a, b *btcchainhash.Hash) bool {
 	return false
 }
 
-func (m *Miner) lowPriorityPause(nonce uint64) {
+func (m *Miner) lowPriorityPause(nonce uint64, stop <-chan struct{}) {
 	if nonce%lowPriorityYieldEvery == 0 {
-		runtime.Gosched()
+		if runtime.GOOS == "js" && !m.cfg.LowPriority {
+			// Go scheduling alone cannot return control to the browser event loop.
+			time.Sleep(time.Millisecond)
+		} else {
+			runtime.Gosched()
+		}
 	}
 	if m.cfg.LowPriority && nonce%lowPrioritySleepEvery == 0 {
-		time.Sleep(m.cfg.LowPrioritySleep)
+		sleepOrDone(stop, m.cfg.LowPrioritySleep)
 	}
 }
 
-func (m *Miner) setJob(job *CompactMiningJob) {
+func (m *Miner) setTemplate(t *BlockTemplate) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.status.JobID = job.JobID
-	m.status.CurrentTarget = job.Target
-	m.status.BTCHeight = job.Height
-	m.status.LastJobTime = time.Now()
+	m.status.TemplateID = t.ID
+	m.status.CurrentTarget = t.Target
+	m.status.BTCHeight = t.Height
+	m.status.LastTemplateTime = time.Now()
 	m.status.LastError = ""
 }
 
 func (m *Miner) setError(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err != nil {
+	if err == nil {
+		m.status.LastError = ""
+	} else {
 		m.status.LastError = err.Error()
 	}
 }

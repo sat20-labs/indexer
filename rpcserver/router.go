@@ -55,7 +55,6 @@ type Rpc struct {
 
 func NewRpc(baseIndexer *indexer.IndexerMgr, chain string) *Rpc {
 	btcdService := bitcoind.NewService(baseIndexer.Config(), baseIndexer.LocalDB())
-	baseIndexer.SetBTCLuckyTemplateService(btcdService.BTCLuckyTemplateService())
 	return &Rpc{
 		basicService: base.NewService(baseIndexer),
 		ordxService:  ordx.NewService(baseIndexer),
@@ -104,10 +103,10 @@ func (s *Rpc) Start(rpcUrl, swaggerHost, swaggerSchemes, rpcProxy, rpcLogFile st
 	engine.Use(gin.Recovery())
 
 	config := cors.Config{
-		AllowOrigins: []string{"*", "sat20.org", "ordx.market", "localhost"},
-		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
-		// ExposeHeaders:    []string{"Content-Length"},
+		AllowOrigins:  []string{"*", "sat20.org", "ordx.market", "localhost"},
+		AllowMethods:  []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:  []string{"Origin", "Content-Length", "Content-Type", "Authorization", "If-None-Match"},
+		ExposeHeaders: []string{"ETag"},
 		// AllowCredentials: true,
 		MaxAge: 12 * time.Hour,
 	}

@@ -30,7 +30,6 @@ func NewService(cfg *config.YamlConf, localDB common.KVDB) *Service {
 		RPCPass:          cfg.ShareRPC.Bitcoin.Password,
 		RPCDisableTLS:    true,
 		Network:          network,
-		CacheLimit:       16,
 		FoundBlocksDB:    localDB,
 		CoinbaseMaturity: cfg.ShareRPC.Bitcoin.CoinbaseMaturity,
 	})
@@ -43,13 +42,6 @@ func NewService(cfg *config.YamlConf, localDB common.KVDB) *Service {
 	}
 	s.btcLucky = svc
 	return s
-}
-
-func (s *Service) BTCLuckyTemplateService() *btclucky.TemplateService {
-	if s == nil {
-		return nil
-	}
-	return s.btcLucky
 }
 
 func (s *Service) InitRouter(r *gin.Engine, basePath string) {
@@ -74,7 +66,7 @@ func (s *Service) InitRouter(r *gin.Engine, basePath string) {
 	r.GET(basePath+"/btc/block/blockhash/:height", s.getBlockHash)
 	r.GET(basePath+"/btc/block/bestblockheight", s.getBestBlockHeight)
 	r.GET(basePath+"/btc/fee/summary", s.feeSummary)
-	r.POST(basePath+"/btc/lucky/job", s.getBTCLuckyJob)
-	r.POST(basePath+"/btc/lucky/submit", s.submitBTCLuckySolution)
+	r.GET(basePath+"/btc/lucky/template", s.getBTCLuckyTemplate)
+	r.POST(basePath+"/v3/bitcoin/block/submit", s.submitBitcoinBlock)
 	r.GET(basePath+"/btc/lucky/info", s.getBTCLuckyInfo)
 }

@@ -2,14 +2,17 @@ package btclucky
 
 import (
 	"bytes"
+	"encoding/hex"
 	"math/big"
 	"testing"
 
+	btcblockchain "github.com/btcsuite/btcd/blockchain"
 	btcbtcec "github.com/btcsuite/btcd/btcec/v2"
 	btcbtcjson "github.com/btcsuite/btcd/btcjson"
 	btcbtcutil "github.com/btcsuite/btcd/btcutil"
 	btcchaincfg "github.com/btcsuite/btcd/chaincfg"
-	"github.com/sat20-labs/indexer/indexer/db"
+	btcchainhash "github.com/btcsuite/btcd/chaincfg/chainhash"
+	btcwire "github.com/btcsuite/btcd/wire"
 )
 
 func testTemplate() *btcbtcjson.GetBlockTemplateResult {
@@ -25,6 +28,35 @@ func testTemplate() *btcbtcjson.GetBlockTemplateResult {
 		Target:        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 		WorkID:        "test-work",
 	}
+}
+
+func templateWithTxs(t *testing.T) (*btcbtcjson.GetBlockTemplateResult, [][]byte) {
+	t.Helper()
+	tpl := testTemplate()
+	rawTxs := make([][]byte, 2)
+	for i := range rawTxs {
+		tx := btcwire.NewMsgTx(2)
+		var prev btcchainhash.Hash
+		prev[0] = byte(i + 1)
+		tx.AddTxIn(&btcwire.TxIn{
+			PreviousOutPoint: btcwire.OutPoint{Hash: prev, Index: uint32(i)},
+			SignatureScript:  []byte{0x51},
+			Sequence:         ^uint32(0),
+			Witness:          btcwire.TxWitness{{byte(i + 1), 0x02}},
+		})
+		tx.AddTxOut(btcwire.NewTxOut(int64(1000+i), []byte{0x51}))
+		var buf bytes.Buffer
+		if err := tx.Serialize(&buf); err != nil {
+			t.Fatalf("serialize template transaction: %v", err)
+		}
+		rawTxs[i] = append([]byte(nil), buf.Bytes()...)
+		tpl.Transactions = append(tpl.Transactions, btcbtcjson.GetBlockTemplateResultTx{
+			Data: hex.EncodeToString(rawTxs[i]),
+			Hash: tx.WitnessHash().String(),
+			TxID: tx.TxHash().String(),
+		})
+	}
+	return tpl, rawTxs
 }
 
 func testRewardAddress(t *testing.T) string {
@@ -63,84 +95,101 @@ func TestResolveJobCount(t *testing.T) {
 	}
 }
 
-func TestMakeWorkerRanges(t *testing.T) {
-	ranges := makeWorkerRanges(4)
-	if len(ranges) != 4 {
-		t.Fatalf("range count = %d, want 4", len(ranges))
-	}
-	for i, r := range ranges {
-		if r.WorkerID != i {
-			t.Fatalf("worker id = %d, want %d", r.WorkerID, i)
-		}
-		if r.ExtraNonceStart != r.ExtraNonceEnd {
-			t.Fatalf("range %d is not a compact fixed extranonce range", i)
-		}
-	}
-}
-
-func TestAssembleBTCWorkUsesBitcoinWireSerialization(t *testing.T) {
+func TestBlockBytesWireEncoding(t *testing.T) {
 	rewardAddr := testRewardAddress(t)
-	minerID := "miner-pubkey"
-	work, err := assembleBTCWork(testTemplate(), &btcchaincfg.MainNetParams, rewardAddr, minerID, 7, 11, 1700000001)
+	tplResult, rawTxs := templateWithTxs(t)
+	tpl, err := newBlockTemplate(tplResult, "mainnet")
 	if err != nil {
-		t.Fatalf("assembleBTCWork: %v", err)
+		t.Fatalf("newBlockTemplate: %v", err)
 	}
-	if len(work.block.Transactions) != 1 {
-		t.Fatalf("tx count = %d, want 1", len(work.block.Transactions))
+	coinbase, header, err := tpl.work(&btcchaincfg.MainNetParams, rewardAddr, 7)
+	if err != nil {
+		t.Fatalf("BlockTemplate.work: %v", err)
 	}
-	if got := work.coinbase.TxOut[0].Value; got != 5000000000 {
+	if got := coinbase.TxOut[0].Value; got != 5000000000 {
 		t.Fatalf("coinbase value = %d", got)
 	}
 
 	var txBuf bytes.Buffer
-	if err := work.coinbase.Serialize(&txBuf); err != nil {
+	if err := coinbase.Serialize(&txBuf); err != nil {
 		t.Fatalf("serialize coinbase: %v", err)
 	}
 	decoded, err := btcbtcutil.NewTxFromBytes(txBuf.Bytes())
 	if err != nil {
 		t.Fatalf("decode serialized coinbase as btc tx: %v", err)
 	}
-	if decoded.MsgTx().TxOut[0].Value != work.coinbase.TxOut[0].Value {
+	if decoded.MsgTx().TxOut[0].Value != coinbase.TxOut[0].Value {
 		t.Fatalf("decoded coinbase value mismatch")
 	}
-	if !bytes.Contains(work.coinbase.TxIn[0].SignatureScript, []byte(coinbaseTag)) {
+	if !bytes.Contains(coinbase.TxIn[0].SignatureScript, []byte(coinbaseTag)) {
 		t.Fatalf("coinbase signature script missing tag %q", coinbaseTag)
 	}
 
-	var blockBuf bytes.Buffer
-	if err := work.block.Serialize(&blockBuf); err != nil {
-		t.Fatalf("serialize block: %v", err)
+	header.Nonce = 11
+	blockBytes, err := tpl.blockBytes(coinbase, header)
+	if err != nil {
+		t.Fatalf("BlockTemplate.blockBytes: %v", err)
 	}
-	if _, err := btcbtcutil.NewBlockFromBytes(blockBuf.Bytes()); err != nil {
+	block, err := btcbtcutil.NewBlockFromBytes(blockBytes)
+	if err != nil {
 		t.Fatalf("decode serialized block as btc block: %v", err)
+	}
+	if got, want := len(block.Transactions()), len(rawTxs)+1; got != want {
+		t.Fatalf("block transaction count = %d, want %d", got, want)
+	}
+	var rawTxSuffix bytes.Buffer
+	for i, tx := range rawTxs {
+		got := block.MsgBlock().Transactions[i+1]
+		if got.TxHash() != *block.Transactions()[i+1].Hash() {
+			t.Fatalf("template transaction %d txid mismatch", i)
+		}
+		if len(got.TxIn[0].Witness) != 1 || !bytes.Equal(got.TxIn[0].Witness[0], []byte{byte(i + 1), 0x02}) {
+			t.Fatalf("template transaction %d witness changed", i)
+		}
+		_, _ = rawTxSuffix.Write(tx)
+	}
+	if !bytes.HasSuffix(blockBytes, rawTxSuffix.Bytes()) {
+		t.Fatal("block bytes do not preserve template transaction bytes")
+	}
+	if got, want := header.MerkleRoot, btcblockchain.CalcMerkleRoot(block.Transactions(), false); got != want {
+		t.Fatalf("merkle root = %s, want %s", got, want)
 	}
 }
 
-func TestCompactJobHeaderHashMatchesAssembledWork(t *testing.T) {
-	tpl := testTemplate()
+func TestWorkHeaderHash(t *testing.T) {
+	tplResult, _ := templateWithTxs(t)
+	tplResult.Transactions = tplResult.Transactions[:1]
+	tpl, err := newBlockTemplate(tplResult, "mainnet")
+	if err != nil {
+		t.Fatalf("newBlockTemplate: %v", err)
+	}
+	if len(tpl.MerkleBranch) != 1 || tpl.MerkleBranch[0] != tplResult.Transactions[0].TxID {
+		t.Fatalf("two-leaf merkle branch = %v, want sibling %s", tpl.MerkleBranch, tplResult.Transactions[0].TxID)
+	}
 	rewardAddr := testRewardAddress(t)
-	work, err := assembleBTCWork(tpl, &btcchaincfg.MainNetParams, rewardAddr, "miner-pubkey", 7, 11, tpl.CurTime)
+	coinbase, header, err := tpl.work(&btcchaincfg.MainNetParams, rewardAddr, 7)
 	if err != nil {
-		t.Fatalf("assembleBTCWork: %v", err)
+		t.Fatalf("BlockTemplate.work: %v", err)
 	}
-	job := &CompactMiningJob{
-		PreviousBlockHash: tpl.PreviousHash,
-		Version:           tpl.Version,
-		Bits:              tpl.Bits,
-		CurTime:           tpl.CurTime,
-	}
-	header, err := prepareMiningHeader(job, WorkerRange{
-		WorkerID:        0,
-		ExtraNonceStart: 7,
-		ExtraNonceEnd:   7,
-		MerkleRoot:      work.header.MerkleRoot.String(),
-	})
+	blockBytes, err := tpl.blockBytes(coinbase, header)
 	if err != nil {
-		t.Fatalf("prepareMiningHeader: %v", err)
+		t.Fatalf("BlockTemplate.blockBytes: %v", err)
 	}
-	hash := header.hashNonce(11)
-	if hash != work.blockHash {
-		t.Fatalf("compact hash = %s, want %s", hash, work.blockHash)
+	block, err := btcbtcutil.NewBlockFromBytes(blockBytes)
+	if err != nil {
+		t.Fatalf("decode serialized block as btc block: %v", err)
+	}
+	if got, want := header.MerkleRoot, btcblockchain.CalcMerkleRoot(block.Transactions(), false); got != want {
+		t.Fatalf("two-leaf merkle root = %s, want %s", got, want)
+	}
+	header.Nonce = 11
+	var data miningHeader
+	if err := header.Serialize(bytes.NewBuffer(data[:0])); err != nil {
+		t.Fatalf("serialize header: %v", err)
+	}
+	got, want := data.hashNonce(header.Nonce), header.BlockHash()
+	if got != want {
+		t.Fatalf("mining header hash = %s, want %s", got, want)
 	}
 }
 
@@ -162,88 +211,5 @@ func TestTargetFromTemplate(t *testing.T) {
 	}
 	if target.Sign() <= 0 {
 		t.Fatalf("target from bits must be positive")
-	}
-}
-
-func TestTemplateServiceSubmitSolutionRecordsMetadataOnSubmitError(t *testing.T) {
-	tpl := testTemplate()
-	rewardAddr := testRewardAddress(t)
-	foundDB := db.NewKVDB(t.TempDir())
-	defer foundDB.Close()
-	service, err := NewTemplateService(BTCLuckyTemplateServiceConfig{
-		Enabled:       true,
-		Network:       "mainnet",
-		FoundBlocksDB: foundDB,
-	})
-	if err != nil {
-		t.Fatalf("NewTemplateService: %v", err)
-	}
-
-	job := &CompactMiningJob{
-		JobID:             "job-1",
-		TemplateID:        "template-1",
-		Network:           "mainnet",
-		Height:            tpl.Height,
-		PreviousBlockHash: tpl.PreviousHash,
-		Version:           tpl.Version,
-		Bits:              tpl.Bits,
-		CurTime:           tpl.CurTime,
-		Target:            tpl.Target,
-		RewardAddress:     rewardAddr,
-		MinerID:           "miner-pubkey",
-	}
-	work, err := assembleBTCWork(tpl, &btcchaincfg.MainNetParams, rewardAddr, job.MinerID, 1, 2, tpl.CurTime)
-	if err != nil {
-		t.Fatalf("assembleBTCWork: %v", err)
-	}
-
-	service.jobs[job.JobID] = &cachedBTCJob{
-		job:      job,
-		template: tpl,
-		params:   &btcchaincfg.MainNetParams,
-	}
-	record, err := service.SubmitSolution(&MiningSolution{
-		JobID:         job.JobID,
-		TemplateID:    job.TemplateID,
-		Network:       job.Network,
-		RewardAddress: rewardAddr,
-		ExtraNonce:    1,
-		NTime:         tpl.CurTime,
-		Nonce:         2,
-		HeaderHash:    work.blockHash.String(),
-	})
-	if err == nil {
-		t.Fatalf("expected SubmitSolution to fail without btc rpc client")
-	}
-	if record.BlockHash != work.blockHash.String() {
-		t.Fatalf("record block hash = %s, want %s", record.BlockHash, work.blockHash)
-	}
-	if record.SubmitResult != "btc rpc client is not connected" {
-		t.Fatalf("submit result = %q", record.SubmitResult)
-	}
-	if len(service.FoundBlocks()) != 1 {
-		t.Fatalf("found block count = %d, want 1", len(service.FoundBlocks()))
-	}
-	records, err := loadFoundBlockRecords(foundDB)
-	if err != nil {
-		t.Fatalf("loadFoundBlockRecords: %v", err)
-	}
-	if len(records) != 1 {
-		t.Fatalf("persisted found block count = %d, want 1", len(records))
-	}
-	if records[0].BlockHash != work.blockHash.String() {
-		t.Fatalf("persisted block hash = %s, want %s", records[0].BlockHash, work.blockHash)
-	}
-
-	reloaded, err := NewTemplateService(BTCLuckyTemplateServiceConfig{
-		Enabled:       true,
-		Network:       "mainnet",
-		FoundBlocksDB: foundDB,
-	})
-	if err != nil {
-		t.Fatalf("reload NewTemplateService: %v", err)
-	}
-	if len(reloaded.FoundBlocks()) != 1 {
-		t.Fatalf("reloaded found block count = %d, want 1", len(reloaded.FoundBlocks()))
 	}
 }

@@ -2,37 +2,43 @@ package btclucky
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
 	btcbtcjson "github.com/btcsuite/btcd/btcjson"
 	btcbtcutil "github.com/btcsuite/btcd/btcutil"
 	btcchaincfg "github.com/btcsuite/btcd/chaincfg"
 	btcrpcclient "github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/sat20-labs/indexer/common"
 )
 
 const foundBlockDBPrefix = "btclucky:found:"
 
-type cachedBTCJob struct {
-	job      *CompactMiningJob
-	template *btcbtcjson.GetBlockTemplateResult
-	params   *btcchaincfg.Params
-	created  time.Time
-}
-
 type TemplateService struct {
-	mu      sync.Mutex
-	cfg     BTCLuckyTemplateServiceConfig
-	params  *btcchaincfg.Params
-	client  *btcrpcclient.Client
-	running bool
-	lastTpl *btcbtcjson.GetBlockTemplateResult
-	jobs    map[string]*cachedBTCJob
-	found   []FoundBlockRecord
-	status  TemplateServiceStatus
+	mu         sync.Mutex
+	cfg        BTCLuckyTemplateServiceConfig
+	params     *btcchaincfg.Params
+	client     *btcrpcclient.Client
+	running    bool
+	cacheMu    sync.Mutex
+	body       []byte
+	etag       string
+	parent     string
+	bits       string
+	longPollID string
+	checked    time.Time
+	probeErr   error
+	refreshed  time.Time
+	found      []FoundBlockRecord
+	status     TemplateServiceStatus
 }
 
 func NewTemplateService(cfg BTCLuckyTemplateServiceConfig) (*TemplateService, error) {
@@ -44,7 +50,6 @@ func NewTemplateService(cfg BTCLuckyTemplateServiceConfig) (*TemplateService, er
 	svc := &TemplateService{
 		cfg:    cfg,
 		params: params,
-		jobs:   make(map[string]*cachedBTCJob),
 		status: TemplateServiceStatus{
 			CoinbaseMaturity: cfg.CoinbaseMaturity,
 			Enabled:          cfg.Enabled,
@@ -53,7 +58,7 @@ func NewTemplateService(cfg BTCLuckyTemplateServiceConfig) (*TemplateService, er
 		},
 	}
 	if err := svc.loadFoundBlocks(); err != nil {
-		return nil, err
+		log.Warnf("failed to read BTC lucky found block history: %v", err)
 	}
 	return svc, nil
 }
@@ -106,213 +111,156 @@ func (s *TemplateService) IsReady() bool {
 	return s.running && s.client != nil
 }
 
-func (s *TemplateService) CurrentJob(req JobRequest) (*CompactMiningJob, error) {
-	if req.RewardAddress == "" {
-		return nil, fmt.Errorf("missing btc lucky reward address")
-	}
-	if req.Jobs < 1 {
-		req.Jobs = 1
-	}
-
+// TemplateBytes publishes one immutable response. A burst of GETs shares
+// the same Core probe, including the first request after a restart.
+func (s *TemplateService) TemplateBytes() (payload []byte, tag string, err error) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
 	s.mu.Lock()
 	client := s.client
-	running := s.running
 	s.mu.Unlock()
-	if !running || client == nil {
-		return nil, fmt.Errorf("btc template service is not running")
+	if client == nil {
+		return nil, "", fmt.Errorf("Bitcoin Core is unavailable")
 	}
-
 	now := time.Now()
-	template, err := s.currentTemplate(client)
-	if err != nil {
-		s.setTemplateError(err)
-		return nil, err
+	if now.Sub(s.checked) < time.Second {
+		if s.probeErr != nil {
+			return nil, "", s.probeErr
+		}
+		return s.body, s.etag, nil
 	}
-	if _, err := btcPayToAddrScript(req.RewardAddress, s.params); err != nil {
-		s.setTemplateError(err)
-		return nil, err
-	}
-
-	templateID := templateIDFromTemplate(template)
-	jobID := fmt.Sprintf("%s:%x", templateID, now.UnixNano())
-	target := template.Target
-	if target == "" {
-		t, err := targetFromTemplate(template)
+	// All concurrent miners share the outcome, including a failed Core probe.
+	defer func() {
+		s.checked, s.probeErr = time.Now(), err
 		if err != nil {
 			s.setTemplateError(err)
-			return nil, err
 		}
-		target = fmt.Sprintf("%064x", t)
-	}
-	workerRanges := makeWorkerRanges(req.Jobs)
-	for i := range workerRanges {
-		work, err := assembleBTCWork(template, s.params, req.RewardAddress,
-			req.MinerID, workerRanges[i].ExtraNonceStart, 0, template.CurTime)
+	}()
+	if s.body != nil {
+		tip, err := client.GetBestBlockHash()
 		if err != nil {
-			s.setTemplateError(err)
-			return nil, err
+			return nil, "", err
 		}
-		workerRanges[i].MerkleRoot = work.header.MerkleRoot.String()
+		if tip.String() == s.parent && now.Sub(s.refreshed) < 30*time.Second {
+			return s.body, s.etag, nil
+		}
 	}
-	job := &CompactMiningJob{
-		JobID:             jobID,
-		TemplateID:        templateID,
-		Network:           s.cfg.Network,
-		Height:            template.Height,
-		PreviousBlockHash: template.PreviousHash,
-		Version:           template.Version,
-		Bits:              template.Bits,
-		Target:            target,
-		CurTime:           template.CurTime,
-		MinTime:           template.MinTime,
-		RewardAddress:     req.RewardAddress,
-		MinerID:           req.MinerID,
-		WorkerRanges:      workerRanges,
-	}
-
-	s.mu.Lock()
-	s.jobs[jobID] = &cachedBTCJob{job: job, template: template, params: s.params, created: now}
-	s.pruneJobsLocked()
-	s.status.BTCHeight = template.Height
-	s.status.TemplateCacheSize = 1
-	s.status.ActiveJobs = len(s.jobs)
-	s.status.LastError = ""
-	s.mu.Unlock()
-
-	return job, nil
-}
-
-func (s *TemplateService) currentTemplate(client *btcrpcclient.Client) (*btcbtcjson.GetBlockTemplateResult, error) {
-	s.mu.Lock()
-	template := s.lastTpl
-	s.mu.Unlock()
-	if template != nil {
-		return template, nil
-	}
-
-	return s.refreshTemplate(client)
-}
-
-func (s *TemplateService) RefreshTemplate() error {
-	s.mu.Lock()
-	client := s.client
-	running := s.running
-	s.mu.Unlock()
-	if !running || client == nil {
-		return fmt.Errorf("btc template service is not running")
-	}
-	_, err := s.refreshTemplate(client)
-	return err
-}
-
-func (s *TemplateService) refreshTemplate(client *btcrpcclient.Client) (*btcbtcjson.GetBlockTemplateResult, error) {
-	template, err := client.GetBlockTemplate(&btcbtcjson.TemplateRequest{
-		Mode:  "template",
-		Rules: []string{"segwit"},
-	})
+	tpl, err := client.GetBlockTemplate(&btcbtcjson.TemplateRequest{Mode: "template", Rules: []string{"segwit"}})
 	if err != nil {
-		s.setTemplateError(err)
-		return nil, err
+		return nil, "", err
 	}
-
-	now := time.Now()
-
+	// Core updates curtime on every GBT. A time-only update leaves the work
+	// usable; changes to testnet difficulty or to the transaction set do not
+	// escape this check. LongPollID is supplied by Bitcoin Core.
+	if s.body != nil && tpl.LongPollID != "" && tpl.LongPollID == s.longPollID && tpl.PreviousHash == s.parent && tpl.Bits == s.bits {
+		s.refreshed = now
+		return s.body, s.etag, nil
+	}
+	data, err := newBlockTemplate(tpl, s.cfg.Network)
+	if err != nil {
+		return nil, "", err
+	}
+	body, err := json.Marshal(APIResponse[*BlockTemplate]{Msg: "ok", Data: data})
+	if err != nil {
+		return nil, "", err
+	}
+	s.body = body
+	s.etag = fmt.Sprintf(`"%x"`, sha256.Sum256(body))
+	s.parent, s.bits, s.longPollID = tpl.PreviousHash, tpl.Bits, tpl.LongPollID
+	s.refreshed = now
 	s.mu.Lock()
-	s.lastTpl = template
 	s.status.LastTemplateTime = now
-	s.status.BTCHeight = template.Height
+	s.status.BTCHeight = tpl.Height
 	s.status.TemplateCacheSize = 1
-	s.pruneJobsLocked()
-	s.status.ActiveJobs = len(s.jobs)
 	s.status.LastError = ""
 	s.mu.Unlock()
-
-	return template, nil
+	return s.body, s.etag, nil
 }
 
-func (s *TemplateService) SubmitSolution(solution *MiningSolution) (*FoundBlockRecord, error) {
+// SubmitBlock uses exactly the submitted witness serialization. It does not
+// consult the current template, so a restart cannot invalidate a solved block.
+func (s *TemplateService) SubmitBlock(raw []byte) (*FoundBlockRecord, error) {
 	s.mu.Lock()
-	cached := s.jobs[solution.JobID]
 	client := s.client
 	s.mu.Unlock()
-	if cached == nil {
-		return nil, fmt.Errorf("unknown btc lucky mining job %s", solution.JobID)
-	}
-	if solution.TemplateID != cached.job.TemplateID {
-		return nil, fmt.Errorf("btc lucky mining solution template mismatch")
-	}
-	if solution.RewardAddress != cached.job.RewardAddress {
-		return nil, fmt.Errorf("btc lucky mining solution reward address mismatch")
-	}
-
-	work, err := assembleBTCWork(cached.template, cached.params, solution.RewardAddress,
-		cached.job.MinerID, solution.ExtraNonce, solution.Nonce, solution.NTime)
+	record, err := submitCoreBlock(client, s.params, raw)
 	if err != nil {
 		s.setSubmitResult("", err)
-		return nil, err
+		return record, err
 	}
-	if work.blockHash.String() != solution.HeaderHash {
-		err := fmt.Errorf("solution hash mismatch: got %s want %s", work.blockHash, solution.HeaderHash)
-		s.setSubmitResult("", err)
-		return nil, err
+	s.setSubmitResult(record.SubmitResult, nil)
+	s.cacheMu.Lock()
+	s.checked = time.Time{}
+	s.cacheMu.Unlock()
+	if record.lucky && record.SubmitResult == "accepted" {
+		s.rememberFound(*record)
 	}
-	target, err := targetFromTemplate(cached.template)
-	if err != nil {
-		s.setSubmitResult("", err)
-		return nil, err
-	}
-	if hashToBig(&work.blockHash).Cmp(target) > 0 {
-		err := fmt.Errorf("solution does not satisfy target")
-		s.setSubmitResult("", err)
-		return nil, err
-	}
+	return record, nil
+}
 
-	record := FoundBlockRecord{
-		BlockHash:     work.blockHash.String(),
-		BlockHeight:   cached.template.Height,
-		CoinbaseTxID:  work.coinbase.TxHash().String(),
-		Vout:          0,
-		Amount:        work.coinbase.TxOut[0].Value,
-		RewardAddress: solution.RewardAddress,
-		JobID:         solution.JobID,
-		TemplateID:    solution.TemplateID,
-		CreatedAt:     time.Now(),
+func submitCoreBlock(client *btcrpcclient.Client, params *btcchaincfg.Params, raw []byte) (*FoundBlockRecord, error) {
+	if len(raw) > wire.MaxBlockPayload {
+		return nil, fmt.Errorf("oversized Bitcoin block")
+	}
+	r := bytes.NewReader(raw)
+	var block wire.MsgBlock
+	if err := block.Deserialize(r); err != nil {
+		return nil, err
+	}
+	if r.Len() != 0 || len(block.Transactions) == 0 || !blockchain.IsCoinBaseTx(block.Transactions[0]) || len(block.Transactions[0].TxOut) == 0 {
+		return nil, fmt.Errorf("invalid Bitcoin block body")
+	}
+	cb := block.Transactions[0]
+	height, _ := blockchain.ExtractCoinbaseHeight(btcbtcutil.NewTx(cb))
+	record := &FoundBlockRecord{
+		BlockHash:    block.BlockHash().String(),
+		BlockHeight:  int64(height),
+		CoinbaseTxID: cb.TxHash().String(),
+		Amount:       cb.TxOut[0].Value,
+		CreatedAt:    time.Now(),
+	}
+	_, addrs, _, err := txscript.ExtractPkScriptAddrs(cb.TxOut[0].PkScript, params)
+	if err == nil && len(addrs) == 1 {
+		record.RewardAddress = addrs[0].EncodeAddress()
 	}
 	if client == nil {
-		err := fmt.Errorf("btc rpc client is not connected")
-		record.SubmitResult = err.Error()
-		s.setSubmitResult(record.SubmitResult, err)
-		s.rememberFound(record)
-		return &record, err
+		return nil, ErrCoreUnavailable
 	}
-	var buf bytes.Buffer
-	if err := work.block.Serialize(&buf); err != nil {
-		record.SubmitResult = err.Error()
-		s.setSubmitResult(record.SubmitResult, err)
-		s.rememberFound(record)
-		return &record, err
-	}
-	block, err := btcbtcutil.NewBlockFromBytes(buf.Bytes())
+	arg, _ := json.Marshal(hex.EncodeToString(raw))
+	result, err := client.RawRequest("submitblock", []json.RawMessage{arg})
 	if err != nil {
-		record.SubmitResult = err.Error()
-		s.setSubmitResult(record.SubmitResult, err)
-		s.rememberFound(record)
-		return &record, err
+		var rpcErr *btcbtcjson.RPCError
+		if errors.As(err, &rpcErr) && rpcErr.Code != btcbtcjson.ErrRPCInWarmup {
+			record.SubmitResult = err.Error()
+			return record, err
+		}
+		return nil, fmt.Errorf("%w: %v", ErrCoreUnavailable, err)
 	}
-	err = client.SubmitBlock(block, nil)
-	if err != nil {
-		record.SubmitResult = err.Error()
-		s.setSubmitResult(record.SubmitResult, err)
-		s.rememberFound(record)
-		return &record, err
+	if string(result) != "null" {
+		if err = json.Unmarshal(result, &record.SubmitResult); err != nil {
+			return nil, err
+		}
+		if record.SubmitResult == "duplicate" {
+			hash := block.BlockHash()
+			header, lookupErr := client.GetBlockHeaderVerbose(&hash)
+			if lookupErr != nil {
+				return nil, fmt.Errorf("%w: %v", ErrCoreUnavailable, lookupErr)
+			}
+			if header.Confirmations > 0 {
+				record.Submitted = true
+				return record, nil
+			}
+		}
+		err = fmt.Errorf("Core rejected block: %s", record.SubmitResult)
+		return record, err
 	}
 	record.Submitted = true
 	record.SubmitResult = "accepted"
-
-	s.setSubmitResult(record.SubmitResult, nil)
-	s.rememberFound(record)
-	return &record, nil
+	record.lucky = bytes.Contains(cb.TxIn[0].SignatureScript, []byte(coinbaseTag))
+	return record, nil
 }
+
+var ErrCoreUnavailable = errors.New("Bitcoin Core unavailable")
 
 func (s *TemplateService) Status() TemplateServiceStatus {
 	s.mu.Lock()
@@ -323,11 +271,6 @@ func (s *TemplateService) Status() TemplateServiceStatus {
 	st.BTCNetwork = s.cfg.Network
 	st.Running = s.running
 	st.BTCRPCConnected = s.client != nil && s.running
-	st.ActiveJobs = len(s.jobs)
-	if s.lastTpl != nil {
-		st.BTCHeight = s.lastTpl.Height
-		st.TemplateCacheSize = 1
-	}
 	return st
 }
 
@@ -337,32 +280,6 @@ func (s *TemplateService) FoundBlocks() []FoundBlockRecord {
 	out := make([]FoundBlockRecord, len(s.found))
 	copy(out, s.found)
 	return out
-}
-
-func (s *TemplateService) pruneJobsLocked() {
-	limit := s.cfg.CacheLimit
-	if limit <= 0 || len(s.jobs) <= limit {
-		return
-	}
-
-	for len(s.jobs) > limit {
-		var oldestID string
-		var oldest time.Time
-		for id, job := range s.jobs {
-			if oldestID == "" || job.created.Before(oldest) {
-				oldestID = id
-				oldest = job.created
-			}
-		}
-		delete(s.jobs, oldestID)
-	}
-}
-
-func templateIDFromTemplate(template *btcbtcjson.GetBlockTemplateResult) string {
-	if template == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s:%d:%s", template.PreviousHash, template.Height, template.WorkID)
 }
 
 func (s *TemplateService) setTemplateError(err error) {
@@ -394,9 +311,9 @@ func (s *TemplateService) rememberFound(record FoundBlockRecord) {
 	db := s.cfg.FoundBlocksDB
 	s.mu.Unlock()
 
-	log.Infof("BTC lucky found block metadata block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s job_id=%s template_id=%s submitted=%v result=%q",
+	log.Infof("BTC lucky found block metadata block_hash=%s height=%d coinbase_txid=%s vout=%d amount=%d reward_address=%s submitted=%v result=%q",
 		record.BlockHash, record.BlockHeight, record.CoinbaseTxID, record.Vout, record.Amount,
-		record.RewardAddress, record.JobID, record.TemplateID, record.Submitted, record.SubmitResult)
+		record.RewardAddress, record.Submitted, record.SubmitResult)
 
 	if err := appendFoundBlockRecord(db, record); err != nil {
 		log.Warnf("failed to persist BTC lucky found block record: %v", err)

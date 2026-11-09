@@ -1,6 +1,7 @@
 package btclucky
 
 import (
+	"bytes"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -45,7 +46,6 @@ type BTCLuckyTemplateServiceConfig struct {
 	RPCPass          string
 	RPCDisableTLS    bool
 	Network          string
-	CacheLimit       int
 	FoundBlocksDB    common.KVDB
 	CoinbaseMaturity uint64
 }
@@ -82,9 +82,6 @@ func (c *BTCLuckyTemplateServiceConfig) Normalize() {
 	}
 	if c.Network == "" {
 		c.Network = "mainnet"
-	}
-	if c.CacheLimit <= 0 {
-		c.CacheLimit = 16
 	}
 }
 
@@ -124,4 +121,21 @@ func BTCChainParams(network string) (*btcchaincfg.Params, error) {
 	default:
 		return nil, fmt.Errorf("unsupported btc lucky mining network %q", network)
 	}
+}
+
+// RewardSigner returns the other key of the Lucky coinbase's 2-of-2 script.
+func RewardSigner(miner, provider, bootstrap []byte, core bool) ([]byte, error) {
+	if bytes.Equal(miner, bootstrap) {
+		return nil, fmt.Errorf("bootstrap does not participate in BTC lucky mining")
+	}
+	if core {
+		if !bytes.Equal(miner, provider) {
+			return nil, fmt.Errorf("core BTC lucky mining requires its own indexer")
+		}
+		return bootstrap, nil
+	}
+	if bytes.Equal(miner, provider) || bytes.Equal(provider, bootstrap) {
+		return nil, fmt.Errorf("ordinary BTC lucky mining requires a serving core indexer")
+	}
+	return provider, nil
 }

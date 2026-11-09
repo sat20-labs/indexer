@@ -21,61 +21,92 @@ import (
 
 const coinbaseTag = "satoshinet"
 
-type assembledWork struct {
-	block     *btcwire.MsgBlock
-	coinbase  *btcwire.MsgTx
-	header    btcwire.BlockHeader
-	blockHash btcchainhash.Hash
-}
-
-func makeWorkerRanges(workers int) []WorkerRange {
-	if workers < 1 {
-		workers = 1
+// The first leaf is supplied later by the miner's coinbase. Only siblings
+// along its path are needed to compute its Merkle root.
+func newBlockTemplate(t *btcbtcjson.GetBlockTemplateResult, network string) (*BlockTemplate, error) {
+	if t == nil || t.CoinbaseValue == nil {
+		return nil, fmt.Errorf("missing coinbase value")
 	}
-	ranges := make([]WorkerRange, workers)
-	baseExtraNonce := uint64(time.Now().UnixNano())
-	for i := 0; i < workers; i++ {
-		extraNonce := baseExtraNonce + uint64(i)
-		ranges[i] = WorkerRange{
-			WorkerID:        i,
-			ExtraNonceStart: extraNonce,
-			ExtraNonceEnd:   extraNonce,
+	result := &BlockTemplate{GetBlockTemplateResult: *t, Network: network, MerkleBranch: []string{}}
+	target, err := targetFromTemplate(t)
+	if err != nil {
+		return nil, err
+	}
+	result.Target = fmt.Sprintf("%064x", target)
+	hashes := make([]btcchainhash.Hash, 1+len(t.Transactions))
+	for i, tx := range t.Transactions {
+		h, err := btcchainhash.NewHashFromStr(tx.TxID)
+		if err != nil || len(tx.TxID) != 64 || tx.Data == "" {
+			return nil, fmt.Errorf("invalid template transaction %d", i)
 		}
+		hashes[i+1] = *h
 	}
-	return ranges
+	for len(hashes) > 1 {
+		result.MerkleBranch = append(result.MerkleBranch, hashes[1].String())
+		// Skip index zero, which depends on the as-yet unknown coinbase.
+		for i := 2; i < len(hashes); i += 2 {
+			right := min(i+1, len(hashes)-1)
+			hashes[i/2] = hashPair(hashes[i], hashes[right])
+		}
+		hashes = hashes[:(len(hashes)+1)/2]
+	}
+	return result, nil
 }
 
 type miningHeader [btcwire.MaxBlockHeaderPayload]byte
 
-func prepareMiningHeader(job *CompactMiningJob, r WorkerRange) (miningHeader, error) {
-	var data miningHeader
-	if job == nil {
-		return data, fmt.Errorf("nil compact mining job")
-	}
-	if r.MerkleRoot == "" {
-		return data, fmt.Errorf("compact mining job missing worker merkle root")
-	}
-	prevHash, err := btcchainhash.NewHashFromStr(job.PreviousBlockHash)
+func (t *BlockTemplate) work(params *btcchaincfg.Params, address string, extraNonce uint64) (*btcwire.MsgTx, btcwire.BlockHeader, error) {
+	var header btcwire.BlockHeader
+	cb, err := buildCoinbaseTx(&t.GetBlockTemplateResult, params, address, extraNonce)
 	if err != nil {
-		return data, fmt.Errorf("invalid previous block hash: %w", err)
+		return nil, header, err
 	}
-	merkleRoot, err := btcchainhash.NewHashFromStr(r.MerkleRoot)
+	root := cb.TxHash()
+	for _, s := range t.MerkleBranch {
+		sibling, err := btcchainhash.NewHashFromStr(s)
+		if err != nil {
+			return nil, header, err
+		}
+		root = hashPair(root, *sibling)
+	}
+	prev, err := btcchainhash.NewHashFromStr(t.PreviousHash)
 	if err != nil {
-		return data, fmt.Errorf("invalid merkle root: %w", err)
+		return nil, header, err
 	}
-	bits64, err := strconv.ParseUint(job.Bits, 16, 32)
+	bits, err := strconv.ParseUint(t.Bits, 16, 32)
 	if err != nil {
-		return data, fmt.Errorf("invalid template bits %q: %w", job.Bits, err)
+		return nil, header, err
 	}
-	header := btcwire.BlockHeader{
-		Version:    job.Version,
-		PrevBlock:  *prevHash,
-		MerkleRoot: *merkleRoot,
-		Timestamp:  time.Unix(job.CurTime, 0),
-		Bits:       uint32(bits64),
+	header = btcwire.BlockHeader{
+		Version:    t.Version,
+		PrevBlock:  *prev,
+		MerkleRoot: root,
+		Timestamp:  time.Unix(t.CurTime, 0),
+		Bits:       uint32(bits),
 	}
-	err = header.Serialize(bytes.NewBuffer(data[:0]))
-	return data, err
+	return cb, header, nil
+}
+
+// Keep the exact transaction order and witness bytes delivered by Core.
+func (t *BlockTemplate) blockBytes(cb *btcwire.MsgTx, header btcwire.BlockHeader) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := header.Serialize(&buf); err != nil {
+		return nil, err
+	}
+	if err := btcwire.WriteVarInt(&buf, 0, uint64(len(t.Transactions))+1); err != nil {
+		return nil, err
+	}
+	if err := cb.Serialize(&buf); err != nil {
+		return nil, err
+	}
+	for _, tx := range t.Transactions {
+		raw, err := hex.DecodeString(tx.Data)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(raw)
+	}
+	return buf.Bytes(), nil
 }
 
 func (h *miningHeader) hashNonce(nonce uint32) btcchainhash.Hash {
@@ -95,76 +126,14 @@ func btcPayToAddrScript(addr string, params *btcchaincfg.Params) ([]byte, error)
 	return btctxscript.PayToAddrScript(decoded)
 }
 
-func assembleBTCWork(template *btcbtcjson.GetBlockTemplateResult, params *btcchaincfg.Params, rewardAddress, minerID string, extraNonce uint64, nonce uint32, ntime int64) (*assembledWork, error) {
-	if template == nil {
-		return nil, fmt.Errorf("nil block template")
-	}
-	if template.CoinbaseValue == nil {
-		return nil, fmt.Errorf("getblocktemplate missing coinbasevalue")
-	}
-
-	prevHash, err := btcchainhash.NewHashFromStr(template.PreviousHash)
-	if err != nil {
-		return nil, fmt.Errorf("invalid previous block hash: %w", err)
-	}
-	bits64, err := strconv.ParseUint(template.Bits, 16, 32)
-	if err != nil {
-		return nil, fmt.Errorf("invalid template bits %q: %w", template.Bits, err)
-	}
-
-	coinbase, err := buildCoinbaseTx(template, params, rewardAddress, minerID, extraNonce)
-	if err != nil {
-		return nil, err
-	}
-
-	txs := make([]*btcwire.MsgTx, 0, 1+len(template.Transactions))
-	txs = append(txs, coinbase)
-	for _, txTemplate := range template.Transactions {
-		raw, err := hex.DecodeString(txTemplate.Data)
-		if err != nil {
-			return nil, fmt.Errorf("decode template tx %s: %w", txTemplate.TxID, err)
-		}
-		tx := btcwire.NewMsgTx(btcwire.TxVersion)
-		if err := tx.Deserialize(bytes.NewReader(raw)); err != nil {
-			return nil, fmt.Errorf("deserialize template tx %s: %w", txTemplate.TxID, err)
-		}
-		txs = append(txs, tx)
-	}
-
-	merkleRoot := calcMerkleRoot(txs)
-	if ntime == 0 {
-		ntime = template.CurTime
-	}
-	header := btcwire.BlockHeader{
-		Version:    template.Version,
-		PrevBlock:  *prevHash,
-		MerkleRoot: merkleRoot,
-		Timestamp:  time.Unix(ntime, 0),
-		Bits:       uint32(bits64),
-		Nonce:      nonce,
-	}
-
-	block := btcwire.NewMsgBlock(&header)
-	for _, tx := range txs {
-		if err := block.AddTransaction(tx); err != nil {
-			return nil, err
-		}
-	}
-	hash := header.BlockHash()
-	return &assembledWork{
-		block:     block,
-		coinbase:  coinbase,
-		header:    header,
-		blockHash: hash,
-	}, nil
-}
-
-func buildCoinbaseTx(template *btcbtcjson.GetBlockTemplateResult, params *btcchaincfg.Params, rewardAddress, minerID string, extraNonce uint64) (*btcwire.MsgTx, error) {
+func buildCoinbaseTx(template *btcbtcjson.GetBlockTemplateResult, params *btcchaincfg.Params, rewardAddress string, extraNonce uint64) (*btcwire.MsgTx, error) {
 	pkScript, err := btcPayToAddrScript(rewardAddress, params)
 	if err != nil {
 		return nil, fmt.Errorf("invalid btc lucky reward address: %w", err)
 	}
-	_ = minerID
+	if template.CoinbaseValue == nil {
+		return nil, fmt.Errorf("missing coinbase value")
+	}
 
 	extraNonceBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(extraNonceBytes, extraNonce)
@@ -199,29 +168,6 @@ func buildCoinbaseTx(template *btcbtcjson.GetBlockTemplateResult, params *btccha
 	return tx, nil
 }
 
-func calcMerkleRoot(txs []*btcwire.MsgTx) btcchainhash.Hash {
-	if len(txs) == 0 {
-		return btcchainhash.Hash{}
-	}
-	hashes := make([]btcchainhash.Hash, len(txs))
-	for i, tx := range txs {
-		hashes[i] = tx.TxHash()
-	}
-	for len(hashes) > 1 {
-		next := make([]btcchainhash.Hash, 0, (len(hashes)+1)/2)
-		for i := 0; i < len(hashes); i += 2 {
-			left := hashes[i]
-			right := left
-			if i+1 < len(hashes) {
-				right = hashes[i+1]
-			}
-			next = append(next, hashPair(left, right))
-		}
-		hashes = next
-	}
-	return hashes[0]
-}
-
 func hashPair(left, right btcchainhash.Hash) btcchainhash.Hash {
 	var data [64]byte
 	copy(data[:32], left[:])
@@ -246,12 +192,4 @@ func targetFromTemplate(template *btcbtcjson.GetBlockTemplateResult) (*big.Int, 
 		return nil, err
 	}
 	return btcblockchain.CompactToBig(uint32(bits64)), nil
-}
-
-func hashToBig(hash *btcchainhash.Hash) *big.Int {
-	buf := hash.CloneBytes()
-	for i := 0; i < len(buf)/2; i++ {
-		buf[i], buf[len(buf)-1-i] = buf[len(buf)-1-i], buf[i]
-	}
-	return new(big.Int).SetBytes(buf)
 }
