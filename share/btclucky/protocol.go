@@ -1,10 +1,20 @@
 package btclucky
 
 import (
+	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
 )
+
+// SubmitResponse follows the Bitcoin Core JSON-RPC submitblock contract.
+type SubmitResponse struct {
+	JSONRPC string            `json:"jsonrpc"`
+	Result  json.RawMessage   `json:"result,omitempty"`
+	Error   *btcjson.RPCError `json:"error,omitempty"`
+	ID      interface{}       `json:"id"`
+}
 
 // BlockTemplate is shared by every miner. Its ETag identifies the exact bytes
 // received over HTTP. All transaction data includes witness serialization.
@@ -29,6 +39,6 @@ type FoundBlockRecord struct {
 }
 
 type MiningBackend interface {
-	CurrentTemplate() (*BlockTemplate, error)
-	SubmitBlock([]byte) (*FoundBlockRecord, error)
+	CurrentTemplate(context.Context) (*BlockTemplate, error)
+	SubmitBlock(context.Context, []byte) (*FoundBlockRecord, error)
 }

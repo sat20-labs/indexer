@@ -198,17 +198,17 @@ func (s *TemplateService) SubmitBlock(raw []byte) (*FoundBlockRecord, error) {
 	return record, nil
 }
 
-func submitCoreBlock(client *btcrpcclient.Client, params *btcchaincfg.Params, raw []byte) (*FoundBlockRecord, error) {
+func blockRecord(params *btcchaincfg.Params, raw []byte) (*wire.MsgBlock, *FoundBlockRecord, error) {
 	if len(raw) > wire.MaxBlockPayload {
-		return nil, fmt.Errorf("oversized Bitcoin block")
+		return nil, nil, fmt.Errorf("oversized Bitcoin block")
 	}
 	r := bytes.NewReader(raw)
 	var block wire.MsgBlock
 	if err := block.Deserialize(r); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if r.Len() != 0 || len(block.Transactions) == 0 || !blockchain.IsCoinBaseTx(block.Transactions[0]) || len(block.Transactions[0].TxOut) == 0 {
-		return nil, fmt.Errorf("invalid Bitcoin block body")
+		return nil, nil, fmt.Errorf("invalid Bitcoin block body")
 	}
 	cb := block.Transactions[0]
 	height, _ := blockchain.ExtractCoinbaseHeight(btcbtcutil.NewTx(cb))
@@ -222,6 +222,15 @@ func submitCoreBlock(client *btcrpcclient.Client, params *btcchaincfg.Params, ra
 	_, addrs, _, err := txscript.ExtractPkScriptAddrs(cb.TxOut[0].PkScript, params)
 	if err == nil && len(addrs) == 1 {
 		record.RewardAddress = addrs[0].EncodeAddress()
+	}
+	record.lucky = bytes.Contains(cb.TxIn[0].SignatureScript, []byte(coinbaseTag))
+	return &block, record, nil
+}
+
+func submitCoreBlock(client *btcrpcclient.Client, params *btcchaincfg.Params, raw []byte) (*FoundBlockRecord, error) {
+	block, record, err := blockRecord(params, raw)
+	if err != nil {
+		return nil, err
 	}
 	if client == nil {
 		return nil, ErrCoreUnavailable
@@ -256,7 +265,6 @@ func submitCoreBlock(client *btcrpcclient.Client, params *btcchaincfg.Params, ra
 	}
 	record.Submitted = true
 	record.SubmitResult = "accepted"
-	record.lucky = bytes.Contains(cb.TxIn[0].SignatureScript, []byte(coinbaseTag))
 	return record, nil
 }
 

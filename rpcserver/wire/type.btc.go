@@ -75,6 +75,7 @@ type TxSimpleInfoResp struct {
 }
 
 type TxSimpleInfo struct {
+	BlockHash     string `json:"block_hash,omitempty"`
 	TxID          string `json:"txid"`
 	Version       uint32 `json:"version"`
 	Confirmations uint64 `json:"confirmations"`

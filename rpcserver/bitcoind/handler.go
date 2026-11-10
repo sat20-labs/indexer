@@ -379,6 +379,7 @@ func (s *Service) getTxSimpleInfo(c *gin.Context) {
 	}
 
 	txInfo := &rpcwire.TxSimpleInfo{
+		BlockHash:     tx.BlockHash,
 		TxID:          tx.Txid,
 		Version:       tx.Version,
 		Confirmations: tx.Confirmations,

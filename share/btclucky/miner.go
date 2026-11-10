@@ -2,6 +2,7 @@ package btclucky
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -22,16 +23,18 @@ const (
 )
 
 type Miner struct {
-	mu      sync.Mutex
-	cfg     BTCLuckyMinerConfig
-	backend MiningBackend
-	jobs    int
-	speed   *speedMonitor
-	status  MinerStatus
-	quit    chan struct{}
-	wg      sync.WaitGroup
-	running bool
-	params  *chaincfg.Params
+	mu        sync.Mutex
+	cfg       BTCLuckyMinerConfig
+	backend   MiningBackend
+	jobs      int
+	speed     *speedMonitor
+	status    MinerStatus
+	ctx       context.Context
+	cancel    context.CancelFunc
+	lifecycle sync.Mutex
+	wg        sync.WaitGroup
+	running   bool
+	params    *chaincfg.Params
 }
 
 func NewMiner(cfg BTCLuckyMinerConfig, backend MiningBackend) (*Miner, error) {
@@ -73,12 +76,14 @@ func NewMiner(cfg BTCLuckyMinerConfig, backend MiningBackend) (*Miner, error) {
 }
 
 func (m *Miner) Start() error {
+	m.lifecycle.Lock()
+	defer m.lifecycle.Unlock()
 	m.mu.Lock()
 	if m.running {
 		m.mu.Unlock()
 		return nil
 	}
-	m.quit = make(chan struct{})
+	m.ctx, m.cancel = context.WithCancel(context.Background())
 	m.running = true
 	m.status.Running = true
 	m.wg.Add(1)
@@ -89,12 +94,14 @@ func (m *Miner) Start() error {
 }
 
 func (m *Miner) Stop() {
+	m.lifecycle.Lock()
+	defer m.lifecycle.Unlock()
 	m.mu.Lock()
 	if !m.running {
 		m.mu.Unlock()
 		return
 	}
-	close(m.quit)
+	m.cancel()
 	m.running = false
 	m.status.Running = false
 	m.mu.Unlock()
@@ -140,7 +147,7 @@ func (m *Miner) controller() {
 	for {
 		if tpl == nil {
 			select {
-			case <-m.quit:
+			case <-m.ctx.Done():
 				return
 			case tpl = <-updates:
 			}
@@ -170,7 +177,7 @@ func (m *Miner) watchTemplates(updates chan<- *BlockTemplate, refresh <-chan str
 	var fetchFailed bool
 	lastLog := time.Now()
 	for {
-		t, err := m.backend.CurrentTemplate()
+		t, err := m.backend.CurrentTemplate(m.ctx)
 		if err != nil || fetchFailed {
 			m.setError(err)
 		}
@@ -179,7 +186,7 @@ func (m *Miner) watchTemplates(updates chan<- *BlockTemplate, refresh <-chan str
 			select {
 			case updates <- t:
 				previous = t.ID
-			case <-m.quit:
+			case <-m.ctx.Done():
 				return
 			}
 		}
@@ -189,7 +196,7 @@ func (m *Miner) watchTemplates(updates chan<- *BlockTemplate, refresh <-chan str
 			lastLog = time.Now()
 		}
 		select {
-		case <-m.quit:
+		case <-m.ctx.Done():
 			return
 		case <-refresh:
 		case <-ticker.C:
@@ -199,7 +206,7 @@ func (m *Miner) watchTemplates(updates chan<- *BlockTemplate, refresh <-chan str
 
 func (m *Miner) submit(raw []byte) {
 	for {
-		record, err := m.backend.SubmitBlock(raw)
+		record, err := m.backend.SubmitBlock(m.ctx, raw)
 		if err == nil && record != nil {
 			m.setSubmit(record.SubmitResult)
 			log.Infof("BTC lucky block submitted hash=%s result=%s", record.BlockHash, record.SubmitResult)
@@ -209,7 +216,7 @@ func (m *Miner) submit(raw []byte) {
 			err = fmt.Errorf("missing Bitcoin submission result")
 		}
 		m.setSubmit(err.Error())
-		if !errors.Is(err, ErrCoreUnavailable) || !sleepOrDone(m.quit, time.Second) {
+		if !errors.Is(err, ErrCoreUnavailable) || !sleepOrDone(m.ctx.Done(), time.Second) {
 			return
 		}
 	}
@@ -262,7 +269,7 @@ func (m *Miner) mineTemplate(t *BlockTemplate, updates <-chan *BlockTemplate) (*
 	var next *BlockTemplate
 	var hit result
 	select {
-	case <-m.quit:
+	case <-m.ctx.Done():
 	case hit = <-found:
 	case next = <-updates:
 	}
@@ -304,7 +311,7 @@ func (m *Miner) mineRange(t *BlockTemplate, target *btcchainhash.Hash, extra uin
 				select {
 				case <-stop:
 					return nil, nil
-				case <-m.quit:
+				case <-m.ctx.Done():
 					return nil, nil
 				default:
 				}

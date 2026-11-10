@@ -1,10 +1,13 @@
 package bitcoind
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/gin-gonic/gin"
 	"github.com/sat20-labs/indexer/share/btclucky"
@@ -30,30 +33,69 @@ func (s *Service) getBTCLuckyTemplate(c *gin.Context) {
 }
 
 func (s *Service) submitBitcoinBlock(c *gin.Context) {
-	resp := btclucky.APIResponse[*btclucky.FoundBlockRecord]{Code: -1}
+	var request btcjson.Request
+	response := btclucky.SubmitResponse{JSONRPC: "2.0"}
+	fail := func(status int, code btcjson.RPCErrorCode, err error) {
+		response.Error = btcjson.NewRPCError(code, err.Error())
+		c.JSON(status, response)
+	}
+	payload, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, 2*wire.MaxBlockPayload+1024))
+	if err != nil {
+		fail(http.StatusBadRequest, btcjson.ErrRPCInvalidRequest.Code, err)
+		return
+	}
+	if err := json.Unmarshal(payload, &request); err != nil {
+		fail(http.StatusOK, btcjson.ErrRPCParse.Code, err)
+		return
+	}
+	if request.Jsonrpc != btcjson.RpcVersion2 || !btcjson.IsValidIDType(request.ID) {
+		fail(http.StatusOK, btcjson.ErrRPCInvalidRequest.Code, errors.New("invalid JSON-RPC 2.0 request"))
+		return
+	}
+	response.ID = request.ID
+	if request.Method != "submitblock" {
+		fail(http.StatusOK, btcjson.ErrRPCMethodNotFound.Code, errors.New("method not found"))
+		return
+	}
+	if len(request.Params) < 1 || len(request.Params) > 2 {
+		fail(http.StatusOK, btcjson.ErrRPCInvalidParams.Code, errors.New("submitblock requires block hex"))
+		return
+	}
+	var blockHex string
+	if err := json.Unmarshal(request.Params[0], &blockHex); err != nil || blockHex == "" {
+		fail(http.StatusOK, btcjson.ErrRPCInvalidParams.Code, errors.New("block data must be a hex string"))
+		return
+	}
+	raw, err := hex.DecodeString(blockHex)
+	if err != nil {
+		fail(http.StatusOK, btcjson.ErrRPCDeserialization, err)
+		return
+	}
 	if s.btcLucky == nil {
-		resp.Msg = "block submission unavailable"
-		c.JSON(http.StatusServiceUnavailable, resp)
+		fail(http.StatusServiceUnavailable, btcjson.ErrRPCInWarmup, errors.New("block submission unavailable"))
 		return
 	}
-	raw, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, wire.MaxBlockPayload))
+	record, err := s.btcLucky.SubmitBlock(raw)
 	if err != nil {
-		resp.Msg = err.Error()
-		c.JSON(http.StatusBadRequest, resp)
-		return
-	}
-	resp.Data, err = s.btcLucky.SubmitBlock(raw)
-	if err != nil {
-		resp.Msg = err.Error()
-		status := http.StatusOK
 		if errors.Is(err, btclucky.ErrCoreUnavailable) {
-			status = http.StatusServiceUnavailable
+			fail(http.StatusServiceUnavailable, btcjson.ErrRPCInWarmup, err)
+			return
 		}
-		c.JSON(status, resp)
-		return
+		var rpcError *btcjson.RPCError
+		if errors.As(err, &rpcError) {
+			fail(http.StatusOK, rpcError.Code, rpcError)
+			return
+		}
+		if record == nil {
+			fail(http.StatusOK, btcjson.ErrRPCDeserialization, err)
+			return
+		}
 	}
-	resp.Code, resp.Msg = 0, "ok"
-	c.JSON(http.StatusOK, resp)
+	response.Result = json.RawMessage("null")
+	if record != nil && record.SubmitResult != "accepted" {
+		response.Result, _ = json.Marshal(record.SubmitResult)
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func (s *Service) getBTCLuckyInfo(c *gin.Context) {

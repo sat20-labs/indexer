@@ -1,6 +1,7 @@
 package base
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -219,12 +220,21 @@ func (b *RpcIndexer) GetOrdinalsWithUtxoId(id uint64) (string, []*common.Range, 
 
 // key: utxoId, value: btc value
 func (b *RpcIndexer) GetUTXOs(address string) (map[uint64]int64, error) {
-	addrValue, err := b.getUtxosWithAddress(address)
-
-	if err != nil {
-		return nil, err
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	id, _ := b.getAddressId(address)
+	if id == common.INVALID_ID {
+		data, err := db.GetAddressDataFromDBV2(b.db, address)
+		if errors.Is(err, common.ErrKeyNotFound) {
+			// An address that never received an output has an empty UTXO set.
+			return map[uint64]int64{}, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		id = data.AddressId
 	}
-	return addrValue.Utxos, nil
+	return b.loadAddressUtxos(b.db, id)
 }
 
 // only for RPC
