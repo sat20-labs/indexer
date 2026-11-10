@@ -110,7 +110,7 @@ func (b *HTTPTemplateBackend) CurrentTemplate(ctx context.Context) (*BlockTempla
 	if resp.Code != 0 {
 		return nil, errors.New(resp.Msg)
 	}
-	tag = result.Header.Get("ETag")
+	tag = strings.TrimPrefix(result.Header.Get("ETag"), "W/")
 	if resp.Data == nil || len(tag) < 3 || tag[0] != '"' || tag[len(tag)-1] != '"' {
 		return nil, fmt.Errorf("incomplete Bitcoin template response")
 	}
