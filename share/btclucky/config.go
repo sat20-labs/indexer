@@ -129,9 +129,6 @@ func RewardSigner(miner, provider, bootstrap []byte, core bool) ([]byte, error) 
 		return nil, fmt.Errorf("bootstrap does not participate in BTC lucky mining")
 	}
 	if core {
-		if !bytes.Equal(miner, provider) {
-			return nil, fmt.Errorf("core BTC lucky mining requires its own indexer")
-		}
 		return bootstrap, nil
 	}
 	if bytes.Equal(miner, provider) || bytes.Equal(provider, bootstrap) {
