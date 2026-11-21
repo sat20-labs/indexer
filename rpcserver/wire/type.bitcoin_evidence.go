@@ -141,3 +141,16 @@ type BitcoinFeeRateResp struct {
 	BaseResp
 	Data *BitcoinFeeRate `json:"data"`
 }
+
+// BitcoinPrevOut is the historical output selected by a transaction input.
+// Value is the exact integer satoshi count; PkScript is raw script hex.
+type BitcoinPrevOut struct {
+	Outpoint string `json:"outpoint"`
+	Value    int64  `json:"value"`
+	PkScript string `json:"pk_script"`
+}
+
+type BitcoinPrevOutResp struct {
+	BaseResp
+	Data *BitcoinPrevOut `json:"data,omitempty"`
+}

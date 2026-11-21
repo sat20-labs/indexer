@@ -62,6 +62,7 @@ func (s *Service) InitRouter(r *gin.Engine, basePath string) {
 	r.GET(basePath+"/btc/tx/:txid", s.getTxInfo)
 	r.GET(basePath+"/btc/tx/simpleinfo/:txid", s.getTxSimpleInfo)
 	r.GET(basePath+"/btc/rawtx/:txid", s.getRawTx)
+	r.GET(basePath+"/btc/lastinputprevout/:txid", s.getLastInputPrevOut)
 	r.GET(basePath+"/btc/block/:blockhash", s.getRawBlock)
 	r.GET(basePath+"/btc/block/blockhash/:height", s.getBlockHash)
 	r.GET(basePath+"/btc/block/bestblockheight", s.getBestBlockHeight)
