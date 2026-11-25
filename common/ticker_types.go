@@ -122,6 +122,7 @@ func NewMintAbbrInfo2(base *InscribeBaseContent) *MintAbbrInfo {
 type TickerInfo struct {
 	AssetName       `json:"name"`
 	DisplayName     string `json:"displayname"`
+	ContractID      string `json:"contract_id,omitempty"`
 	Id              int64  `json:"id"`
 	Divisibility    int    `json:"divisibility,omitempty"`
 	StartBlock      int    `json:"startBlock,omitempty"`
